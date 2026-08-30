@@ -36,6 +36,11 @@ export function SignUp() {
           <h2 className='text-center text-2xl font-semibold tracking-tight sm:text-left'>
             {t('Create an account')}
           </h2>
+          <p className='text-muted-foreground text-sm'>
+            {t(
+              'After you sign in, create one key and paste three fields into your app.'
+            )}
+          </p>
           <p className='text-muted-foreground text-left text-sm sm:text-base'>
             {t('Already have an account?')}{' '}
             <Link

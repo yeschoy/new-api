@@ -514,6 +514,131 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
+.dark .yecao-field {
+  background-image:
+    radial-gradient(
+      ellipse 70% 50% at 12% 0%,
+      color-mix(in oklch, var(--primary) 16%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 92% 8%,
+      color-mix(in oklch, var(--chart-2) 12%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 45% 30% at 50% 100%,
+      color-mix(in oklch, var(--chart-5) 10%, transparent) 0%,
+      transparent 70%
+    );
+}
+
+.yecao-field {
+  background-image:
+    radial-gradient(
+      ellipse 70% 50% at 12% 0%,
+      color-mix(in oklch, var(--primary) 28%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 92% 8%,
+      color-mix(in oklch, var(--chart-2) 26%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 45% 30% at 50% 100%,
+      color-mix(in oklch, var(--chart-5) 18%, transparent) 0%,
+      transparent 70%
+    );
+}
+
+.yecao-aurora {
+  background:
+    radial-gradient(
+      ellipse 40% 30% at 70% 20%,
+      color-mix(in oklch, var(--primary) 22%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 35% 25% at 20% 80%,
+      color-mix(in oklch, var(--chart-2) 16%, transparent),
+      transparent 70%
+    );
+  filter: blur(8px);
+}
+
+.yecao-firefly {
+  position: absolute;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary) 80%, white);
+  box-shadow: 0 0 10px 3px color-mix(in oklch, var(--primary) 55%, transparent);
+  animation: yecao-twinkle 3.6s ease-in-out infinite;
+}
+
+.yecao-kit {
+  isolation: isolate;
+}
+
+.yecao-kit::before {
+  content: '';
+  position: absolute;
+  inset: -45%;
+  z-index: 0;
+  background: conic-gradient(
+    from 180deg,
+    color-mix(in oklch, var(--primary) 80%, transparent),
+    color-mix(in oklch, var(--chart-2) 50%, transparent),
+    transparent 42%,
+    color-mix(in oklch, var(--primary) 80%, transparent)
+  );
+  animation: yecao-spin 10s linear infinite;
+}
+
+.yecao-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+}
+
+.yecao-blade {
+  transform-origin: bottom center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .yecao-blade {
+    animation: yecao-sway 7s ease-in-out infinite;
+  }
+  .yecao-blade-delay {
+    animation-delay: -2.4s;
+  }
+}
+
+@keyframes yecao-sway {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+@keyframes yecao-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes yecao-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .landing-animate-fade-up {
   animation: landing-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -531,6 +656,10 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .yecao-firefly,
+  .yecao-kit::before {
+    animation: none !important;
+  }
   .landing-animate-fade-up,
   .landing-animate-fade-in,
   .landing-animate-scale-in,

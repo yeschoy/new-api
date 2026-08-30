@@ -19,12 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 
-import {
-  BadgeCell,
-  BadgeListCell,
-  DataTableColumnHeader,
-} from '@/components/data-table'
-import { GroupBadge } from '@/components/group-badge'
+import { BadgeCell, DataTableColumnHeader } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
@@ -35,7 +30,6 @@ import {
   getDynamicPricingSummary,
   isUnconfiguredTaskUsageModel,
 } from '../lib/dynamic-price'
-import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import {
   formatPrice,
@@ -43,7 +37,6 @@ import {
   stripTrailingZeros,
 } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
-import { ModelBillingModeBadge } from './model-billing-mode-badge'
 
 // ----------------------------------------------------------------------------
 // Pricing Table Columns
@@ -94,17 +87,6 @@ export function usePricingColumns(
         )
       },
       minSize: 200,
-    },
-
-    // Type column
-    {
-      accessorKey: 'quota_type',
-      header: t('Type'),
-      cell: ({ row }) => (
-        <ModelBillingModeBadge model={row.original} className='-ml-1.5' />
-      ),
-      size: 110,
-      enableSorting: false,
     },
 
     // Price column
@@ -257,88 +239,6 @@ export function usePricingColumns(
       enableSorting: false,
     },
 
-    // Cached price column (Vercel AI Gateway style)
-    {
-      id: 'cached_price',
-      header: t('Cached'),
-      cell: ({ row }) => {
-        const model = row.original
-        const dynamicSummary = getDynamicPricingSummary(model, {
-          tokenUnit,
-          showRechargePrice,
-          priceRate,
-          usdExchangeRate,
-          groupRatioMultiplier: getDynamicDisplayGroupRatio(
-            model,
-            selectedGroup
-          ),
-        })
-
-        if (dynamicSummary) {
-          if (dynamicSummary.isSpecialExpression) {
-            return (
-              <span className='text-muted-foreground/50 text-xs'>
-                {t('Special billing expression')}
-              </span>
-            )
-          }
-
-          const cacheEntry = dynamicSummary.entries.find(
-            (entry) => entry.field === 'cacheReadPrice'
-          )
-          if (!cacheEntry) {
-            return <span className='text-muted-foreground/30 text-xs'>—</span>
-          }
-
-          return (
-            <div className='max-w-full min-w-0'>
-              <span className='font-mono text-sm tabular-nums'>
-                {stripTrailingZeros(cacheEntry.formatted)}
-              </span>
-              <div className='text-muted-foreground/50 text-[10px]'>
-                / {tokenUnitLabel}
-              </div>
-            </div>
-          )
-        }
-
-        if (isUnconfiguredTaskUsageModel(model)) {
-          return <span className='text-muted-foreground/30 text-xs'>—</span>
-        }
-
-        const isTokenBased = isTokenBasedModel(model)
-
-        if (!isTokenBased || model.cache_ratio == null) {
-          return <span className='text-muted-foreground/30 text-xs'>—</span>
-        }
-
-        const cachedPrice = stripTrailingZeros(
-          formatPrice(
-            model,
-            'cache',
-            tokenUnit,
-            showRechargePrice,
-            priceRate,
-            usdExchangeRate,
-            selectedGroup
-          )
-        )
-
-        return (
-          <div className='max-w-full min-w-0'>
-            <span className='font-mono text-sm tabular-nums'>
-              {cachedPrice}
-            </span>
-            <div className='text-muted-foreground/50 text-[10px]'>
-              / {tokenUnitLabel}
-            </div>
-          </div>
-        )
-      },
-      size: 110,
-      enableSorting: false,
-    },
-
     // Vendor column
     {
       accessorKey: 'vendor_name',
@@ -361,73 +261,6 @@ export function usePricingColumns(
               copyable={false}
             />
           </BadgeCell>
-        )
-      },
-      size: 130,
-      enableSorting: false,
-    },
-
-    // Tags column
-    {
-      accessorKey: 'tags',
-      header: t('Tags'),
-      cell: ({ row }) => {
-        const tags = parseTags(row.original.tags)
-        return (
-          <BadgeListCell
-            items={tags.map((tag) => (
-              <StatusBadge
-                key={tag}
-                label={tag}
-                autoColor={tag}
-                size='sm'
-                copyable={false}
-              />
-            ))}
-          />
-        )
-      },
-      size: 140,
-      enableSorting: false,
-    },
-
-    // Endpoints column
-    {
-      accessorKey: 'supported_endpoint_types',
-      header: t('Endpoints'),
-      cell: ({ row }) => {
-        const endpoints = row.original.supported_endpoint_types || []
-        return (
-          <BadgeListCell
-            items={endpoints.map((ep) => (
-              <StatusBadge
-                key={ep}
-                label={ep}
-                autoColor={ep}
-                size='sm'
-                copyable={false}
-              />
-            ))}
-          />
-        )
-      },
-      size: 130,
-      enableSorting: false,
-    },
-
-    // Enable Groups column
-    {
-      accessorKey: 'enable_groups',
-      header: t('Groups'),
-      cell: ({ row }) => {
-        const groups = row.original.enable_groups || []
-        return (
-          <BadgeListCell
-            items={groups.map((group) => (
-              <GroupBadge key={group} group={group} size='sm' />
-            ))}
-            tooltipClassName='max-w-[280px] p-2'
-          />
         )
       },
       size: 130,

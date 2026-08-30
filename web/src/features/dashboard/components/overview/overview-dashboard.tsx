@@ -47,6 +47,7 @@ import {
 } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
+import { StarterKitCard } from '@/features/guide/components/starter-kit-card'
 import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
 import type { ApiKey } from '@/features/keys/types'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -501,21 +502,21 @@ export function OverviewDashboard() {
     () => [
       {
         title: t('Create API Key'),
-        description: t('Create a key for your app or service'),
+        description: t('Create one key for the app you will actually use'),
         to: '/keys',
         icon: KeyRound,
         completed: Boolean(preferredKey),
       },
       {
         title: t('Add credits'),
-        description: t('Keep enough balance before production traffic'),
+        description: t('Add some balance before a long task'),
         to: '/wallet',
         icon: CreditCard,
         completed: remainQuota > 0 || usedQuota > 0,
       },
       {
         title: t('Send a request'),
-        description: t('Verify routing with Playground or your client'),
+        description: t('Send 你好 in Playground or in your app'),
         to: '/playground',
         icon: TerminalSquare,
         completed: requestCount > 0,
@@ -619,6 +620,7 @@ export function OverviewDashboard() {
 
   return (
     <div className='flex flex-col gap-4'>
+      <StarterKitCard compact />
       {setupGuideExpanded ? (
         <CardStaggerContainer className='grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]'>
           <CardStaggerItem className='bg-card h-full overflow-hidden rounded-2xl border shadow-xs'>
@@ -633,11 +635,11 @@ export function OverviewDashboard() {
                         {t('Get started')}
                       </div>
                       <h3 className='text-xl font-semibold tracking-tight sm:text-2xl'>
-                        {t('Build on your API gateway in minutes')}
+                        {t('Create a key, copy the address, send 你好')}
                       </h3>
                       <p className='text-muted-foreground max-w-xl text-sm leading-relaxed'>
                         {t(
-                          'A focused home for keys, balance, routing, and service health.'
+                          'Create a key, copy the address, then open the beginner guide if you get stuck.'
                         )}
                       </p>
                     </div>
@@ -649,6 +651,13 @@ export function OverviewDashboard() {
                       >
                         <ChevronUp data-icon='inline-start' />
                         {t('Hide setup guide')}
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        render={<Link to='/guide' />}
+                      >
+                        {t('Open the beginner guide')}
                       </Button>
                       <Button size='sm' render={<Link to='/keys' />}>
                         <KeyRound data-icon='inline-start' />
@@ -684,7 +693,7 @@ export function OverviewDashboard() {
                   {t('Recommended actions')}
                 </div>
                 <h3 className='text-lg font-semibold tracking-tight'>
-                  {t('Keep the platform ready')}
+                  {t('Common next steps')}
                 </h3>
               </div>
               <div className='grid gap-2'>

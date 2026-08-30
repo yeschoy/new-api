@@ -17,19 +17,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  Activity,
+  BarChart3,
   Box,
   CreditCard,
   FileText,
-  FlaskConical,
   Key,
-  LayoutDashboard,
   ListTodo,
   MessageSquare,
   PlugZap,
   Radio,
   ServerCog,
   Settings,
+  Sprout,
   Ticket,
   User,
   Users,
@@ -37,14 +36,14 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { type SidebarData } from '@/components/layout/types'
+import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
 
 /**
  * Root navigation groups for the application sidebar.
  *
- * These are shown when the URL does not match any nested sidebar view
- * registered in `layout/lib/sidebar-view-registry.ts`.
+ * Beginner items stay at the top. Analytics stay in Advanced.
+ * Admin-only tools keep `id: 'admin'` so existing role filters still apply.
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
@@ -52,44 +51,50 @@ export function useSidebarData(): SidebarData {
   return {
     navGroups: [
       {
-        id: 'chat',
-        title: t('Chat'),
-        items: [
-          {
-            title: t('Playground'),
-            url: '/playground',
-            icon: FlaskConical,
-          },
-          {
-            title: t('Chat'),
-            icon: MessageSquare,
-            type: 'chat-presets',
-          },
-        ],
-      },
-      {
         id: 'general',
-        title: t('General'),
+        title: t('Everyday'),
         items: [
           {
-            title: t('Overview'),
+            title: t('Start using'),
             url: '/dashboard/overview',
-            icon: Activity,
+            icon: Sprout,
           },
           {
-            title: t('Dashboard'),
-            url: '/dashboard/models',
-            icon: LayoutDashboard,
-          },
-          {
-            title: t('API Keys'),
+            title: t('My API Keys'),
             url: '/keys',
             icon: Key,
           },
           {
-            title: t('Usage Logs'),
+            title: t('Balance'),
+            url: '/wallet',
+            icon: Wallet,
+          },
+          {
+            title: t('Usage'),
             url: '/usage-logs/common',
             icon: FileText,
+          },
+        ],
+      },
+      {
+        id: 'personal',
+        title: t('Account'),
+        items: [
+          {
+            title: t('Profile'),
+            url: '/profile',
+            icon: User,
+          },
+        ],
+      },
+      {
+        id: 'advanced',
+        title: t('Advanced'),
+        items: [
+          {
+            title: t('Usage charts'),
+            url: '/dashboard/models',
+            icon: BarChart3,
           },
           {
             title: t('Task Logs'),
@@ -98,21 +103,10 @@ export function useSidebarData(): SidebarData {
             configUrls: ['/usage-logs/drawing', '/usage-logs/task'],
             icon: ListTodo,
           },
-        ],
-      },
-      {
-        id: 'personal',
-        title: t('Personal'),
-        items: [
           {
-            title: t('Wallet'),
-            url: '/wallet',
-            icon: Wallet,
-          },
-          {
-            title: t('Profile'),
-            url: '/profile',
-            icon: User,
+            title: t('Chat'),
+            icon: MessageSquare,
+            type: 'chat-presets',
           },
         ],
       },

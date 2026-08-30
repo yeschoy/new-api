@@ -22,7 +22,10 @@ import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/constants'
 import { cn } from '@/lib/utils'
+
+import { BrandMark } from './brand-mark'
 
 interface FooterLink {
   text: string
@@ -158,8 +161,8 @@ export function Footer(props: FooterProps) {
     demoSiteEnabled,
   } = useSystemConfig()
 
-  const displayLogo = systemLogo || props.logo || '/logo.png'
-  const displayName = systemName || props.name || 'New API'
+  const displayLogo = systemLogo || props.logo
+  const displayName = systemName || props.name || DEFAULT_SYSTEM_NAME
   const isDemoSiteMode = Boolean(demoSiteEnabled)
   const currentYear = new Date().getFullYear()
 
@@ -255,17 +258,19 @@ export function Footer(props: FooterProps) {
           {/* Brand column */}
           <div className='shrink-0'>
             <Link to='/' className='group flex items-center gap-2.5'>
-              <img
-                src={displayLogo}
-                alt={displayName}
-                className='size-7 rounded-lg object-contain'
-              />
-              <span className='text-sm font-semibold tracking-tight'>
+              <span className='flex size-7 shrink-0 items-center justify-center'>
+                <BrandMark
+                  src={displayLogo}
+                  alt={displayName}
+                  className='size-full'
+                />
+              </span>
+              <span className='font-serif text-sm font-semibold tracking-tight'>
                 {displayName}
               </span>
             </Link>
-            <p className='text-muted-foreground/60 mt-3 max-w-[200px] text-xs leading-relaxed'>
-              {t('Powerful API Management Platform')}
+            <p className='text-muted-foreground/60 mt-3 max-w-[220px] text-xs leading-relaxed'>
+              {t('A key, an address, and a model. That is enough to start.')}
             </p>
           </div>
 

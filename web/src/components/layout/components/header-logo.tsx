@@ -16,7 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { isDefaultLogo } from '@/lib/constants'
 import { cn } from '@/lib/utils'
+
+import { BrandMark } from './brand-mark'
 
 interface HeaderLogoProps {
   src: string
@@ -37,15 +40,17 @@ export function HeaderLogo({
   logoLoaded,
   className,
 }: HeaderLogoProps) {
+  const ready = isDefaultLogo(src) || (!loading && logoLoaded)
+
   return (
-    <img
-      src={src}
-      alt={alt}
+    <span
       className={cn(
-        'h-6 w-6 rounded-full transition-opacity duration-200',
-        !loading && logoLoaded ? 'opacity-100' : 'opacity-0',
+        'inline-flex size-6 items-center justify-center transition-opacity duration-200',
+        ready ? 'opacity-100' : 'opacity-0',
         className
       )}
-    />
+    >
+      <BrandMark src={src} alt={alt} className='size-full' />
+    </span>
   )
 }

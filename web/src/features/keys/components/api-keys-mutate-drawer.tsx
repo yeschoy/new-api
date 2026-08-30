@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, KeyRound, Settings2, WalletCards } from 'lucide-react'
+import { ChevronDown, Key, Settings2, WalletCards } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, type SubmitErrorHandler } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -395,7 +395,7 @@ export function ApiKeysMutateDrawer({
               <SideDrawerSectionHeader
                 title={t('Basic Information')}
                 description={t('Set API key basic information')}
-                icon={<KeyRound className='size-4' />}
+                icon={<Key className='size-4' />}
                 iconTone='info'
               />
               <FormField

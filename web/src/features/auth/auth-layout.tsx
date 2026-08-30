@@ -19,7 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { BrandMark } from '@/components/layout/components/brand-mark'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FieldBackdrop } from '@/features/guide/components/field-backdrop'
 import { useSystemConfig } from '@/hooks/use-system-config'
 
 type AuthLayoutProps = {
@@ -31,26 +33,23 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   const { systemName, logo, loading } = useSystemConfig()
 
   return (
-    <div className='relative grid h-svh max-w-none'>
+    <div className='relative grid h-svh max-w-none overflow-hidden'>
+      <FieldBackdrop />
       <Link
         to='/'
         className='absolute top-4 left-4 z-10 flex items-center gap-2 transition-opacity hover:opacity-80 sm:top-8 sm:left-8'
       >
-        <div className='relative h-8 w-8'>
+        <div className='relative size-8'>
           {loading ? (
-            <Skeleton className='absolute inset-0 rounded-full' />
+            <Skeleton className='absolute inset-0 rounded-[22%]' />
           ) : (
-            <img
-              src={logo}
-              alt={t('Logo')}
-              className='h-8 w-8 rounded-full object-cover'
-            />
+            <BrandMark src={logo} alt={t('Logo')} className='size-8' />
           )}
         </div>
         {loading ? (
           <Skeleton className='h-6 w-24' />
         ) : (
-          <h1 className='text-xl font-medium'>{systemName}</h1>
+          <h1 className='font-serif text-xl font-medium'>{systemName}</h1>
         )}
       </Link>
       <div className='container flex items-center pt-16 sm:pt-0'>

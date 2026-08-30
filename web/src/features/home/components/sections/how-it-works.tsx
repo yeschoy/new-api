@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Settings, Zap, BarChart3 } from 'lucide-react'
+import { Key, Link2, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
@@ -27,41 +27,43 @@ export function HowItWorks() {
   const steps = [
     {
       num: '1',
-      title: t('Configure'),
+      title: t('Create a key'),
       desc: t(
-        'Add your API keys, set up channels and configure access permissions'
+        'Sign in, open API Keys, and create one key per app. Copy it before the dialog closes.'
       ),
-      icon: <Settings className='size-6' strokeWidth={1.5} />,
+      icon: <Key className='size-6' strokeWidth={1.5} />,
     },
     {
       num: '2',
-      title: t('Connect'),
+      title: t('Copy the address'),
       desc: t(
-        'Connect through OpenAI, Claude, Gemini, and other compatible API routes'
+        'Pick mainland or global, then copy Base URL, Host, or Full URL depending on the box in your app.'
       ),
-      icon: <Zap className='size-6' strokeWidth={1.5} />,
+      icon: <Link2 className='size-6' strokeWidth={1.5} />,
     },
     {
       num: '3',
-      title: t('Monitor'),
-      desc: t('Track usage, costs and performance with real-time analytics'),
-      icon: <BarChart3 className='size-6' strokeWidth={1.5} />,
+      title: t('Send 你好'),
+      desc: t(
+        'Paste the exact model ID, save, and send a short hello. If it replies, you are done.'
+      ),
+      icon: <MessageSquare className='size-6' strokeWidth={1.5} />,
     },
   ]
 
   return (
-    <section className='border-border/40 relative z-10 border-t px-6 py-24 md:py-32'>
+    <section className='border-border/40 relative z-10 border-t px-4 py-20 sm:px-6 md:py-28'>
       <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-16 text-center md:mb-20'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
-            {t('How It Works')}
+        <AnimateInView className='mb-14 text-center md:mb-16'>
+          <p className='text-primary mb-3 text-xs font-medium'>
+            {t('First three minutes')}
           </p>
-          <h2 className='text-2xl font-bold tracking-tight md:text-3xl'>
-            {t('Three steps to get started')}
+          <h2 className='font-serif text-3xl tracking-tight md:text-4xl'>
+            {t('Three steps. No server knowledge required.')}
           </h2>
         </AnimateInView>
 
-        <div className='grid gap-8 md:grid-cols-3 md:gap-12'>
+        <div className='grid gap-8 md:grid-cols-3 md:gap-10'>
           {steps.map((step, i) => (
             <AnimateInView
               key={step.num}
@@ -70,7 +72,7 @@ export function HowItWorks() {
               className='relative flex flex-col items-center text-center'
             >
               <div className='relative mb-6'>
-                <div className='text-muted-foreground border-border/50 bg-muted/30 flex size-16 items-center justify-center rounded-2xl border transition-colors'>
+                <div className='text-primary border-primary/20 bg-primary/8 flex size-16 items-center justify-center rounded-2xl border'>
                   {step.icon}
                 </div>
                 <div className='bg-foreground text-background absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full text-xs font-bold'>
@@ -78,7 +80,7 @@ export function HowItWorks() {
                 </div>
               </div>
               <h3 className='mb-2 text-base font-semibold'>{step.title}</h3>
-              <p className='text-muted-foreground max-w-[240px] text-sm leading-relaxed'>
+              <p className='text-muted-foreground max-w-[280px] text-sm leading-relaxed'>
                 {step.desc}
               </p>
             </AnimateInView>

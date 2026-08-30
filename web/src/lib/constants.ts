@@ -21,8 +21,19 @@ For commercial licensing, please contact support@quantumnous.com
  */
 
 // System Configuration Defaults
-export const DEFAULT_SYSTEM_NAME = 'New API'
-export const DEFAULT_LOGO = '/logo.png'
+export const DEFAULT_SYSTEM_NAME = '野草 API'
+export const DEFAULT_LOGO = '/logo.svg'
+
+export function isDefaultLogo(src?: string | null): boolean {
+  if (!src) return true
+  const path = src.split('?')[0]
+  return (
+    path === '/logo.svg' ||
+    path === '/logo.png' ||
+    path.endsWith('/logo.svg') ||
+    path.endsWith('/logo.png')
+  )
+}
 
 // LocalStorage Keys
 export const STORAGE_KEYS = {

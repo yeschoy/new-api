@@ -17,46 +17,37 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { Construction } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
+import { BrandMark } from '@/components/layout/components/brand-mark'
 import { RichContent } from '@/components/rich-content'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSystemConfig } from '@/hooks/use-system-config'
 import { isHttpUrl, isLikelyHtml } from '@/lib/content-format'
 
 import { getAboutContent } from './api'
 
 function EmptyAboutState() {
   const { t } = useTranslation()
+  const { systemName, logo } = useSystemConfig()
   const currentYear = new Date().getFullYear()
 
   return (
     <div className='flex min-h-[60vh] items-center justify-center p-8'>
       <div className='max-w-2xl space-y-6 text-center'>
         <div className='flex justify-center'>
-          <Construction className='text-muted-foreground h-24 w-24' />
+          <BrandMark src={logo} alt={systemName} className='size-16' />
         </div>
         <div className='space-y-2'>
-          <h2 className='text-2xl font-bold'>{t('No About Content Set')}</h2>
+          <h2 className='font-serif text-3xl tracking-tight'>{systemName}</h2>
           <p className='text-muted-foreground'>
             {t(
-              'The administrator has not configured any about content yet. You can set it in the settings page, supporting HTML or URL.'
+              'You do not need to know how servers work. Create a key, copy an address, paste a model name, then send 你好.'
             )}
           </p>
         </div>
-        <div className='space-y-4 text-sm'>
-          <p>
-            {t('New API Project Repository:')}{' '}
-            <a
-              href='https://github.com/QuantumNous/new-api'
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-primary hover:underline'
-            >
-              {t('https://github.com/QuantumNous/new-api')}
-            </a>
-          </p>
+        <div className='text-muted-foreground/70 space-y-3 pt-2 text-xs'>
           <p className='text-muted-foreground'>
             <a
               href='https://github.com/QuantumNous/new-api'

@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 
 import { ErrorState } from '@/components/error-state'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { BrandMark } from '@/components/layout/components/brand-mark'
 import { LoadingState } from '@/components/loading-state'
 import {
   Card,
@@ -287,12 +288,12 @@ export function SetupWizard() {
         <div className='flex flex-col items-center gap-3'>
           <div className='relative h-12 w-12'>
             {systemConfigLoading ? (
-              <Skeleton className='absolute inset-0 rounded-full' />
+              <Skeleton className='absolute inset-0 rounded-[22%]' />
             ) : (
-              <img
+              <BrandMark
                 src={logo}
                 alt={t('System logo')}
-                className='h-12 w-12 rounded-full object-cover shadow-sm'
+                className='h-12 w-12'
               />
             )}
           </div>

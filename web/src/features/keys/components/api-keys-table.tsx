@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import type { Table as TanstackTable } from '@tanstack/react-table'
-import { Database } from 'lucide-react'
+import { Key } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -53,6 +53,7 @@ import {
   ERROR_MESSAGES,
 } from '../constants'
 import type { ApiKey } from '../types'
+import { ApiKeysBeginnerEmpty } from './api-keys-beginner-empty'
 import { ApiKeyCell, UnlimitedQuotaBadge } from './api-keys-cells'
 import { useApiKeysColumns } from './api-keys-columns'
 import { useApiKeys } from './api-keys-provider'
@@ -111,12 +112,12 @@ function ApiKeysMobileList({
         <Empty className='border-none p-0'>
           <EmptyHeader>
             <EmptyMedia variant='icon'>
-              <Database className='size-6' />
+              <Key className='size-6' />
             </EmptyMedia>
-            <EmptyTitle>{t('No API Keys Found')}</EmptyTitle>
+            <EmptyTitle>{t('Create your first key')}</EmptyTitle>
             <EmptyDescription>
               {t(
-                'No API keys available. Create your first API key to get started.'
+                'A key is like a password for one app. Create one, copy it immediately, then paste it into your software.'
               )}
             </EmptyDescription>
           </EmptyHeader>
@@ -275,6 +276,8 @@ export function ApiKeysTable() {
   })
 
   const apiKeys = data?.items || []
+  const isFirstTimeEmpty =
+    !isLoading && !shouldSearch && (data?.total ?? 0) === 0
 
   const { table } = useDataTable({
     data: apiKeys,
@@ -293,6 +296,10 @@ export function ApiKeysTable() {
     ensurePageInRange,
   })
 
+  if (isFirstTimeEmpty) {
+    return <ApiKeysBeginnerEmpty />
+  }
+
   return (
     <DataTablePage
       table={table}
@@ -303,6 +310,7 @@ export function ApiKeysTable() {
       emptyDescription={t(
         'No API keys available. Create your first API key to get started.'
       )}
+      emptyIcon={<Key className='size-6' />}
       skeletonKeyPrefix='api-keys-skeleton'
       applyHeaderSize
       toolbarProps={{

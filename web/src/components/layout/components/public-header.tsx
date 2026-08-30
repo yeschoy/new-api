@@ -39,6 +39,50 @@ import { HeaderLogo } from './header-logo'
 
 const AUTH_PROMPT_SECONDS = 5
 
+function renderBrandMark(args: {
+  loading: boolean
+  customLogo?: React.ReactNode
+  systemLogo: string
+  logoLoaded: boolean
+}) {
+  if (args.loading) {
+    return <Skeleton className='size-full rounded-[22%]' />
+  }
+  if (args.customLogo) {
+    return args.customLogo
+  }
+  return (
+    <HeaderLogo
+      src={args.systemLogo}
+      loading={args.loading}
+      logoLoaded={args.logoLoaded}
+      className='size-full'
+    />
+  )
+}
+
+function renderAuthControl(args: {
+  loading: boolean
+  isAuthenticated: boolean
+  signInLabel: string
+}) {
+  if (args.loading) {
+    return <Skeleton className='h-8 w-20 rounded-lg' />
+  }
+  if (args.isAuthenticated) {
+    return <ProfileDropdown />
+  }
+  return (
+    <Button
+      size='sm'
+      className='h-8 rounded-lg px-3.5 text-xs font-medium'
+      render={<Link to='/sign-in' />}
+    >
+      {args.signInLabel}
+    </Button>
+  )
+}
+
 type AuthPromptTarget = {
   title: string
   href: string
@@ -196,32 +240,27 @@ export function PublicHeader(props: PublicHeaderProps) {
               className='group flex shrink-0 items-center gap-2.5'
             >
               <div className='flex size-7 shrink-0 items-center justify-center transition-all duration-300 group-hover:scale-105'>
-                {loading ? (
-                  <Skeleton className='size-full rounded-lg' />
-                ) : customLogo ? (
-                  customLogo
-                ) : (
-                  <HeaderLogo
-                    src={systemLogo}
-                    loading={loading}
-                    logoLoaded={logoLoaded}
-                    className='size-full rounded-lg object-contain'
-                  />
-                )}
+                {renderBrandMark({
+                  loading,
+                  customLogo,
+                  systemLogo,
+                  logoLoaded,
+                })}
               </div>
-              <span className='text-sm font-semibold tracking-tight'>
+              <span className='font-serif text-[15px] font-semibold tracking-tight'>
                 {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
               </span>
             </Link>
 
             {/* Desktop nav */}
             <div className='hidden items-center gap-0.5 sm:flex'>
-              {links.map((link, i) => {
+              {links.map((link) => {
                 const isActive = pathname === link.href
+                const linkKey = `${link.href}-${link.title}`
                 if (link.external) {
                   return (
                     <a
-                      key={i}
+                      key={linkKey}
                       href={link.href}
                       target='_blank'
                       rel='noopener noreferrer'
@@ -239,7 +278,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                 }
                 return (
                   <Link
-                    key={i}
+                    key={linkKey}
                     to={link.href}
                     disabled={link.disabled}
                     onClick={(event) => handleNavLinkClick(event, link)}
@@ -280,19 +319,11 @@ export function PublicHeader(props: PublicHeaderProps) {
               {showAuthButtons && (
                 <>
                   <div className='bg-border/40 mx-1 h-4 w-px' />
-                  {loading ? (
-                    <Skeleton className='h-8 w-20 rounded-lg' />
-                  ) : isAuthenticated ? (
-                    <ProfileDropdown />
-                  ) : (
-                    <Button
-                      size='sm'
-                      className='h-8 rounded-lg px-3.5 text-xs font-medium'
-                      render={<Link to='/sign-in' />}
-                    >
-                      {t('Sign in')}
-                    </Button>
-                  )}
+                  {renderAuthControl({
+                    loading,
+                    isAuthenticated,
+                    signInLabel: t('Sign in'),
+                  })}
                 </>
               )}
             </div>
@@ -350,6 +381,7 @@ export function PublicHeader(props: PublicHeaderProps) {
           <nav className='flex flex-col gap-1'>
             {links.map((link, i) => {
               const isActive = pathname === link.href
+              const linkKey = `${link.href}-${link.title}`
               const linkClassName = cn(
                 'flex items-center gap-3 py-3 text-base font-medium tracking-tight transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
                 mobileOpen
@@ -364,7 +396,7 @@ export function PublicHeader(props: PublicHeaderProps) {
               if (link.external) {
                 return (
                   <a
-                    key={i}
+                    key={linkKey}
                     href={link.href}
                     target='_blank'
                     rel='noopener noreferrer'
@@ -380,7 +412,7 @@ export function PublicHeader(props: PublicHeaderProps) {
               }
               return (
                 <Link
-                  key={i}
+                  key={linkKey}
                   to={link.href}
                   disabled={link.disabled}
                   onClick={(event) => handleNavLinkClick(event, link, true)}

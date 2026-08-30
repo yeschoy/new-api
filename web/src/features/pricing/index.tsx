@@ -129,7 +129,7 @@ export function Pricing() {
           priceRate={priceRate}
           usdExchangeRate={usdExchangeRate}
           tokenUnit={tokenUnit}
-          showRechargePrice={showRechargePrice}
+          showRechargePrice={false}
           selectedGroup={groupFilter}
         />
       )
@@ -141,7 +141,7 @@ export function Pricing() {
         priceRate={priceRate}
         usdExchangeRate={usdExchangeRate}
         tokenUnit={tokenUnit}
-        showRechargePrice={showRechargePrice}
+        showRechargePrice={false}
         selectedGroup={groupFilter}
         onModelClick={handleModelClick}
       />
@@ -166,9 +166,9 @@ export function Pricing() {
           className='pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 dark:opacity-[0.10]'
           style={{
             background: [
-              'radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%)',
-              'radial-gradient(ellipse 40% 35% at 50% 70%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%)',
+              'radial-gradient(ellipse 60% 50% at 20% 20%, color-mix(in oklch, var(--primary) 55%, transparent) 0%, transparent 70%)',
+              'radial-gradient(ellipse 50% 40% at 80% 15%, color-mix(in oklch, var(--chart-2) 45%, transparent) 0%, transparent 70%)',
+              'radial-gradient(ellipse 40% 35% at 50% 70%, color-mix(in oklch, var(--chart-5) 35%, transparent) 0%, transparent 70%)',
             ].join(', '),
             maskImage:
               'linear-gradient(to bottom, black 40%, transparent 100%)',
@@ -178,7 +178,7 @@ export function Pricing() {
         />
         <PageTransition className='relative mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
           <header className='mx-auto mb-5 max-w-3xl pt-5 text-center sm:mb-10 sm:pt-10'>
-            <h1 className='text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'>
+            <h1 className='font-serif text-[clamp(2rem,5.5vw,3.5rem)] leading-[1.15] font-bold tracking-tight'>
               {t('Model Square')}
             </h1>
             <p className='text-muted-foreground/80 mt-3 text-sm sm:mt-4 sm:text-base'>
@@ -188,16 +188,14 @@ export function Pricing() {
             </p>
             <p className='text-muted-foreground/60 mx-auto mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
               {t(
-                'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
+                'Copy the model name. Prices are input / output per 1M tokens.'
               )}
             </p>
             <SearchBar
               value={searchInput}
               onChange={setSearchInput}
               onClear={clearSearch}
-              placeholder={t(
-                'Search model name, provider, endpoint, or tag...'
-              )}
+              placeholder={t('Search a model name...')}
               className='mx-auto mt-4 max-w-2xl sm:mt-6'
             />
           </header>
