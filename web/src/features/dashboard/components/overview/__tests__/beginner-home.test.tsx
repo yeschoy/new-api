@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { createInstance } from 'i18next'
 import { I18nextProvider, initReactI18next } from 'react-i18next'
@@ -32,6 +33,17 @@ vi.mock('@/stores/auth-store', () => ({
     selector({ auth: { user: null } }),
 }))
 
+vi.mock('@/features/pricing/hooks/use-pricing-data', () => ({
+  usePricingData: () => ({
+    models: [],
+    groupRatio: {},
+    usableGroup: {},
+    isLoading: false,
+    priceRate: 1,
+    usdExchangeRate: 1,
+  }),
+}))
+
 const { TooltipProvider } = await import('@/components/ui/tooltip')
 const { BeginnerHomeView } = await import('../beginner-home')
 
@@ -41,62 +53,25 @@ await i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        'Hello, {{name}}': 'Hello, {{name}}',
-        'Today you only need three steps: create a key, copy the address, then send 你好 in your app.':
-          'Today you only need three steps: create a key, copy the address, then send 你好 in your app.',
-        'Create your first key': 'Create your first key',
-        'Manage keys': 'Manage keys',
-        'My API Keys': 'My API Keys',
+        'Put AI into the app you already use':
+          'Put AI into the app you already use',
+        'Pick a model, choose a rate group, then create a key. Paste the three fields into your software and send 你好.':
+          'Pick a model, choose a rate group, then create a key. Paste the three fields into your software and send 你好.',
+        'Pick a model': 'Pick a model',
+        'This list only includes models your account can use.':
+          'This list only includes models your account can use.',
+        'Search or pick a model': 'Search or pick a model',
+        'Open the model square': 'Open the model square',
         'How to fill this into an app': 'How to fill this into an app',
-        'You do not have a key yet': 'You do not have a key yet',
+        'Manage keys': 'Manage keys',
         'You have {{count}} keys': 'You have {{count}} keys',
         Balance: 'Balance',
-        'Add balance': 'Add balance',
-        Usage: 'Usage',
         'Used {{count}} times': 'Used {{count}} times',
-        'The only three fields': 'The only three fields',
-        'Key, address, model': 'Key, address, model',
-        'Fill these three things into the app you already use.':
-          'Fill these three things into the app you already use.',
-        'Model Square': 'Model Square',
-        'Network line': 'Network line',
-        'This site': 'This site',
-        'Mainland line': 'Mainland line',
-        'Global line': 'Global line',
-        'Address box type': 'Address box type',
-        'Base URL': 'Base URL',
-        'API Host': 'API Host',
-        'API Path': 'API Path',
-        'Full URL': 'Full URL',
-        'API Key': 'API Key',
-        'Model ID': 'Model ID',
-        'Sign in': 'Sign in',
-        'Open model pricing': 'Open model pricing',
         'Copy to clipboard': 'Copy to clipboard',
         'Copied!': 'Copied!',
         Copied: 'Copied',
-        'The address of the site you are on right now':
-          'The address of the site you are on right now',
-        'Best for networks in mainland China':
-          'Best for networks in mainland China',
-        'Cloudflare acceleration for overseas and cross-border networks':
-          'Cloudflare acceleration for overseas and cross-border networks',
-        'Use this when the app asks for Base URL, API Base, or API address':
-          'Use this when the app asks for Base URL, API Base, or API address',
-        'Use this when the app asks for API Host or Host only':
-          'Use this when the app asks for API Host or Host only',
-        'Keep this path if the app has a separate path box':
-          'Keep this path if the app has a separate path box',
-        'Use this when the app asks for a full endpoint':
-          'Use this when the app asks for a full endpoint',
-        'Never paste Base URL and Full URL into the same box.':
-          'Never paste Base URL and Full URL into the same box.',
-        'Sign in, create a key, then come back and copy these fields.':
-          'Sign in, create a key, then come back and copy these fields.',
-        'Copy the exact ID from the pricing page':
-          'Copy the exact ID from the pricing page',
-        'The model ID must match the pricing page character for character.':
-          'The model ID must match the pricing page character for character.',
+        'No matching models': 'No matching models',
+        'Loading...': 'Loading...',
       },
     },
   },
@@ -107,47 +82,47 @@ function renderHome(props: {
   keyCount: number
   requestCount: number
 }) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
-    <I18nextProvider i18n={i18n}>
-      <TooltipProvider>
-        <BeginnerHomeView
-          greetingName='yecao'
-          hasKey={props.hasKey}
-          keyCount={props.keyCount}
-          balanceText='$10.00'
-          requestCount={props.requestCount}
-        />
-      </TooltipProvider>
-    </I18nextProvider>
+    <QueryClientProvider client={client}>
+      <I18nextProvider i18n={i18n}>
+        <TooltipProvider>
+          <BeginnerHomeView
+            greetingName='yecao'
+            hasKey={props.hasKey}
+            keyCount={props.keyCount}
+            balanceText='$10.00'
+            requestCount={props.requestCount}
+          />
+        </TooltipProvider>
+      </I18nextProvider>
+    </QueryClientProvider>
   )
 }
 
 describe('beginner home', () => {
-  test('asks a first-time user to create a key instead of opening charts', () => {
+  test('starts from picking a model instead of opening charts', () => {
     renderHome({ hasKey: false, keyCount: 0, requestCount: 0 })
 
-    expect(screen.getByText('Hello, yecao')).toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'Create your first key' })
-    ).toHaveAttribute('href', '/keys')
-    expect(screen.getByText('You do not have a key yet')).toBeInTheDocument()
-    expect(screen.queryByText('Usage charts')).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('link', { name: 'Try a chat' })
-    ).not.toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'How to fill this into an app' })
+      screen.getByText('Put AI into the app you already use')
     ).toBeInTheDocument()
+    expect(screen.getByText('Pick a model')).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: 'Open the model square' })
+    ).toHaveAttribute('href', '/pricing')
+    expect(screen.queryByText('Usage charts')).not.toBeInTheDocument()
   })
 
-  test('shows the key count after the user already has keys', () => {
+  test('lets an existing user manage keys without leaving the setup', () => {
     renderHome({ hasKey: true, keyCount: 2, requestCount: 8 })
 
     expect(screen.getByRole('link', { name: 'Manage keys' })).toHaveAttribute(
       'href',
       '/keys'
     )
-    expect(screen.getByText('You have 2 keys')).toBeInTheDocument()
     expect(screen.getByText('Used 8 times')).toBeInTheDocument()
   })
 })

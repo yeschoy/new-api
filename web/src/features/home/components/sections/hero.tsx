@@ -35,12 +35,6 @@ export function Hero(props: HeroProps) {
   return (
     <section className='relative z-10 overflow-hidden px-4 pt-24 pb-12 sm:px-6 md:pt-32 md:pb-20'>
       <FieldBackdrop />
-      <div
-        aria-hidden='true'
-        className='text-primary/8 pointer-events-none absolute top-16 -right-6 hidden font-serif text-[9rem] leading-none font-bold select-none sm:block'
-      >
-        野草
-      </div>
       <div className='mx-auto grid max-w-6xl items-start gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-12'>
         <div className='flex flex-col items-start text-left'>
           <div

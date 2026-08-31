@@ -30,7 +30,7 @@ export function ApiKeys() {
   return (
     <ApiKeysProvider>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>{t('My API Keys')}</SectionPageLayout.Title>
+        <SectionPageLayout.Title>{t('Keys')}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <ApiKeysPrimaryButtons />
         </SectionPageLayout.Actions>

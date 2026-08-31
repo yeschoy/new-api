@@ -25,10 +25,8 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import {
-  DISABLED_ROW_DESKTOP,
   DISABLED_ROW_MOBILE,
-  DataTablePage,
-  useDebouncedColumnFilter,
+  DataTablePagination,
   useDataTable,
 } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
@@ -46,18 +44,12 @@ import { formatQuota } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { getApiKeys, searchApiKeys } from '../api'
-import {
-  API_KEY_STATUS,
-  API_KEY_STATUS_OPTIONS,
-  API_KEY_STATUSES,
-  ERROR_MESSAGES,
-} from '../constants'
+import { API_KEY_STATUS, API_KEY_STATUSES, ERROR_MESSAGES } from '../constants'
 import type { ApiKey } from '../types'
 import { ApiKeysBeginnerEmpty } from './api-keys-beginner-empty'
 import { ApiKeyCell, UnlimitedQuotaBadge } from './api-keys-cells'
 import { useApiKeysColumns } from './api-keys-columns'
 import { useApiKeys } from './api-keys-provider'
-import { DataTableBulkActions } from './data-table-bulk-actions'
 import { DataTableRowActions } from './data-table-row-actions'
 
 const route = getRouteApi('/_authenticated/keys/')
@@ -214,22 +206,10 @@ export function ApiKeysTable() {
     navigate: route.useNavigate(),
     pagination: { defaultPage: 1, defaultPageSize: 20 },
     globalFilter: { enabled: true, key: 'filter' },
-    columnFilters: [
-      { columnId: 'status', searchKey: 'status', type: 'array' },
-      { columnId: '_tokenSearch', searchKey: 'token', type: 'string' },
-    ],
+    columnFilters: [{ columnId: 'status', searchKey: 'status', type: 'array' }],
   })
 
-  const {
-    value: tokenFilter,
-    inputValue: tokenFilterInput,
-    setInputValue: setTokenFilterInput,
-  } = useDebouncedColumnFilter({
-    columnFilters,
-    columnId: '_tokenSearch',
-    onColumnFiltersChange,
-  })
-  const shouldSearch = Boolean(globalFilter?.trim() || tokenFilter.trim())
+  const shouldSearch = Boolean(globalFilter?.trim())
 
   // Fetch data with React Query
   // eslint-disable-next-line @tanstack/query/exhaustive-deps
@@ -239,14 +219,12 @@ export function ApiKeysTable() {
       pagination.pageIndex + 1,
       pagination.pageSize,
       globalFilter,
-      tokenFilter,
       refreshTrigger,
     ],
     queryFn: async () => {
       const result = shouldSearch
         ? await searchApiKeys({
             keyword: globalFilter,
-            token: tokenFilter,
             p: pagination.pageIndex + 1,
             size: pagination.pageSize,
           })
@@ -301,44 +279,21 @@ export function ApiKeysTable() {
   }
 
   return (
-    <DataTablePage
-      table={table}
-      columns={columns}
-      isLoading={isLoading}
-      isFetching={isFetching}
-      emptyTitle={t('No API Keys Found')}
-      emptyDescription={t(
-        'No API keys available. Create your first API key to get started.'
-      )}
-      emptyIcon={<Key className='size-6' />}
-      skeletonKeyPrefix='api-keys-skeleton'
-      applyHeaderSize
-      toolbarProps={{
-        searchPlaceholder: t('Filter by name...'),
-        searchDebounceMs: 500,
-        additionalSearch: (
-          <Input
-            placeholder={t('Filter by API key...')}
-            aria-label={t('Filter by API key...')}
-            value={tokenFilterInput}
-            onChange={(e) => setTokenFilterInput(e.target.value)}
-            className='w-full sm:w-50 lg:w-60'
-          />
-        ),
-        filters: [
-          {
-            columnId: 'status',
-            title: t('Status'),
-            options: API_KEY_STATUS_OPTIONS,
-            singleSelect: true,
-          },
-        ],
-      }}
-      mobile={<ApiKeysMobileList table={table} isLoading={isLoading} />}
-      getRowClassName={(row) =>
-        isDisabledApiKeyRow(row.original) ? DISABLED_ROW_DESKTOP : undefined
-      }
-      bulkActions={<DataTableBulkActions table={table} />}
-    />
+    <div className='flex flex-col gap-4'>
+      <p className='text-muted-foreground text-sm'>
+        {t(
+          'A key is like a password for one app. Create one, copy it immediately, then paste it into your software.'
+        )}
+      </p>
+      <Input
+        placeholder={t('Filter by name...')}
+        aria-label={t('Filter by name...')}
+        value={globalFilter}
+        onChange={(event) => onGlobalFilterChange?.(event.target.value)}
+        className='max-w-sm'
+      />
+      <ApiKeysMobileList table={table} isLoading={isLoading || isFetching} />
+      <DataTablePagination table={table} />
+    </div>
   )
 }

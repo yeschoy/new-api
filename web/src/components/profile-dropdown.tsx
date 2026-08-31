@@ -46,7 +46,7 @@ export function ProfileDropdown() {
   const [open, setOpen] = useDialogState()
   const user = useAuthStore((state) => state.auth.user)
   const { displayName, roleLabel } = useUserDisplay(user)
-  const isSuperAdmin = user?.role === ROLE.SUPER_ADMIN
+  const isAdmin = (user?.role ?? 0) >= ROLE.ADMIN
   const isWalletVisible = useIsSidebarModuleVisible('/wallet')
   const avatarName = user?.username || displayName
   const avatarFallback = getUserAvatarFallback(avatarName)
@@ -110,21 +110,14 @@ export function ProfileDropdown() {
           {isWalletVisible && (
             <DropdownMenuItem onClick={() => navigate({ to: '/wallet' })}>
               <Wallet className='size-4' />
-              {t('Wallet')}
+              {t('Balance')}
             </DropdownMenuItem>
           )}
 
-          {isSuperAdmin && (
-            <DropdownMenuItem
-              onClick={() =>
-                navigate({
-                  to: '/system-settings/site/$section',
-                  params: { section: 'system-info' },
-                })
-              }
-            >
+          {isAdmin && (
+            <DropdownMenuItem onClick={() => navigate({ to: '/channels' })}>
               <Settings className='size-4' />
-              {t('System Settings')}
+              {t('Admin')}
             </DropdownMenuItem>
           )}
 

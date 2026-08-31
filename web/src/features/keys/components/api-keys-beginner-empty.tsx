@@ -35,7 +35,7 @@ export function ApiKeysBeginnerEmpty() {
       <span className='bg-primary/10 text-primary mb-4 flex size-14 items-center justify-center rounded-2xl'>
         <Key className='size-7' aria-hidden='true' />
       </span>
-      <h3 className='font-serif text-2xl tracking-tight'>
+      <h3 className='text-2xl font-semibold tracking-tight'>
         {t('Create your first key')}
       </h3>
       <p className='text-muted-foreground mt-3 max-w-md text-sm leading-relaxed'>

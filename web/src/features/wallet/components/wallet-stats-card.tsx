@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next'
 
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatQuota } from '@/lib/format'
+import { formatQuotaWithCurrency } from '@/lib/currency'
 
 import type { UserWalletData } from '../types'
 
@@ -54,23 +54,23 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
     tone: IconBadgeTone
   }[] = [
     {
-      label: t('Current Balance'),
-      value: formatQuota(props.user?.quota ?? 0),
-      description: t('Remaining quota'),
+      label: t('Balance'),
+      value: formatQuotaWithCurrency(props.user?.quota ?? 0),
+      description: t('You can still use this'),
       icon: WalletCards,
       tone: 'success',
     },
     {
-      label: t('Total Usage'),
-      value: formatQuota(props.user?.used_quota ?? 0),
-      description: t('Total consumed quota'),
+      label: t('Already used'),
+      value: formatQuotaWithCurrency(props.user?.used_quota ?? 0),
+      description: t('Spent so far'),
       icon: BarChart3,
       tone: 'info',
     },
     {
-      label: t('API Requests'),
+      label: t('Times used'),
       value: (props.user?.request_count ?? 0).toLocaleString(),
-      description: t('Total requests made'),
+      description: t('How many times you have sent messages'),
       icon: Activity,
       tone: 'chart-4',
     },
@@ -84,7 +84,7 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
             <IconBadge tone={item.tone} size='stat'>
               <item.icon />
             </IconBadge>
-            <div className='text-muted-foreground truncate text-[11px] font-medium tracking-wider uppercase sm:text-xs'>
+            <div className='text-muted-foreground truncate text-[11px] font-medium sm:text-xs'>
               {item.label}
             </div>
           </div>

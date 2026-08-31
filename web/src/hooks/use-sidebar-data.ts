@@ -17,22 +17,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
+  ArrowLeft,
   BarChart3,
   Box,
   CreditCard,
-  FileText,
-  Key,
   ListTodo,
-  MessageSquare,
   PlugZap,
   Radio,
   ServerCog,
   Settings,
-  Sprout,
   Ticket,
-  User,
   Users,
-  Wallet,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -40,10 +35,8 @@ import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
 
 /**
- * Root navigation groups for the application sidebar.
- *
- * Beginner items stay at the top. Analytics stay in Advanced.
- * Admin-only tools keep `id: 'admin'` so existing role filters still apply.
+ * Sidebar used only inside the admin workspace.
+ * Everyday using lives in the top bar, without this tree.
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
@@ -51,62 +44,13 @@ export function useSidebarData(): SidebarData {
   return {
     navGroups: [
       {
-        id: 'general',
-        title: t('Everyday'),
+        id: 'product',
+        title: t('Using the product'),
         items: [
           {
-            title: t('Start using'),
+            title: t('Back to using'),
             url: '/dashboard/overview',
-            icon: Sprout,
-          },
-          {
-            title: t('My API Keys'),
-            url: '/keys',
-            icon: Key,
-          },
-          {
-            title: t('Balance'),
-            url: '/wallet',
-            icon: Wallet,
-          },
-          {
-            title: t('Usage'),
-            url: '/usage-logs/common',
-            icon: FileText,
-          },
-        ],
-      },
-      {
-        id: 'personal',
-        title: t('Account'),
-        items: [
-          {
-            title: t('Profile'),
-            url: '/profile',
-            icon: User,
-          },
-        ],
-      },
-      {
-        id: 'advanced',
-        title: t('Advanced'),
-        items: [
-          {
-            title: t('Usage charts'),
-            url: '/dashboard/models',
-            icon: BarChart3,
-          },
-          {
-            title: t('Task Logs'),
-            url: '/usage-logs/task',
-            activeUrls: ['/usage-logs/drawing'],
-            configUrls: ['/usage-logs/drawing', '/usage-logs/task'],
-            icon: ListTodo,
-          },
-          {
-            title: t('Chat'),
-            icon: MessageSquare,
-            type: 'chat-presets',
+            icon: ArrowLeft,
           },
         ],
       },
@@ -138,6 +82,18 @@ export function useSidebarData(): SidebarData {
             title: t('Subscriptions'),
             url: '/subscriptions',
             icon: CreditCard,
+          },
+          {
+            title: t('Usage charts'),
+            url: '/dashboard/models',
+            icon: BarChart3,
+          },
+          {
+            title: t('Task Logs'),
+            url: '/usage-logs/task',
+            activeUrls: ['/usage-logs/drawing'],
+            configUrls: ['/usage-logs/drawing', '/usage-logs/task'],
+            icon: ListTodo,
           },
           {
             title: t('System Info'),

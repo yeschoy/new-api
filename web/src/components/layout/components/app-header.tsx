@@ -54,6 +54,7 @@ import { TopNav } from './top-nav'
  * />
  */
 type AppHeaderProps = {
+  showSidebarTrigger?: boolean
   /**
    * Custom navigation links, uses default global navigation or dynamically generated from backend if not provided
    */
@@ -95,6 +96,7 @@ type AppHeaderProps = {
 
 export function AppHeader({
   navLinks = defaultTopNavLinks,
+  showSidebarTrigger = true,
   showTopNav = true,
   leftContent,
   showSearch = true,
@@ -112,7 +114,7 @@ export function AppHeader({
 
   return (
     <>
-      <Header>
+      <Header showSidebarTrigger={showSidebarTrigger}>
         <SystemBrand variant='inline' />
 
         {leftContent ? (
@@ -122,7 +124,7 @@ export function AppHeader({
         {rightContent ?? (
           <div className='ms-auto flex items-center gap-1 sm:gap-2'>
             {showTopNav && (
-              <div className='me-1 hidden lg:block'>
+              <div className='me-1'>
                 <TopNav links={links} />
               </div>
             )}

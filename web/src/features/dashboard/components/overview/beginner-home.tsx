@@ -17,19 +17,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { Link, type LinkProps } from '@tanstack/react-router'
-import { ArrowRight, FileText, Key, Wallet } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { Link } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { FieldBackdrop } from '@/features/guide/components/field-backdrop'
 import { GuideDrawer } from '@/features/guide/components/guide-drawer'
-import { StarterKitCard } from '@/features/guide/components/starter-kit-card'
 import { getApiKeys } from '@/features/keys/api'
 import { formatQuotaWithCurrency } from '@/lib/currency'
-import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+
+import { BeginnerSetup } from './beginner-setup'
 
 export type BeginnerHomeViewProps = {
   greetingName: string
@@ -44,101 +42,45 @@ export function BeginnerHomeView(props: BeginnerHomeViewProps) {
   const [guideOpen, setGuideOpen] = useState(false)
 
   return (
-    <div className='relative mx-auto flex max-w-5xl flex-col gap-8 overflow-hidden rounded-3xl px-4 py-6 sm:px-6 sm:py-8'>
-      <FieldBackdrop />
-      <header className='relative max-w-2xl min-w-0'>
-        <h1 className='font-serif text-3xl tracking-tight break-words sm:text-4xl'>
-          {props.greetingName
-            ? t('Hello, {{name}}', { name: props.greetingName })
-            : t('Hello')}
+    <div className='mx-auto flex max-w-3xl flex-col gap-8 px-1 py-4 sm:py-8'>
+      <header>
+        <h1 className='text-2xl font-semibold tracking-tight sm:text-3xl'>
+          {t('Put AI into the app you already use')}
         </h1>
         <p className='text-muted-foreground mt-3 text-base leading-relaxed'>
           {t(
-            'Today you only need three steps: create a key, copy the address, then send 你好 in your app.'
+            'Pick a model, choose a rate group, then create a key. Paste the three fields into your software and send 你好.'
           )}
         </p>
       </header>
 
-      <StarterKitCard />
+      <BeginnerSetup />
 
-      <div className='flex flex-wrap items-center gap-3'>
-        <Button
-          size='lg'
-          className='h-12 rounded-xl px-5'
-          render={<Link to='/keys' />}
-        >
-          {props.hasKey ? t('Manage keys') : t('Create your first key')}
-          <ArrowRight className='size-4' />
-        </Button>
-        <Button
-          size='lg'
-          variant='ghost'
-          className='h-12 rounded-xl px-5'
-          onClick={() => setGuideOpen(true)}
-        >
+      <div className='flex flex-wrap gap-2'>
+        <Button variant='outline' onClick={() => setGuideOpen(true)}>
           {t('How to fill this into an app')}
         </Button>
+        {props.hasKey ? (
+          <Button variant='ghost' render={<Link to='/keys' />}>
+            {t('Manage keys')}
+          </Button>
+        ) : null}
       </div>
       <GuideDrawer open={guideOpen} onOpenChange={setGuideOpen} />
 
-      <div className='grid gap-3 sm:grid-cols-3'>
-        <StatusCard
-          icon={<Key className='size-4' aria-hidden='true' />}
-          label={t('My API Keys')}
-          value={
-            props.hasKey
-              ? t('You have {{count}} keys', { count: props.keyCount })
-              : t('You do not have a key yet')
-          }
-          to='/keys'
-          tone={props.hasKey ? 'ready' : 'todo'}
-        />
-        <StatusCard
-          icon={<Wallet className='size-4' aria-hidden='true' />}
-          label={t('Balance')}
-          value={props.balanceText}
-          to='/wallet'
-          action={t('Add balance')}
-        />
-        <StatusCard
-          icon={<FileText className='size-4' aria-hidden='true' />}
-          label={t('Usage')}
-          value={t('Used {{count}} times', { count: props.requestCount })}
+      <div className='text-muted-foreground flex flex-wrap gap-x-6 gap-y-2 text-sm'>
+        <Link to='/wallet' className='hover:text-foreground'>
+          {t('Balance')}: {props.balanceText}
+        </Link>
+        <Link
           to='/usage-logs/$section'
           params={{ section: 'common' }}
-        />
+          className='hover:text-foreground'
+        >
+          {t('Used {{count}} times', { count: props.requestCount })}
+        </Link>
       </div>
     </div>
-  )
-}
-
-function StatusCard(props: {
-  icon: ReactNode
-  label: string
-  value: string
-  to: LinkProps['to']
-  params?: LinkProps['params']
-  action?: string
-  tone?: 'ready' | 'todo'
-}) {
-  return (
-    <Link
-      to={props.to}
-      params={props.params}
-      className={cn(
-        'bg-card/90 hover:border-primary/40 block rounded-2xl border p-4 transition-colors',
-        props.tone === 'todo' && 'border-primary/30 bg-primary/5'
-      )}
-    >
-      <div className='text-muted-foreground flex items-center gap-2 text-xs font-medium'>
-        {props.icon}
-        <span>{props.label}</span>
-      </div>
-      <div className='mt-2 text-sm font-medium'>{props.value}</div>
-      {props.action ? (
-        <div className='text-primary mt-2 text-xs'>{props.action}</div>
-      ) : null}
-    </Link>
   )
 }
 
