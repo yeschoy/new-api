@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { CopyButton } from '@/components/copy-button'
+import { LiquidGlass, LiquidGlassButton } from '@/components/liquid-glass'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
 import {
@@ -135,11 +136,21 @@ export function BeginnerSetup() {
       : model.model_name,
   }))
 
+  const ratioLabel = (tone: ReturnType<typeof ratioTone>) => {
+    if (tone === 'cheaper') return t('cheaper')
+    if (tone === 'costlier') return t('costlier')
+    return t('list price')
+  }
+
   return (
     <div className='grid gap-5'>
-      <section className='rounded-2xl border p-5'>
-        <p className='text-muted-foreground text-xs font-medium'>1</p>
-        <h2 className='mt-1 font-medium'>{t('Pick a model')}</h2>
+      <LiquidGlass className='rounded-2xl border p-6'>
+        <p className='text-muted-foreground font-mono text-xs tracking-widest'>
+          01
+        </p>
+        <h2 className='mt-2 text-lg font-semibold tracking-tight'>
+          {t('Pick a model')}
+        </h2>
         <p className='text-muted-foreground mt-1 text-sm'>
           {t('This list only includes models your account can use.')}
         </p>
@@ -163,12 +174,16 @@ export function BeginnerSetup() {
             {t('Open the model square')}
           </Button>
         </div>
-      </section>
+      </LiquidGlass>
 
       {selectedModel ? (
-        <section className='rounded-2xl border p-5'>
-          <p className='text-muted-foreground text-xs font-medium'>2</p>
-          <h2 className='mt-1 font-medium'>{t('Pick a rate group')}</h2>
+        <LiquidGlass className='rounded-2xl border p-6'>
+          <p className='text-muted-foreground font-mono text-xs tracking-widest'>
+            02
+          </p>
+          <h2 className='mt-2 text-lg font-semibold tracking-tight'>
+            {t('Pick a rate group')}
+          </h2>
           <p className='text-muted-foreground mt-1 text-sm'>
             {t(
               'Each group has a ratio. The key will bill at that group’s rate for this model.'
@@ -205,10 +220,8 @@ export function BeginnerSetup() {
                     setCreatedKey('')
                   }}
                   className={cn(
-                    'rounded-xl border px-4 py-3 text-left transition-colors',
-                    selected
-                      ? 'border-primary bg-primary/8'
-                      : 'hover:border-primary/40'
+                    'liquid-glass-inset rounded-xl border px-4 py-3 text-left transition-colors',
+                    selected ? 'border-primary' : 'hover:border-primary/40'
                   )}
                 >
                   <div className='flex flex-wrap items-baseline justify-between gap-2'>
@@ -227,11 +240,8 @@ export function BeginnerSetup() {
                       )}
                     >
                       {t('{{ratio}}× rate', { ratio: group.ratio })}
-                      {tone === 'cheaper'
-                        ? ` · ${t('cheaper')}`
-                        : tone === 'costlier'
-                          ? ` · ${t('costlier')}`
-                          : ` · ${t('list price')}`}
+                      {' · '}
+                      {ratioLabel(tone)}
                     </span>
                   </div>
                   <p className='text-muted-foreground mt-1 text-xs'>
@@ -244,39 +254,48 @@ export function BeginnerSetup() {
               )
             })}
           </div>
-        </section>
+        </LiquidGlass>
       ) : null}
 
       {selectedModel && selectedGroup ? (
-        <section className='rounded-2xl border p-5'>
-          <p className='text-muted-foreground text-xs font-medium'>3</p>
-          <h2 className='mt-1 font-medium'>{t('Create the key')}</h2>
+        <LiquidGlass className='rounded-2xl border p-6'>
+          <p className='text-muted-foreground font-mono text-xs tracking-widest'>
+            03
+          </p>
+          <h2 className='mt-2 text-lg font-semibold tracking-tight'>
+            {t('Create the key')}
+          </h2>
           <p className='text-muted-foreground mt-1 text-sm'>
             {t(
               'The key is bound to this rate group. Copy it immediately after it appears.'
             )}
           </p>
           {user ? (
-            <Button
-              className='mt-4'
+            <LiquidGlassButton
+              className='mt-5 h-11 rounded-full border px-5'
               disabled={createMutation.isPending}
               onClick={() => createMutation.mutate()}
             >
               {createMutation.isPending
                 ? t('Creating...')
                 : t('Create this key')}
-            </Button>
+            </LiquidGlassButton>
           ) : (
-            <Button className='mt-4' render={<Link to='/sign-in' />}>
+            <LiquidGlassButton
+              className='mt-5 h-11 rounded-full border px-5'
+              render={<Link to='/sign-in' />}
+            >
               {t('Sign in')}
-            </Button>
+            </LiquidGlassButton>
           )}
-        </section>
+        </LiquidGlass>
       ) : null}
 
       {createdKey && selectedModel ? (
-        <section className='rounded-2xl border p-5'>
-          <h2 className='font-medium'>{t('Paste these three fields')}</h2>
+        <LiquidGlass className='rounded-2xl border p-6'>
+          <h2 className='text-lg font-semibold tracking-tight'>
+            {t('Paste these three fields')}
+          </h2>
           <p className='text-muted-foreground mt-1 mb-4 text-sm'>
             {t('Fill these three things into the app you already use.')}
           </p>
@@ -297,7 +316,7 @@ export function BeginnerSetup() {
               value={selectedModel.model_name}
             />
           </div>
-        </section>
+        </LiquidGlass>
       ) : null}
     </div>
   )
@@ -310,7 +329,7 @@ function CopyRow(props: {
 }) {
   const { t } = useTranslation()
   return (
-    <div className='bg-background/70 flex items-center gap-3 rounded-xl border px-3 py-3'>
+    <div className='liquid-glass-inset flex items-center gap-3 rounded-xl border px-3 py-3'>
       <span className='bg-muted text-primary flex size-8 shrink-0 items-center justify-center rounded-lg'>
         {props.icon}
       </span>

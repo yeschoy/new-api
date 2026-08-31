@@ -75,29 +75,27 @@ export function Features() {
   ]
 
   return (
-    <section className='relative z-10 px-4 py-20 sm:px-6 md:py-24'>
+    <section className='relative z-10 px-4 py-20 sm:px-6 md:py-28'>
       <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-12 max-w-2xl'>
-          <p className='text-primary mb-2 text-xs font-medium'>
+        <AnimateInView className='mb-16 max-w-2xl'>
+          <p className='text-muted-foreground mb-3 text-sm tracking-wide'>
             {t('How we help you get started')}
           </p>
-          <h2 className='font-serif text-3xl tracking-tight md:text-4xl'>
+          <h2 className='text-3xl font-semibold tracking-tight text-balance md:text-5xl'>
             {t('You do not need to learn the admin panel first.')}
           </h2>
         </AnimateInView>
-        <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
+        <div className='grid gap-x-10 gap-y-12 md:grid-cols-2 lg:grid-cols-3'>
           {features.map((feature, index) => {
             const Icon = feature.icon
             return (
-              <AnimateInView
-                key={feature.title}
-                delay={index * 70}
-                className='bg-card/80 rounded-2xl border p-5'
-              >
-                <span className='bg-primary/10 text-primary mb-4 flex size-10 items-center justify-center rounded-xl'>
-                  <Icon className='size-5' aria-hidden='true' />
-                </span>
-                <h3 className='font-medium'>{feature.title}</h3>
+              <AnimateInView key={feature.title} delay={index * 70}>
+                <Icon
+                  className='text-muted-foreground mb-4 size-5'
+                  strokeWidth={1.5}
+                  aria-hidden='true'
+                />
+                <h3 className='text-base font-medium'>{feature.title}</h3>
                 <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
                   {feature.desc}
                 </p>

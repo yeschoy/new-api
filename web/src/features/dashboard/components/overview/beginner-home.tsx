@@ -21,6 +21,7 @@ import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { LiquidGlassButton } from '@/components/liquid-glass'
 import { Button } from '@/components/ui/button'
 import { GuideDrawer } from '@/features/guide/components/guide-drawer'
 import { getApiKeys } from '@/features/keys/api'
@@ -42,12 +43,15 @@ export function BeginnerHomeView(props: BeginnerHomeViewProps) {
   const [guideOpen, setGuideOpen] = useState(false)
 
   return (
-    <div className='mx-auto flex max-w-3xl flex-col gap-8 px-1 py-4 sm:py-8'>
-      <header>
-        <h1 className='text-2xl font-semibold tracking-tight sm:text-3xl'>
+    <div className='mx-auto flex max-w-3xl flex-col gap-10 px-1 py-6 sm:py-10'>
+      <header className='max-w-2xl'>
+        <p className='text-muted-foreground mb-3 text-sm tracking-wide'>
+          {t('First three minutes')}
+        </p>
+        <h1 className='text-3xl font-semibold tracking-tight text-balance sm:text-4xl'>
           {t('Put AI into the app you already use')}
         </h1>
-        <p className='text-muted-foreground mt-3 text-base leading-relaxed'>
+        <p className='text-muted-foreground mt-4 text-base leading-relaxed'>
           {t(
             'Pick a model, choose a rate group, then create a key. Paste the three fields into your software and send 你好.'
           )}
@@ -57,9 +61,14 @@ export function BeginnerHomeView(props: BeginnerHomeViewProps) {
       <BeginnerSetup />
 
       <div className='flex flex-wrap gap-2'>
-        <Button variant='outline' onClick={() => setGuideOpen(true)}>
+        <LiquidGlassButton
+          glass='default'
+          variant='outline'
+          className='rounded-full'
+          onClick={() => setGuideOpen(true)}
+        >
           {t('How to fill this into an app')}
-        </Button>
+        </LiquidGlassButton>
         {props.hasKey ? (
           <Button variant='ghost' render={<Link to='/keys' />}>
             {t('Manage keys')}

@@ -20,6 +20,7 @@ import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
+import { LiquidGlass } from '@/components/liquid-glass'
 import { USE_CASES } from '@/features/guide/constants'
 import { USE_CASE_ICONS } from '@/features/guide/lib/use-case-icons'
 
@@ -29,34 +30,31 @@ export function UseCases() {
   return (
     <section className='relative z-10 px-4 py-16 sm:px-6 md:py-20'>
       <div className='mx-auto max-w-6xl'>
-        <AnimateInView className='mb-8 max-w-2xl'>
-          <p className='text-primary mb-2 text-xs font-medium'>
+        <AnimateInView className='mb-10 text-center'>
+          <p className='text-muted-foreground mb-3 text-sm tracking-wide'>
             {t('Start from a use case')}
           </p>
-          <h2 className='font-serif text-3xl tracking-tight md:text-4xl'>
+          <h2 className='text-3xl font-semibold tracking-tight text-balance md:text-4xl'>
             {t('First tell us what you want to do.')}
           </h2>
         </AnimateInView>
-        <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+        <div className='flex flex-wrap justify-center gap-3'>
           {USE_CASES.map((useCase, index) => {
             const Icon = USE_CASE_ICONS[useCase.id]
             return (
-              <AnimateInView key={useCase.id} delay={index * 60}>
-                <Link
-                  to='/guide'
-                  search={{ use: useCase.id }}
-                  className='bg-card/80 hover:border-primary/40 block rounded-2xl border px-5 py-4 transition-colors'
-                >
-                  <div className='flex items-center gap-2 font-medium'>
-                    <span className='bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-lg'>
-                      <Icon className='size-4' aria-hidden='true' />
+              <AnimateInView key={useCase.id} delay={index * 50}>
+                <LiquidGlass className='rounded-full border'>
+                  <Link
+                    to='/guide'
+                    search={{ use: useCase.id }}
+                    className='flex items-center gap-2.5 px-4 py-2.5'
+                  >
+                    <Icon className='size-4' aria-hidden='true' />
+                    <span className='text-sm font-medium'>
+                      {t(useCase.labelKey)}
                     </span>
-                    <span>{t(useCase.labelKey)}</span>
-                  </div>
-                  <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
-                    {t(useCase.hintKey)}
-                  </p>
-                </Link>
+                  </Link>
+                </LiquidGlass>
               </AnimateInView>
             )
           })}

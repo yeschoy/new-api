@@ -21,11 +21,11 @@ import { ArrowRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
-import { Button } from '@/components/ui/button'
-import { FieldBackdrop } from '@/features/guide/components/field-backdrop'
+import { LiquidGlassButton } from '@/components/liquid-glass'
+
+import { LandingGlow } from '../landing-glow'
 
 interface CTAProps {
-  className?: string
   isAuthenticated?: boolean
 }
 
@@ -33,16 +33,16 @@ export function CTA(props: CTAProps) {
   const { t } = useTranslation()
 
   return (
-    <section className='relative z-10 overflow-hidden px-4 py-20 sm:px-6 md:py-28'>
-      <FieldBackdrop />
+    <section className='relative isolate overflow-hidden px-4 py-24 sm:px-6 md:py-32'>
+      <LandingGlow />
       <AnimateInView
-        className='mx-auto max-w-2xl text-center'
+        className='mx-auto max-w-3xl text-center'
         animation='scale-in'
       >
-        <h2 className='font-serif text-3xl leading-tight tracking-tight md:text-5xl'>
+        <h2 className='text-4xl font-semibold tracking-tight text-balance md:text-6xl'>
           {t('Start with one app today.')}
         </h2>
-        <p className='text-muted-foreground mx-auto mt-5 max-w-md text-sm leading-relaxed md:text-base'>
+        <p className='text-muted-foreground mx-auto mt-6 max-w-lg text-base leading-relaxed'>
           {props.isAuthenticated
             ? t(
                 'Create a key for the app you will actually use, then open the beginner guide and paste the three fields.'
@@ -51,23 +51,26 @@ export function CTA(props: CTAProps) {
                 'Create an account, make one key, and paste it into Cherry Studio or WorkBuddy. You can grow from there.'
               )}
         </p>
-        <div className='mt-8 flex items-center justify-center gap-3'>
-          <Button
-            className='group rounded-lg'
-            render={<Link to={props.isAuthenticated ? '/keys' : '/sign-up'} />}
+        <div className='mt-10 flex flex-wrap items-center justify-center gap-3'>
+          <LiquidGlassButton
+            className='group h-12 rounded-full border px-6'
+            render={
+              <Link to={props.isAuthenticated ? '/dashboard' : '/sign-up'} />
+            }
           >
             {props.isAuthenticated
-              ? t('Create API Key')
+              ? t('Get Started')
               : t('Create a free account')}
-            <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
-          </Button>
-          <Button
+            <ArrowRight className='ml-1 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+          </LiquidGlassButton>
+          <LiquidGlassButton
+            glass='default'
             variant='outline'
-            className='rounded-lg'
+            className='h-12 rounded-full px-6'
             render={<Link to='/guide' />}
           >
             {t('Usage guide')}
-          </Button>
+          </LiquidGlassButton>
         </div>
       </AnimateInView>
     </section>

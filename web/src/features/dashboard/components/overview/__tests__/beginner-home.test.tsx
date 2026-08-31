@@ -53,6 +53,7 @@ await i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
+        'First three minutes': 'First three minutes',
         'Put AI into the app you already use':
           'Put AI into the app you already use',
         'Pick a model, choose a rate group, then create a key. Paste the three fields into your software and send 你好.':

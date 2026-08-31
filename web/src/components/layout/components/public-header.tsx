@@ -17,17 +17,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { motion } from 'motion/react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { LiquidGlassButton } from '@/components/liquid-glass'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useNotifications } from '@/hooks/use-notifications'
+import { usePointerGlass } from '@/hooks/use-pointer-glass'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 import { cn } from '@/lib/utils'
@@ -73,13 +76,13 @@ function renderAuthControl(args: {
     return <ProfileDropdown />
   }
   return (
-    <Button
+    <LiquidGlassButton
       size='sm'
-      className='h-8 rounded-lg px-3.5 text-xs font-medium'
+      className='h-8 rounded-full border px-3.5 text-xs font-medium'
       render={<Link to='/sign-in' />}
     >
       {args.signInLabel}
-    </Button>
+    </LiquidGlassButton>
   )
 }
 
@@ -119,6 +122,8 @@ export function PublicHeader(props: PublicHeaderProps) {
 
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const navGlass = usePointerGlass<HTMLElement>({ lift: false })
+  const [navHover, setNavHover] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [authPromptTarget, setAuthPromptTarget] =
@@ -223,15 +228,20 @@ export function PublicHeader(props: PublicHeaderProps) {
         <div
           className={cn(
             'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-            scrolled ? 'max-w-[52rem] px-3 pt-3' : 'max-w-7xl px-4 pt-0 md:px-6'
+            scrolled ? 'max-w-[52rem] px-3 pt-3' : 'max-w-6xl px-4 pt-3 md:px-6'
           )}
         >
           <nav
+            ref={navGlass.ref}
+            onPointerMove={navGlass.onPointerMove}
+            onPointerEnter={navGlass.onPointerEnter}
+            onPointerLeave={navGlass.onPointerLeave}
+            onPointerDown={navGlass.onPointerDown}
+            onPointerUp={navGlass.onPointerUp}
+            onPointerCancel={navGlass.onPointerCancel}
             className={cn(
-              'flex items-center justify-between transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
-              scrolled
-                ? 'bg-background/60 ring-border/50 h-12 rounded-2xl pr-1.5 pl-4 shadow-[0_2px_16px_-6px_rgba(0,0,0,0.08),0_0_0_0.5px_rgba(0,0,0,0.02)] ring-[0.5px] backdrop-blur-2xl dark:shadow-[0_2px_16px_-6px_rgba(0,0,0,0.4)]'
-                : 'h-16 px-2'
+              'liquid-glass liquid-glass-interactive flex items-center justify-between border pr-1.5 pl-4 transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',
+              scrolled ? 'h-12 rounded-2xl' : 'h-14 rounded-2xl'
             )}
           >
             {/* Logo */}
@@ -247,16 +257,31 @@ export function PublicHeader(props: PublicHeaderProps) {
                   logoLoaded,
                 })}
               </div>
-              <span className='font-serif text-[15px] font-semibold tracking-tight'>
+              <span className='text-[15px] font-semibold tracking-tight'>
                 {loading ? <Skeleton className='h-4 w-16' /> : displaySiteName}
               </span>
             </Link>
 
             {/* Desktop nav */}
-            <div className='hidden items-center gap-0.5 sm:flex'>
+            <div
+              className='hidden items-center gap-0.5 sm:flex'
+              onPointerLeave={() => setNavHover(null)}
+            >
               {links.map((link) => {
                 const isActive = pathname === link.href
                 const linkKey = `${link.href}-${link.title}`
+                const pill =
+                  navHover === linkKey || (navHover === null && isActive) ? (
+                    <motion.span
+                      layoutId='public-nav-pill'
+                      className='bg-foreground/8 absolute inset-0 -z-10 rounded-lg'
+                      transition={{
+                        type: 'spring',
+                        stiffness: 420,
+                        damping: 32,
+                      }}
+                    />
+                  ) : null
                 if (link.external) {
                   return (
                     <a
@@ -266,12 +291,17 @@ export function PublicHeader(props: PublicHeaderProps) {
                       rel='noopener noreferrer'
                       aria-disabled={link.disabled}
                       tabIndex={link.disabled ? -1 : undefined}
+                      onPointerEnter={() => setNavHover(linkKey)}
                       onClick={(event) => handleNavLinkClick(event, link)}
                       className={cn(
-                        'text-muted-foreground hover:text-foreground rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
+                        'relative z-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
+                        isActive
+                          ? 'text-foreground'
+                          : 'text-muted-foreground hover:text-foreground',
                         link.disabled && 'pointer-events-none opacity-50'
                       )}
                     >
+                      {pill}
                       {t(link.title)}
                     </a>
                   )
@@ -281,15 +311,17 @@ export function PublicHeader(props: PublicHeaderProps) {
                     key={linkKey}
                     to={link.href}
                     disabled={link.disabled}
+                    onPointerEnter={() => setNavHover(linkKey)}
                     onClick={(event) => handleNavLinkClick(event, link)}
                     className={cn(
-                      'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
+                      'relative z-0 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
                       isActive
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground',
                       link.disabled && 'pointer-events-none opacity-50'
                     )}
                   >
+                    {pill}
                     {t(link.title)}
                   </Link>
                 )

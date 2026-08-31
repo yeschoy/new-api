@@ -16,75 +16,75 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Key, Link2, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
 
+import { HelloMock, KeyCreatedMock, PasteFieldsMock } from '../step-mock-cards'
+
+const STEPS = [
+  {
+    num: '01',
+    titleKey: 'Create a key',
+    hintKey: 'Pick a model and a rate group, then create one key per app.',
+    Mock: KeyCreatedMock,
+  },
+  {
+    num: '02',
+    titleKey: 'Paste these three fields',
+    hintKey:
+      'Paste Base URL, API Key, and Model ID into the app you already use.',
+    Mock: PasteFieldsMock,
+  },
+  {
+    num: '03',
+    titleKey: 'Send 你好',
+    hintKey:
+      'Paste the exact model ID, save, and send a short hello. If it replies, you are done.',
+    Mock: HelloMock,
+  },
+] as const
+
 export function HowItWorks() {
   const { t } = useTranslation()
 
-  const steps = [
-    {
-      num: '1',
-      title: t('Create a key'),
-      desc: t(
-        'Sign in, open API Keys, and create one key per app. Copy it before the dialog closes.'
-      ),
-      icon: <Key className='size-6' strokeWidth={1.5} />,
-    },
-    {
-      num: '2',
-      title: t('Copy the address'),
-      desc: t(
-        'Pick mainland or global, then copy Base URL, Host, or Full URL depending on the box in your app.'
-      ),
-      icon: <Link2 className='size-6' strokeWidth={1.5} />,
-    },
-    {
-      num: '3',
-      title: t('Send 你好'),
-      desc: t(
-        'Paste the exact model ID, save, and send a short hello. If it replies, you are done.'
-      ),
-      icon: <MessageSquare className='size-6' strokeWidth={1.5} />,
-    },
-  ]
-
   return (
-    <section className='border-border/40 relative z-10 border-t px-4 py-20 sm:px-6 md:py-28'>
+    <section className='relative z-10 px-4 py-20 sm:px-6 md:py-28'>
       <div className='mx-auto max-w-6xl'>
         <AnimateInView className='mb-14 text-center md:mb-16'>
-          <p className='text-primary mb-3 text-xs font-medium'>
-            {t('First three minutes')}
+          <p className='text-muted-foreground mb-3 text-sm tracking-wide'>
+            {t('Three things.')}
           </p>
-          <h2 className='font-serif text-3xl tracking-tight md:text-4xl'>
+          <h2 className='text-3xl font-semibold tracking-tight text-balance md:text-5xl'>
             {t('Three steps. No server knowledge required.')}
           </h2>
         </AnimateInView>
 
-        <div className='grid gap-8 md:grid-cols-3 md:gap-10'>
-          {steps.map((step, i) => (
-            <AnimateInView
-              key={step.num}
-              delay={i * 150}
-              animation='fade-up'
-              className='relative flex flex-col items-center text-center'
-            >
-              <div className='relative mb-6'>
-                <div className='text-primary border-primary/20 bg-primary/8 flex size-16 items-center justify-center rounded-2xl border'>
-                  {step.icon}
+        <div className='grid gap-10 md:grid-cols-3 md:gap-8'>
+          {STEPS.map((step, i) => {
+            const Mock = step.Mock
+            return (
+              <AnimateInView
+                key={step.num}
+                delay={i * 120}
+                animation='fade-up'
+                className='flex flex-col gap-5'
+              >
+                <div>
+                  <p className='text-muted-foreground font-mono text-xs tracking-widest'>
+                    {step.num}
+                  </p>
+                  <h3 className='mt-2 text-lg font-semibold tracking-tight'>
+                    {t(step.titleKey)}
+                  </h3>
+                  <p className='text-muted-foreground mt-2 text-sm leading-relaxed'>
+                    {t(step.hintKey)}
+                  </p>
                 </div>
-                <div className='bg-foreground text-background absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full text-xs font-bold'>
-                  {step.num}
-                </div>
-              </div>
-              <h3 className='mb-2 text-base font-semibold'>{step.title}</h3>
-              <p className='text-muted-foreground max-w-[280px] text-sm leading-relaxed'>
-                {step.desc}
-              </p>
-            </AnimateInView>
-          ))}
+                <Mock />
+              </AnimateInView>
+            )
+          })}
         </div>
       </div>
     </section>
