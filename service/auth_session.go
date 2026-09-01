@@ -13,16 +13,12 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	RefreshCookieName  = "new_api_refresh"
-	DesktopLoginMethod = "desktop_device"
-)
+const RefreshCookieName = "new_api_refresh"
 
 var (
 	ErrLoginSessionInvalid  = errors.New("login session is invalid")
 	ErrLoginSessionRevoked  = errors.New("login session is revoked")
 	ErrLoginSessionMismatch = errors.New("login session does not match the expected session")
-	ErrLoginSessionMethod   = errors.New("login session method is not allowed")
 	ErrRefreshTokenInvalid  = errors.New("refresh token is invalid")
 	ErrRefreshRace          = errors.New("refresh token was already rotated")
 )
@@ -203,22 +199,6 @@ func advanceCurrentSessionToVersion(identity AuthIdentity, nextUserAuthVersion i
 }
 
 func RefreshLoginSession(rawRefreshToken, expectedSID, ip, userAgent string) (*AuthBundle, *model.User, error) {
-	return refreshLoginSession(rawRefreshToken, expectedSID, "", ip, userAgent)
-}
-
-// RefreshLoginSessionForMethod rotates a refresh token only when the backing
-// session was created by the expected login method. The method check happens
-// before any rotation so a credential presented to the wrong client endpoint
-// is rejected without consuming it.
-func RefreshLoginSessionForMethod(rawRefreshToken, expectedSID, expectedLoginMethod, ip, userAgent string) (*AuthBundle, *model.User, error) {
-	expectedLoginMethod = strings.TrimSpace(expectedLoginMethod)
-	if expectedLoginMethod == "" {
-		return nil, nil, ErrLoginSessionMethod
-	}
-	return refreshLoginSession(rawRefreshToken, expectedSID, expectedLoginMethod, ip, userAgent)
-}
-
-func refreshLoginSession(rawRefreshToken, expectedSID, expectedLoginMethod, ip, userAgent string) (*AuthBundle, *model.User, error) {
 	sid, secret, ok := splitRefreshToken(rawRefreshToken)
 	if !ok {
 		return nil, nil, ErrRefreshTokenInvalid
@@ -235,9 +215,6 @@ func refreshLoginSession(rawRefreshToken, expectedSID, expectedLoginMethod, ip, 
 	}
 	if session.Status != model.UserSessionStatusActive || session.RevokedAt != 0 || session.ExpiresAt <= time.Now().Unix() {
 		return nil, nil, ErrLoginSessionRevoked
-	}
-	if expectedLoginMethod != "" && session.LoginMethod != expectedLoginMethod {
-		return nil, nil, ErrLoginSessionMethod
 	}
 	userCache, err := model.GetUserCache(session.UserID)
 	if err != nil {
@@ -416,8 +393,6 @@ func authSessionErrorCode(err error) (int, string) {
 		return http.StatusTooManyRequests, "AUTH_SESSION_ISSUANCE_LIMIT"
 	case errors.Is(err, ErrLoginSessionMismatch):
 		return http.StatusConflict, "AUTH_SESSION_MISMATCH"
-	case errors.Is(err, ErrLoginSessionMethod):
-		return http.StatusForbidden, "AUTH_SESSION_METHOD"
 	case errors.Is(err, ErrRefreshRace):
 		return http.StatusConflict, "AUTH_REFRESH_RACE"
 	case errors.Is(err, ErrAuthTokenExpired):
