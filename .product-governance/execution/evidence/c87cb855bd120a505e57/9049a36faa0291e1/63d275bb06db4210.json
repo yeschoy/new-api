@@ -1,0 +1,14 @@
+{
+  "scenarioId": "DESKTOP-V2-SCOPED-AS-07",
+  "assertion": "The latest authenticated approval page requires explicit action, handles success and failure states and never exposes device_code.",
+  "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_browser_approval_surface",
+  "acceptanceCommandId": "desktop-v2-scoped-web",
+  "runId": "RU-DESKTOP-INTEGRATION-V2-SCOPED/WP-DESKTOP-INTEGRATION-V2-SCOPED@2026-09-01T13:09:15.172889+00:00",
+  "packageId": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+  "evidenceOwner": "govern-product-build/verifier",
+  "passed": false,
+  "runnerProof": null,
+  "commandResultHash": "sha256:0f28d180b1c61873d01e4e73ed81729253e6cfc3985d994a9278504efd1bf3a6",
+  "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+  "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958"
+}

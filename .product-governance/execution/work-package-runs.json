@@ -64,6 +64,38 @@
       "reportSha256": "sha256:f3752e4a5e9890e88781b3267e0ef56e90415c3d590a982d658c82ba60ec8c15",
       "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2",
       "releaseUnitHash": "sha256:17fac34dfadf4d7215fc5e093a44eebc5448744ec094872379694a98877a2fa7"
+    },
+    {
+      "id": "RU-DESKTOP-INTEGRATION-V2-SCOPED/WP-DESKTOP-INTEGRATION-V2-SCOPED@2026-09-01T13:09:15.172889+00:00",
+      "packageId": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+      "baselineCommit": "c15b3d1ecbeff08de46da77990343ca861e1f4cb",
+      "baselineTreeHash": "sha256:5b7d08b6df164a24c914f22f7d0accda5b4fa04bc2c12d8a9fb19eb0c1665cfa",
+      "baselineSnapshotPath": "execution/baselines/9049a36faa0291e1.c87cb855bd120a505e57.json",
+      "baselineSnapshotSha256": "sha256:2c0d28fbebe973b2d21fdb82715eb534d02c11ecd0517fc43c32ee6ccc0f3935",
+      "assignedTo": "codex-primary",
+      "status": "failed",
+      "startedAt": "2026-09-01T13:09:15.172889+00:00",
+      "finishedAt": "2026-09-01T13:20:38.784319+00:00",
+      "reportPath": "execution/reports/9049a36faa0291e1.c87cb855bd120a505e57.json",
+      "reportSha256": "sha256:84dcd0ea7279d0cec08ed22dae06a5a2843d69dee7408c84427e8aecc9f0cbe7",
+      "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+      "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958"
+    },
+    {
+      "id": "RU-DESKTOP-INTEGRATION-V2-SCOPED/WP-DESKTOP-INTEGRATION-V2-SCOPED@2026-09-01T13:22:32.789096+00:00",
+      "packageId": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+      "baselineCommit": "c15b3d1ecbeff08de46da77990343ca861e1f4cb",
+      "baselineTreeHash": "sha256:5b7d08b6df164a24c914f22f7d0accda5b4fa04bc2c12d8a9fb19eb0c1665cfa",
+      "baselineSnapshotPath": "execution/baselines/9049a36faa0291e1.6904e0bd953bf21c87c1.json",
+      "baselineSnapshotSha256": "sha256:2c0d28fbebe973b2d21fdb82715eb534d02c11ecd0517fc43c32ee6ccc0f3935",
+      "assignedTo": "codex-primary",
+      "status": "completed",
+      "startedAt": "2026-09-01T13:22:32.789096+00:00",
+      "finishedAt": "2026-09-01T13:32:53.381475+00:00",
+      "reportPath": "execution/reports/9049a36faa0291e1.6904e0bd953bf21c87c1.json",
+      "reportSha256": "sha256:4159fb0c7b760092dd29cb4551dc49249800068d39a5667feaf476c3972faa70",
+      "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+      "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958"
     }
   ]
 }

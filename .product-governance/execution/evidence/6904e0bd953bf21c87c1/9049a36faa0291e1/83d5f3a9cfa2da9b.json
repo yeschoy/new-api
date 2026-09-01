@@ -1,0 +1,28 @@
+{
+  "scenarioId": "DESKTOP-V2-SCOPED-AS-06",
+  "assertion": "Desktop sessions are denied outside the closed route allowlist, cannot approve another device, and browser refresh or logout credentials are rejected without mutation.",
+  "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_desktop_session_scope",
+  "acceptanceCommandId": "desktop-v2-scoped-authority",
+  "runId": "RU-DESKTOP-INTEGRATION-V2-SCOPED/WP-DESKTOP-INTEGRATION-V2-SCOPED@2026-09-01T13:22:32.789096+00:00",
+  "packageId": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+  "evidenceOwner": "govern-product-build/verifier",
+  "passed": true,
+  "runnerProof": {
+    "schemaVersion": 1,
+    "adapter": "pytest-json@1",
+    "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_desktop_session_scope",
+    "cwd": ".",
+    "executedPassingTests": 1,
+    "actualExitCode": 0,
+    "runnerMetadataSha256": "sha256:428eb83c5f80b9032863c960585215e0aeb9e9bfe0d1ac225218637e1b34cacc",
+    "machineReportSha256": "sha256:1334db7ea965991be398a4820aacfd8ce56eaaa3afdb85c90e2aa64b12e07237",
+    "isolation": {
+      "adapter": "darwin-sandbox-exec-readonly-source@1",
+      "policySha256": "sha256:ce180896b31f4375b160bbeb625f09f48479a65867476702f428994cacc7af1c",
+      "executableSha256": "sha256:2ff75194b3e5689debee061c69f27f873ca21ff8fc54b7d49cbf5f2fb673f6ea"
+    }
+  },
+  "commandResultHash": "sha256:f35f281ddda25c9c9777951e6dee4383ae48b61db89e40ffbc3480b82e327865",
+  "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+  "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958"
+}

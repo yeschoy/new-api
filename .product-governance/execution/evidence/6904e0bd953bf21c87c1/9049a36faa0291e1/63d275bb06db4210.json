@@ -1,0 +1,28 @@
+{
+  "scenarioId": "DESKTOP-V2-SCOPED-AS-07",
+  "assertion": "The latest authenticated approval page requires explicit action, handles success and failure states and never exposes device_code.",
+  "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_browser_approval_surface",
+  "acceptanceCommandId": "desktop-v2-scoped-web",
+  "runId": "RU-DESKTOP-INTEGRATION-V2-SCOPED/WP-DESKTOP-INTEGRATION-V2-SCOPED@2026-09-01T13:22:32.789096+00:00",
+  "packageId": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+  "evidenceOwner": "govern-product-build/verifier",
+  "passed": true,
+  "runnerProof": {
+    "schemaVersion": 1,
+    "adapter": "pytest-json@1",
+    "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_browser_approval_surface",
+    "cwd": ".",
+    "executedPassingTests": 1,
+    "actualExitCode": 0,
+    "runnerMetadataSha256": "sha256:186c48aacfd7b8cf47e41eeac3413b8cd396b7809431bcf1570504ea1717ed1c",
+    "machineReportSha256": "sha256:8efab303a9f3fb5c089c6f9aeeaf4225fa70f8f98014fd98db1be82eb226bc51",
+    "isolation": {
+      "adapter": "darwin-sandbox-exec-readonly-source@1",
+      "policySha256": "sha256:3825f055827fc5483bb8942b45d06a5381c46eae0369fe1c96d56d8ca8975a85",
+      "executableSha256": "sha256:2ff75194b3e5689debee061c69f27f873ca21ff8fc54b7d49cbf5f2fb673f6ea"
+    }
+  },
+  "commandResultHash": "sha256:918f117f9895e071649fb1a5049953a1707dc10feef8d4a72ce3ce946bfb9d18",
+  "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+  "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958"
+}

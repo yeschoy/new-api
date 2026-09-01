@@ -1,0 +1,28 @@
+{
+  "scenarioId": "DESKTOP-V2-SCOPED-AS-02",
+  "assertion": "A browser-approved unexpired device code issues one dedicated desktop_device user_session and no new table.",
+  "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_happy_path",
+  "acceptanceCommandId": "desktop-v2-scoped-happy",
+  "runId": "RU-DESKTOP-INTEGRATION-V2-SCOPED/WP-DESKTOP-INTEGRATION-V2-SCOPED@2026-09-01T13:22:32.789096+00:00",
+  "packageId": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+  "evidenceOwner": "govern-product-build/verifier",
+  "passed": true,
+  "runnerProof": {
+    "schemaVersion": 1,
+    "adapter": "pytest-json@1",
+    "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_happy_path",
+    "cwd": ".",
+    "executedPassingTests": 1,
+    "actualExitCode": 0,
+    "runnerMetadataSha256": "sha256:304a58bbf80f2663f2c2b8de2b674bfc045cd4758e8f08c868984089357efae9",
+    "machineReportSha256": "sha256:bc333f37f4bbd00e48da9326218da76780ec9201b5122b14ff99dcdec9ba8530",
+    "isolation": {
+      "adapter": "darwin-sandbox-exec-readonly-source@1",
+      "policySha256": "sha256:ca89defa2c0ad2e5eabb7dc779d666dec0335ef940335187cecaac439d2f1896",
+      "executableSha256": "sha256:2ff75194b3e5689debee061c69f27f873ca21ff8fc54b7d49cbf5f2fb673f6ea"
+    }
+  },
+  "commandResultHash": "sha256:ce3b92cac8d56390a03b061d40e62234a23c7269d48f3b128d4c5cc722590410",
+  "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+  "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958"
+}

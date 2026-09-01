@@ -1,0 +1,28 @@
+{
+  "scenarioId": "DESKTOP-V2-SCOPED-AS-05",
+  "assertion": "Desktop refresh rotates its secret, logout revokes only the current session and failed refresh remains recoverable.",
+  "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_refresh_revoke_and_recovery",
+  "acceptanceCommandId": "desktop-v2-scoped-refresh",
+  "runId": "RU-DESKTOP-INTEGRATION-V2-SCOPED/WP-DESKTOP-INTEGRATION-V2-SCOPED@2026-09-01T13:22:32.789096+00:00",
+  "packageId": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+  "evidenceOwner": "govern-product-build/verifier",
+  "passed": true,
+  "runnerProof": {
+    "schemaVersion": 1,
+    "adapter": "pytest-json@1",
+    "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_refresh_revoke_and_recovery",
+    "cwd": ".",
+    "executedPassingTests": 1,
+    "actualExitCode": 0,
+    "runnerMetadataSha256": "sha256:a7b2247e5c0228152c885d167930477eddbfe7cb701e8cf3e2879afd365f54bc",
+    "machineReportSha256": "sha256:67d2b6773c5b6d79a529cca40f3a50b77aeed06fb0e8d1880912f2cedc61a042",
+    "isolation": {
+      "adapter": "darwin-sandbox-exec-readonly-source@1",
+      "policySha256": "sha256:688ac8aa09e29c94098448c16920f9bece5956676373edbc8f45b9bf82f7dfbb",
+      "executableSha256": "sha256:2ff75194b3e5689debee061c69f27f873ca21ff8fc54b7d49cbf5f2fb673f6ea"
+    }
+  },
+  "commandResultHash": "sha256:50710102bba55e8fdc9aa7675f3e858f124a9ff91371c98f49b79d2484d97cf0",
+  "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+  "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958"
+}

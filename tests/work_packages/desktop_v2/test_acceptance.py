@@ -88,12 +88,22 @@ def test_refresh_revoke_and_recovery(tmp_path: Path) -> None:
     go_test("./model", "TestRotateUserSessionRefreshRaceAndReuse", tmp_path)
 
 
+def test_desktop_session_scope(tmp_path: Path) -> None:
+    go_test("./middleware", "TestDesktopSessionUsesClosedDashboardRouteScope", tmp_path)
+    go_test("./service", "TestRefreshLoginSessionForMethodRejectsBeforeRotation", tmp_path)
+    go_test(
+        "./controller",
+        "Test(DecideDesktopDeviceAuthorizationRejectsDesktopSession|RefreshDesktopSessionRejectsBrowserSessionWithoutRotation|RevokeCurrentDesktopSessionRejectsBrowserSession)",
+        tmp_path,
+    )
+
+
 def test_browser_approval_surface() -> None:
+    vitest = ROOT / "web" / "node_modules" / ".bin" / "vitest"
+    assert vitest.is_file(), "frontend dependencies are not installed"
     run(
         [
-            "bun",
-            "x",
-            "vitest",
+            str(vitest),
             "run",
             "src/features/desktop-authorization/__tests__/authorization.test.tsx",
             "--configLoader",
