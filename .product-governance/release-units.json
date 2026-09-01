@@ -482,16 +482,26 @@
     },
     {
       "id": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
-      "status": "review",
+      "status": "frozen",
       "objective": "Replace the prior desktop v2 authority with the latest beginner UI integration, retained existing API-key management and server-enforced least-privilege desktop_device session boundaries without database or deployment changes.",
       "decisionRef": "DEC-003",
-      "dependsOnReleaseUnits": ["RU-DESKTOP-INTEGRATION-V2"],
-      "supersedesReleaseUnits": ["RU-DESKTOP-INTEGRATION-V2"],
+      "dependsOnReleaseUnits": [
+        "RU-DESKTOP-INTEGRATION-V2"
+      ],
+      "supersedesReleaseUnits": [
+        "RU-DESKTOP-INTEGRATION-V2"
+      ],
       "roots": {
-        "workPackages": ["WP-DESKTOP-INTEGRATION-V2-SCOPED"],
-        "requirements": ["REQ-003"],
+        "workPackages": [
+          "WP-DESKTOP-INTEGRATION-V2-SCOPED"
+        ],
+        "requirements": [
+          "REQ-003"
+        ],
         "nonFunctionalRequirements": [],
-        "domains": ["desktop-integration"],
+        "domains": [
+          "desktop-integration"
+        ],
         "contracts": [
           "desktop-bootstrap@v2",
           "desktop-device-authorization-create@v2",
@@ -508,9 +518,220 @@
         "entitlements": [],
         "trackCoverage": []
       },
-      "closure": null,
-      "deferredSnapshot": null,
-      "freeze": null
+      "closure": {
+        "workPackages": [
+          "WP-DESKTOP-INTEGRATION-V2-SCOPED"
+        ],
+        "requirements": [
+          "REQ-001",
+          "REQ-002",
+          "REQ-003"
+        ],
+        "nonFunctionalRequirements": [],
+        "domains": [
+          "desktop-integration"
+        ],
+        "contracts": [
+          "desktop-bootstrap@v1",
+          "desktop-bootstrap@v2",
+          "desktop-device-authorization-create@v2",
+          "desktop-device-authorization-decision@v2",
+          "desktop-device-authorization-exchange@v2",
+          "desktop-session-refresh@v2",
+          "desktop-session-revoke@v2"
+        ],
+        "stateMachines": [],
+        "pages": [],
+        "pageStateProfiles": [],
+        "journeys": [],
+        "actors": [],
+        "dataLifecycleResources": [],
+        "aiScenarios": [],
+        "entitlements": [],
+        "trackCoverage": [],
+        "evidence": [
+          "E-CLIENT-001",
+          "E-CLIENT-002",
+          "E-CODE-001",
+          "E-CODE-002",
+          "E-CODE-003",
+          "E-USER-001",
+          "E-USER-002",
+          "E-USER-003"
+        ],
+        "decisions": [
+          "DEC-001",
+          "DEC-003"
+        ],
+        "conflicts": [],
+        "glossaryTerms": [],
+        "resources": [
+          "desktop-bootstrap-declaration",
+          "desktop-device-authorization"
+        ],
+        "tracks": [
+          "desktop-api"
+        ]
+      },
+      "deferredSnapshot": {
+        "schemaVersion": 1,
+        "catalogHash": "sha256:4bdbc86d01c9e8126d67090cfc715f91a60c4eb70f7fbf8490c29c5e8b2e1f98",
+        "items": [
+          {
+            "subjectKind": "actors",
+            "subjectId": "*",
+            "message": "No product actors are defined"
+          },
+          {
+            "subjectKind": "aiScenarios",
+            "subjectId": "*",
+            "message": "No AI scenarios are defined"
+          },
+          {
+            "subjectKind": "dataLifecycleResources",
+            "subjectId": "*",
+            "message": "No data lifecycle resources are defined"
+          },
+          {
+            "subjectKind": "entitlements",
+            "subjectId": "*",
+            "message": "No entitlement capabilities are defined"
+          },
+          {
+            "subjectKind": "glossaryTerms",
+            "subjectId": "*",
+            "message": "No canonical glossary terms are defined"
+          },
+          {
+            "subjectKind": "journeys",
+            "subjectId": "*",
+            "message": "No end-to-end journeys are defined"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-accessibility",
+            "message": "High-impact non-functional requirement is unresolved: NFR-accessibility (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-ai_cost",
+            "message": "High-impact non-functional requirement is unresolved: NFR-ai_cost (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-ai_quality",
+            "message": "High-impact non-functional requirement is unresolved: NFR-ai_quality (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-backup_restore",
+            "message": "High-impact non-functional requirement is unresolved: NFR-backup_restore (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-capacity",
+            "message": "High-impact non-functional requirement is unresolved: NFR-capacity (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-commerce",
+            "message": "High-impact non-functional requirement is unresolved: NFR-commerce (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-migration",
+            "message": "High-impact non-functional requirement is unresolved: NFR-migration (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-observability",
+            "message": "High-impact non-functional requirement is unresolved: NFR-observability (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-operations",
+            "message": "High-impact non-functional requirement is unresolved: NFR-operations (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-performance",
+            "message": "High-impact non-functional requirement is unresolved: NFR-performance (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-privacy",
+            "message": "High-impact non-functional requirement is unresolved: NFR-privacy (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-reliability",
+            "message": "High-impact non-functional requirement is unresolved: NFR-reliability (unknown)"
+          },
+          {
+            "subjectKind": "nonFunctionalRequirements",
+            "subjectId": "NFR-security",
+            "message": "High-impact non-functional requirement is unresolved: NFR-security (unknown)"
+          },
+          {
+            "subjectKind": "pages",
+            "subjectId": "*",
+            "message": "No pages are defined"
+          },
+          {
+            "subjectKind": "stateMachines",
+            "subjectId": "*",
+            "message": "No canonical state machines are defined"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "ability_estimate::desktop-api",
+            "message": "Capability ability_estimate/desktop-api remains unknown"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "attempt::desktop-api",
+            "message": "Capability attempt/desktop-api remains unknown"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "evidence::desktop-api",
+            "message": "Capability evidence/desktop-api remains unknown"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "global_ask::desktop-api",
+            "message": "Capability global_ask/desktop-api remains unknown"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "mastery::desktop-api",
+            "message": "Capability mastery/desktop-api remains unknown"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "planning::desktop-api",
+            "message": "Capability planning/desktop-api remains unknown"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "reflection::desktop-api",
+            "message": "Capability reflection/desktop-api remains unknown"
+          },
+          {
+            "subjectKind": "trackCoverage",
+            "subjectId": "report::desktop-api",
+            "message": "Capability report/desktop-api remains unknown"
+          }
+        ]
+      },
+      "freeze": {
+        "releaseUnitId": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+        "decisionId": "DEC-003",
+        "commit": "be58778db93b4b637935591a0fdc52713e40d9c5",
+        "frozenAt": "2026-09-01T13:07:30.527108+00:00",
+        "releaseUnitHash": "sha256:09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958",
+        "snapshotPath": "execution/release-unit-snapshots/09d44c57814b44bb57c15af796097e1ce73b912fd0ee873af41cfb0480ed8958/release-unit.json"
+      }
     }
   ]
 }
