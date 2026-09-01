@@ -479,6 +479,38 @@
         "releaseUnitHash": "sha256:17fac34dfadf4d7215fc5e093a44eebc5448744ec094872379694a98877a2fa7",
         "snapshotPath": "execution/release-unit-snapshots/17fac34dfadf4d7215fc5e093a44eebc5448744ec094872379694a98877a2fa7/release-unit.json"
       }
+    },
+    {
+      "id": "RU-DESKTOP-INTEGRATION-V2-SCOPED",
+      "status": "review",
+      "objective": "Replace the prior desktop v2 authority with the latest beginner UI integration, retained existing API-key management and server-enforced least-privilege desktop_device session boundaries without database or deployment changes.",
+      "decisionRef": "DEC-003",
+      "dependsOnReleaseUnits": ["RU-DESKTOP-INTEGRATION-V2"],
+      "supersedesReleaseUnits": ["RU-DESKTOP-INTEGRATION-V2"],
+      "roots": {
+        "workPackages": ["WP-DESKTOP-INTEGRATION-V2-SCOPED"],
+        "requirements": ["REQ-003"],
+        "nonFunctionalRequirements": [],
+        "domains": ["desktop-integration"],
+        "contracts": [
+          "desktop-bootstrap@v2",
+          "desktop-device-authorization-create@v2",
+          "desktop-device-authorization-decision@v2",
+          "desktop-device-authorization-exchange@v2",
+          "desktop-session-refresh@v2",
+          "desktop-session-revoke@v2"
+        ],
+        "stateMachines": [],
+        "pages": [],
+        "journeys": [],
+        "dataLifecycleResources": [],
+        "aiScenarios": [],
+        "entitlements": [],
+        "trackCoverage": []
+      },
+      "closure": null,
+      "deferredSnapshot": null,
+      "freeze": null
     }
   ]
 }

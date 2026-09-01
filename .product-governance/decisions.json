@@ -28,6 +28,20 @@
         "pageRefs": [],
         "domainRefs": ["desktop-integration"]
       }
+    },
+    {
+      "id": "DEC-003",
+      "question": "What capability and security boundary replaces the frozen desktop integration v2 authority on the latest beginner UI baseline?",
+      "choice": "Supersede the prior v2 authority with the same additive device-authorization and session contracts, explicitly retain desktop API-key management through the existing /api/token routes, and enforce a server-side closed allowlist for every desktop_device session. Only a normal browser session may approve a device; only a desktop_device refresh token or access token may refresh or revoke a desktop session. Add no database schema or migration, do not process payment, and prepare a reviewed PR without directly merging or deploying main.",
+      "status": "accepted",
+      "decidedBy": "product owner",
+      "decidedAt": "2026-09-01T13:03:25Z",
+      "evidenceRefs": ["E-USER-003", "E-CODE-003"],
+      "affects": {
+        "requirementRefs": ["REQ-003"],
+        "pageRefs": [],
+        "domainRefs": ["desktop-integration"]
+      }
     }
   ]
 }

@@ -158,6 +158,112 @@
         "Deployment or production configuration becomes necessary."
       ],
       "status": "planned"
+    },
+    {
+      "id": "WP-DESKTOP-INTEGRATION-V2-SCOPED",
+      "wave": "integration",
+      "owner": "backend-api",
+      "riskClass": "high",
+      "objective": "Integrate desktop v2 onto the latest beginner UI baseline, retain existing API-key management and enforce least-privilege desktop_device session boundaries without database or deployment changes.",
+      "deliverables": [
+        "Unchanged desktop bootstrap v1 plus the existing v2 device authorization and approval surface on the latest UI baseline.",
+        "Server-validated desktop_device identity sourced from existing user_sessions.",
+        "Closed method-and-route allowlist for account, usage, models, pricing, existing API-key management and desktop logout.",
+        "Browser-only device approval and desktop-only refresh/logout with rejection before refresh-token rotation.",
+        "Contract, route, concurrency, replay, expiry, refresh, revocation, authorization-scope and browser behavior evidence."
+      ],
+      "requirementRefs": ["REQ-003"],
+      "decisionRefs": ["DEC-003"],
+      "blockingDecisionRefs": [],
+      "nonGoals": [
+        "No database schema, migration, duplicate session or API-key table, payment processing, deployment, Nginx or production configuration change.",
+        "No access from desktop_device sessions to account mutation, payment, 2FA, passkey, OAuth binding, administrator or other dashboard routes.",
+        "No desktop client repository change in this server integration package."
+      ],
+      "dependsOn": ["WP-DESKTOP-INTEGRATION-V2"],
+      "allowedPaths": [
+        "controller/desktop.go",
+        "controller/desktop_v2_test.go",
+        "middleware/auth.go",
+        "middleware/auth_test.go",
+        "service/auth_session.go",
+        "service/auth_session_test.go",
+        "service/auth_token.go",
+        "service/desktop_device_authorization.go",
+        "service/desktop_device_authorization_test.go",
+        "router/api-router.go",
+        "router/desktop_v2_router_test.go",
+        "web/src/features/desktop-authorization/**",
+        "web/src/routes/_authenticated/desktop-authorize/**",
+        "web/src/routeTree.gen.ts",
+        "web/src/i18n/locales/**",
+        "docs/desktop-api-v2.md",
+        "docs/contracts/desktop-integration.v2.schema.json",
+        "tests/work_packages/desktop_v2/**"
+      ],
+      "forbiddenPaths": [
+        ".product-governance/**",
+        "model/**",
+        "bin/**",
+        "docker-compose.yml",
+        ".github/**",
+        "web/src/features/wallet/**"
+      ],
+      "migrationPolicy": {
+        "mode": "none",
+        "ownedPaths": [],
+        "dataBackfill": "No schema or customer-data migration. Existing user_sessions.login_method distinguishes desktop_device sessions and existing token storage remains authoritative.",
+        "rollback": "Revert the successor integration commit set and retain v1; no data recovery or migration rollback is required, and pending Redis keys expire naturally."
+      },
+      "compatibilityPolicy": {
+        "strategy": "Keep v1 byte-for-byte compatible, preserve the v2 wire contract and tighten only server-side authority to the already declared browser and desktop session roles.",
+        "supportedVersions": "desktop-bootstrap@v1 remains recognition-only; desktop integration v2 retains minimum client version 0.2.0 and existing route declarations.",
+        "removalGate": "V1 removal, v2 wire changes, expansion beyond the closed desktop route allowlist or database changes require a later successor release unit."
+      },
+      "inputContracts": [
+        "desktop-bootstrap@v1",
+        "desktop-bootstrap@v2",
+        "desktop-device-authorization-create@v2",
+        "desktop-device-authorization-decision@v2",
+        "desktop-device-authorization-exchange@v2",
+        "desktop-session-refresh@v2",
+        "desktop-session-revoke@v2"
+      ],
+      "outputContracts": [
+        "desktop-bootstrap@v2",
+        "desktop-device-authorization-create@v2",
+        "desktop-device-authorization-decision@v2",
+        "desktop-device-authorization-exchange@v2",
+        "desktop-session-refresh@v2",
+        "desktop-session-revoke@v2"
+      ],
+      "acceptanceCommands": [
+        {"id": "desktop-v2-scoped-contract", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_contract_and_v1_compatibility", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-scoped-happy", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_happy_path", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-scoped-failure", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_failure_paths", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-scoped-replay", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_replay_and_race", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-scoped-refresh", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_refresh_revoke_and_recovery", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-scoped-authority", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_desktop_session_scope", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-scoped-web", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_browser_approval_surface", "cwd": ".", "timeoutSeconds": 900}
+      ],
+      "requiredAcceptanceScenarios": [
+        {"id": "DESKTOP-V2-SCOPED-AS-01", "assertion": "V1 stays exact while v2 keeps its closed routes, fixed comparison rate and retained tool-key declaration on the latest UI baseline.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_contract_and_v1_compatibility", "acceptanceCommandId": "desktop-v2-scoped-contract"},
+        {"id": "DESKTOP-V2-SCOPED-AS-02", "assertion": "A browser-approved unexpired device code issues one dedicated desktop_device user_session and no new table.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_happy_path", "acceptanceCommandId": "desktop-v2-scoped-happy"},
+        {"id": "DESKTOP-V2-SCOPED-AS-03", "assertion": "Missing Redis, malformed codes, pending, slow-down, denied and expired states never issue credentials, and a valid retry remains recoverable.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_failure_paths", "acceptanceCommandId": "desktop-v2-scoped-failure"},
+        {"id": "DESKTOP-V2-SCOPED-AS-04", "assertion": "Concurrent exchange creates at most one session and consumed authorization cannot be replayed.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_replay_and_race", "acceptanceCommandId": "desktop-v2-scoped-replay"},
+        {"id": "DESKTOP-V2-SCOPED-AS-05", "assertion": "Desktop refresh rotates its secret, logout revokes only the current session and failed refresh remains recoverable.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_refresh_revoke_and_recovery", "acceptanceCommandId": "desktop-v2-scoped-refresh"},
+        {"id": "DESKTOP-V2-SCOPED-AS-06", "assertion": "Desktop sessions are denied outside the closed route allowlist, cannot approve another device, and browser refresh or logout credentials are rejected without mutation.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_desktop_session_scope", "acceptanceCommandId": "desktop-v2-scoped-authority"},
+        {"id": "DESKTOP-V2-SCOPED-AS-07", "assertion": "The latest authenticated approval page requires explicit action, handles success and failure states and never exposes device_code.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_browser_approval_surface", "acceptanceCommandId": "desktop-v2-scoped-web"}
+      ],
+      "verificationOnly": false,
+      "stopConditions": [
+        "Any implementation requires a database schema or migration.",
+        "Any desktop_device route outside the closed allowlist is required.",
+        "A desktop access token can approve another device or a browser refresh token can rotate through the desktop endpoint.",
+        "Any credential is placed in a URL, browser storage or log.",
+        "V1 compatibility changes, payment processing or production deployment becomes necessary."
+      ],
+      "status": "planned"
     }
   ]
 }

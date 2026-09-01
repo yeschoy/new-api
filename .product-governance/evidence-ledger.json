@@ -66,6 +66,28 @@
       "status": "active",
       "verificationLevel": 1,
       "basisRefs": []
+    },
+    {
+      "id": "E-USER-003",
+      "claim": "The product owner confirmed that the final latest-UI integration must retain desktop API-key management while keeping desktop sessions restricted to the declared desktop capabilities, and authorized preparing the integrated branch and PR without directly merging or deploying main.",
+      "class": "user_confirmed",
+      "locator": "conversation:2026-09-01:retain-desktop-api-key-management-and-integrate",
+      "observedAt": "2026-09-01T13:03:25Z",
+      "scope": "target",
+      "status": "active",
+      "verificationLevel": 0,
+      "basisRefs": []
+    },
+    {
+      "id": "E-CODE-003",
+      "claim": "The integrated server identifies desktop_device sessions from existing user_sessions, applies a closed method-and-route allowlist, requires a non-desktop browser session for approval, and requires a desktop session for desktop refresh and logout without adding schema or migration files.",
+      "class": "code_observed",
+      "locator": "middleware/auth.go;controller/desktop.go;service/auth_session.go;service/auth_token.go;git:ab420373",
+      "observedAt": "2026-09-01T13:03:25Z",
+      "scope": "current",
+      "status": "active",
+      "verificationLevel": 1,
+      "basisRefs": []
     }
   ]
 }

@@ -34,6 +34,23 @@
         "The wallet endpoint returns only the first-party /wallet/ URL and the desktop API does not accept payment details or payment callbacks.",
         "No model, migration, database schema, deployment, Nginx or production configuration file changes belong to this release unit."
       ]
+    },
+    {
+      "id": "REQ-003",
+      "statement": "The latest beginner UI baseline integrates desktop v2 with retained API-key management and a server-enforced least-privilege boundary for desktop_device sessions, without changing database schema or deploying production.",
+      "scope": "target",
+      "impact": "critical",
+      "state": "confirmed",
+      "owner": "desktop-integration",
+      "evidenceRefs": ["E-USER-003", "E-CODE-003"],
+      "acceptance": [
+        "Desktop bootstrap v1 remains unchanged while v2 advertises the implemented account, usage, models, pricing and tool-key capabilities.",
+        "A desktop_device access token can reach only the exact declared read routes, existing /api/token management routes and current desktop logout; every other dashboard route returns AUTH_DESKTOP_SCOPE_DENIED.",
+        "Device approval requires a live non-desktop browser session, and a desktop access token cannot approve another device.",
+        "Desktop refresh accepts only a desktop_device refresh token and rejects a browser refresh token before rotation; desktop logout rejects browser and PAT identities.",
+        "The five-minute Redis authorization flow remains single-issuance, bounded and compatible with the unchanged v1 contract and the latest authenticated approval UI.",
+        "No model, migration, database schema, payment, deployment, Nginx or production configuration file changes belong to this successor release unit."
+      ]
     }
   ]
 }
