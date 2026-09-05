@@ -49,3 +49,5 @@ go.work.sum
 .agents/skills/trellis-*/
 .opencode/
 .codex/
+.cursor/
+.agents/
