@@ -16,228 +16,207 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { CherryStudio } from '@lobehub/icons'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, BookOpen } from 'lucide-react'
+import {
+  ArrowRight,
+  Calculator,
+  Check,
+  ReceiptText,
+  Sparkles,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { Button } from '@/components/ui/button'
-import { useStatus } from '@/hooks/use-status'
-
-import { HeroTerminalDemo } from '../hero-terminal-demo'
+import { YecaiAction, YecaiPanel, YecaiPriceFlow } from '@/components/yecai'
+import { DEFAULT_SYSTEM_NAME } from '@/lib/constants'
 
 interface HeroProps {
   className?: string
   isAuthenticated?: boolean
+  maxSavingsPercent?: number
 }
 
-// Stylized three-dots indicator representing "More"
-const MoreIcon = () => (
-  <svg
-    className='text-muted-foreground/60 group-hover:text-foreground size-6 shrink-0 transition-colors'
-    viewBox='0 0 24 24'
-    fill='none'
-    xmlns='http://www.w3.org/2000/svg'
-  >
-    <circle cx='6' cy='12' r='2' fill='currentColor' />
-    <circle cx='12' cy='12' r='2' fill='currentColor' />
-    <circle cx='18' cy='12' r='2' fill='currentColor' />
-  </svg>
-)
+/** A price-flow receipt built only from live pricing. */
+function HeroSavingsFlow(props: { maxSavingsPercent?: number }) {
+  const { t } = useTranslation()
+  const hasSavings =
+    props.maxSavingsPercent != null && props.maxSavingsPercent > 0
+
+  return (
+    <div className='relative w-full max-w-[31rem]'>
+      <div
+        aria-hidden
+        className='dopa-glow-pulse absolute -inset-8 -z-10 rounded-[3rem] opacity-60 blur-3xl'
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 55% at 30% 30%, color-mix(in oklch, var(--chart-1) 32%, transparent), transparent 70%), radial-gradient(ellipse 55% 50% at 75% 65%, color-mix(in oklch, var(--chart-3) 26%, transparent), transparent 70%)',
+        }}
+      />
+
+      <YecaiPanel
+        as='aside'
+        tone='model'
+        layer='hero'
+        className='dopa-token-grid overflow-hidden p-5 sm:p-6'
+      >
+        <div className='relative z-10 flex items-center justify-between gap-4'>
+          <div>
+            <div className='text-muted-foreground flex items-center gap-2 text-[10px] font-black tracking-[0.16em] uppercase'>
+              <ReceiptText className='size-3.5' aria-hidden='true' />
+              {t('Savings receipt')}
+            </div>
+            <div className='mt-1 text-lg font-black'>{DEFAULT_SYSTEM_NAME}</div>
+          </div>
+          <span className='bg-success/10 text-success inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold'>
+            <span className='bg-success size-1.5 rounded-full' />
+            {t('Live pricing')}
+          </span>
+        </div>
+
+        <YecaiPriceFlow
+          accessibleLabel={t('Official API estimate')}
+          className='relative z-10 mt-9'
+          officialLabel={t('Official API')}
+          officialValue={t('Official API estimate')}
+          siteLabel={t('Our price')}
+          siteValue={t('Live pricing')}
+          savingsLabel={t('Estimated savings')}
+          savingsValue={
+            hasSavings ? (
+              <span
+                key={props.maxSavingsPercent}
+                className='dopa-number-change inline-block'
+              >
+                -{props.maxSavingsPercent}%
+              </span>
+            ) : (
+              t('Loading...')
+            )
+          }
+          size='hero'
+        />
+
+        <YecaiAction
+          appearance='soft'
+          tone='leaf'
+          size='sm'
+          className='relative z-10 mt-5 w-full justify-start'
+          render={<a href='#savings-calculator' />}
+        >
+          <Calculator className='text-primary size-4 shrink-0' />
+          <span className='text-xs font-bold'>
+            {hasSavings
+              ? t('Save {{percent}}%', {
+                  percent: props.maxSavingsPercent,
+                })
+              : t('Prices update from the live model catalog.')}
+          </span>
+          <ArrowRight className='text-muted-foreground ml-auto size-4' />
+        </YecaiAction>
+      </YecaiPanel>
+    </div>
+  )
+}
 
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
-  const { status } = useStatus()
-  const docsUrl =
-    (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
-
-  const renderDocsButton = () => {
-    const isExternal = docsUrl.startsWith('http')
-    if (isExternal) {
-      return (
-        <Button
-          variant='outline'
-          className='group border-border/50 hover:border-border hover:bg-muted/50 inline-flex h-11 items-center gap-1.5 rounded-lg px-5 text-sm font-medium'
-          render={
-            <a href={docsUrl} target='_blank' rel='noopener noreferrer' />
-          }
-        >
-          <BookOpen className='text-muted-foreground/80 group-hover:text-foreground size-4 transition-colors duration-200' />
-          <span>{t('Docs')}</span>
-        </Button>
-      )
-    }
-    return (
-      <Button
-        variant='outline'
-        className='group border-border/50 hover:border-border hover:bg-muted/50 inline-flex h-11 items-center gap-1.5 rounded-lg px-5 text-sm font-medium'
-        render={<Link to={docsUrl} />}
-      >
-        <BookOpen className='text-muted-foreground/80 group-hover:text-foreground size-4 transition-colors duration-200' />
-        <span>{t('Docs')}</span>
-      </Button>
-    )
-  }
 
   return (
-    <section className='relative z-10 overflow-hidden px-6 pt-24 pb-16 md:pt-32 md:pb-24 lg:pt-36 lg:pb-28'>
-      {/* Radial gradient background */}
+    <section className='relative z-10 overflow-hidden px-6 pt-28 pb-12 md:pt-36 md:pb-18'>
+      {/* Soft candy background blobs */}
       <div
         aria-hidden
-        className='pointer-events-none absolute inset-0 -z-10 opacity-25 dark:opacity-[0.12]'
+        className='pointer-events-none absolute inset-0 -z-10'
         style={{
           background: [
-            'radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%)',
-            'radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%)',
-            'radial-gradient(ellipse 40% 35% at 40% 80%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%)',
+            'radial-gradient(ellipse 55% 45% at 12% 18%, color-mix(in oklch, var(--chart-1) 14%, transparent) 0%, transparent 70%)',
+            'radial-gradient(ellipse 45% 40% at 88% 12%, color-mix(in oklch, var(--chart-3) 12%, transparent) 0%, transparent 70%)',
+            'radial-gradient(ellipse 40% 38% at 70% 85%, color-mix(in oklch, var(--chart-2) 10%, transparent) 0%, transparent 70%)',
           ].join(', '),
         }}
       />
-      {/* Grid pattern */}
-      <div
-        aria-hidden
-        className='absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_30%,black_20%,transparent_100%)] bg-[size:4rem_4rem] opacity-[0.08]'
-      />
 
-      <div className='mx-auto grid max-w-6xl grid-cols-1 items-start gap-12 lg:grid-cols-12 lg:gap-8'>
-        {/* Left Column: Title, description, action buttons and application support */}
-        <div className='flex flex-col items-start text-left lg:col-span-6'>
-          {/* Top Pill Badge */}
-          <div
-            className='landing-animate-fade-up mb-5 inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-[11px] font-medium text-blue-600 opacity-0 shadow-xs dark:border-blue-400/20 dark:bg-blue-400/5 dark:text-blue-400'
-            style={{ animationDelay: '0ms' }}
-          >
-            <span className='relative flex size-1.5'>
-              <span className='absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75' />
-              <span className='relative inline-flex size-1.5 rounded-full bg-blue-500 dark:bg-blue-400' />
-            </span>
-            <span>{t('AI Application Infrastructure Foundation')}</span>
+      <div
+        className='dopa-section-shell grid grid-cols-1 items-center gap-14 lg:grid-cols-12 lg:gap-10'
+        data-section='START'
+      >
+        {/* Left column */}
+        <div className='flex flex-col items-start text-left lg:col-span-7'>
+          <div className='dopa-fade-up dopa-section-kicker'>
+            <Sparkles className='size-3.5' />
+            {t('Leave expensive monthly fees behind · Ready in 1 minute')}
           </div>
 
-          <h1
-            className='landing-animate-fade-up text-[clamp(2.25rem,4.5vw,3.25rem)] leading-[1.15] font-bold tracking-tight'
-            style={{ animationDelay: '60ms' }}
-          >
-            {t('Unified API Gateway for')}
-            <br />
-            <span className='bg-gradient-to-r from-blue-400 via-violet-400 to-purple-500 bg-clip-text text-transparent'>
-              {t('Vast Range of AI Models')}
+          <h1 className='dopa-fade-up dopa-delay-1 mt-6 max-w-3xl text-[clamp(2.65rem,6.2vw,5.15rem)] leading-[0.98] font-black tracking-[-0.075em] text-balance'>
+            {t("Bring top-tier AI into everyone's daily life")}
+            <span className='dopa-gradient-text mt-4 block text-[0.72em] leading-[1.08] tracking-[-0.055em]'>
+              {props.maxSavingsPercent && props.maxSavingsPercent > 0
+                ? t('The same powerful experience, {{percent}}% less', {
+                    percent: props.maxSavingsPercent,
+                  })
+                : t(
+                    'The same powerful experience, without the high monthly cost'
+                  )}
             </span>
           </h1>
-          <p
-            className='landing-animate-fade-up text-muted-foreground/80 mt-5 max-w-xl text-base leading-relaxed opacity-0 md:text-[15px]'
-            style={{ animationDelay: '120ms' }}
-          >
+
+          <p className='dopa-fade-up dopa-delay-2 text-muted-foreground mt-6 max-w-xl text-base leading-relaxed text-pretty md:text-lg'>
             {t(
-              'Access a vast selection of models via a standard, unified API protocol. Power AI applications, manage digital assets, and connect the Future.'
+              "No complicated setup and no expensive subscription barrier. Configure once, pay only as you go, and put the latest productivity within everyone's reach."
             )}
           </p>
 
-          <div
-            className='landing-animate-fade-up mt-8 flex flex-wrap items-center gap-3 opacity-0'
-            style={{ animationDelay: '180ms' }}
-          >
+          <div className='dopa-fade-up dopa-delay-3 mt-9 flex flex-wrap items-center gap-3'>
+            <YecaiAction
+              tone='leaf'
+              size='lg'
+              className='dopa-shine group'
+              render={<a href='#savings-calculator' />}
+            >
+              <Calculator className='mr-1.5 size-4' />
+              {t('Plan your yearly savings')}
+              <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+            </YecaiAction>
             {props.isAuthenticated ? (
-              <>
-                <Button
-                  className='group h-11 rounded-lg px-5 text-sm font-medium'
-                  render={<Link to='/dashboard' />}
-                >
-                  {t('Go to Dashboard')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
-                {renderDocsButton()}
-              </>
+              <YecaiAction
+                appearance='outline'
+                tone='model'
+                size='lg'
+                className='group'
+                render={<Link to='/dashboard' />}
+              >
+                {t('Go to Dashboard')}
+                <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+              </YecaiAction>
             ) : (
-              <>
-                <Button
-                  className='group h-11 rounded-lg px-5 text-sm font-medium'
-                  render={<Link to='/sign-up' />}
-                >
-                  {t('Get Started')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
-                <Button
-                  variant='outline'
-                  className='border-border/50 hover:border-border hover:bg-muted/50 h-11 rounded-lg px-5 text-sm font-medium'
-                  render={<Link to='/pricing' />}
-                >
-                  {t('View Pricing')}
-                </Button>
-                {renderDocsButton()}
-              </>
+              <YecaiAction
+                appearance='outline'
+                tone='model'
+                size='lg'
+                className='group'
+                render={<Link to='/sign-up' />}
+              >
+                {t('Start for free')}
+                <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+              </YecaiAction>
             )}
           </div>
 
-          {/* Supported Apps (参考图二样式，进行卡片化和信息扩充设计，增加视觉高度) */}
-          <div
-            className='landing-animate-fade-up mt-10 w-full max-w-xl opacity-0'
-            style={{ animationDelay: '240ms' }}
-          >
-            <div className='mb-4 flex flex-col gap-1'>
-              <span className='text-muted-foreground/50 text-[10px] font-bold tracking-[0.15em] uppercase'>
-                {t('Supported Applications')}
-              </span>
-              <p className='text-muted-foreground/60 text-xs leading-relaxed'>
-                {t(
-                  'Supports one-click configuration and perfectly adapts to NewAPI multi-protocol configuration.'
-                )}
-              </p>
-            </div>
-            <div className='flex flex-wrap items-center gap-3'>
-              {/* Cherry Studio */}
-              <a
-                href='https://cherry-ai.com'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='group border-border/40 bg-muted/15 text-foreground/80 hover:border-border hover:bg-muted/30 hover:text-foreground flex items-center gap-3 rounded-full border px-5 py-2.5 text-sm font-medium shadow-[0_1px_2.5px_rgba(0,0,0,0.01)] backdrop-blur-xs transition-all duration-300 hover:scale-[1.02]'
-              >
-                <CherryStudio.Color size={24} className='shrink-0' />
-                <span>Cherry Studio</span>
-              </a>
-
-              {/* CC Switch */}
-              <a
-                href='https://ccswitch.io'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='group border-border/40 bg-muted/15 text-foreground/80 hover:border-border hover:bg-muted/30 hover:text-foreground flex items-center gap-3 rounded-full border px-5 py-2.5 text-sm font-medium shadow-[0_1px_2.5px_rgba(0,0,0,0.01)] backdrop-blur-xs transition-all duration-300 hover:scale-[1.02]'
-              >
-                <img
-                  src='https://ccswitch.io/favicon.png'
-                  alt='CC Switch'
-                  className='size-6 shrink-0 rounded-md object-contain'
-                  onError={(e) => {
-                    // Fallback to a styled text avatar if the remote favicon fails to load in sandbox or local environments
-                    e.currentTarget.style.display = 'none'
-                    const fallback = e.currentTarget.nextSibling as HTMLElement
-                    if (fallback) fallback.style.display = 'flex'
-                  }}
-                />
-                <span
-                  style={{ display: 'none' }}
-                  className='size-6 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-[10px] font-bold text-blue-600 dark:bg-blue-400/10 dark:text-blue-400'
-                >
-                  CC
-                </span>
-                <span>CC Switch</span>
-              </a>
-
-              {/* "更多" */}
-              <div className='group border-border/40 bg-muted/15 text-foreground/55 hover:border-border hover:bg-muted/30 hover:text-foreground flex cursor-default items-center gap-2.5 rounded-full border px-5 py-2.5 text-sm font-medium shadow-[0_1px_2.5px_rgba(0,0,0,0.01)] backdrop-blur-xs transition-all duration-300 hover:scale-[1.02]'>
-                <MoreIcon />
-                <span>{t('More Apps')}</span>
-              </div>
-            </div>
+          {/* Reassurance row */}
+          <div className='dopa-fade-up dopa-delay-4 text-muted-foreground mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm'>
+            <span className='inline-flex items-center gap-1.5'>
+              <Check className='text-success size-4' />
+              {t('True pay-as-you-go: pay only for what you use')}
+            </span>
+            <span className='inline-flex items-center gap-1.5'>
+              <Check className='text-success size-4' />
+              {t('Fully compatible with 30+ popular everyday tools')}
+            </span>
           </div>
         </div>
 
-        {/* Right Column: Hero Terminal API Demo */}
-        <div
-          className='landing-animate-fade-up flex w-full justify-center opacity-0 lg:col-span-6'
-          style={{ animationDelay: '320ms' }}
-        >
-          <HeroTerminalDemo className='mt-8 lg:mt-0' />
+        {/* Right column */}
+        <div className='dopa-fade-up dopa-delay-3 flex w-full justify-center lg:col-span-5'>
+          <HeroSavingsFlow maxSavingsPercent={props.maxSavingsPercent} />
         </div>
       </div>
     </section>

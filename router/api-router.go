@@ -20,6 +20,7 @@ func SetApiRouter(router *gin.Engine) {
 	apiRouter.Use(middleware.GlobalAPIRateLimit())
 	anonymousRequestBodyLimit := middleware.AnonymousRequestBodyLimit()
 	{
+		registerDesktopRoutes(apiRouter)
 		apiRouter.GET("/setup", controller.GetSetup)
 		apiRouter.POST("/setup", anonymousRequestBodyLimit, controller.PostSetup)
 		apiRouter.GET("/status", controller.GetStatus)
@@ -407,4 +408,17 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
 		}
 	}
+}
+
+func registerDesktopRoutes(apiRouter *gin.RouterGroup) {
+	desktopV1Route := apiRouter.Group("/desktop/v1")
+	desktopV1Route.GET("/bootstrap", controller.GetDesktopBootstrap)
+
+	desktopV2Route := apiRouter.Group("/desktop/v2")
+	desktopV2Route.GET("/bootstrap", controller.GetDesktopBootstrapV2)
+	desktopV2Route.POST("/device-authorizations", middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.AnonymousRequestBodyLimit(), controller.CreateDesktopDeviceAuthorization)
+	desktopV2Route.POST("/device-authorizations/token", middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.AnonymousRequestBodyLimit(), controller.ExchangeDesktopDeviceAuthorization)
+	desktopV2Route.POST("/device-authorizations/decision", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.DecideDesktopDeviceAuthorization)
+	desktopV2Route.POST("/sessions/refresh", middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.AnonymousRequestBodyLimit(), controller.RefreshDesktopSession)
+	desktopV2Route.DELETE("/sessions/current", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.RevokeCurrentDesktopSession)
 }

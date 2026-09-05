@@ -100,14 +100,7 @@ func TestRegisterCreatesUsableLoginSession(t *testing.T) {
 			require.NoError(t, common.UnmarshalJsonStr(audit.Other, &auditOther))
 			assert.Equal(t, "password", auditOther["login_method"])
 
-			cookies := response.Result().Cookies()
-			require.Len(t, cookies, 1)
-			cookie := cookies[0]
-			assert.Equal(t, service.RefreshCookieName, cookie.Name)
-			assert.Empty(t, cookie.Domain)
-			assert.True(t, cookie.HttpOnly)
-			assert.True(t, cookie.Secure)
-			assert.Equal(t, http.SameSiteStrictMode, cookie.SameSite)
+			cookie := requireSecureLoginCookies(t, response.Result())
 			assert.Equal(t, "no-store", response.Header().Get("Cache-Control"))
 
 			selfRequest := httptest.NewRequest(http.MethodGet, "https://main.example/api/user/self", nil)

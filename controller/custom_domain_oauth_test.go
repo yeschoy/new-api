@@ -874,13 +874,7 @@ func testDomainLoginHandoffCreatesAnIndependentSessionOnAPeerMainHost(t *testing
 			assert.Empty(t, response.Header().Get("Set-Cookie"), attempt.name)
 			continue
 		}
-		require.NotEmpty(t, response.Result().Cookies())
-		for _, cookie := range response.Result().Cookies() {
-			assert.Empty(t, cookie.Domain)
-			assert.Equal(t, service.RefreshCookieName, cookie.Name)
-			assert.True(t, cookie.Secure)
-			assert.True(t, cookie.HttpOnly)
-		}
+		requireSecureLoginCookies(t, response.Result())
 	}
 
 	var sessionCount int64

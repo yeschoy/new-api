@@ -103,7 +103,7 @@ export function ApiKeysMutateDrawer({
   const { t } = useTranslation()
   const isUpdate = !!currentRow
   const currentRowId = currentRow?.id
-  const { triggerRefresh } = useApiKeys()
+  const { triggerRefresh, setCreatedKey } = useApiKeys()
   const { status, loading: statusLoading } = useStatus()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -298,6 +298,7 @@ export function ApiKeysMutateDrawer({
         // Create mode - handle batch creation
         const count = data.tokenCount || 1
         let successCount = 0
+        let firstCreatedKey: string | null = null
 
         for (let i = 0; i < count; i++) {
           const result = await createApiKey({
@@ -309,6 +310,11 @@ export function ApiKeysMutateDrawer({
           })
           if (result.success) {
             successCount++
+            // The create endpoint echoes the new secret back once so the UI
+            // can walk beginners through tool setup immediately.
+            if (!firstCreatedKey && result.data?.key) {
+              firstCreatedKey = `sk-${result.data.key}`
+            }
           } else {
             toast.error(result.message || t(ERROR_MESSAGES.CREATE_FAILED))
             break
@@ -323,6 +329,9 @@ export function ApiKeysMutateDrawer({
           )
           onOpenChange(false)
           triggerRefresh()
+          if (firstCreatedKey) {
+            setCreatedKey(firstCreatedKey)
+          }
         }
       }
     } catch {
