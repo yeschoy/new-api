@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Activity,
+  BookOpen,
   Box,
   CreditCard,
   FileText,
@@ -37,8 +38,9 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { type SidebarData } from '@/components/layout/types'
+import type { SidebarData } from '@/components/layout/types'
 import { ROLE } from '@/lib/roles'
+import { useConsoleModeStore } from '@/stores/console-mode-store'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -48,6 +50,50 @@ import { ROLE } from '@/lib/roles'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const mode = useConsoleModeStore((state) => state.mode)
+
+  if (mode === 'easy') {
+    return {
+      navGroups: [
+        {
+          id: 'easy',
+          title: t('Easy mode'),
+          items: [
+            {
+              title: t('Overview'),
+              url: '/dashboard/overview',
+              icon: Activity,
+            },
+            {
+              title: t('My key'),
+              url: '/keys',
+              icon: Key,
+            },
+            {
+              title: t('Model prices'),
+              url: '/pricing',
+              icon: CreditCard,
+            },
+            {
+              title: t('Beginner guide'),
+              url: '/guide',
+              icon: BookOpen,
+            },
+            {
+              title: t('Spending details'),
+              url: '/usage-logs/common',
+              icon: FileText,
+            },
+            {
+              title: t('Wallet'),
+              url: '/wallet',
+              icon: Wallet,
+            },
+          ],
+        },
+      ],
+    }
+  }
 
   return {
     navGroups: [
@@ -85,6 +131,11 @@ export function useSidebarData(): SidebarData {
             title: t('API Keys'),
             url: '/keys',
             icon: Key,
+          },
+          {
+            title: t('Beginner guide'),
+            url: '/guide',
+            icon: BookOpen,
           },
           {
             title: t('Usage Logs'),
