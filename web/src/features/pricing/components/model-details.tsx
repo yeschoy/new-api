@@ -72,6 +72,7 @@ import {
   type DynamicPriceEntry,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
+import { resolveModelGroupRatios } from '../lib/group-ratio'
 import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
 import { formatFixedPrice, formatGroupPrice } from '../lib/price'
 import {
@@ -1348,7 +1349,10 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
             )}
             <GroupPricingSection
               model={props.model}
-              groupRatio={props.groupRatio}
+              groupRatio={resolveModelGroupRatios(
+                props.model,
+                props.groupRatio
+              )}
               usableGroup={props.usableGroup}
               autoGroups={props.autoGroups}
               priceRate={props.priceRate}

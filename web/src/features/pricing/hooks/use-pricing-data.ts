@@ -22,6 +22,7 @@ import { useMemo } from 'react'
 import { useStatus } from '@/hooks/use-status'
 
 import { getPricing } from '../api'
+import { resolveModelGroupRatios } from '../lib/group-ratio'
 
 export function usePricingData(enabled = true) {
   const { status } = useStatus()
@@ -58,7 +59,7 @@ export function usePricingData(enabled = true) {
         vendor_name: vendor?.name,
         vendor_icon: vendor?.icon,
         vendor_description: vendor?.description,
-        group_ratio: data.group_ratio,
+        group_ratio: resolveModelGroupRatios(model, data.group_ratio),
       }
     })
   }, [data])

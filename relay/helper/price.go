@@ -69,6 +69,13 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 		groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 	}
 
+	groupRatioInfo.GroupRatio = ratio_setting.ResolveModelGroupRatio(
+		relayInfo.UserGroup,
+		relayInfo.UsingGroup,
+		relayInfo.GetBillingModelName(),
+		groupRatioInfo.GroupRatio,
+	)
+
 	return groupRatioInfo
 }
 

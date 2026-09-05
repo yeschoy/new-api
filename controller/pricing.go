@@ -34,7 +34,7 @@ func filterPricingByUsableGroups(pricing []model.Pricing, usableGroup map[string
 }
 
 func GetPricing(c *gin.Context) {
-	pricing := model.GetPricing()
+	pricing := append([]model.Pricing(nil), model.GetPricing()...)
 	userId, exists := c.Get("id")
 	usableGroup := map[string]string{}
 	groupRatio := map[string]float64{}
@@ -64,6 +64,21 @@ func GetPricing(c *gin.Context) {
 		}
 	}
 
+	// Return the same effective model/group ratio that settlement uses. The
+	// model slice is copied above so this request-specific data never mutates
+	// the shared pricing cache.
+	for i := range pricing {
+		pricing[i].GroupRatio = make(map[string]float64, len(groupRatio))
+		for usingGroup, baseRatio := range groupRatio {
+			pricing[i].GroupRatio[usingGroup] = ratio_setting.ResolveModelGroupRatio(
+				group,
+				usingGroup,
+				pricing[i].ModelName,
+				baseRatio,
+			)
+		}
+	}
+
 	c.JSON(200, gin.H{
 		"success":            true,
 		"data":               pricing,
@@ -72,7 +87,7 @@ func GetPricing(c *gin.Context) {
 		"usable_group":       usableGroup,
 		"supported_endpoint": model.GetSupportedEndpointMap(),
 		"auto_groups":        service.GetUserAutoGroup(group),
-		"pricing_version":    "a42d372ccf0b5dd13ecf71203521f9d2",
+		"pricing_version":    "model-group-ratio-v1",
 	})
 }
 

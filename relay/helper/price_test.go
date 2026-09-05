@@ -68,6 +68,55 @@ func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	require.Equal(t, common.QuotaPerUnit, info.TieredBillingSnapshot.QuotaPerUnit)
 }
 
+func TestHandleGroupRatioUsesCustomerModelPriceBeforeRoutingGroup(t *testing.T) {
+	saved := map[string]string{}
+	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
+		saved[key] = value
+		return nil
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
+	})
+
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"group_ratio_setting.group_ratio":       `{"default":0.7,"SVIP":0.25,"route":0.5,"broken":0.4}`,
+		"group_ratio_setting.group_group_ratio": `{"SVIP":{"route":0.21}}`,
+		"group_ratio_setting.model_group_ratio": `{"default":{"premium":0.8},"SVIP":{"premium":0.6},"route":{"premium":0.5},"broken":{"premium":-0.1}}`,
+	}))
+
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+
+	negotiated := &relaycommon.RelayInfo{
+		OriginModelName:  "premium@high",
+		BillingModelName: "premium",
+		UserGroup:        "SVIP",
+		UsingGroup:       "route",
+	}
+	assert.Equal(t, 0.6, HandleGroupRatio(ctx, negotiated).GroupRatio)
+
+	routePriced := &relaycommon.RelayInfo{
+		OriginModelName: "premium",
+		UserGroup:       "unconfigured",
+		UsingGroup:      "route",
+	}
+	assert.Equal(t, 0.5, HandleGroupRatio(ctx, routePriced).GroupRatio)
+
+	legacy := &relaycommon.RelayInfo{
+		OriginModelName: "other-model",
+		UserGroup:       "SVIP",
+		UsingGroup:      "route",
+	}
+	assert.Equal(t, 0.21, HandleGroupRatio(ctx, legacy).GroupRatio)
+
+	invalidOverride := &relaycommon.RelayInfo{
+		OriginModelName: "premium",
+		UserGroup:       "broken",
+		UsingGroup:      "broken",
+	}
+	assert.Equal(t, 0.4, HandleGroupRatio(ctx, invalidOverride).GroupRatio)
+	assert.Error(t, ratio_setting.CheckModelGroupRatio(`{"broken":{"premium":-0.1}}`))
+}
+
 func TestModelPriceHelperTieredPreConsumeMaxTokensFallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
