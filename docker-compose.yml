@@ -28,6 +28,8 @@ services:
     volumes:
       - ./data:/data
       - ./logs:/app/logs
+    env_file:
+      - .env
 
     environment:
       # PostgreSQL
