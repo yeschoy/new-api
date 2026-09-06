@@ -17,8 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  getDynamicPricingSummary,
   isDynamicPricingModel,
+  hasTaskUsageSchema,
 } from '@/features/pricing/lib/dynamic-price'
 import { getDisplayGroupRatio } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
@@ -302,24 +302,28 @@ function toSavingsModel(
   let cacheWriteUSD = getOptionalRatio(model.create_cache_ratio)
 
   if (isDynamicPricingModel(model)) {
-    const summary = getDynamicPricingSummary(model, { tokenUnit: 'M' })
-    if (
-      !summary ||
-      summary.isTaskUsage ||
-      summary.isSpecialExpression ||
-      summary.tierCount !== 1 ||
-      summary.hasRequestRules
-    ) {
-      return null
-    }
-
-    const prices = new Map(
-      summary.entries.map((entry) => [entry.field, entry.value])
+    // Display summaries intentionally omit zero entries and may parse only
+    // part of an expression. Estimates require the entire supported formula.
+    if (hasTaskUsageSchema(model)) return null
+    const number = String.raw`(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?`
+    const term = String.raw`(?:p|c|cr|cc)\s*\*\s*${number}`
+    const formula = new RegExp(
+      String.raw`^\s*(?:v1:\s*)?tier\s*\(\s*"(?:[^"\\]|\\.)*"\s*,\s*(${term}(?:\s*\+\s*${term})*)\s*\)\s*$`
     )
-    inputUSD = prices.get('inputPrice') ?? 0
-    outputUSD = prices.get('outputPrice') ?? 0
-    cacheReadUSD = prices.get('cacheReadPrice') ?? null
-    cacheWriteUSD = prices.get('cacheCreatePrice') ?? null
+    const match = model.billing_expr?.match(formula)
+    if (!match) return null
+
+    const prices = new Map<string, number>()
+    const terms = new RegExp(String.raw`(p|c|cr|cc)\s*\*\s*(${number})`, 'g')
+    for (const entry of match[1].matchAll(terms)) {
+      const price = (prices.get(entry[1]) ?? 0) + Number(entry[2])
+      if (!Number.isFinite(price)) return null
+      prices.set(entry[1], price)
+    }
+    inputUSD = prices.get('p') ?? 0
+    outputUSD = prices.get('c') ?? 0
+    cacheReadUSD = prices.get('cr') ?? null
+    cacheWriteUSD = prices.get('cc') ?? null
     if (inputUSD <= 0 && outputUSD <= 0) return null
   } else {
     cacheReadUSD = cacheReadUSD == null ? null : inputUSD * cacheReadUSD

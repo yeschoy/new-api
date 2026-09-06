@@ -186,6 +186,93 @@ describe('buildSavingsModels', () => {
     })
   })
 
+  it.each([
+    'tier("base", p * 10 + c * 20) * 2',
+    'len <= 1000 ? tier("base", p * 10 + c * 20) : 0',
+    'tier("base", p * 10 + c * 20 + 100)',
+    'tier("base", p * 10 + c * 20 + cr * 2 / 2)',
+    'tier("base", p * 10 + c * 20 + cc1h * 5)',
+    'tier("base", p * 1e309 + c * 20)',
+  ])(
+    'excludes formulas outside the supported complete token mix: %s',
+    (billingExpr) => {
+      expect(
+        buildSavingsCatalog(
+          [
+            makePricingModel('dynamic', 1, {
+              billing_mode: 'tiered_expr',
+              billing_expr: billingExpr,
+            }),
+          ],
+          1
+        )
+      ).toEqual([])
+    }
+  )
+
+  it('preserves explicit free cache terms instead of charging regular input', () => {
+    const models = buildSavingsCatalog(
+      [
+        makePricingModel('dynamic', 1, {
+          billing_mode: 'tiered_expr',
+          billing_expr: 'v1:tier("base", p * 10 + c * 20 + cr * 0 + cc * 0)',
+          group_ratio: { default: 0.5 },
+        }),
+      ],
+      1
+    )
+    expect(models[0]).toMatchObject({
+      siteCacheReadPrice: 0,
+      siteCacheWritePrice: 0,
+    })
+    const estimate = calculateSavingsEstimate(models, 'coding', 1, 1, {
+      inputPercent: 0,
+      cacheReadPercent: 50,
+      cacheWritePercent: 50,
+      outputPercent: 0,
+    })
+    expect(estimate.siteMonthlyCost).toBe(0)
+    expect(estimate.baseMonthlyCost).toBe(0)
+  })
+
+  it('keeps omitted cache terms billable as input even when the label mentions cache', () => {
+    const models = buildSavingsCatalog(
+      [
+        makePricingModel('dynamic', 1, {
+          billing_mode: 'tiered_expr',
+          billing_expr: 'tier("cr * 0", p * 10 + c * 20)',
+        }),
+      ],
+      1
+    )
+    expect(models[0].siteCacheReadPrice).toBeNull()
+    expect(
+      calculateSavingsEstimate(models, 'coding', 1, 1, {
+        inputPercent: 0,
+        cacheReadPercent: 100,
+        cacheWritePercent: 0,
+        outputPercent: 0,
+      }).siteMonthlyCost
+    ).toBe(10)
+  })
+
+  it('sums repeated terms and accepts reordered prices with scientific notation', () => {
+    const [model] = buildSavingsCatalog(
+      [
+        makePricingModel('dynamic', 1, {
+          billing_mode: 'tiered_expr',
+          billing_expr: 'tier("base", cr * 1e-1 + c * 2e+1 + p * 3 + p * 7)',
+        }),
+      ],
+      1
+    )
+    expect(model).toMatchObject({
+      siteInputPrice: 10,
+      siteOutputPrice: 20,
+      siteCacheReadPrice: 0.1,
+    })
+  })
+
   it('excludes conditional expression pricing that the calculator cannot model', () => {
     const models = buildSavingsCatalog(
       [
