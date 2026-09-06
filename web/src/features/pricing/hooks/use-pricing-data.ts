@@ -20,15 +20,42 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import { useStatus } from '@/hooks/use-status'
+import { getFreshModuleAccess } from '@/lib/nav-modules'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { getPricing } from '../api'
 
-export function usePricingData(enabled = true) {
+export function usePricingData(
+  enabled = true,
+  options: { publicPreview?: boolean } = {}
+) {
   const { status } = useStatus()
+  const viewerId = useAuthStore((state) =>
+    state.auth.accessToken ? (state.auth.user?.id ?? null) : null
+  )
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['pricing'],
-    queryFn: getPricing,
+    queryKey: options.publicPreview
+      ? ['pricing', 'home', viewerId]
+      : ['pricing'],
+    queryFn: async () => {
+      if (!options.publicPreview) return getPricing()
+
+      // Home is public even when the catalog is private. Do not rely on
+      // placeholder status or a previously cached authenticated catalog.
+      const access = await getFreshModuleAccess('pricing')
+      if (!access.enabled || (access.requireAuth && viewerId === null)) {
+        return null
+      }
+      return getPricing({
+        skipAuthRefresh: true,
+        skipErrorHandler: true,
+        skipBusinessError: true,
+        // Preview and catalog requests must not share an in-flight request
+        // whose auth-error policy could redirect the public page.
+        disableDuplicate: true,
+      })
+    },
     staleTime: 5 * 60 * 1000,
     enabled,
   })

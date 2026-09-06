@@ -43,7 +43,7 @@ import {
 } from './lib/pricing-savings'
 
 function DefaultHome(props: { isAuthenticated: boolean }) {
-  const { models, priceRate } = usePricingData()
+  const { models, priceRate } = usePricingData(true, { publicPreview: true })
   const savingsModels = useMemo(
     () => buildSavingsModels(models, priceRate),
     [models, priceRate]
