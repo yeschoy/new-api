@@ -1783,7 +1783,9 @@ For commercial licensing, please contact support@quantumnous.com
   border: 0;
 }
 
-.dopa-console--developer [data-slot='sidebar-gap'] {
+.dopa-console--developer
+  [data-slot='sidebar'][data-state='expanded']
+  > [data-slot='sidebar-gap'] {
   inline-size: calc(var(--sidebar-width) + 0.2rem);
 }
 
