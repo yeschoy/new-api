@@ -29,9 +29,9 @@ import {
 import { troubleshootRows, useCaseRows } from '../data'
 
 const DIFFICULTY_HUE: Record<string, string> = {
-  简单: 'var(--success)',
-  中等: 'var(--warning)',
-  较难: 'var(--destructive)',
+  Easy: 'var(--success)',
+  Medium: 'var(--warning)',
+  Advanced: 'var(--destructive)',
 }
 
 /** "Which tool should I use?" quick picker. */
@@ -57,13 +57,13 @@ export function UseCasePicker() {
       <div className='grid gap-3 sm:grid-cols-2'>
         {useCaseRows.map((row) => (
           <div
-            key={row.useCase}
+            key={t(row.useCase)}
             className='dopa-lift border-border bg-card flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5'
           >
             <div className='min-w-0'>
-              <p className='text-sm font-semibold'>{row.useCase}</p>
+              <p className='text-sm font-semibold'>{t(row.useCase)}</p>
               <p className='text-muted-foreground mt-0.5 truncate text-xs'>
-                {row.tools}
+                {t(row.tools)}
               </p>
             </div>
             <span
@@ -73,7 +73,7 @@ export function UseCasePicker() {
                 color: DIFFICULTY_HUE[row.difficulty],
               }}
             >
-              {row.difficulty}
+              {t(row.difficulty)}
             </span>
           </div>
         ))}
@@ -112,25 +112,28 @@ export function Troubleshoot() {
       <Accordion className='border-border bg-card rounded-3xl border px-5'>
         {troubleshootRows.map((row, i) => (
           <AccordionItem
-            key={row.error}
+            key={t(row.error)}
             value={`err-${i}`}
             className={i === troubleshootRows.length - 1 ? 'border-b-0' : ''}
           >
             <AccordionTrigger className='py-4 text-left font-mono text-sm font-semibold hover:no-underline'>
-              {row.error}
+              {t(row.error)}
             </AccordionTrigger>
             <AccordionContent className='flex flex-col gap-2 pb-4'>
               <p className='text-sm'>
                 <span className='text-muted-foreground'>
                   {t('What it means')}:{' '}
                 </span>
-                {row.meaning}
+                {t(row.meaning)}
               </p>
               <p className='text-sm'>
-                <span className='font-semibold' style={{ color: 'var(--success)' }}>
+                <span
+                  className='font-semibold'
+                  style={{ color: 'var(--success)' }}
+                >
                   {t('How to fix')}:{' '}
                 </span>
-                {row.fix}
+                {t(row.fix)}
               </p>
             </AccordionContent>
           </AccordionItem>

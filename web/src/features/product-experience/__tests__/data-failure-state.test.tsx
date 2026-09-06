@@ -52,7 +52,7 @@ describe('missing pricing and usage data', () => {
           </section>
         }
         savings={{
-          officialCost: 0,
+          baseCost: 0,
           siteCost: 0,
           savings: 0,
           comparableRequests: 0,
@@ -76,7 +76,6 @@ describe('missing pricing and usage data', () => {
     expect(
       getLogCostComparison(50_000, null, {
         priceRate: 1,
-        usdExchangeRate: 7.2,
         quotaPerUnit: 500_000,
       })
     ).toBeNull()
@@ -86,7 +85,6 @@ describe('missing pricing and usage data', () => {
         { group_ratio: 0 },
         {
           priceRate: 1,
-          usdExchangeRate: 7.2,
           quotaPerUnit: 500_000,
         }
       )
@@ -98,12 +96,12 @@ describe('missing pricing and usage data', () => {
       getLogCostComparison(
         900_000,
         { group_ratio: 0.5, user_group_ratio: 0.4, fee_quota: 200_000 },
-        { priceRate: 1, usdExchangeRate: 7.2, quotaPerUnit: 500_000 }
+        { priceRate: 1, quotaPerUnit: 500_000 }
       )
     ).toEqual({
-      officialCost: 7.2,
+      baseCost: 1,
       siteCost: 0.4,
-      savings: 6.8,
+      savings: 0.6,
     })
   })
 })

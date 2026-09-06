@@ -26,8 +26,12 @@ import {
 } from '../constants'
 
 describe('resolveSystemName', () => {
+  it('keeps the protected project default', () => {
+    expect(DEFAULT_SYSTEM_NAME).toBe('New API')
+  })
+
   it.each([undefined, null, '', '  ', 'New API'])(
-    'uses the 野菜API brand for legacy or empty value %s',
+    'preserves the protected New API default for empty or existing value %s',
     (value) => {
       expect(resolveSystemName(value)).toBe(DEFAULT_SYSTEM_NAME)
     }
@@ -39,8 +43,12 @@ describe('resolveSystemName', () => {
 })
 
 describe('resolveLogoUrl', () => {
+  it('keeps the protected project logo', () => {
+    expect(DEFAULT_LOGO).toBe('/logo.png')
+  })
+
   it.each([undefined, null, '', '  ', '/logo.png', 'logo.png'])(
-    'uses the 野菜API logo for legacy or empty value %s',
+    'preserves the protected default logo for empty or existing value %s',
     (value) => {
       expect(resolveLogoUrl(value)).toBe(DEFAULT_LOGO)
     }

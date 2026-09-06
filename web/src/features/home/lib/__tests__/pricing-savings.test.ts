@@ -66,10 +66,10 @@ function makeSavingsModel(
     modelName,
     vendorName: modelName,
     family,
-    officialInputPrice: prices.officialInput,
-    officialOutputPrice: prices.officialOutput,
-    officialCacheReadPrice: prices.officialCacheRead ?? null,
-    officialCacheWritePrice: prices.officialCacheWrite ?? null,
+    baseInputPrice: prices.officialInput,
+    baseOutputPrice: prices.officialOutput,
+    baseCacheReadPrice: prices.officialCacheRead ?? null,
+    baseCacheWritePrice: prices.officialCacheWrite ?? null,
     siteInputPrice: prices.siteInput,
     siteOutputPrice: prices.siteOutput,
     siteCacheReadPrice: prices.siteCacheRead ?? null,
@@ -87,8 +87,7 @@ describe('buildSavingsModels', () => {
         makePricingModel('deepseek-v3.2', 3),
         makePricingModel('deepseek-v4', 2),
       ],
-      4,
-      7
+      4
     )
 
     expect(models.slice(0, 2).map((model) => model.modelName)).toEqual([
@@ -108,16 +107,15 @@ describe('buildSavingsModels', () => {
         }),
         makePricingModel('image-request-model', 100, { quota_type: 1 }),
       ],
-      4,
-      5
+      4
     )
 
     expect(models).toHaveLength(1)
     expect(models[0]).toMatchObject({
-      officialInputPrice: 40,
-      officialOutputPrice: 120,
+      baseInputPrice: 32,
+      baseOutputPrice: 96,
       siteInputPrice: 16,
-      savingsPercent: 60,
+      savingsPercent: 50,
     })
     expect(models[0].siteOutputPrice).toBeCloseTo(48)
   })
@@ -132,27 +130,25 @@ describe('buildSavingsModels', () => {
           group_ratio: { default: 0.5 },
         }),
       ],
-      4,
-      7
+      4
     )
 
     expect(model).toMatchObject({
-      officialInputPrice: 14,
-      officialOutputPrice: 56,
-      officialCacheWritePrice: 17.5,
+      baseInputPrice: 8,
+      baseOutputPrice: 32,
+      baseCacheWritePrice: 10,
       siteInputPrice: 4,
       siteOutputPrice: 16,
       siteCacheReadPrice: 0.4,
       siteCacheWritePrice: 5,
     })
-    expect(model.officialCacheReadPrice).toBeCloseTo(1.4)
+    expect(model.baseCacheReadPrice).toBeCloseTo(0.8)
   })
 
   it('returns no comparison rows when pricing has no valid token model', () => {
     expect(
       buildSavingsModels(
         [makePricingModel('request-only', 1, { quota_type: 1 })],
-        1,
         1
       )
     ).toEqual([])
@@ -163,8 +159,60 @@ describe('buildSavingsModels', () => {
       makePricingModel(`custom-model-${index + 1}`, index + 1)
     )
 
-    expect(buildSavingsModels(sourceModels, 4, 7)).toHaveLength(1)
-    expect(buildSavingsCatalog(sourceModels, 4, 7)).toHaveLength(8)
+    expect(buildSavingsModels(sourceModels, 4)).toHaveLength(1)
+    expect(buildSavingsCatalog(sourceModels, 4)).toHaveLength(8)
+  })
+
+  it('uses a single deterministic billing expression as the pricing source', () => {
+    const models = buildSavingsCatalog(
+      [
+        makePricingModel('dynamic-model', 0, {
+          billing_mode: 'tiered_expr',
+          billing_expr: 'tier("base", p * 10 + c * 20 + cr * 2)',
+          group_ratio: { default: 0.5 },
+        }),
+      ],
+      4
+    )
+
+    expect(models).toHaveLength(1)
+    expect(models[0]).toMatchObject({
+      baseInputPrice: 40,
+      baseOutputPrice: 80,
+      baseCacheReadPrice: 8,
+      siteInputPrice: 20,
+      siteOutputPrice: 40,
+      siteCacheReadPrice: 4,
+    })
+  })
+
+  it('excludes conditional expression pricing that the calculator cannot model', () => {
+    const models = buildSavingsCatalog(
+      [
+        makePricingModel('tiered-model', 1, {
+          billing_mode: 'tiered_expr',
+          billing_expr:
+            'len <= 1000 ? tier("short", p * 1 + c * 2) : tier("long", p * 3 + c * 6)',
+        }),
+      ],
+      4
+    )
+
+    expect(models).toEqual([])
+  })
+
+  it('excludes non-canonical expressions instead of using stale ratios', () => {
+    const models = buildSavingsCatalog(
+      [
+        makePricingModel('special-model', 1, {
+          billing_mode: 'tiered_expr',
+          billing_expr: 'p * 10 + c * 20',
+        }),
+      ],
+      4
+    )
+
+    expect(models).toEqual([])
   })
 })
 
@@ -210,7 +258,7 @@ describe('calculateSavingsEstimate', () => {
       cacheWritePercent: 10,
       outputPercent: 20,
     })
-    expect(estimate.officialMonthlyCost).toBe(152)
+    expect(estimate.baseMonthlyCost).toBe(152)
     expect(estimate.siteMonthlyCost).toBe(76)
     expect(estimate.monthlySavings).toBe(76)
     expect(estimate.annualSavings).toBe(912)
@@ -235,7 +283,7 @@ describe('calculateSavingsEstimate', () => {
       1
     )
 
-    expect(estimate.officialMonthlyCost).toBeCloseTo(158.2)
+    expect(estimate.baseMonthlyCost).toBeCloseTo(158.2)
     expect(estimate.siteMonthlyCost).toBeCloseTo(45.2)
     expect(estimate.monthlySavings).toBeCloseTo(113)
   })

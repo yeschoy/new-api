@@ -16,28 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { SVGProps } from 'react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { cn } from '@/lib/utils'
+describe('API client deployment origin', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
 
-export function Logo({ className, ...props }: SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      id='newapi-logo'
-      viewBox='0 0 24 24'
-      xmlns='http://www.w3.org/2000/svg'
-      height='24'
-      width='24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='2'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-      className={cn('size-6', className)}
-      {...props}
-    >
-      <title>New API</title>
-      <path d='M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3' />
-    </svg>
-  )
-}
+  it('keeps browser API requests same-origin when a backend proxy target is configured', async () => {
+    vi.stubEnv('VITE_REACT_APP_SERVER_URL', 'https://api.example.com/')
+
+    const { resolveApiRequestURL } = await import('../api-base-url')
+    const { api } = await import('../http-client')
+
+    expect(api.defaults.baseURL).toBe('')
+    expect(resolveApiRequestURL('/api/status')).toBe('/api/status')
+  })
+})

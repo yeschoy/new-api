@@ -20,6 +20,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { t } from 'i18next'
 
+import { API_BASE_URL } from '@/lib/api-base-url'
 import { publishAuthSessionEvent } from '@/lib/auth-session-sync'
 import {
   useAuthStore,
@@ -67,7 +68,7 @@ export class AuthRotationError extends Error {
 }
 
 const authClient = axios.create({
-  baseURL: '',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: {
     'Cache-Control': 'no-store',

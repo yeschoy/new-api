@@ -69,7 +69,7 @@ function SavingsReceipt(props: { savings: EasySavingsSummary }) {
         </div>
 
         <p className='text-muted-foreground mt-5 text-xs font-medium'>
-          {t('Estimated savings')}
+          {t('Savings versus base price')}
         </p>
         <p className='mt-2 pb-1 text-5xl leading-none font-black tracking-[-0.08em] tabular-nums sm:text-6xl'>
           <span
@@ -83,11 +83,17 @@ function SavingsReceipt(props: { savings: EasySavingsSummary }) {
         <YecaiPriceFlow
           accessibleLabel={t('Savings receipt')}
           className='mt-9'
-          officialLabel={t('Official equivalent')}
-          officialValue={formatEasySavingsCny(props.savings.officialCost)}
+          officialLabel={t('Base billing estimate')}
+          officialValue={formatEasySavingsCny(props.savings.baseCost)}
           siteLabel={t('Yecai billing')}
           siteValue={formatEasySavingsCny(props.savings.siteCost)}
         />
+
+        <p className='text-muted-foreground mt-3 text-xs leading-relaxed'>
+          {t(
+            'Compared with site base prices before group discounts, not official provider prices.'
+          )}
+        </p>
 
         <div className='mt-4 flex items-end justify-between gap-4'>
           <p className='text-muted-foreground text-xs leading-relaxed'>
@@ -190,18 +196,9 @@ export function EasyOverviewDashboard() {
     () =>
       estimateEasySavings(usageLogsQuery.data ?? [], {
         priceRate: Math.max(Number(status?.price ?? 1), 0.001),
-        usdExchangeRate: Math.max(
-          Number(status?.usd_exchange_rate ?? status?.price ?? 1),
-          0.001
-        ),
         quotaPerUnit,
       }),
-    [
-      quotaPerUnit,
-      status?.price,
-      status?.usd_exchange_rate,
-      usageLogsQuery.data,
-    ]
+    [quotaPerUnit, status?.price, usageLogsQuery.data]
   )
 
   return (

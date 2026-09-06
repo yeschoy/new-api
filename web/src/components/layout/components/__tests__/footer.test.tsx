@@ -17,23 +17,69 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Footer } from '../footer'
 
+const status = vi.hoisted(() => ({
+  user_agreement_enabled: false,
+  privacy_policy_enabled: false,
+}))
+const systemConfig = vi.hoisted(() => ({
+  footerHtml: '',
+  logo: '/logo.png',
+  systemName: 'New API',
+}))
+
+vi.mock('@/hooks/use-status', () => ({
+  useStatus: () => ({ status }),
+}))
+
+vi.mock('@/hooks/use-system-config', () => ({
+  useSystemConfig: () => systemConfig,
+}))
+
 describe('Footer', () => {
+  beforeEach(() => {
+    status.user_agreement_enabled = false
+    status.privacy_policy_enabled = false
+    systemConfig.footerHtml = ''
+  })
+
   it('shows one concise upstream copyright attribution', () => {
     render(<Footer />)
 
-    const projectLink = screen.getByRole('link', { name: 'New API' })
+    const projectLink = screen
+      .getAllByRole('link', { name: 'New API' })
+      .find(
+        (link) =>
+          link.getAttribute('href') === 'https://github.com/QuantumNous/new-api'
+      )
+    if (!projectLink) throw new Error('New API attribution link is missing')
     expect(projectLink).toHaveAttribute(
       'href',
       'https://github.com/QuantumNous/new-api'
     )
-    expect(screen.getAllByText('New API')).toHaveLength(1)
+    expect(screen.getAllByText('New API')).toHaveLength(2)
     expect(projectLink.closest('footer')).toHaveTextContent(
       String(new Date().getFullYear())
     )
     expect(screen.queryByText('野菜API')).not.toBeInTheDocument()
+  })
+
+  it('renders configured footer content and enabled legal links', () => {
+    systemConfig.footerHtml = '<strong>Operator footer</strong>'
+    status.user_agreement_enabled = true
+    status.privacy_policy_enabled = true
+
+    render(<Footer />)
+
+    expect(screen.getByText('Operator footer')).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: 'User Agreement' })
+    ).toHaveAttribute('href', '/user-agreement')
+    expect(
+      screen.getByRole('link', { name: 'Privacy Policy' })
+    ).toHaveAttribute('href', '/privacy-policy')
   })
 })

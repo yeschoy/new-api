@@ -43,14 +43,14 @@ import {
 } from './lib/pricing-savings'
 
 function DefaultHome(props: { isAuthenticated: boolean }) {
-  const { models, priceRate, usdExchangeRate } = usePricingData()
+  const { models, priceRate } = usePricingData()
   const savingsModels = useMemo(
-    () => buildSavingsModels(models, priceRate, usdExchangeRate),
-    [models, priceRate, usdExchangeRate]
+    () => buildSavingsModels(models, priceRate),
+    [models, priceRate]
   )
   const savingsCatalog = useMemo(
-    () => buildSavingsCatalog(models, priceRate, usdExchangeRate),
-    [models, priceRate, usdExchangeRate]
+    () => buildSavingsCatalog(models, priceRate),
+    [models, priceRate]
   )
   const maxSavingsPercent = useMemo(
     () => getMaximumSavingsPercent(savingsModels),
@@ -61,7 +61,9 @@ function DefaultHome(props: { isAuthenticated: boolean }) {
     <>
       <Hero
         isAuthenticated={props.isAuthenticated}
-        maxSavingsPercent={maxSavingsPercent}
+        maxSavingsPercent={
+          savingsModels.length > 0 ? maxSavingsPercent : undefined
+        }
       />
       <PriceSavings models={savingsModels} calculatorModels={savingsCatalog} />
       <HowItWorks />

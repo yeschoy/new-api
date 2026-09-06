@@ -227,7 +227,7 @@ export function DesktopAuthorization({ userCode }: DesktopAuthorizationProps) {
 
           <p className='text-muted-foreground mt-4 text-center text-xs leading-5'>
             {t(
-              'This approval does not reveal your password or API keys to the desktop app.'
+              'This approval lets the desktop app read and manage your API keys, but never reveals your password.'
             )}
           </p>
         </section>

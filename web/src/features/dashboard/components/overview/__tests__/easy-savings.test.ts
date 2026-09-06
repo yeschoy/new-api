@@ -50,17 +50,29 @@ function createUsageLog(overrides: Partial<UsageLog> = {}): UsageLog {
 }
 
 describe('easy savings estimate', () => {
-  it('compares logged site billing with the official equivalent in CNY', () => {
+  it('compares the base and discounted charge in the same site currency', () => {
+    expect(
+      estimateEasySavings([createUsageLog()], {
+        priceRate: 4,
+        quotaPerUnit: 500_000,
+      })
+    ).toMatchObject({
+      baseCost: 8,
+      siteCost: 4,
+      savings: 4,
+    })
+  })
+
+  it('compares logged site billing with the site base equivalent in CNY', () => {
     const result = estimateEasySavings([createUsageLog()], {
       priceRate: 4,
-      usdExchangeRate: 7,
       quotaPerUnit: 500_000,
     })
 
     expect(result).toEqual({
-      officialCost: 14,
+      baseCost: 8,
       siteCost: 4,
-      savings: 10,
+      savings: 4,
       comparableRequests: 1,
     })
   })
@@ -70,7 +82,6 @@ describe('easy savings estimate', () => {
       [createUsageLog({ other: '{}' }), createUsageLog({ type: 4 })],
       {
         priceRate: 4,
-        usdExchangeRate: 7,
         quotaPerUnit: 500_000,
       }
     )
@@ -89,13 +100,36 @@ describe('easy savings estimate', () => {
       ],
       {
         priceRate: 4,
-        usdExchangeRate: 7,
         quotaPerUnit: 500_000,
       }
     )
 
     expect(result.siteCost).toBe(2)
-    expect(result.officialCost).toBe(7)
-    expect(result.savings).toBe(5)
+    expect(result.baseCost).toBe(4)
+    expect(result.savings).toBe(2)
+  })
+
+  it('excludes subscription deductions from cash savings', () => {
+    const result = estimateEasySavings(
+      [
+        createUsageLog({
+          other: JSON.stringify({
+            group_ratio: 0.5,
+            billing_source: 'subscription',
+          }),
+        }),
+      ],
+      {
+        priceRate: 4,
+        quotaPerUnit: 500_000,
+      }
+    )
+
+    expect(result).toEqual({
+      baseCost: 0,
+      siteCost: 0,
+      savings: 0,
+      comparableRequests: 0,
+    })
   })
 })

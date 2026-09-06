@@ -111,7 +111,9 @@ export function PriceCompare(props: PriceCompareProps) {
             <tr className='text-muted-foreground border-border border-b text-xs'>
               <th className='px-7 py-3 font-semibold'>{t('Model')}</th>
               <th className='px-5 py-3 font-semibold'>{t('Our price')}</th>
-              <th className='px-7 py-3 font-semibold'>{t('Official API')}</th>
+              <th className='px-7 py-3 font-semibold'>
+                {t('Base billing estimate')}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -141,8 +143,8 @@ export function PriceCompare(props: PriceCompareProps) {
                 <td className='px-7 py-4'>
                   <PricePair
                     struck={model.savingsPercent > 0}
-                    input={model.officialInputPrice}
-                    output={model.officialOutputPrice}
+                    input={model.baseInputPrice}
+                    output={model.baseOutputPrice}
                   />
                 </td>
               </tr>
@@ -181,12 +183,12 @@ export function PriceCompare(props: PriceCompareProps) {
               </div>
               <div>
                 <div className='text-muted-foreground mb-2 text-[11px] font-semibold tracking-wide uppercase'>
-                  {t('Official API')}
+                  {t('Base billing estimate')}
                 </div>
                 <PricePair
                   struck={model.savingsPercent > 0}
-                  input={model.officialInputPrice}
-                  output={model.officialOutputPrice}
+                  input={model.baseInputPrice}
+                  output={model.baseOutputPrice}
                 />
               </div>
             </div>

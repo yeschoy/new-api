@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { UsageLog } from '@/features/usage-logs/data/schema'
 
 export type EasySavingsSummary = {
-  officialCost: number
+  baseCost: number
   siteCost: number
   savings: number
   comparableRequests: number
@@ -27,18 +27,18 @@ export type EasySavingsSummary = {
 
 type EasySavingsRates = {
   priceRate: number
-  usdExchangeRate: number
   quotaPerUnit: number
 }
 
 type LogBillingData = {
+  billing_source?: unknown
   group_ratio?: unknown
   user_group_ratio?: unknown
   fee_quota?: unknown
 }
 
 const EMPTY_SAVINGS: EasySavingsSummary = {
-  officialCost: 0,
+  baseCost: 0,
   siteCost: 0,
   savings: 0,
   comparableRequests: 0,
@@ -63,15 +63,13 @@ export function estimateEasySavings(
   if (
     !Number.isFinite(rates.priceRate) ||
     rates.priceRate <= 0 ||
-    !Number.isFinite(rates.usdExchangeRate) ||
-    rates.usdExchangeRate <= 0 ||
     !Number.isFinite(rates.quotaPerUnit) ||
     rates.quotaPerUnit <= 0
   ) {
     return EMPTY_SAVINGS
   }
 
-  let officialCost = 0
+  let baseCost = 0
   let siteCost = 0
   let comparableRequests = 0
 
@@ -79,6 +77,7 @@ export function estimateEasySavings(
     if (log.type !== 2) continue
 
     const billing = readLogBillingData(log.other)
+    if (billing?.billing_source === 'subscription') continue
     const userGroupRatio = Number(billing?.user_group_ratio)
     const groupRatio =
       Number.isFinite(userGroupRatio) && userGroupRatio > 0
@@ -93,14 +92,14 @@ export function estimateEasySavings(
 
     const billedCredits = chargedQuota / rates.quotaPerUnit
     siteCost += billedCredits * rates.priceRate
-    officialCost += (billedCredits / groupRatio) * rates.usdExchangeRate
+    baseCost += (billedCredits / groupRatio) * rates.priceRate
     comparableRequests += 1
   }
 
   return {
-    officialCost,
+    baseCost,
     siteCost,
-    savings: officialCost - siteCost,
+    savings: baseCost - siteCost,
     comparableRequests,
   }
 }

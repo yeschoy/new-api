@@ -51,6 +51,21 @@ describe('DesktopAuthorization', () => {
     expect(screen.getByText('Connection approved')).toBeInTheDocument()
   })
 
+  it('discloses that the desktop session can manage API keys', () => {
+    render(<DesktopAuthorization userCode='ABCD-2345' />)
+
+    expect(
+      screen.getByText(
+        'This approval lets the desktop app read and manage your API keys, but never reveals your password.'
+      )
+    ).toBeVisible()
+    expect(
+      screen.queryByText(
+        'This approval does not reveal your password or API keys to the desktop app.'
+      )
+    ).not.toBeInTheDocument()
+  })
+
   it('lets the user decline without granting access', async () => {
     decideMock.mockResolvedValue({
       success: true,

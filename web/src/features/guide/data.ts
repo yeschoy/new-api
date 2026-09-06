@@ -19,8 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 /*
  * Beginner guide content data.
  *
- * The guide body is authored in Chinese (the primary audience of the
- * operator-provided onboarding handbook). Address strings use placeholders
+ * Guide prose is stored as English translation keys and translated at render
+ * time. Address strings use placeholders
  * that are substituted at render time with the deployment's real address,
  * so changing the domain never requires touching this file:
  *   {{BASE_URL}}  -> https://<host>/v1
@@ -51,7 +51,7 @@ export interface GuideTool {
   status: ToolStatus
   /** One-line description in plain language. */
   summary: string
-  /** Step-by-step instructions (Chinese, with address placeholders). */
+  /** Step-by-step instructions (translation keys with address placeholders). */
   steps: string[]
   /** Optional extra warnings / tips. */
   tips?: string[]
@@ -68,19 +68,19 @@ export const guideTools: GuideTool[] = [
     category: 'chat',
     status: 'green',
     recommended: true,
-    summary: '国产办公智能体,可操作本地文件',
+    summary: 'A Chinese office agent with local file access.',
     steps: [
-      '打开 WorkBuddy,点击左下角账户头像',
-      '进入「设置」→「模型」,点击「添加模型」',
-      '提供商选择「自定义 / Custom」',
-      '接口地址填完整地址 {{FULL_URL}}',
-      'API Key 填 sk-... 密钥',
-      '模型名称填模型广场里的完整模型 ID',
-      '第一次测试先只开「工具调用」,「图片输入」「推理模式」仅在模型明确支持时开启',
-      '保存后回到对话框选择刚添加的模型',
+      'Open WorkBuddy and click the account avatar at the bottom left.',
+      'Go to Settings → Models and click Add model.',
+      'Choose Custom as the provider.',
+      'Set the full endpoint URL to {{FULL_URL}}.',
+      'Enter your sk-... key in API Key.',
+      'Use the exact model ID from the model catalog.',
+      'For the first test, enable only tool calling. Enable image input or reasoning only if the model explicitly supports it.',
+      'Save, then return to chat and select the model you added.',
     ],
     tips: [
-      '有「完整 URL」开关的版本:填完整地址时打开开关;只填 {{BASE_URL}} 时关闭开关让软件自动补路径。两者不要同时用,否则容易 404',
+      'If your version has a Full URL switch, enable it for the full endpoint. Disable it when entering only {{BASE_URL}} so the app adds the path. Do not combine both, or you may get a 404.',
     ],
   },
   {
@@ -88,19 +88,19 @@ export const guideTools: GuideTool[] = [
     name: 'Cherry Studio',
     category: 'chat',
     status: 'green',
-    summary: '桌面聊天客户端,支持 OpenAI 兼容接口',
+    summary: 'Desktop chat client supporting OpenAI-compatible APIs.',
     steps: [
-      '打开 Cherry Studio,点击左下角「设置」',
-      '进入「模型服务」,点击「添加」,类型选择「OpenAI」或「OpenAI Compatible」',
-      '名称随意填,例如本站名称',
-      'API Key 填你创建的 sk-... 密钥',
-      'API 地址填 {{BASE_URL}}',
-      '点击「管理」或「添加模型」,粘贴完整模型 ID',
-      '点击「检查」,成功后打开右上角启用开关',
-      '回到聊天页选择刚添加的模型,发一句「你好」测试',
+      'Open Cherry Studio and click Settings at the bottom left.',
+      'Open Model services, click Add, and choose OpenAI or OpenAI Compatible.',
+      "Choose any name, such as this site's name.",
+      'Enter the sk-... key you created in API Key.',
+      'Set the API address to {{BASE_URL}}.',
+      'Click Manage or Add model and paste the exact model ID.',
+      'Click Check. If it succeeds, turn on the enable switch at the top right.',
+      'Return to chat, select the new model, and send a short greeting to test it.',
     ],
     tips: [
-      '如果检查时报 404,把 API 地址改成 {{HOST}} 再试(不同版本对 /v1 的自动补全方式不同)',
+      'If Check returns 404, try {{HOST}} as the API address; versions differ in how they append /v1.',
     ],
   },
   {
@@ -108,15 +108,15 @@ export const guideTools: GuideTool[] = [
     name: 'Chatbox',
     category: 'chat',
     status: 'green',
-    summary: '轻量聊天客户端,手机电脑都能用',
+    summary: 'Lightweight chat client for phones and computers.',
     steps: [
-      '打开 Chatbox,点击侧边栏「设置」',
-      '进入「模型提供方」,点击「添加」,类型选「OpenAI API compatible」',
-      '如果界面显示「API Host」,填 {{HOST}}',
-      '如果界面显示「Base URL」,填 {{BASE_URL}}',
-      'API Key 填 sk-... 密钥',
-      'API Path 保持 /v1/chat/completions,没有这个输入框就不用管',
-      '添加模型 ID,保存并点击「检查」',
+      'Open Chatbox and click Settings in the sidebar.',
+      'Open Model providers, click Add, and choose OpenAI API compatible.',
+      'If the field is API Host, enter {{HOST}}.',
+      'If the field is Base URL, enter {{BASE_URL}}.',
+      'Enter your sk-... key in API Key.',
+      'Keep API Path as /v1/chat/completions. Skip this if there is no such field.',
+      'Add the model ID, save, and click Check.',
     ],
   },
   {
@@ -124,13 +124,13 @@ export const guideTools: GuideTool[] = [
     name: 'LobeChat',
     category: 'chat',
     status: 'green',
-    summary: '漂亮的开源聊天界面,可自建团队版',
+    summary: 'An open-source chat interface you can host for your team.',
     steps: [
-      '进入「设置」→「语言模型」',
-      '选择 OpenAI,或创建自定义 OpenAI 提供商',
-      'API Key 填 sk-...',
-      'Base URL 填 {{BASE_URL}}',
-      '保存后测试连接;如果没有自动显示模型,手动添加模型 ID',
+      'Go to Settings → Language models.',
+      'Select OpenAI or create a custom OpenAI provider.',
+      'Set API Key to sk-....',
+      'Set Base URL to {{BASE_URL}}.',
+      'Save and test the connection. Add the model ID manually if models do not appear automatically.',
     ],
   },
   {
@@ -138,93 +138,95 @@ export const guideTools: GuideTool[] = [
     name: 'NextChat',
     category: 'chat',
     status: 'green',
-    summary: '开源网页聊天,一键部署',
+    summary: 'Open-source web chat with one-click deployment.',
     steps: [
-      '打开设置页,找到「自定义接口」或「接口地址」',
-      '地址填 {{BASE_URL}}',
-      '密钥填 sk-...',
-      '在自定义模型中填写模型 ID',
-      '保存后新建会话测试',
+      'Open Settings and find Custom endpoint or API address.',
+      'Enter {{BASE_URL}} as the address.',
+      'Enter sk-... as the key.',
+      'Enter the model ID under custom models.',
+      'Save and start a new chat to test.',
     ],
-    tips: ['如果版本会自动把 /v1 附加到地址后面,接口地址只填 {{HOST}}'],
+    tips: [
+      'If your version adds /v1 automatically, enter only {{HOST}} as the endpoint.',
+    ],
   },
   {
     id: 'open-webui',
     name: 'Open WebUI',
     category: 'chat',
     status: 'green',
-    summary: '团队自建聊天平台,需管理员权限',
+    summary: 'Self-hosted team chat platform requiring administrator access.',
     steps: [
-      '点击头像,进入「管理员设置」',
-      '打开「Connections / 连接」,找到 OpenAI,点击「管理」',
-      '点击「添加连接」,URL 填 {{BASE_URL}}',
-      'API Key 填 sk-...',
-      '模型过滤留空可尝试自动读取;读不到时手动添加模型 ID',
-      '保存并启用该连接',
+      'Click your avatar and open Admin settings.',
+      'Open Connections, find OpenAI, and click Manage.',
+      'Click Add connection and set the URL to {{BASE_URL}}.',
+      'Set API Key to sk-....',
+      'Leave the model filter empty to try automatic discovery; add the model ID manually if it fails.',
+      'Save and enable the connection.',
     ],
   },
   {
     id: 'other-chat-clients',
-    name: 'DeepChat / AionUI / OpenCat 等',
+    name: 'DeepChat / AionUI / OpenCat and others',
     category: 'chat',
     status: 'green',
-    summary: '其他聊天客户端的通用配置方法',
+    summary: 'General setup for other chat clients.',
     steps: [
-      '优先在本站「API 密钥」页寻找一键导入按钮',
-      '手动配置时,类型选「OpenAI Compatible」',
-      'Base URL 填 {{BASE_URL}}',
-      'API Key 填你的 sk-... 密钥',
-      'Model 填模型广场上的完整模型 ID',
+      "First look for a one-click import button on this site's API Keys page.",
+      'For manual setup, choose OpenAI Compatible.',
+      'Set Base URL to {{BASE_URL}}.',
+      'Set API Key to your sk-... key.',
+      'Set Model to the exact ID from the model catalog.',
     ],
   },
   // ── 翻译 ─────────────────────────────────────────────────────────────
   {
     id: 'immersive-translate',
-    name: '沉浸式翻译',
+    name: 'Immersive Translate',
     category: 'translate',
     status: 'green',
     recommended: true,
-    summary: '网页、PDF、字幕翻译神器',
+    summary: 'Translate web pages, PDFs, and subtitles.',
     steps: [
-      '打开沉浸式翻译设置',
-      '在「翻译服务」中选择 OpenAI,或添加 OpenAI 兼容服务',
-      'API Key 填 sk-...',
-      '自定义模型填模型 ID',
-      '「自定义 URL」填完整地址 {{FULL_URL}}',
-      '保存并用一小段网页文字测试',
+      'Open Immersive Translate settings.',
+      'Choose OpenAI under Translation service, or add an OpenAI-compatible service.',
+      'Set API Key to sk-....',
+      'Enter the model ID in Custom model.',
+      'Set Custom URL to the full endpoint {{FULL_URL}}.',
+      'Save and test with a short section of a web page.',
     ],
     tips: [
-      '翻译网页会短时间发出很多小请求。遇到 429 时降低「每秒请求数」,不要连续反复点重试',
+      'Page translation sends many small requests quickly. If you see 429, lower requests per second instead of repeatedly retrying.',
     ],
   },
   {
     id: 'fluent-read',
-    name: '流畅阅读 FluentRead',
+    name: 'FluentRead',
     category: 'translate',
     status: 'green',
-    summary: '开源沉浸式阅读翻译插件',
+    summary: 'Open-source extension for immersive reading and translation.',
     steps: [
-      '在流畅阅读中添加「OpenAI 兼容」翻译服务',
-      '地址填 {{BASE_URL}};如果界面明确要求完整地址,则填 {{FULL_URL}}',
-      '填写密钥和模型 ID',
-      '先用短网页测试,再翻译 PDF 或长页面',
+      'Add an OpenAI-compatible translation service in FluentRead.',
+      'Enter {{BASE_URL}}, or {{FULL_URL}} if the field explicitly asks for the full endpoint.',
+      'Enter the API key and model ID.',
+      'Test with a short web page before translating PDFs or long pages.',
     ],
   },
-  // ── 编程 ───────────────────────���─────────────────────────────────────
+  // Coding tools
   {
     id: 'claude-code',
     name: 'Claude Code',
     category: 'coding',
     status: 'blue',
-    summary: '使用 Anthropic 协议,需专用地址',
+    summary: 'Uses the Anthropic protocol and requires its dedicated endpoint.',
     steps: [
-      'Claude Code 使用 Anthropic Messages 协议,不能直接把 OpenAI 地址填进 ANTHROPIC_BASE_URL',
-      '只有当平台另外提供「Anthropic 专用地址」时才能配置:',
-      'export ANTHROPIC_BASE_URL="平台提供的Anthropic专用地址"',
-      'export ANTHROPIC_AUTH_TOKEN="你的密钥"',
+      'Claude Code uses Anthropic Messages. Do not put an OpenAI endpoint in ANTHROPIC_BASE_URL.',
+      'Configure this only if the platform provides a dedicated Anthropic endpoint:',
+      'export ANTHROPIC_BASE_URL="YOUR_ANTHROPIC_ENDPOINT"',
+      'export ANTHROPIC_AUTH_TOKEN="YOUR_API_KEY"',
     ],
     tips: [
-      '不要把 /v1/chat/completions 当作 Anthropic /v1/messages 使用。没有专用地址时请改用 Cline、Roo Code、OpenCode',
+      'Do not substitute /v1/chat/completions for Anthropic /v1/messages. Without a dedicated endpoint, use Cline, Roo Code, or OpenCode.',
     ],
   },
   {
@@ -232,25 +234,25 @@ export const guideTools: GuideTool[] = [
     name: 'Codex CLI',
     category: 'coding',
     status: 'blue',
-    summary: '仅支持 Responses API 兼容的模型',
+    summary: 'Supports only models compatible with the Responses API.',
     steps: [
-      'Codex 的自定义提供商使用 Responses API,不能把只支持 Chat Completions 的模型硬套进去',
-      '只有所选模型明确支持 /v1/responses 时才配置(见示例)',
-      '启动前设置对应的环境变量',
+      'Codex custom providers use the Responses API; Chat Completions-only models will not work.',
+      'Configure this only if the selected model explicitly supports /v1/responses; see the example.',
+      'Set the corresponding environment variable before starting.',
     ],
     snippet: {
       label: 'config.toml',
-      code: `model = "请替换为支持Responses的模型ID"
+      code: `model = "YOUR_RESPONSES_MODEL_ID"
 model_provider = "myprovider"
 
 [model_providers.myprovider]
-name = "我的中转"
+name = "My API provider"
 base_url = "{{BASE_URL}}"
 env_key = "MY_API_KEY"
 wire_api = "responses"`,
     },
     tips: [
-      '如果报 404 /responses 或持续工具调用失败,请改用 Cline、Roo Code、OpenCode,不要反复改地址碰运气',
+      'If /responses returns 404 or tool calls keep failing, use Cline, Roo Code, or OpenCode instead of repeatedly guessing URLs.',
     ],
   },
   {
@@ -259,18 +261,19 @@ wire_api = "responses"`,
     category: 'coding',
     status: 'green',
     recommended: true,
-    summary: 'DeepSeek 官方开源 Agent,支持自定义 OpenAI 兼容供应商',
+    summary:
+      "DeepSeek's official open-source agent with custom OpenAI-compatible providers.",
     steps: [
-      '先安装 Node.js,在项目目录运行 npx @deepseek-ai/dsh web',
-      '浏览器打开 http://127.0.0.1:3080,进入「Settings」→「Models」',
-      '选择「Add a custom provider」,Provider ID 填一个小写英文名称,例如 yecai',
-      'API protocol 选择「OpenAI Completions」,Base URL 填 {{BASE_URL}}',
-      'Credential / API Key 填自己的 sk-... 密钥',
-      '添加完整模型 ID,保存后返回会话并选择项目目录开始使用',
+      'Install Node.js, then run npx @deepseek-ai/dsh web in your project directory.',
+      'Open http://127.0.0.1:3080 in your browser and go to Settings → Models.',
+      'Choose Add a custom provider and enter a lowercase Provider ID, such as yecai.',
+      'Choose OpenAI Completions for API protocol and set Base URL to {{BASE_URL}}.',
+      'Enter your sk-... key in Credential / API Key.',
+      'Add the exact model ID, save, then return to the session and select a project directory.',
     ],
     tips: [
-      'DSH 当前仍处于开发者预览阶段,升级后界面和配置格式可能变化',
-      '模型必须支持工具调用;只能聊天、不能执行任务时,先换用支持 tools/function calling 的模型',
+      'DSH is still in developer preview; its interface and configuration format may change after updates.',
+      'The model must support tool calling. If chat works but tasks do not, switch to a model supporting tools/function calling.',
     ],
   },
   {
@@ -278,12 +281,12 @@ wire_api = "responses"`,
     name: 'Pi Coding Agent',
     category: 'coding',
     status: 'yellow',
-    summary: '轻量可扩展的终端 Agent',
+    summary: 'A lightweight, extensible terminal agent.',
     steps: [
-      '安装:npm install -g @mariozechner/pi-coding-agent',
-      '创建或编辑 ~/.pi/agent/models.json,按下面的示例配置',
-      '设置环境变量后启动 pi,输入 /model 选择模型',
-      '先确认基础聊天和工具调用正常,再逐个增加扩展',
+      'Install with npm install -g @mariozechner/pi-coding-agent.',
+      'Create or edit ~/.pi/agent/models.json using the example below.',
+      'Set the environment variable, start pi, and use /model to select a model.',
+      'Verify basic chat and tool calls before adding extensions one by one.',
     ],
     snippet: {
       label: '~/.pi/agent/models.json',
@@ -294,29 +297,29 @@ wire_api = "responses"`,
       "api": "openai-completions",
       "apiKey": "$MY_API_KEY",
       "authHeader": true,
-      "models": [{ "id": "请替换为模型ID", "name": "中转模型" }]
+      "models": [{ "id": "YOUR_MODEL_ID", "name": "API model" }]
     }
   }
 }`,
     },
-    tips: ['不要把完整的 /chat/completions 地址写进 baseUrl'],
+    tips: ['Do not put the full /chat/completions endpoint in baseUrl.'],
   },
   {
     id: 'cline',
     name: 'Cline',
     category: 'coding',
     status: 'green',
-    summary: 'VS Code 里的 AI 编程助手,新手编程首选',
+    summary: 'AI coding assistant in VS Code, suitable for beginners.',
     steps: [
-      '在 VS Code 中安装 Cline,打开面板点击齿轮',
-      'API Provider 选择「OpenAI Compatible」',
-      'Base URL 填 {{BASE_URL}}',
-      'API Key 填 sk-...',
-      'Model ID 填完整模型 ID',
-      '保存后让它读取一个小文件或解释一段代码测试',
+      'Install Cline in VS Code, open its panel, and click the gear icon.',
+      'Choose OpenAI Compatible as API Provider.',
+      'Set Base URL to {{BASE_URL}}.',
+      'Set API Key to sk-....',
+      'Enter the exact model ID in Model ID.',
+      'Save and test by asking it to read a small file or explain some code.',
     ],
     tips: [
-      '聊天能回复但不能修改文件时,通常不是密钥问题,而是模型不支持工具调用。换支持 tools 的模型再试',
+      'If chat works but file edits do not, the model usually lacks tool support rather than having a key problem. Try a tools-capable model.',
     ],
   },
   {
@@ -324,31 +327,31 @@ wire_api = "responses"`,
     name: 'Roo Code',
     category: 'coding',
     status: 'green',
-    summary: 'VS Code AI Agent,依赖原生工具调用',
+    summary: 'VS Code AI agent that relies on native tool calling.',
     steps: [
-      '打开 Roo Code 设置',
-      'API Provider 选择「OpenAI Compatible」',
-      'Base URL 填 {{BASE_URL}}',
-      'API Key 填 sk-...',
-      'Model ID 填完整模型 ID',
-      '保存并执行一个只读的小任务测试',
+      'Open Roo Code settings.',
+      'Choose OpenAI Compatible as API Provider.',
+      'Set Base URL to {{BASE_URL}}.',
+      'Set API Key to sk-....',
+      'Enter the exact model ID in Model ID.',
+      'Save and test with a small read-only task.',
     ],
-    tips: ['模型必须支持 tools/function calling,否则无法执行 Agent 任务'],
+    tips: ['The model must support tools/function calling to run agent tasks.'],
   },
   {
     id: 'kilo-code',
     name: 'Kilo Code',
     category: 'coding',
     status: 'green',
-    summary: 'VS Code / CLI,原生支持自定义供应商',
+    summary: 'VS Code / CLI with native support for custom providers.',
     steps: [
-      '打开 Kilo Code 设置,进入 Providers,选择「添加自定义供应商」',
-      'Provider ID 随意填,显示名称填本站名称',
-      'Provider API 选择「OpenAI Compatible」',
-      'Base URL 填 {{BASE_URL}}',
-      'API Key 填 sk-... 密钥',
-      '从自动获取的列表选择模型;获取不到时手动添加完整模型 ID',
-      '保存后先运行一个小任务测试工具调用',
+      'Open Kilo Code settings, go to Providers, and add a custom provider.',
+      "Choose any Provider ID and use this site's name as the display name.",
+      'Choose OpenAI Compatible as Provider API.',
+      'Set Base URL to {{BASE_URL}}.',
+      'Enter your sk-... key in API Key.',
+      'Select a model from the fetched list, or add its exact ID manually if fetching fails.',
+      'Save, then run a small task to test tool calling.',
     ],
   },
   {
@@ -356,25 +359,25 @@ wire_api = "responses"`,
     name: 'Continue',
     category: 'coding',
     status: 'yellow',
-    summary: 'VS Code / JetBrains 插件,需编辑配置文件',
+    summary: 'VS Code / JetBrains extension requiring a configuration file.',
     steps: [
-      '打开 Continue 的配置文件,按下面的示例添加模型',
-      '把 apiBase 填为 {{BASE_URL}},apiKey 填你的密钥',
-      '保存后重启编辑器测试',
+      "Open Continue's configuration file and add a model using the example below.",
+      'Set apiBase to {{BASE_URL}} and apiKey to your key.',
+      'Save and restart the editor to test.',
     ],
     snippet: {
       label: 'config.yaml',
       code: `models:
-  - name: 我的中转模型
+  - name: My API model
     provider: openai
-    model: 请替换为模型ID
+    model: YOUR_MODEL_ID
     apiBase: {{BASE_URL}}
-    apiKey: 请替换为你的密钥
+    apiKey: YOUR_API_KEY
     capabilities:
       - tool_use`,
     },
     tips: [
-      '如果 Continue 自动改用 /responses 后报错,在模型配置中增加 useResponsesApi: false',
+      'If Continue fails after automatically switching to /responses, add useResponsesApi: false to the model configuration.',
     ],
   },
   {
@@ -382,12 +385,12 @@ wire_api = "responses"`,
     name: 'OpenCode',
     category: 'coding',
     status: 'yellow',
-    summary: '终端编程 Agent,需编辑 opencode.json',
+    summary: 'Terminal coding agent configured through opencode.json.',
     steps: [
-      '运行 /connect,选择「Other」,设置一个提供商 ID',
-      '在 opencode.json 中按下面的示例配置',
-      '重启 OpenCode,输入 /models 选择你的模型',
-      '用一个小项目测试读取、编辑和命令调用',
+      'Run /connect, choose Other, and set a provider ID.',
+      'Configure opencode.json using the example below.',
+      'Restart OpenCode and use /models to select your model.',
+      'Test reading, editing, and command execution in a small project.',
     ],
     snippet: {
       label: 'opencode.json',
@@ -395,9 +398,9 @@ wire_api = "responses"`,
   "provider": {
     "myprovider": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "我的中转",
+      "name": "My API provider",
       "options": { "baseURL": "{{BASE_URL}}" },
-      "models": { "请替换为模型ID": { "name": "中转模型" } }
+      "models": { "YOUR_MODEL_ID": { "name": "API model" } }
     }
   }
 }`,
@@ -408,13 +411,16 @@ wire_api = "responses"`,
     name: 'Aider',
     category: 'coding',
     status: 'yellow',
-    summary: '命令行结对编程,用环境变量配置',
-    steps: ['在终端设置环境变量后启动(见下方示例)'],
+    summary:
+      'Command-line pair programming configured with environment variables.',
+    steps: [
+      'Set the environment variables in your terminal before starting; see the example below.',
+    ],
     snippet: {
       label: 'macOS / Linux',
       code: `export OPENAI_API_BASE="{{BASE_URL}}"
-export OPENAI_API_KEY="请替换为你的密钥"
-aider --model openai/请替换为模型ID`,
+export OPENAI_API_KEY="YOUR_API_KEY"
+aider --model openai/YOUR_MODEL_ID`,
     },
   },
   {
@@ -422,10 +428,10 @@ aider --model openai/请替换为模型ID`,
     name: 'Qwen Code',
     category: 'coding',
     status: 'yellow',
-    summary: '命令行编程工具,需编辑 settings.json',
+    summary: 'Command-line coding tool configured through settings.json.',
     steps: [
-      '在 ~/.qwen/settings.json 中按下面的示例配置',
-      '启动前设置对应的环境变量,然后用 /model 选择该模型',
+      'Configure ~/.qwen/settings.json using the example below.',
+      'Set the corresponding environment variable before starting, then select the model with /model.',
     ],
     snippet: {
       label: '~/.qwen/settings.json',
@@ -433,8 +439,8 @@ aider --model openai/请替换为模型ID`,
   "modelProviders": {
     "openai": [
       {
-        "id": "请替换为模型ID",
-        "name": "我的中转",
+        "id": "YOUR_MODEL_ID",
+        "name": "My API provider",
         "envKey": "MY_API_KEY",
         "baseUrl": "{{BASE_URL}}"
       }
@@ -449,13 +455,13 @@ aider --model openai/请替换为模型ID`,
     category: 'coding',
     status: 'green',
     recommended: true,
-    summary: '国产编程工具,支持自定义 OpenAI 模型',
+    summary: 'Chinese coding tool supporting custom OpenAI models.',
     steps: [
-      '进入「设置」→「模型」→「添加模型」',
-      'API 格式选择 OpenAI',
-      'Base URL 填 {{BASE_URL}}',
-      'API Key 填 sk-...',
-      '模型填完整模型 ID',
+      'Go to Settings → Models → Add model.',
+      'Choose OpenAI as the API format.',
+      'Set Base URL to {{BASE_URL}}.',
+      'Set API Key to sk-....',
+      'Enter the exact model ID as the model.',
     ],
   },
   {
@@ -463,14 +469,14 @@ aider --model openai/请替换为模型ID`,
     name: 'Crush',
     category: 'coding',
     status: 'yellow',
-    summary: '终端编程 Agent,适合命令行熟手',
+    summary: 'Terminal coding agent for experienced command-line users.',
     steps: [
-      '在供应商管理中添加 openai-compat 类型的自定义供应商(见示例)',
-      '用 model add 添加模型,模型 ID 必须与模型广场完全一致',
-      '上下文长度、最大输出等参数以模型页面为准,不要照抄别家同名模型',
+      'Add a custom provider of type openai-compat in provider management; see the example.',
+      'Use model add to add a model whose ID exactly matches the model catalog.',
+      'Use the model page for context length and output limits; do not copy settings from a similarly named model elsewhere.',
     ],
     snippet: {
-      label: '终端',
+      label: 'Terminal',
       code: `provider add myprovider --type openai-compat \\
   --base-url "{{BASE_URL}}" \\
   --api-key "$MY_API_KEY"`,
@@ -481,29 +487,32 @@ aider --model openai/请替换为模型ID`,
     name: 'Gemini CLI',
     category: 'coding',
     status: 'blue',
-    summary: '使用 Gemini 原生协议,需专用地址',
+    summary:
+      "Uses Gemini's native protocol and requires its dedicated endpoint.",
     steps: [
-      '只有��台提供「Gemini 专用地址」时才能配置:',
-      'export GEMINI_API_KEY="你的密钥"',
-      'export GOOGLE_GEMINI_BASE_URL="平台提供的Gemini专用地址"',
+      'Configure this only if the platform provides a dedicated Gemini endpoint:',
+      'export GEMINI_API_KEY="YOUR_API_KEY"',
+      'export GOOGLE_GEMINI_BASE_URL="YOUR_GEMINI_ENDPOINT"',
     ],
-    tips: ['普通 OpenAI 兼容地址不能直接代替 Gemini 原生地址'],
+    tips: [
+      'A standard OpenAI-compatible endpoint cannot replace a native Gemini endpoint.',
+    ],
   },
   {
     id: 'cursor',
     name: 'Cursor',
     category: 'coding',
     status: 'yellow',
-    summary: '有限支持,可能影响内置模型',
+    summary: 'Limited support that may affect built-in models.',
     steps: [
-      '打开 Cursor Settings → Models',
-      '填写 OpenAI API Key(你的 sk-... 密钥)',
-      '打开 Override OpenAI Base URL,填 {{BASE_URL}}',
-      '添加或选择模型 ID',
-      '先用 Ask/Chat 测试,不要一开始运行大型 Agent 任务',
+      'Open Cursor Settings → Models.',
+      'Enter your sk-... key as the OpenAI API Key.',
+      'Enable Override OpenAI Base URL and enter {{BASE_URL}}.',
+      'Add or select the model ID.',
+      'Test with Ask/Chat first; do not begin with a large agent task.',
     ],
     tips: [
-      '自定义 Key 主要用于普通聊天;Tab 补全等功能仍走 Cursor 自己的服务。需要稳定使用第三方接口时更推荐 Cline 或 Roo Code',
+      "Custom keys mainly serve regular chat. Tab completion still uses Cursor's services. Prefer Cline or Roo Code for reliable third-party API use.",
     ],
   },
   {
@@ -511,11 +520,11 @@ aider --model openai/请替换为模型ID`,
     name: 'Windsurf',
     category: 'coding',
     status: 'gray',
-    summary: '暂无通用自定义 Base URL,不建议',
+    summary: 'No general custom Base URL support; not recommended.',
     steps: [
-      'Windsurf 官方 BYOK 只对它列出的部分模型开放,没有面向任意 OpenAI 兼容服务的通用 Base URL 配置',
-      '不要把密钥直接填进官方 OpenAI / Anthropic / Google Key 输入框后期待它自动识别中转地址',
-      '当前建议使用 Cline、Roo Code、Continue 或 Trae',
+      'Windsurf BYOK supports only selected listed models and has no general Base URL setting for arbitrary OpenAI-compatible services.',
+      'Do not expect an official OpenAI / Anthropic / Google key field to detect your custom proxy address automatically.',
+      'Use Cline, Roo Code, Continue, or Trae instead.',
     ],
   },
   // ── 配置与账号管理 ───────────────────────────────────────────────────
@@ -524,21 +533,21 @@ aider --model openai/请替换为模型ID`,
     name: 'CC Switch',
     category: 'manager',
     status: 'yellow',
-    summary: '多个编程 CLI 的地址、Key、MCP 统一切换器',
+    summary: 'Switch endpoints, keys, and MCP settings across coding CLIs.',
     steps: [
-      '先安装并至少启动一次目标应用(推荐 OpenCode),让 CC Switch 能找到它的配置目录',
-      '打开 CC Switch,顶部选择「OpenCode」',
-      '点击右上角「+」添加供应商,选择「应用专属供应商」,不要先选「通用供应商」',
-      '预设选择「OpenAI Compatible」;没有该预设就选「Custom / 自定义」',
-      'API Key 填自己的 sk-... 密钥',
-      'Endpoint / Base URL 填 {{BASE_URL}}',
-      '点击「获取模型」;失败时手动粘贴完整模型 ID',
-      '保存后点击「启用」,完全退出并重新打开目标应用',
+      'Install and start the target app at least once, preferably OpenCode, so CC Switch can find its configuration directory.',
+      'Open CC Switch and select OpenCode at the top.',
+      'Click + at the top right, then choose an app-specific provider rather than a universal provider.',
+      'Choose the OpenAI Compatible preset, or Custom if that preset is unavailable.',
+      'Enter your own sk-... key in API Key.',
+      'Set Endpoint / Base URL to {{BASE_URL}}.',
+      'Click Fetch models; paste the exact model ID manually if it fails.',
+      'Save, click Enable, then fully quit and reopen the target app.',
     ],
     tips: [
-      '不要把同一配置通过「通用供应商」直接同步给 Claude Code 和 Gemini CLI,它们使用的原生协议不同',
-      '切换后大多数 CLI 需要重启才能读取新配置;旧地址仍生效时先检查系统环境变量是否覆盖了配置',
-      '首次使用前建议导出备份,避免切换时覆盖原有的 MCP、模型或登录配置',
+      'Do not sync one universal configuration directly to Claude Code and Gemini CLI; they use different native protocols.',
+      'Most CLIs must restart after switching. If the old endpoint remains active, check whether system environment variables override the configuration.',
+      'Export a backup before first use to avoid overwriting existing MCP, model, or login settings.',
     ],
   },
   {
@@ -546,18 +555,19 @@ aider --model openai/请替换为模型ID`,
     name: 'Cockpit Tools',
     category: 'manager',
     status: 'green',
-    summary: '支持 Codex API Key、自定义 Base URL 与本地 API 服务',
+    summary:
+      'Supports Codex API keys, custom Base URLs, and a local API service.',
     steps: [
-      '升级到最新版 Cockpit Tools,打开 Codex 账号页',
-      '选择「API Key」方式添加账号,供应商模式选「自定义」',
-      'API Key 填自己的 sk-... 密钥,Base URL 填 {{BASE_URL}}',
-      '按本站模型广场填写或同步模型 ID,协议选择与模型匹配的 Responses 或 OpenAI 兼容模式',
-      '保存并切换到该账号;需要给其他工具调用时,再到「Codex API Service」创建客户端 Key 并启用本地服务',
-      '把 Cockpit Tools 显示的本地 Base URL 和客户端 Key 填进目标工具,先发一条短消息测试',
+      'Update Cockpit Tools to the latest version and open the Codex accounts page.',
+      'Add an account using API Key and choose Custom as the provider mode.',
+      'Enter your sk-... key and set Base URL to {{BASE_URL}}.',
+      "Enter or sync model IDs from this site's catalog, then choose Responses or OpenAI-compatible mode to match the model.",
+      'Save and switch to this account. To connect other tools, create a client key in Codex API Service and enable the local service.',
+      'Enter the local Base URL and client key shown by Cockpit Tools into your target tool, then send a short test message.',
     ],
     tips: [
-      'Cockpit Tools 的本地 API Service 地址通常是 localhost 加动态端口,不要误填成本站上游地址',
-      '只从官方项目下载;切换前备份配置,不要把包含 Token、Cookie 或客户端 Key 的备份发给别人',
+      "Cockpit Tools' local API service usually uses localhost with a dynamic port. Do not confuse it with this site's upstream address.",
+      'Download only from the official project and back up settings before switching. Never share backups containing tokens, cookies, or client keys.',
     ],
   },
   // ── 知识库与工作流 ───────────────────────────────────────────────────
@@ -566,16 +576,17 @@ aider --model openai/请替换为模型ID`,
     name: 'Dify',
     category: 'platform',
     status: 'green',
-    summary: '知识库与工作流平台,需管理员权限',
+    summary:
+      'Knowledge-base and workflow platform requiring administrator access.',
     steps: [
-      '进入「设置」→「模型供应商」',
-      '安装或打开 OpenAI 模型供应商',
-      '填 API Key',
-      '自定义基础 URL 填 {{BASE_URL}}',
-      '添加或选择模型 ID,测试并保存',
+      'Go to Settings → Model providers.',
+      'Install or open the OpenAI model provider.',
+      'Enter your API key.',
+      'Set the custom base URL to {{BASE_URL}}.',
+      'Add or select a model ID, test, and save.',
     ],
     tips: [
-      '如果插件只显示官方 OpenAI 模型、不能添加自定义模型,需换用支持自定义模型 ID 的 OpenAI 兼容插件',
+      'If the plugin only lists official OpenAI models and cannot add custom IDs, use an OpenAI-compatible plugin that supports custom model IDs.',
     ],
   },
   {
@@ -583,15 +594,15 @@ aider --model openai/请替换为模型ID`,
     name: 'FastGPT',
     category: 'platform',
     status: 'green',
-    summary: '知识库平台,管理员配置',
+    summary: 'Knowledge-base platform configured by an administrator.',
     steps: [
-      '在「模型供应商」中添加 OpenAI 协议渠道',
-      'Base URL 填 {{BASE_URL}}',
-      'Key 填 sk-...',
-      '模型填完整模型 ID',
+      'Add an OpenAI-protocol channel under Model providers.',
+      'Set Base URL to {{BASE_URL}}.',
+      'Set Key to sk-....',
+      'Enter the exact model ID as the model.',
     ],
     tips: [
-      '自部署版本也可通过 OPENAI_BASE_URL 和 CHAT_API_KEY 环境变量配置。不要把完整 /chat/completions 地址当作 Base URL',
+      'Self-hosted versions can also use OPENAI_BASE_URL and CHAT_API_KEY. Do not use the full /chat/completions endpoint as the Base URL.',
     ],
   },
   {
@@ -599,26 +610,28 @@ aider --model openai/请替换为模型ID`,
     name: 'Flowise',
     category: 'platform',
     status: 'green',
-    summary: '可视化工作流编排',
+    summary: 'Visual workflow orchestration.',
     steps: [
-      '使用 ChatOpenAI 节点',
-      '创建 OpenAI 凭据并填入密钥',
-      '在 Additional Parameters 中将 Base Path 改为 {{BASE_URL}}',
-      '内置列表没有该模型时,使用 ChatOpenAI Custom 并填写模型 ID',
+      'Use a ChatOpenAI node.',
+      'Create OpenAI credentials and enter the key.',
+      'In Additional Parameters, set Base Path to {{BASE_URL}}.',
+      'If the model is absent from the built-in list, use ChatOpenAI Custom and enter its ID.',
     ],
   },
   {
     id: 'n8n-langflow',
-    name: 'n8n / Langflow / Coze 等',
+    name: 'n8n / Langflow / Coze and others',
     category: 'platform',
     status: 'yellow',
-    summary: '其他自动化平台的通用判断方法',
+    summary: 'How to assess support in other automation platforms.',
     steps: [
-      '先看它的模型凭据页面有没有三个输入框:API Key、Base URL / Endpoint、Model ID',
-      '三个都有,并且明确写着 OpenAI Compatible,通常可以接入',
-      '只有 API Key、没有 Base URL 的,通常只能连接官方服务,不能接入自定义中转',
+      'Look for three fields on the model credentials page: API Key, Base URL / Endpoint, and Model ID.',
+      'If all three exist and OpenAI Compatible is explicitly supported, the platform can usually connect.',
+      'If there is only an API Key field and no Base URL, it usually supports official services only, not a custom proxy.',
     ],
-    tips: ['找不到 Base URL 时,不要把地址填进 API Key 或 Organization 字段'],
+    tips: [
+      'If you cannot find Base URL, do not put the address in API Key or Organization.',
+    ],
   },
 ]
 
@@ -632,63 +645,68 @@ export interface TroubleshootRow {
 export const troubleshootRows: TroubleshootRow[] = [
   {
     error: '401 Invalid API key',
-    meaning: '密钥错、被删除、复制不完整或前后有空格',
-    fix: '重新复制完整密钥;仍失败就新建一枚',
+    meaning:
+      'The key is incorrect, deleted, incomplete, or has surrounding spaces.',
+    fix: 'Copy the complete key again; create a new one if it still fails.',
   },
   {
     error: '404 Not Found',
-    meaning: '地址或路径拼错',
-    fix: '检查是否重复了 /v1 或 /chat/completions',
+    meaning: 'The address or path is misspelled.',
+    fix: 'Check for a duplicated /v1 or /chat/completions in the URL.',
   },
   {
     error: '400 model not found',
-    meaning: '模型 ID 写错或当前分组无权使用',
-    fix: '从模型广场重新复制模型 ID',
+    meaning: 'The model ID is incorrect or unavailable to the current group.',
+    fix: 'Copy the model ID again from the model catalog.',
   },
   {
     error: '400 response_format unavailable',
-    meaning: '客户端发送了该模型不支持的格式参数',
-    fix: '关闭 JSON/结构化输出,或换模型/客户端',
+    meaning: 'The client sent a format parameter unsupported by this model.',
+    fix: 'Disable JSON/structured output, or switch the model or client.',
   },
   {
     error: '429 Too Many Requests',
-    meaning: '请求太快、并发过高或额度窗口已满',
-    fix: '降低并发,稍等后再试,不要疯狂重试',
+    meaning:
+      'Requests are too frequent, concurrency is too high, or the quota window is exhausted.',
+    fix: 'Reduce concurrency and wait before retrying; avoid repeated rapid retries.',
   },
   {
     error: '500 Internal server error',
-    meaning: '服务内部异常,也可能是上游返回异常',
-    fix: '保存请求 ID,稍后重试一次;持续出现再反馈',
+    meaning:
+      'An internal service error occurred, possibly from the upstream provider.',
+    fix: 'Save the request ID and retry once later. Report it if the issue persists.',
   },
   {
     error: '502 all upstream attempts failed',
-    meaning: '可用上游暂时全部失败',
-    fix: '换模型或等待恢复,并带请求 ID 反馈',
+    meaning: 'All available upstream providers have temporarily failed.',
+    fix: 'Switch models or wait for recovery, and include the request ID in your report.',
   },
   {
     error: '503 Service Unavailable',
-    meaning: '上游繁忙、维护或当前无可用线路',
-    fix: '等待片刻或换模型',
+    meaning:
+      'The upstream is busy, under maintenance, or has no available route.',
+    fix: 'Wait a moment or choose another model.',
   },
   {
-    error: '一直转圈、30 秒后失败',
-    meaning: '客户端超时或首字太慢',
-    fix: '将超时调到 120 秒;先测试短问题',
+    error: 'Keeps loading, then fails after 30 seconds',
+    meaning: 'The client timed out or the first response token was too slow.',
+    fix: 'Set the timeout to 120 seconds and test with a short question first.',
   },
   {
-    error: '能聊天但不能改文件',
-    meaning: '模型不支持工具调用,或工具协议不兼容',
-    fix: '换支持 tools/function calling 的模型',
+    error: 'Chat works but files cannot be edited',
+    meaning:
+      'The model lacks tool calling or uses an incompatible tool protocol.',
+    fix: 'Switch to a model supporting tools/function calling.',
   },
   {
-    error: '模型列表为空',
-    meaning: '客户端没成功读取 /v1/models',
-    fix: '手动添加模型 ID,不代表密钥失效',
+    error: 'The model list is empty',
+    meaning: 'The client could not fetch /v1/models.',
+    fix: 'Add the model ID manually; an empty list does not mean the key is invalid.',
   },
   {
-    error: '上下文提前压缩',
-    meaning: '客户端自己的压缩策略触发',
-    fix: '查看客户端上下文设置;不等于服务端只有小上下文',
+    error: 'Context is compressed too early',
+    meaning: "The client's own context-compaction policy was triggered.",
+    fix: "Check the client's context settings; this does not imply a small server-side context window.",
   },
 ]
 
@@ -696,53 +714,53 @@ export const troubleshootRows: TroubleshootRow[] = [
 export interface UseCaseRow {
   useCase: string
   tools: string
-  difficulty: '简单' | '中等' | '较难'
+  difficulty: 'Easy' | 'Medium' | 'Advanced'
 }
 
 export const useCaseRows: UseCaseRow[] = [
   {
-    useCase: '国产办公智能体、操作本地文件',
+    useCase: 'Office agents and local file tasks',
     tools: 'WorkBuddy / CodeBuddy',
-    difficulty: '简单',
+    difficulty: 'Easy',
   },
   {
-    useCase: '网页、PDF、字幕翻译',
-    tools: '沉浸式翻译、流畅阅读',
-    difficulty: '简单',
+    useCase: 'Translate web pages, PDFs, and subtitles',
+    tools: 'Immersive Translate, FluentRead',
+    difficulty: 'Easy',
   },
   {
-    useCase: '用 DeepSeek 官方 Agent 执行任务',
+    useCase: "Run tasks with DeepSeek's official agent",
     tools: 'DeepSeek Harness (DSH)',
-    difficulty: '中等',
+    difficulty: 'Medium',
   },
   {
-    useCase: '用国产工具辅助编程',
+    useCase: 'Code with Chinese developer tools',
     tools: 'Trae / TraeCode CLI',
-    difficulty: '简单',
+    difficulty: 'Easy',
   },
   {
-    useCase: '终端里写代码',
+    useCase: 'Write code in the terminal',
     tools: 'Claude Code、Codex、Pi、OpenCode、Crush',
-    difficulty: '中等',
+    difficulty: 'Medium',
   },
   {
-    useCase: 'VS Code 里写代码',
+    useCase: 'Write code in VS Code',
     tools: 'Cline、Roo Code、Kilo Code、Continue',
-    difficulty: '简单',
+    difficulty: 'Easy',
   },
   {
-    useCase: '同时切换多个 CLI 的配置',
+    useCase: 'Switch configurations for several CLIs',
     tools: 'CC Switch',
-    difficulty: '中等',
+    difficulty: 'Medium',
   },
   {
-    useCase: '自建团队聊天网页',
+    useCase: 'Host a team chat website',
     tools: 'Open WebUI、LobeChat、NextChat',
-    difficulty: '中等',
+    difficulty: 'Medium',
   },
   {
-    useCase: '搭建知识库或工作流',
+    useCase: 'Build a knowledge base or workflow',
     tools: 'Dify、FastGPT、Flowise',
-    difficulty: '较难',
+    difficulty: 'Advanced',
   },
 ]

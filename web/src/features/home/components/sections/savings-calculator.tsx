@@ -435,9 +435,9 @@ export function SavingsCalculator(props: SavingsCalculatorProps) {
 
           <div className='dopa-calculator-price-flow relative z-10 mt-4'>
             <div className='dopa-flow-value' data-tone='official'>
-              <span>{t('Official API estimate')}</span>
+              <span>{t('Base billing estimate')}</span>
               <strong className='line-through decoration-1'>
-                {formatCnyAmount(estimate.officialMonthlyCost, {
+                {formatCnyAmount(estimate.baseMonthlyCost, {
                   compact: totalFormatOptions.compact,
                   maximumFractionDigits: totalFormatOptions.digitsLarge,
                 })}

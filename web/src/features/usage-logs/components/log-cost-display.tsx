@@ -131,27 +131,23 @@ export function LogCostDisplay(props: LogCostDisplayProps) {
   const showToolSurcharge = hasToolSurcharge(props.other)
   const comparison = getLogCostComparison(props.quota, props.other, {
     priceRate: Math.max(Number(status?.price ?? 1), 0.001),
-    usdExchangeRate: Math.max(
-      Number(status?.usd_exchange_rate ?? status?.price ?? 1),
-      0.001
-    ),
     quotaPerUnit,
   })
   const costContent = comparison ? (
     <div
       className='dopa-cost-stack'
       data-testid='log-savings-comparison'
-      aria-label={`${t('Estimated savings')} ${formatEasySavingsCny(comparison.savings)}`}
+      aria-label={`${t('Savings versus base price')} ${formatEasySavingsCny(comparison.savings)}`}
     >
       <span className='dopa-cost-stack__official'>
-        {t('Official equivalent')}{' '}
-        {formatEasySavingsCny(comparison.officialCost)}
+        {t('Base billing estimate')} {formatEasySavingsCny(comparison.baseCost)}
       </span>
       <span className='dopa-cost-stack__actual'>
         {t('Yecai billing')} {formatEasySavingsCny(comparison.siteCost)}
       </span>
       <span className='dopa-cost-stack__saved'>
-        {t('Estimated savings')} {formatEasySavingsCny(comparison.savings)}
+        {t('Savings versus base price')}{' '}
+        {formatEasySavingsCny(comparison.savings)}
       </span>
     </div>
   ) : (

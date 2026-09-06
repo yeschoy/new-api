@@ -42,7 +42,7 @@ describe('easy dashboard overview', () => {
           </section>
         }
         savings={{
-          officialCost: 0,
+          baseCost: 0,
           siteCost: 0,
           savings: 0,
           comparableRequests: 0,
@@ -67,7 +67,7 @@ describe('easy dashboard overview', () => {
         usedQuota={0}
         connectPanel={<div data-testid='connect-panel' />}
         savings={{
-          officialCost: 0,
+          baseCost: 0,
           siteCost: 0,
           savings: 0,
           comparableRequests: 0,
@@ -77,7 +77,7 @@ describe('easy dashboard overview', () => {
 
     expect(screen.getByTestId('connect-panel')).toBeVisible()
     expect(screen.getByTestId('easy-savings-receipt')).toBeVisible()
-    expect(screen.getByText('Estimated savings')).toBeVisible()
+    expect(screen.getByText('Savings versus base price')).toBeVisible()
     expect(screen.getAllByText('¥0').length).toBeGreaterThan(0)
   })
 })

@@ -27,7 +27,7 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { YecaiAction, YecaiPanel, YecaiPriceFlow } from '@/components/yecai'
-import { DEFAULT_SYSTEM_NAME } from '@/lib/constants'
+import { useSystemConfig } from '@/hooks/use-system-config'
 
 interface HeroProps {
   className?: string
@@ -38,8 +38,8 @@ interface HeroProps {
 /** A price-flow receipt built only from live pricing. */
 function HeroSavingsFlow(props: { maxSavingsPercent?: number }) {
   const { t } = useTranslation()
-  const hasSavings =
-    props.maxSavingsPercent != null && props.maxSavingsPercent > 0
+  const { systemName } = useSystemConfig()
+  const hasSavings = props.maxSavingsPercent != null
 
   return (
     <div className='relative w-full max-w-[31rem]'>
@@ -64,7 +64,7 @@ function HeroSavingsFlow(props: { maxSavingsPercent?: number }) {
               <ReceiptText className='size-3.5' aria-hidden='true' />
               {t('Savings receipt')}
             </div>
-            <div className='mt-1 text-lg font-black'>{DEFAULT_SYSTEM_NAME}</div>
+            <div className='mt-1 text-lg font-black'>{systemName}</div>
           </div>
           <span className='bg-success/10 text-success inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold'>
             <span className='bg-success size-1.5 rounded-full' />
@@ -73,13 +73,13 @@ function HeroSavingsFlow(props: { maxSavingsPercent?: number }) {
         </div>
 
         <YecaiPriceFlow
-          accessibleLabel={t('Official API estimate')}
+          accessibleLabel={t('Base billing estimate')}
           className='relative z-10 mt-9'
-          officialLabel={t('Official API')}
-          officialValue={t('Official API estimate')}
+          officialLabel={t('Base billing estimate')}
+          officialValue={t('Base billing estimate')}
           siteLabel={t('Our price')}
           siteValue={t('Live pricing')}
-          savingsLabel={t('Estimated savings')}
+          savingsLabel={t('Savings versus base price')}
           savingsValue={
             hasSavings ? (
               <span
@@ -150,7 +150,7 @@ export function Hero(props: HeroProps) {
             {t("Bring top-tier AI into everyone's daily life")}
             <span className='dopa-gradient-text mt-4 block text-[0.72em] leading-[1.08] tracking-[-0.055em]'>
               {props.maxSavingsPercent && props.maxSavingsPercent > 0
-                ? t('The same powerful experience, {{percent}}% less', {
+                ? t('Save up to {{percent}}% versus site base prices', {
                     percent: props.maxSavingsPercent,
                   })
                 : t(

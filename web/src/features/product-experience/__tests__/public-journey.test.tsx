@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Home } from '@/features/home'
 
 vi.mock('@/components/layout', () => ({
-  PublicLayout: (props: { children: ReactNode }) => <>{props.children}</>,
+  PublicLayout: (props: { children: ReactNode }) => props.children,
 }))
 
 vi.mock('@/components/layout/components/footer', () => ({
@@ -69,9 +69,9 @@ vi.mock('@/features/home/components', () => ({
 describe('public product journey', () => {
   it('orders value, price, setup, and support with one primary action each', () => {
     const { container } = render(<Home />)
-    const stages = Array.from(
-      container.querySelectorAll<HTMLElement>('[data-journey-stage]')
-    )
+    const stages = [
+      ...container.querySelectorAll<HTMLElement>('[data-journey-stage]'),
+    ]
 
     expect(stages.map((stage) => stage.dataset.journeyStage)).toEqual([
       'value',

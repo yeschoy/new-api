@@ -63,6 +63,23 @@ describe('easy connect group pricing copy', () => {
 })
 
 describe('easy connect existing key reuse', () => {
+  it('does not reuse an IP-restricted key for a different client', () => {
+    expect(
+      canReuseEasyConnectKey(
+        createApiKey({ allow_ips: '203.0.113.10' }),
+        'deepseek-v4',
+        'default'
+      )
+    ).toBe(false)
+    expect(
+      canReuseEasyConnectKey(
+        createApiKey({ allow_ips: '  ' }),
+        'deepseek-v4',
+        'default'
+      )
+    ).toBe(true)
+  })
+
   it('does not reuse a key whose implicit or custom automatic routes differ from the checked route', () => {
     expect(
       canReuseEasyConnectKey(
@@ -102,5 +119,22 @@ describe('easy connect existing key reuse', () => {
         'default'
       )
     ).toBe(true)
+  })
+
+  it('does not reuse an expired or exhausted key even when its stored status is enabled', () => {
+    const expired = createApiKey({
+      expired_time: Math.floor(Date.now() / 1000) - 1,
+    })
+    const exhausted = createApiKey({
+      unlimited_quota: false,
+      remain_quota: 0,
+    })
+
+    expect(canReuseEasyConnectKey(expired, 'deepseek-v4', 'default')).toBe(
+      false
+    )
+    expect(canReuseEasyConnectKey(exhausted, 'deepseek-v4', 'default')).toBe(
+      false
+    )
   })
 })

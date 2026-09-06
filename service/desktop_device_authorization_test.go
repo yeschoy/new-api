@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -13,6 +14,31 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type approveBeforeDesktopPollCommitHook struct {
+	approve func()
+	fired   bool
+}
+
+func (hook *approveBeforeDesktopPollCommitHook) BeforeProcess(ctx context.Context, _ redis.Cmder) (context.Context, error) {
+	return ctx, nil
+}
+
+func (hook *approveBeforeDesktopPollCommitHook) AfterProcess(context.Context, redis.Cmder) error {
+	return nil
+}
+
+func (hook *approveBeforeDesktopPollCommitHook) BeforeProcessPipeline(ctx context.Context, _ []redis.Cmder) (context.Context, error) {
+	if !hook.fired {
+		hook.fired = true
+		hook.approve()
+	}
+	return ctx, nil
+}
+
+func (hook *approveBeforeDesktopPollCommitHook) AfterProcessPipeline(context.Context, []redis.Cmder) error {
+	return nil
+}
 
 func useDesktopAuthorizationRedis(t *testing.T) *miniredis.Miniredis {
 	t.Helper()
@@ -133,6 +159,31 @@ func TestDesktopDeviceAuthorizationConcurrentExchangeCreatesOneSession(t *testin
 	var count int64
 	require.NoError(t, model.DB.Model(&model.UserSession{}).Count(&count).Error)
 	assert.Equal(t, int64(1), count)
+}
+
+func TestDesktopDeviceAuthorizationApprovalDuringPendingPollIssuesSession(t *testing.T) {
+	useTestSessionSecret(t)
+	user := setupAuthSessionTestDB(t)
+	useDesktopAuthorizationRedis(t)
+
+	view, err := CreateDesktopDeviceAuthorization("desktop", "https://yeschoy.com")
+	require.NoError(t, err)
+	common.RDB.AddHook(&approveBeforeDesktopPollCommitHook{approve: func() {
+		_, _, decisionErr := DecideDesktopDeviceAuthorization(view.UserCode, "approve", user.Id, user.AuthVersion)
+		require.NoError(t, decisionErr)
+	}})
+
+	bundle, err := ExchangeDesktopDeviceAuthorization(view.DeviceCode, "127.0.0.1", "desktop-test")
+	require.NoError(t, err)
+	require.NotNil(t, bundle)
+	assert.Equal(t, DesktopLoginMethod, bundle.Session.LoginMethod)
+
+	var count int64
+	require.NoError(t, model.DB.Model(&model.UserSession{}).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
+
+	_, err = ExchangeDesktopDeviceAuthorization(view.DeviceCode, "127.0.0.1", "desktop-test")
+	assert.Equal(t, "already_used", desktopAuthorizationErrorCode(t, err))
 }
 
 func TestDesktopDeviceAuthorizationRequiresRedis(t *testing.T) {

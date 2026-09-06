@@ -21,29 +21,23 @@ For commercial licensing, please contact support@quantumnous.com
  */
 
 // System Configuration Defaults
-// Display-layer defaults only: operators can override both via the system
-// settings (system_name / logo). Powered by New API (QuantumNous).
-export const DEFAULT_SYSTEM_NAME = '野菜API'
-export const DEFAULT_LOGO = '/yecai-logo.svg?v=2'
+export const DEFAULT_SYSTEM_NAME = 'New API'
+export const DEFAULT_LOGO = '/logo.png'
 
 /**
- * Preserve operator-defined names while migrating the upstream default brand.
+ * Preserve the protected project default and operator-defined names.
  */
 export function resolveSystemName(name?: string | null): string {
   const normalized = name?.trim()
 
-  if (!normalized || normalized === 'New API') {
-    return DEFAULT_SYSTEM_NAME
-  }
-
-  return normalized
+  return normalized || DEFAULT_SYSTEM_NAME
 }
 
-/** Migrate the upstream default logo while preserving custom logo URLs. */
+/** Preserve the protected project logo while accepting operator overrides. */
 export function resolveLogoUrl(logo?: string | null): string {
   const normalized = logo?.trim()
 
-  if (!normalized || normalized === '/logo.png' || normalized === 'logo.png') {
+  if (!normalized || normalized === 'logo.png') {
     return DEFAULT_LOGO
   }
 

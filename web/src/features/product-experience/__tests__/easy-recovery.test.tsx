@@ -51,7 +51,7 @@ describe('easy-mode manual recovery', () => {
             </section>
           }
           savings={{
-            officialCost: 0,
+            baseCost: 0,
             siteCost: 0,
             savings: 0,
             comparableRequests: 0,

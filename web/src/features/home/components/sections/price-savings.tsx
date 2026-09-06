@@ -69,6 +69,12 @@ export function PriceSavings(props: PriceSavingsProps) {
           </p>
         </div>
 
+        <p className='text-muted-foreground mt-3 text-xs leading-relaxed'>
+          {t(
+            'Compared with site base prices before group discounts, not official provider prices.'
+          )}
+        </p>
+
         <div className='mt-9 grid gap-5 lg:grid-cols-[1.12fr_0.88fr] lg:items-start'>
           {hasCalculatorData ? (
             <SavingsCalculator models={calculatorModels} />
@@ -151,7 +157,7 @@ function PriceDataStatus() {
         </h3>
         <p className='text-muted-foreground mt-3 text-sm leading-relaxed'>
           {t(
-            'See what you pay here and what the same usage costs at the official API rate.'
+            'See the same usage at site base prices and after group discounts.'
           )}
         </p>
       </div>

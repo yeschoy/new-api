@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { LogOtherData } from '../types'
 
 export type LogCostComparison = {
-  officialCost: number
+  baseCost: number
   siteCost: number
   savings: number
 }
@@ -27,7 +27,7 @@ export type LogCostComparison = {
 export function getLogCostComparison(
   quota: number,
   other: LogOtherData | null,
-  rates: { priceRate: number; usdExchangeRate: number; quotaPerUnit: number }
+  rates: { priceRate: number; quotaPerUnit: number }
 ): LogCostComparison | null {
   if (other?.billing_source === 'subscription') return null
 
@@ -47,8 +47,6 @@ export function getLogCostComparison(
     chargedQuota <= 0 ||
     !Number.isFinite(rates.priceRate) ||
     rates.priceRate <= 0 ||
-    !Number.isFinite(rates.usdExchangeRate) ||
-    rates.usdExchangeRate <= 0 ||
     !Number.isFinite(rates.quotaPerUnit) ||
     rates.quotaPerUnit <= 0
   ) {
@@ -57,9 +55,9 @@ export function getLogCostComparison(
 
   const billedCredits = chargedQuota / rates.quotaPerUnit
   const siteCost = billedCredits * rates.priceRate
-  const officialCost = (billedCredits / groupRatio) * rates.usdExchangeRate
-  const savings = officialCost - siteCost
+  const baseCost = (billedCredits / groupRatio) * rates.priceRate
+  const savings = baseCost - siteCost
 
   if (!Number.isFinite(savings) || savings <= 0) return null
-  return { officialCost, siteCost, savings }
+  return { baseCost, siteCost, savings }
 }

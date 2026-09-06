@@ -37,10 +37,10 @@ const models: SavingsModel[] = [
     modelName: 'gpt-flagship',
     vendorName: 'OpenAI',
     family: 'openai',
-    officialInputPrice: 4,
-    officialOutputPrice: 12,
-    officialCacheReadPrice: 0.4,
-    officialCacheWritePrice: 5,
+    baseInputPrice: 4,
+    baseOutputPrice: 12,
+    baseCacheReadPrice: 0.4,
+    baseCacheWritePrice: 5,
     siteInputPrice: 2,
     siteOutputPrice: 6,
     siteCacheReadPrice: 0.2,
@@ -51,10 +51,10 @@ const models: SavingsModel[] = [
     modelName: 'claude-flagship',
     vendorName: 'Anthropic',
     family: 'anthropic',
-    officialInputPrice: 3,
-    officialOutputPrice: 15,
-    officialCacheReadPrice: 0.3,
-    officialCacheWritePrice: 3.75,
+    baseInputPrice: 3,
+    baseOutputPrice: 15,
+    baseCacheReadPrice: 0.3,
+    baseCacheWritePrice: 3.75,
     siteInputPrice: 1.5,
     siteOutputPrice: 7.5,
     siteCacheReadPrice: 0.15,
@@ -64,6 +64,19 @@ const models: SavingsModel[] = [
 ]
 
 describe('PriceSavings', () => {
+  it('labels editable site rates as a base comparison rather than official prices', () => {
+    render(<PriceSavings models={models} />)
+    expect(screen.queryAllByText('Official API')).toHaveLength(0)
+    expect(screen.getAllByText('Base billing estimate').length).toBeGreaterThan(
+      0
+    )
+    expect(
+      screen.getAllByText(
+        'Compared with site base prices before group discounts, not official provider prices.'
+      ).length
+    ).toBeGreaterThan(0)
+  })
+
   it('keeps a useful recovery state when live pricing has no usable models', () => {
     render(<PriceSavings models={[]} />)
 

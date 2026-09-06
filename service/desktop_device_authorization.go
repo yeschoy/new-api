@@ -235,6 +235,8 @@ func ExchangeDesktopDeviceAuthorization(deviceCode string, ip string, userAgent 
 	var claimed desktopDeviceAuthorizationRecord
 	var outcomeErr error
 	err := watchDesktopAuthorization(ctx, []string{deviceKey}, func(tx *redis.Tx) error {
+		claimed = desktopDeviceAuthorizationRecord{}
+		outcomeErr = nil
 		raw, getErr := tx.Get(ctx, deviceKey).Result()
 		if errors.Is(getErr, redis.Nil) {
 			return desktopAuthorizationError("expired_token", 0, nil)

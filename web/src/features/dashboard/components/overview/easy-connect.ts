@@ -61,6 +61,11 @@ export function canReuseEasyConnectKey(
   group: string
 ): boolean {
   if (!apiKey || apiKey.status !== 1) return false
+  const now = Math.floor(Date.now() / 1000)
+  if (apiKey.expired_time !== -1 && apiKey.expired_time < now) return false
+  if (!apiKey.unlimited_quota && apiKey.remain_quota <= 0) return false
+  // A web session cannot establish the IP of the tool receiving this key.
+  if (apiKey.allow_ips?.trim()) return false
   // An empty group inherits the user's group, not necessarily "default".
   if (!apiKey.group || apiKey.group !== group) return false
   // A custom Auto subset is not the account-wide Auto route we validated.

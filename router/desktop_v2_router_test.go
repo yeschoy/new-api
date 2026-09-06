@@ -1,14 +1,18 @@
 package router
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,4 +89,65 @@ func TestDesktopV2UnsupportedMethodsDoNotFallThroughToCapabilities(t *testing.T)
 
 	assert.Equal(t, http.StatusNotFound, recorder.Code)
 	assert.NotContains(t, recorder.Body.String(), "desktop-integration-v2")
+}
+
+func TestDesktopV2PollingRateLimitCoversAdvertisedLifetime(t *testing.T) {
+	previousRedisEnabled, previousRedisClient := common.RedisEnabled, common.RDB
+	previousCriticalEnabled := common.CriticalRateLimitEnable
+	previousCriticalLimit, previousCriticalDuration := common.CriticalRateLimitNum, common.CriticalRateLimitDuration
+	previousAddress := system_setting.ServerAddress
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	common.RedisEnabled = true
+	common.RDB = client
+	common.CriticalRateLimitEnable = true
+	common.CriticalRateLimitNum = 20
+	common.CriticalRateLimitDuration = 20 * 60
+	system_setting.ServerAddress = "https://yeschoy.com"
+	t.Cleanup(func() {
+		_ = client.Close()
+		common.RedisEnabled = previousRedisEnabled
+		common.RDB = previousRedisClient
+		common.CriticalRateLimitEnable = previousCriticalEnabled
+		common.CriticalRateLimitNum = previousCriticalLimit
+		common.CriticalRateLimitDuration = previousCriticalDuration
+		system_setting.ServerAddress = previousAddress
+	})
+
+	router := newDesktopV2TestRouter()
+	start := httptest.NewRecorder()
+	router.ServeHTTP(start, httptest.NewRequest(http.MethodPost, "/api/desktop/v2/device-authorizations", strings.NewReader(`{}`)))
+	require.Equal(t, http.StatusOK, start.Code)
+	var started struct {
+		Data struct {
+			DeviceCode string `json:"device_code"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(start.Body.Bytes(), &started))
+
+	for poll := 1; poll <= 60; poll++ {
+		keys, err := client.Keys(context.Background(), "desktop:v2:device:*").Result()
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		raw, err := client.Get(context.Background(), keys[0]).Result()
+		require.NoError(t, err)
+		var record map[string]any
+		require.NoError(t, common.UnmarshalJsonStr(raw, &record))
+		record["next_poll_at"] = 0
+		payload, err := common.Marshal(record)
+		require.NoError(t, err)
+		require.NoError(t, client.Set(context.Background(), keys[0], string(payload), redis.KeepTTL).Err())
+
+		body, err := common.Marshal(map[string]string{"device_code": started.Data.DeviceCode})
+		require.NoError(t, err)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/desktop/v2/device-authorizations/token", strings.NewReader(string(body))))
+		assert.Equal(t, http.StatusBadRequest, response.Code, "poll %d should remain inside the advertised five-minute window", poll)
+		assert.Contains(t, response.Body.String(), "authorization_pending")
+		server.FastForward(time.Second)
+	}
+
+	decision := httptest.NewRecorder()
+	router.ServeHTTP(decision, httptest.NewRequest(http.MethodPost, "/api/desktop/v2/device-authorizations/decision", strings.NewReader(`{}`)))
+	assert.Equal(t, http.StatusUnauthorized, decision.Code)
 }

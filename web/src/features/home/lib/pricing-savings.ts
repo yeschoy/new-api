@@ -16,6 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import {
+  getDynamicPricingSummary,
+  isDynamicPricingModel,
+} from '@/features/pricing/lib/dynamic-price'
 import { getDisplayGroupRatio } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
 
@@ -34,10 +38,10 @@ export type SavingsModel = {
   modelName: string
   vendorName: string
   family: ModelFamily
-  officialInputPrice: number
-  officialOutputPrice: number
-  officialCacheReadPrice: number | null
-  officialCacheWritePrice: number | null
+  baseInputPrice: number
+  baseOutputPrice: number
+  baseCacheReadPrice: number | null
+  baseCacheWritePrice: number | null
   siteInputPrice: number
   siteOutputPrice: number
   siteCacheReadPrice: number | null
@@ -55,7 +59,7 @@ export type SavingsTokenMix = {
 export type SavingsEstimate = {
   representativeModels: SavingsModel[]
   tokenMix: SavingsTokenMix
-  officialMonthlyCost: number
+  baseMonthlyCost: number
   siteMonthlyCost: number
   monthlySavings: number
   annualSavings: number
@@ -288,19 +292,64 @@ function compareLatestModel(left: PricingModel, right: PricingModel): number {
 
 function toSavingsModel(
   model: PricingModel,
-  priceRate: number,
-  usdExchangeRate: number
-): SavingsModel {
-  const officialInputPrice =
-    model.model_ratio * 2 * Math.max(usdExchangeRate, 0.001)
-  const officialOutputPrice = officialInputPrice * model.completion_ratio
+  priceRate: number
+): SavingsModel | null {
   const displayGroupRatio = Math.max(getDisplayGroupRatio(model), 0)
-  const siteInputPrice =
-    model.model_ratio * 2 * displayGroupRatio * Math.max(priceRate, 0.001)
-  const siteOutputPrice = siteInputPrice * model.completion_ratio
-  const cacheRatio = getOptionalRatio(model.cache_ratio)
-  const cacheWriteRatio = getOptionalRatio(model.create_cache_ratio)
-  const rawSavingsPercent = (1 - siteInputPrice / officialInputPrice) * 100
+  const normalizedPriceRate = Math.max(priceRate, 0.001)
+  let inputUSD = model.model_ratio * 2
+  let outputUSD = inputUSD * model.completion_ratio
+  let cacheReadUSD = getOptionalRatio(model.cache_ratio)
+  let cacheWriteUSD = getOptionalRatio(model.create_cache_ratio)
+
+  if (isDynamicPricingModel(model)) {
+    const summary = getDynamicPricingSummary(model, { tokenUnit: 'M' })
+    if (
+      !summary ||
+      summary.isTaskUsage ||
+      summary.isSpecialExpression ||
+      summary.tierCount !== 1 ||
+      summary.hasRequestRules
+    ) {
+      return null
+    }
+
+    const prices = new Map(
+      summary.entries.map((entry) => [entry.field, entry.value])
+    )
+    inputUSD = prices.get('inputPrice') ?? 0
+    outputUSD = prices.get('outputPrice') ?? 0
+    cacheReadUSD = prices.get('cacheReadPrice') ?? null
+    cacheWriteUSD = prices.get('cacheCreatePrice') ?? null
+    if (inputUSD <= 0 && outputUSD <= 0) return null
+  } else {
+    cacheReadUSD = cacheReadUSD == null ? null : inputUSD * cacheReadUSD
+    cacheWriteUSD = cacheWriteUSD == null ? null : inputUSD * cacheWriteUSD
+  }
+
+  const baseInputPrice = inputUSD * normalizedPriceRate
+  const baseOutputPrice = outputUSD * normalizedPriceRate
+  const siteInputPrice = inputUSD * displayGroupRatio * normalizedPriceRate
+  const siteOutputPrice = outputUSD * displayGroupRatio * normalizedPriceRate
+  const baseCacheReadPrice =
+    cacheReadUSD == null ? null : cacheReadUSD * normalizedPriceRate
+  const baseCacheWritePrice =
+    cacheWriteUSD == null ? null : cacheWriteUSD * normalizedPriceRate
+  const siteCacheReadPrice =
+    cacheReadUSD == null
+      ? null
+      : cacheReadUSD * displayGroupRatio * normalizedPriceRate
+  const siteCacheWritePrice =
+    cacheWriteUSD == null
+      ? null
+      : cacheWriteUSD * displayGroupRatio * normalizedPriceRate
+  const baseReferencePrice =
+    baseInputPrice > 0 ? baseInputPrice : baseOutputPrice
+  const siteReferencePrice =
+    baseInputPrice > 0 ? siteInputPrice : siteOutputPrice
+  const rawSavingsPercent =
+    baseReferencePrice > 0
+      ? (1 - siteReferencePrice / baseReferencePrice) * 100
+      : 0
   const savingsPercent = Math.floor(
     Math.min(100, Math.max(0, rawSavingsPercent))
   )
@@ -310,17 +359,14 @@ function toSavingsModel(
     modelName: model.model_name,
     vendorName: model.vendor_name?.trim() || getFallbackVendorName(family),
     family,
-    officialInputPrice,
-    officialOutputPrice,
-    officialCacheReadPrice:
-      cacheRatio == null ? null : officialInputPrice * cacheRatio,
-    officialCacheWritePrice:
-      cacheWriteRatio == null ? null : officialInputPrice * cacheWriteRatio,
+    baseInputPrice,
+    baseOutputPrice,
+    baseCacheReadPrice,
+    baseCacheWritePrice,
     siteInputPrice,
     siteOutputPrice,
-    siteCacheReadPrice: cacheRatio == null ? null : siteInputPrice * cacheRatio,
-    siteCacheWritePrice:
-      cacheWriteRatio == null ? null : siteInputPrice * cacheWriteRatio,
+    siteCacheReadPrice,
+    siteCacheWritePrice,
     savingsPercent,
   }
 }
@@ -332,38 +378,42 @@ function getOptionalRatio(value: number | null | undefined): number | null {
 
 export function buildSavingsModels(
   models: PricingModel[],
-  priceRate: number,
-  usdExchangeRate: number
+  priceRate: number
 ): SavingsModel[] {
-  const rankedModels = getRankedPricingModels(models)
+  const rankedModels = getRankedPricingModels(models).flatMap((model) => {
+    const savings = toSavingsModel(model, priceRate)
+    return savings ? [{ model, savings }] : []
+  })
 
-  const selectedModels: PricingModel[] = []
+  const selectedModels: Array<{ model: PricingModel; savings: SavingsModel }> =
+    []
   const selectedNames = new Set<string>()
   const selectedVendors = new Set<string>()
 
   for (const family of FAMILY_ORDER) {
     const flagship = rankedModels.find(
-      (model) =>
-        !selectedNames.has(model.model_name) && getModelFamily(model) === family
+      (candidate) =>
+        !selectedNames.has(candidate.model.model_name) &&
+        candidate.savings.family === family
     )
     if (!flagship) continue
     selectedModels.push(flagship)
-    selectedNames.add(flagship.model_name)
-    selectedVendors.add(getVendorKey(flagship))
+    selectedNames.add(flagship.model.model_name)
+    selectedVendors.add(getVendorKey(flagship.model))
   }
 
-  for (const model of rankedModels) {
+  for (const candidate of rankedModels) {
     if (selectedModels.length >= MAX_COMPARISON_MODELS) break
-    if (selectedNames.has(model.model_name)) continue
-    if (selectedVendors.has(getVendorKey(model))) continue
-    selectedModels.push(model)
-    selectedNames.add(model.model_name)
-    selectedVendors.add(getVendorKey(model))
+    if (selectedNames.has(candidate.model.model_name)) continue
+    if (selectedVendors.has(getVendorKey(candidate.model))) continue
+    selectedModels.push(candidate)
+    selectedNames.add(candidate.model.model_name)
+    selectedVendors.add(getVendorKey(candidate.model))
   }
 
   return selectedModels
     .slice(0, MAX_COMPARISON_MODELS)
-    .map((model) => toSavingsModel(model, priceRate, usdExchangeRate))
+    .map((candidate) => candidate.savings)
 }
 
 function getRankedPricingModels(models: PricingModel[]): PricingModel[] {
@@ -371,10 +421,11 @@ function getRankedPricingModels(models: PricingModel[]): PricingModel[] {
     .filter(
       (model) =>
         model.quota_type === 0 &&
-        Number.isFinite(model.model_ratio) &&
-        model.model_ratio > 0 &&
-        Number.isFinite(model.completion_ratio) &&
-        model.completion_ratio >= 0
+        (isDynamicPricingModel(model) ||
+          (Number.isFinite(model.model_ratio) &&
+            model.model_ratio > 0 &&
+            Number.isFinite(model.completion_ratio) &&
+            model.completion_ratio >= 0))
     )
     .sort(compareLatestModel)
 }
@@ -382,12 +433,12 @@ function getRankedPricingModels(models: PricingModel[]): PricingModel[] {
 /** Build the complete live token-priced catalog used by the calculator. */
 export function buildSavingsCatalog(
   models: PricingModel[],
-  priceRate: number,
-  usdExchangeRate: number
+  priceRate: number
 ): SavingsModel[] {
-  return getRankedPricingModels(models).map((model) =>
-    toSavingsModel(model, priceRate, usdExchangeRate)
-  )
+  return getRankedPricingModels(models).flatMap((model) => {
+    const savings = toSavingsModel(model, priceRate)
+    return savings ? [savings] : []
+  })
 }
 
 export function formatCnyAmount(
@@ -474,30 +525,29 @@ export function calculateSavingsEstimate(
     return {
       representativeModels: [],
       tokenMix: normalizedTokenMix,
-      officialMonthlyCost: 0,
+      baseMonthlyCost: 0,
       siteMonthlyCost: 0,
       monthlySavings: 0,
       annualSavings: 0,
     }
   }
 
-  let officialPricePerMillion = 0
+  let basePricePerMillion = 0
   let sitePricePerMillion = 0
 
   for (const model of representativeModels) {
-    const officialCacheReadPrice =
-      model.officialCacheReadPrice ?? model.officialInputPrice
-    const officialCacheWritePrice =
-      model.officialCacheWritePrice ?? model.officialInputPrice
+    const baseCacheReadPrice = model.baseCacheReadPrice ?? model.baseInputPrice
+    const baseCacheWritePrice =
+      model.baseCacheWritePrice ?? model.baseInputPrice
     const siteCacheReadPrice = model.siteCacheReadPrice ?? model.siteInputPrice
     const siteCacheWritePrice =
       model.siteCacheWritePrice ?? model.siteInputPrice
 
-    officialPricePerMillion +=
-      (model.officialInputPrice * normalizedTokenMix.inputPercent +
-        officialCacheReadPrice * normalizedTokenMix.cacheReadPercent +
-        officialCacheWritePrice * normalizedTokenMix.cacheWritePercent +
-        model.officialOutputPrice * normalizedTokenMix.outputPercent) /
+    basePricePerMillion +=
+      (model.baseInputPrice * normalizedTokenMix.inputPercent +
+        baseCacheReadPrice * normalizedTokenMix.cacheReadPercent +
+        baseCacheWritePrice * normalizedTokenMix.cacheWritePercent +
+        model.baseOutputPrice * normalizedTokenMix.outputPercent) /
       100
     sitePricePerMillion +=
       (model.siteInputPrice * normalizedTokenMix.inputPercent +
@@ -507,21 +557,21 @@ export function calculateSavingsEstimate(
       100
   }
 
-  officialPricePerMillion /= representativeModels.length
+  basePricePerMillion /= representativeModels.length
   sitePricePerMillion /= representativeModels.length
 
   const normalizedTokens = Math.max(monthlyTokensMillions, 0)
   const normalizedPeople = Math.max(people, 0)
-  const officialMonthlyCost =
-    officialPricePerMillion * normalizedTokens * normalizedPeople
+  const baseMonthlyCost =
+    basePricePerMillion * normalizedTokens * normalizedPeople
   const siteMonthlyCost =
     sitePricePerMillion * normalizedTokens * normalizedPeople
-  const monthlySavings = Math.max(officialMonthlyCost - siteMonthlyCost, 0)
+  const monthlySavings = Math.max(baseMonthlyCost - siteMonthlyCost, 0)
 
   return {
     representativeModels,
     tokenMix: normalizedTokenMix,
-    officialMonthlyCost,
+    baseMonthlyCost,
     siteMonthlyCost,
     monthlySavings,
     annualSavings: monthlySavings * 12,

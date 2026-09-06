@@ -1,4 +1,3 @@
-import { Check, Copy, Sparkles } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Check, Copy, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -35,20 +35,20 @@ import { guideTools, type GuideTool, type ToolCategory } from '../data'
 import type { GuideAddress } from '../use-guide-address'
 
 const CATEGORIES: { value: ToolCategory | 'all'; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'chat', label: '聊天与办公' },
-  { value: 'translate', label: '翻译与阅读' },
-  { value: 'coding', label: '编程开发' },
-  { value: 'manager', label: '配置管理' },
-  { value: 'platform', label: '自建平台' },
+  { value: 'all', label: 'All' },
+  { value: 'chat', label: 'Chat and office' },
+  { value: 'translate', label: 'Translation and reading' },
+  { value: 'coding', label: 'Coding and development' },
+  { value: 'manager', label: 'Configuration tools' },
+  { value: 'platform', label: 'Self-hosted platforms' },
 ]
 
 const STATUS_META: Record<GuideTool['status'], { label: string; hue: string }> =
   {
-    green: { label: '直接可用', hue: 'var(--success)' },
-    yellow: { label: '需要配置文件', hue: 'var(--warning)' },
-    blue: { label: '专用协议', hue: 'var(--info)' },
-    gray: { label: '暂不支持', hue: 'var(--neutral)' },
+    green: { label: 'Ready to connect', hue: 'var(--success)' },
+    yellow: { label: 'Requires a configuration file', hue: 'var(--warning)' },
+    blue: { label: 'Dedicated protocol', hue: 'var(--info)' },
+    gray: { label: 'Not currently supported', hue: 'var(--neutral)' },
   }
 
 interface ToolExplorerProps {
@@ -96,7 +96,7 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
                   : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
             >
-              {c.label}
+              {t(c.label)}
             </button>
           )
         })}
@@ -110,7 +110,7 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
               className='size-2.5 rounded-full'
               style={{ backgroundColor: meta.hue }}
             />
-            {meta.label}
+            {t(meta.label)}
           </span>
         ))}
       </div>
@@ -129,7 +129,7 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
               style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}
             >
               <div className='flex items-center justify-between gap-2'>
-                <span className='text-sm font-bold'>{tool.name}</span>
+                <span className='text-sm font-bold'>{t(tool.name)}</span>
                 <span className='flex items-center gap-1.5'>
                   {tool.recommended && (
                     <Badge className='bg-secondary text-secondary-foreground gap-1 border-transparent'>
@@ -138,15 +138,15 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
                     </Badge>
                   )}
                   <span
-                    aria-label={meta.label}
-                    title={meta.label}
+                    aria-label={t(meta.label)}
+                    title={t(meta.label)}
                     className='size-2.5 shrink-0 rounded-full'
                     style={{ backgroundColor: meta.hue }}
                   />
                 </span>
               </div>
               <p className='text-muted-foreground text-xs leading-relaxed'>
-                {tool.summary}
+                {t(tool.summary)}
               </p>
               <span className='text-primary mt-auto text-xs font-semibold opacity-0 transition-opacity group-hover:opacity-100'>
                 {t('View setup steps')} →
@@ -166,7 +166,7 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
             <>
               <DialogHeader className='pb-4'>
                 <DialogTitle className='flex items-center gap-2.5'>
-                  {active.name}
+                  {t(active.name)}
                   <span
                     className='rounded-full px-2.5 py-0.5 text-xs font-semibold'
                     style={{
@@ -174,15 +174,15 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
                       color: STATUS_META[active.status].hue,
                     }}
                   >
-                    {STATUS_META[active.status].label}
+                    {t(STATUS_META[active.status].label)}
                   </span>
                 </DialogTitle>
-                <DialogDescription>{active.summary}</DialogDescription>
+                <DialogDescription>{t(active.summary)}</DialogDescription>
               </DialogHeader>
 
               <ol className='flex flex-col gap-3'>
                 {active.steps.map((step, i) => {
-                  const filled = address.fill(step)
+                  const filled = address.fill(t(step))
                   return (
                     <li key={step} className='flex items-start gap-3'>
                       <span className='bg-primary/10 text-primary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold'>
@@ -202,7 +202,7 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
                   <ul className='mt-1.5 flex list-disc flex-col gap-1 pl-4'>
                     {active.tips.map((tip) => (
                       <li key={tip} className='text-xs leading-relaxed'>
-                        {address.fill(tip)}
+                        {address.fill(t(tip))}
                       </li>
                     ))}
                   </ul>
@@ -212,7 +212,9 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
               {active.snippet && (
                 <div className='mt-5'>
                   <div className='mb-2 flex items-center justify-between'>
-                    <p className='text-sm font-bold'>{active.snippet.label}</p>
+                    <p className='text-sm font-bold'>
+                      {t(active.snippet.label)}
+                    </p>
                     <Button
                       variant='outline'
                       size='sm'
