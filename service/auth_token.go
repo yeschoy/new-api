@@ -21,8 +21,8 @@ const (
 	RefreshReplayWindow   = 30 * time.Second
 	accessTokenUse        = "access"
 	securityProofTokenUse = "security_proof"
-	authTokenIssuer       = "new-api"
-	authTokenAudience     = "new-api-dashboard"
+	authTokenIssuer       = "yeschoy-api"
+	authTokenAudience     = "yeschoy-api-dashboard"
 )
 
 var (
@@ -39,6 +39,7 @@ type AuthIdentity struct {
 	SessionID       string
 	UserAuthVersion int64
 	SessionVersion  int64
+	LoginMethod     string
 }
 
 type authClaims struct {

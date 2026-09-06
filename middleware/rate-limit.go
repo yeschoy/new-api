@@ -178,6 +178,15 @@ func CriticalRateLimit() func(c *gin.Context) {
 	return defNext
 }
 
+// ScopedCriticalRateLimit isolates a high-frequency sensitive flow from the
+// shared critical-operation bucket while preserving the global enable switch.
+func ScopedCriticalRateLimit(scope string, maxRequestNum int, duration int64) func(c *gin.Context) {
+	if common.CriticalRateLimitEnable {
+		return rateLimitFactory(maxRequestNum, duration, "CT:"+scope)
+	}
+	return defNext
+}
+
 func UserCriticalRateLimit(scope string) func(c *gin.Context) {
 	if !common.CriticalRateLimitEnable {
 		return defNext

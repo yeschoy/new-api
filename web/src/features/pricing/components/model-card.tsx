@@ -20,6 +20,7 @@ import { ChevronRight, Copy } from 'lucide-react'
 import { memo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { YecaiAction, YecaiPanel } from '@/components/yecai'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getLobeIcon } from '@/lib/lobe-icon'
 import { cn } from '@/lib/utils'
@@ -32,10 +33,10 @@ import {
   getDynamicPricingSummary,
   isUnconfiguredTaskUsageModel,
 } from '../lib/dynamic-price'
-import { getTaskNumberFields } from '../lib/task-expr'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
+import { getTaskNumberFields } from '../lib/task-expr'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
@@ -50,6 +51,9 @@ export interface ModelCardProps {
   selectedGroup?: string
   perf?: ModelPerfBadgeData
 }
+
+const priceRowClassName =
+  'text-muted-foreground flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 [overflow-wrap:anywhere]'
 
 export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const { t } = useTranslation()
@@ -84,10 +88,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const dynamicSummary = isDynamicPricing
     ? getDynamicPricingSummary(props.model, dynamicPriceOptions)
     : null
-  const cardExamplePrice = getCardExamplePrice(
-    props.model,
-    dynamicPriceOptions
-  )
+  const cardExamplePrice = getCardExamplePrice(props.model, dynamicPriceOptions)
   const showTaskFieldLabels =
     getTaskNumberFields(props.model.billing_usage_schema).length > 1
 
@@ -134,10 +135,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
               )
             }
             return (
-              <span
-                key={entry.key}
-                className='text-muted-foreground whitespace-nowrap'
-              >
+              <span key={entry.key} className={priceRowClassName}>
                 {fieldPrefix}
                 <span className='text-foreground font-mono font-semibold'>
                   {entry.formattedRange ?? entry.formatted}
@@ -147,7 +145,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             )
           })}
           {cardExamplePrice && (
-            <span className='text-muted-foreground/70 min-w-0 max-w-full truncate text-xs'>
+            <span className='text-muted-foreground max-w-full min-w-0 text-xs [overflow-wrap:anywhere]'>
               {cardExamplePrice.label} ≈ {cardExamplePrice.formatted}
             </span>
           )}
@@ -178,7 +176,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   } else if (isTokenBased) {
     priceSummary = (
       <>
-        <span className='text-muted-foreground whitespace-nowrap'>
+        <span className={priceRowClassName}>
           {t('Input')}{' '}
           <span className='text-foreground font-mono font-semibold'>
             {formatPrice(
@@ -192,7 +190,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             )}
           </span>
         </span>
-        <span className='text-muted-foreground whitespace-nowrap'>
+        <span className={priceRowClassName}>
           {t('Output')}{' '}
           <span className='text-foreground font-mono font-semibold'>
             {formatPrice(
@@ -207,7 +205,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           </span>
         </span>
         {hasCachedPrice && (
-          <span className='text-muted-foreground whitespace-nowrap'>
+          <span className={priceRowClassName}>
             {t('Cached')}{' '}
             <span className='text-foreground font-mono font-semibold'>
               {formatPrice(
@@ -226,7 +224,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     )
   } else {
     priceSummary = (
-      <span className='text-muted-foreground whitespace-nowrap'>
+      <span className='text-muted-foreground [overflow-wrap:anywhere]'>
         <span className='text-foreground font-mono font-semibold'>
           {formatRequestPrice(
             props.model,
@@ -242,87 +240,86 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   }
 
   return (
-    <div
+    <YecaiPanel
+      as='article'
+      tone='model'
+      layer='raised'
       className={cn(
-        'group relative flex flex-col rounded-xl border p-3 transition-colors sm:p-5',
+        'dopa-model-tile dopa-scale-texture group relative flex min-w-0 flex-col gap-4 overflow-hidden rounded-3xl border p-4 transition-colors sm:p-5',
         'hover:bg-muted/20'
       )}
     >
-      {/* Header: icon + name + price + actions */}
-      <div className='flex items-start justify-between gap-2.5 sm:gap-3'>
-        <div className='flex min-w-0 items-start gap-2.5 sm:gap-3'>
-          <div className='bg-muted/40 flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10 sm:rounded-xl'>
-            {modelIcon || (
-              <span className='text-muted-foreground text-sm font-bold'>
-                {initial}
-              </span>
-            )}
-          </div>
-          <div className='min-w-0'>
-            <h3 className='text-foreground truncate font-mono text-[15px] leading-tight font-bold'>
-              {props.model.model_name}
-            </h3>
-            <div className='mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm sm:mt-1 sm:gap-x-3'>
-              {priceSummary}
-            </div>
-          </div>
+      <header className='flex min-w-0 items-start gap-3'>
+        <div className='bg-muted/40 flex size-10 shrink-0 items-center justify-center rounded-xl'>
+          {modelIcon || (
+            <span className='text-muted-foreground text-sm font-bold'>
+              {initial}
+            </span>
+          )}
         </div>
+        <h3 className='text-foreground min-w-0 flex-1 pt-1 font-mono text-[15px] leading-relaxed font-bold [overflow-wrap:anywhere]'>
+          {props.model.model_name}
+        </h3>
+      </header>
 
-        <div className='flex shrink-0 items-center gap-1.5'>
-          <button
-            type='button'
-            onClick={props.onClick}
-            className='text-muted-foreground hover:text-foreground hover:bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors sm:px-2.5 sm:py-1.5'
-          >
-            {t('Details')}
-            <ChevronRight className='size-3.5' />
-          </button>
-          <button
-            type='button'
-            onClick={handleCopy}
-            className='text-muted-foreground hover:text-foreground hover:bg-muted rounded-md border p-1.5 transition-colors'
-            title={t('Copy')}
-          >
-            <Copy className='size-3.5' />
-          </button>
-        </div>
-      </div>
-
-      {/* Description */}
-      <p className='text-muted-foreground mt-2 line-clamp-1 flex-1 text-[13px] leading-relaxed sm:mt-4 sm:line-clamp-2 sm:min-h-[2.5rem]'>
+      <p className='text-muted-foreground line-clamp-2 text-[13px] leading-relaxed [overflow-wrap:anywhere]'>
         {props.model.description || t('No description available.')}
       </p>
 
-      {/* Footer: left metadata and right performance summary share row alignment */}
-      <div className='mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 sm:mt-4'>
-        <div className='flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1'>
+      <div className='bg-muted/30 flex min-w-0 flex-col gap-1.5 rounded-2xl p-3 text-sm'>
+        {priceSummary}
+      </div>
+
+      <div data-slot='model-metadata' className='min-w-0 space-y-2'>
+        <div className='flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2'>
           {primaryGroup && (
-            <span className='text-muted-foreground text-sm font-medium'>
+            <span className='text-muted-foreground max-w-full min-w-0 text-sm font-medium [overflow-wrap:anywhere]'>
               {primaryGroup}
             </span>
           )}
-          <ModelBillingModeBadge model={props.model} />
+          <ModelBillingModeBadge
+            model={props.model}
+            className='h-auto shrink-0 whitespace-normal [&>span]:overflow-visible [&>span]:text-clip [&>span]:whitespace-normal'
+          />
         </div>
-        <ModelPerfBadge perf={props.perf} className='row-span-2 self-start' />
 
-        <div className='flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5 sm:gap-x-3 sm:gap-y-1'>
+        <div className='text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs'>
           {bottomTags.map((item) => (
-            <span key={item} className='text-muted-foreground/70 text-xs'>
+            <span key={item} className='max-w-full [overflow-wrap:anywhere]'>
               {item}
             </span>
           ))}
           {!dynamicSummary?.isTaskUsage && !isUnconfiguredTaskUsage && (
-            <span className='text-muted-foreground/50 text-xs'>
-              {tokenUnitLabel}
-            </span>
+            <span>{tokenUnitLabel}</span>
           )}
-          {hiddenCount > 0 && (
-            <span className='text-muted-foreground/40 text-xs'>
-              +{hiddenCount}
-            </span>
-          )}
+          {hiddenCount > 0 && <span>+{hiddenCount}</span>}
         </div>
       </div>
-    </div>
+
+      <footer className='mt-auto flex min-w-0 flex-wrap items-center justify-between gap-3'>
+        <ModelPerfBadge perf={props.perf} />
+        <div className='ml-auto flex shrink-0 items-center gap-2'>
+          <YecaiAction
+            appearance='outline'
+            tone='neutral'
+            size='sm'
+            aria-label={t('Copy model name')}
+            onClick={handleCopy}
+            title={t('Copy model name')}
+          >
+            <Copy className='size-3.5' />
+          </YecaiAction>
+          <YecaiAction
+            appearance='soft'
+            tone='model'
+            size='sm'
+            onClick={props.onClick}
+          >
+            {t('Details')}
+            <ChevronRight className='size-3.5' />
+          </YecaiAction>
+        </div>
+      </footer>
+    </YecaiPanel>
   )
 })

@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "packages": [
+    {
+      "id": "WP-DESKTOP-BOOTSTRAP-V1",
+      "wave": "producer",
+      "owner": "backend-api",
+      "riskClass": "medium",
+      "objective": "Implement and document the anonymous desktop bootstrap v1 handshake without adding any future desktop capability or database behavior.",
+      "deliverables": [
+        "Exact anonymous GET response matching desktop-bootstrap@v1.",
+        "Closed JSON Schema, recognized fixture and integration handoff documentation.",
+        "Deterministic route tests for exact response, unsupported method, replay, version pinning, concurrency and recovery."
+      ],
+      "requirementRefs": ["REQ-001"],
+      "decisionRefs": ["DEC-001"],
+      "blockingDecisionRefs": [],
+      "nonGoals": [
+        "No device authorization, account, balance, usage, pricing projection, tool-key, payment, database, migration, deployment or client-source change."
+      ],
+      "dependsOn": [],
+      "allowedPaths": [
+        "controller/desktop.go",
+        "router/api-router.go",
+        "router/desktop_router_test.go",
+        "docs/desktop-api-v1.md",
+        "docs/contracts/desktop-bootstrap.v1.schema.json",
+        "docs/contracts/fixtures/desktop-bootstrap/**",
+        "tests/work_packages/desktop_bootstrap/**"
+      ],
+      "forbiddenPaths": [
+        ".product-governance/**",
+        "model/**",
+        "service/**",
+        "middleware/**",
+        "web/**",
+        "bin/**",
+        "docker-compose.yml"
+      ],
+      "migrationPolicy": {
+        "mode": "none",
+        "ownedPaths": [],
+        "dataBackfill": "No schema, database or customer-data migration belongs to this package.",
+        "rollback": "Revert only the owned route, handler, tests and documentation; no data recovery is required."
+      },
+      "compatibilityPolicy": {
+        "strategy": "Add one versioned anonymous route without changing existing routes. Keep v1 closed and capability flags false.",
+        "supportedVersions": "desktop-bootstrap@v1 with minimum client version 0.1.0 only.",
+        "removalGate": "Removal or semantic expansion requires a superseding decision, versioned contract and new frozen release unit."
+      },
+      "inputContracts": [],
+      "outputContracts": ["desktop-bootstrap@v1"],
+      "acceptanceCommands": [
+        {"id": "bootstrap-happy", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_happy_path", "cwd": ".", "timeoutSeconds": 300},
+        {"id": "bootstrap-failure", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_unsupported_method", "cwd": ".", "timeoutSeconds": 300},
+        {"id": "bootstrap-replay", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_replay", "cwd": ".", "timeoutSeconds": 300},
+        {"id": "bootstrap-stale-version", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_version_is_closed", "cwd": ".", "timeoutSeconds": 300},
+        {"id": "bootstrap-race", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_concurrent_reads", "cwd": ".", "timeoutSeconds": 300},
+        {"id": "bootstrap-recovery", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_recovery_after_bad_method", "cwd": ".", "timeoutSeconds": 300}
+      ],
+      "requiredAcceptanceScenarios": [
+        {"id": "BOOTSTRAP-AS-01", "assertion": "Anonymous GET returns the exact closed v1 JSON response and content type.", "testSelector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_happy_path", "acceptanceCommandId": "bootstrap-happy"},
+        {"id": "BOOTSTRAP-AS-02", "assertion": "An unsupported method does not expose the handshake or mutate state.", "testSelector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_unsupported_method", "acceptanceCommandId": "bootstrap-failure"},
+        {"id": "BOOTSTRAP-AS-03", "assertion": "Repeated reads return an equivalent declaration with every capability false.", "testSelector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_replay", "acceptanceCommandId": "bootstrap-replay"},
+        {"id": "BOOTSTRAP-AS-04", "assertion": "Schema version, contract ID and minimum client version remain pinned to the closed v1 contract.", "testSelector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_version_is_closed", "acceptanceCommandId": "bootstrap-stale-version"},
+        {"id": "BOOTSTRAP-AS-05", "assertion": "Concurrent anonymous reads remain equivalent and side-effect free.", "testSelector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_concurrent_reads", "acceptanceCommandId": "bootstrap-race"},
+        {"id": "BOOTSTRAP-AS-06", "assertion": "A valid GET succeeds after an unsupported method without manual recovery or state repair.", "testSelector": "tests/work_packages/desktop_bootstrap/test_acceptance.py::test_recovery_after_bad_method", "acceptanceCommandId": "bootstrap-recovery"}
+      ],
+      "verificationOnly": false,
+      "stopConditions": [
+        "The client schema differs from the frozen observed contract.",
+        "Any capability would need to become true.",
+        "Any change requires authentication, database, migration, payment, deployment or a path outside allowedPaths."
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "WP-DESKTOP-INTEGRATION-V2",
+      "wave": "producer",
+      "owner": "backend-api",
+      "riskClass": "high",
+      "objective": "Implement the versioned desktop v2 bootstrap, Redis-only browser-approved device authorization, JSON desktop refresh/logout adapters, and the authenticated browser approval surface while mapping all read and tool-key capabilities to existing NewAPI APIs.",
+      "deliverables": [
+        "Immutable v1 plus a closed v2 bootstrap with exact existing route mappings and fixed comparison rate 6.75.",
+        "Five-minute Redis-only device authorization with explicit live-browser approval, bounded polling and single session issuance.",
+        "Desktop JSON refresh and current-session revocation backed by existing user_sessions.",
+        "Authenticated browser approval page that displays the user code and client name and requires explicit approve or deny.",
+        "Contract, route, concurrency, replay, expiry, refresh, revocation and browser behavior tests."
+      ],
+      "requirementRefs": ["REQ-002"],
+      "decisionRefs": ["DEC-002"],
+      "blockingDecisionRefs": [],
+      "nonGoals": [
+        "No database schema, migration, duplicate account table, duplicate billing data, payment processing, deployment, Nginx or production configuration change.",
+        "No new tool-key table or desktop-specific read projections; v2 advertises the existing authenticated owners.",
+        "No client repository change in this server release unit."
+      ],
+      "dependsOn": ["WP-DESKTOP-BOOTSTRAP-V1"],
+      "allowedPaths": [
+        "controller/desktop.go",
+        "controller/desktop_v2_test.go",
+        "service/desktop_device_authorization.go",
+        "service/desktop_device_authorization_test.go",
+        "router/api-router.go",
+        "router/desktop_v2_router_test.go",
+        "web/src/features/desktop-authorization/**",
+        "web/src/routes/_authenticated/desktop-authorize/**",
+        "web/src/routeTree.gen.ts",
+        "web/src/i18n/locales/**",
+        "docs/desktop-api-v2.md",
+        "docs/contracts/desktop-integration.v2.schema.json",
+        "tests/work_packages/desktop_v2/**"
+      ],
+      "forbiddenPaths": [
+        ".product-governance/**",
+        "model/**",
+        "bin/**",
+        "docker-compose.yml",
+        ".github/**",
+        "middleware/**",
+        "web/src/features/wallet/**"
+      ],
+      "migrationPolicy": {
+        "mode": "none",
+        "ownedPaths": [],
+        "dataBackfill": "No schema or customer-data migration. Pending authorization exists only in Redis for five minutes; successful sessions use the existing user_sessions table.",
+        "rollback": "Remove v2 routes and approval UI. Existing v1 and user_sessions remain valid; pending Redis keys expire naturally."
+      },
+      "compatibilityPolicy": {
+        "strategy": "Keep desktop bootstrap v1 byte-for-byte compatible and add an independent v2 contract with minimum desktop version 0.2.0.",
+        "supportedVersions": "desktop-bootstrap@v1 remains recognition-only; desktop integration v2 adds device authorization and session adapters while reusing existing authenticated APIs.",
+        "removalGate": "V1 removal or v2 semantic change requires a successor version and frozen release unit."
+      },
+      "inputContracts": ["desktop-bootstrap@v1"],
+      "outputContracts": ["desktop-bootstrap@v2", "desktop-device-authorization-create@v2", "desktop-device-authorization-decision@v2", "desktop-device-authorization-exchange@v2", "desktop-session-refresh@v2", "desktop-session-revoke@v2"],
+      "acceptanceCommands": [
+        {"id": "desktop-v2-contract", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_contract_and_v1_compatibility", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-happy", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_happy_path", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-failure", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_failure_paths", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-replay", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_replay_and_race", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-refresh", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_refresh_revoke_and_recovery", "cwd": ".", "timeoutSeconds": 600},
+        {"id": "desktop-v2-web", "kind": "scenario_test", "adapter": "pytest-json@1", "selector": "tests/work_packages/desktop_v2/test_acceptance.py::test_browser_approval_surface", "cwd": ".", "timeoutSeconds": 900}
+      ],
+      "requiredAcceptanceScenarios": [
+        {"id": "DESKTOP-V2-AS-01", "assertion": "V1 stays exact while v2 advertises only implemented existing routes, fixed 6.75 and live Redis availability.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_contract_and_v1_compatibility", "acceptanceCommandId": "desktop-v2-contract"},
+        {"id": "DESKTOP-V2-AS-02", "assertion": "A browser-approved unexpired device code issues one dedicated desktop user_session and no new table.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_happy_path", "acceptanceCommandId": "desktop-v2-happy"},
+        {"id": "DESKTOP-V2-AS-03", "assertion": "Missing Redis, malformed codes, pending, slow-down, denied and expired states never issue credentials.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_failure_paths", "acceptanceCommandId": "desktop-v2-failure"},
+        {"id": "DESKTOP-V2-AS-04", "assertion": "Concurrent exchange of one approved code creates at most one session and later replay is rejected.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_device_authorization_replay_and_race", "acceptanceCommandId": "desktop-v2-replay"},
+        {"id": "DESKTOP-V2-AS-05", "assertion": "Desktop refresh rotates the secret and logout revokes only the current session while a failed refresh remains recoverable under existing semantics.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_refresh_revoke_and_recovery", "acceptanceCommandId": "desktop-v2-refresh"},
+        {"id": "DESKTOP-V2-AS-06", "assertion": "The authenticated approval page shows code and client identity, requires explicit action and handles success, denial, expiry and API failure without exposing device_code.", "testSelector": "tests/work_packages/desktop_v2/test_acceptance.py::test_browser_approval_surface", "acceptanceCommandId": "desktop-v2-web"}
+      ],
+      "verificationOnly": false,
+      "stopConditions": [
+        "Any implementation requires a database schema or migration.",
+        "Any credential would be placed in a URL, browser storage, log or response other than the one-time desktop exchange/refresh body.",
+        "A read or tool-key capability cannot be mapped to an existing authenticated API owner.",
+        "V1 compatibility changes or the approval flow can create more than one session per device code.",
+        "Deployment or production configuration becomes necessary."
+      ],
+      "status": "planned"
+    }
+  ]
+}

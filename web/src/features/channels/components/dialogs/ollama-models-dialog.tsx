@@ -40,6 +40,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { getFreshAuthHeaders } from '@/lib/api'
+import { resolveApiRequestURL } from '@/lib/api-base-url'
 
 import {
   deleteOllamaModel,
@@ -246,19 +247,22 @@ export function OllamaModelsDialog({
 
     try {
       const authHeaders = await getFreshAuthHeaders()
-      const response = await fetch('/api/channel/ollama/pull/stream', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          ...authHeaders,
-          Accept: 'text/event-stream',
-        },
-        body: JSON.stringify({
-          channel_id: channelId,
-          model_name: pullName.trim(),
-        }),
-        signal: controller.signal,
-      })
+      const response = await fetch(
+        resolveApiRequestURL('/api/channel/ollama/pull/stream'),
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            ...authHeaders,
+            Accept: 'text/event-stream',
+          },
+          body: JSON.stringify({
+            channel_id: channelId,
+            model_name: pullName.trim(),
+          }),
+          signal: controller.signal,
+        }
+      )
 
       if (!response.ok || !response.body) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)

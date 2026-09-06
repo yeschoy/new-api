@@ -22,13 +22,12 @@ import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { useNotifications } from '@/hooks/use-notifications'
-import { useTopNavLinks } from '@/hooks/use-top-nav-links'
+import { useConsoleModeStore } from '@/stores/console-mode-store'
 
-import { defaultTopNavLinks } from '../config/top-nav.config'
-import { type TopNavLink } from '../types'
+import { ConsoleModeControl } from './console-mode-switcher'
+import { EasyTaskDock } from './easy-task-dock'
 import { Header } from './header'
 import { SystemBrand } from './system-brand'
-import { TopNav } from './top-nav'
 
 /**
  * General application Header component
@@ -39,12 +38,9 @@ import { TopNav } from './top-nav'
  * <AppHeader />
  *
  * @example
- * // Custom navigation links
- * <AppHeader navLinks={customLinks} />
- *
  * @example
  * // Hide navigation bar and search box
- * <AppHeader showTopNav={false} showSearch={false} />
+ * <AppHeader showSearch={false} />
  *
  * @example
  * // Fully customize left and right content
@@ -55,16 +51,7 @@ import { TopNav } from './top-nav'
  */
 type AppHeaderProps = {
   /**
-   * Custom navigation links, uses default global navigation or dynamically generated from backend if not provided
-   */
-  navLinks?: TopNavLink[]
-  /**
-   * Whether to show top navigation bar
-   * @default true
-   */
-  showTopNav?: boolean
-  /**
-   * Left content, overrides TopNav if provided
+   * Optional content shown after the brand and task dock.
    */
   leftContent?: React.ReactNode
   /**
@@ -93,9 +80,24 @@ type AppHeaderProps = {
   showProfileDropdown?: boolean
 }
 
+function AppHeaderNotifications() {
+  const notifications = useNotifications()
+
+  return (
+    <NotificationPopover
+      open={notifications.popoverOpen}
+      onOpenChange={notifications.setPopoverOpen}
+      unreadCount={notifications.unreadCount}
+      activeTab={notifications.activeTab}
+      onTabChange={notifications.setActiveTab}
+      notice={notifications.notice}
+      announcements={notifications.announcements}
+      loading={notifications.loading}
+    />
+  )
+}
+
 export function AppHeader({
-  navLinks = defaultTopNavLinks,
-  showTopNav = true,
   leftContent,
   showSearch = true,
   rightContent,
@@ -103,48 +105,32 @@ export function AppHeader({
   showConfigDrawer = true,
   showProfileDropdown = true,
 }: AppHeaderProps) {
-  // Prioritize dynamically generated links from backend
-  const dynamicLinks = useTopNavLinks()
-  const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
-
-  // Notifications hook
-  const notifications = useNotifications()
+  const mode = useConsoleModeStore((state) => state.mode)
+  const isEasyMode = mode === 'easy'
 
   return (
-    <>
-      <Header>
-        <SystemBrand variant='inline' />
+    <Header
+      showSidebarTrigger={!isEasyMode}
+      className={isEasyMode ? 'dopa-easy-header' : 'dopa-developer-header'}
+    >
+      <SystemBrand variant='inline' />
 
-        {leftContent ? (
-          <div className='ms-2 flex items-center'>{leftContent}</div>
-        ) : null}
+      {isEasyMode && <EasyTaskDock />}
 
-        {rightContent ?? (
-          <div className='ms-auto flex items-center gap-1 sm:gap-2'>
-            {showTopNav && (
-              <div className='me-1 hidden lg:block'>
-                <TopNav links={links} />
-              </div>
-            )}
-            {showSearch && <Search />}
-            {showNotifications && (
-              <NotificationPopover
-                open={notifications.popoverOpen}
-                onOpenChange={notifications.setPopoverOpen}
-                unreadCount={notifications.unreadCount}
-                activeTab={notifications.activeTab}
-                onTabChange={notifications.setActiveTab}
-                notice={notifications.notice}
-                announcements={notifications.announcements}
-                loading={notifications.loading}
-              />
-            )}
-            <LanguageSwitcher />
-            {showConfigDrawer && <ConfigDrawer />}
-            {showProfileDropdown && <ProfileDropdown />}
-          </div>
-        )}
-      </Header>
-    </>
+      {leftContent ? (
+        <div className='ms-2 flex items-center'>{leftContent}</div>
+      ) : null}
+
+      {rightContent ?? (
+        <div className='dopa-header-actions ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5'>
+          {showSearch && !isEasyMode && <Search />}
+          {showNotifications && !isEasyMode && <AppHeaderNotifications />}
+          <ConsoleModeControl compact />
+          <LanguageSwitcher />
+          {showConfigDrawer && <ConfigDrawer />}
+          {showProfileDropdown && <ProfileDropdown />}
+        </div>
+      )}
+    </Header>
   )
 }
