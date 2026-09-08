@@ -26,7 +26,7 @@ import { renderApp } from '@/test-utils/render-app'
 let client: QueryClient | undefined
 afterEach(() => client?.clear())
 describe('public product journey', () => {
-  it('offers account creation, model discovery, setup and manual supplier contact on the current landing', async () => {
+  it('keeps account, catalog and setup entry points without supplier solicitation', async () => {
     client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     })
@@ -58,7 +58,18 @@ describe('public product journey', () => {
       })
     ).toBeVisible()
     expect(
-      screen.getByRole('button', { name: 'Copy application details' })
-    ).toBeVisible()
+      screen.queryByRole('heading', {
+        name: 'Turn unused inference capacity into revenue',
+      })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('form', { name: 'Sell capacity' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryAllByRole('link', { name: 'Sell capacity' })
+    ).toHaveLength(0)
+    expect(
+      screen.queryAllByRole('link', { name: 'Talk to sales' })
+    ).toHaveLength(0)
   })
 })

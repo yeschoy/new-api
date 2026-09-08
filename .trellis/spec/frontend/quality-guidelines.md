@@ -122,7 +122,7 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 | Model uses per-request/task/complex tier pricing | Keep it discoverable with a details link |
 | Summary unavailable | Error/pending display; no fabricated zero totals |
 | Empty/undiscounted auth catalog | Real data or empty state, no fallback marketing prices |
-| Supplier application copied | Explicitly require manual sending to the configured support QQ group |
+| Retired supplier section | No supplier form or sell-capacity navigation remains on the landing page |
 
 ### Good / Base / Bad Cases
 - Good: priceRate=7 and displayed quote=7 yields ¥7, not ¥49.
@@ -130,7 +130,7 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Bad: reuse the on/off translation for a percentage discount, or apply flex display to td elements.
 
 ### Tests Required
-Cover 101-key revoke and incomplete deletion, reveal retry without duplicate creation, group changes/free pricing, all pricing modes, complete reports vs a paginated list, stream failures and currency export. Browser/DOM tests cover mobile anchor-close behavior, table-cell layout, visible rate comparisons and manual supplier-copy guidance.
+Cover 101-key revoke and incomplete deletion, reveal retry without duplicate creation, group changes/free pricing, all pricing modes, complete reports vs a paginated list, stream failures and currency export. Browser/DOM tests cover mobile anchor-close behavior, table-cell layout, visible rate comparisons and absence of retired supplier entry points.
 
 ### Wrong vs Correct
 - Wrong: use catalog discount percentages to estimate savings for historical logs.

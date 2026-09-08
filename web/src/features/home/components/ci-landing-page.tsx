@@ -53,7 +53,6 @@ import { vendorAvatar, vendorAvatarIsMono } from '../lib/vendor-avatar'
 import { CatalogPrice } from './catalog-price'
 import { CatalogVendorIcon } from './catalog-vendor-icon'
 import { CiMark } from './ci-mark'
-import { SupplierApplication } from './supplier-application'
 
 const PROVIDERS = [
   { name: 'OpenAI', src: '/ci/lobe/openai-avatar.svg', mono: true },
@@ -175,13 +174,6 @@ export function CiLandingPage(props: LandingPageProps) {
                 <Link className='ci-navItem' to='/guide'>
                   <span>{t('Docs')}</span>
                 </Link>
-                <a
-                  className='ci-navItem'
-                  href='/#sell-capacity'
-                  onClick={() => setNavOpen(false)}
-                >
-                  <span>{t('Sell capacity')}</span>
-                </a>
               </div>
               <div className='ci-mobileNavActions'>
                 <Link
@@ -302,12 +294,6 @@ export function CiLandingPage(props: LandingPageProps) {
                   >
                     {t('Start saving')} <ArrowIcon />
                   </Link>
-                  <a
-                    href='/#sell-capacity'
-                    className='ci-button ci-button--outline ci-button--size-sm'
-                  >
-                    {t('Talk to sales')}
-                  </a>
                 </div>
                 <div className='ci-trustRow'>
                   <span>
@@ -472,7 +458,6 @@ export function CiLandingPage(props: LandingPageProps) {
           </section>
 
           <Trust />
-          <Seller />
 
           <section className='ci-finalCta'>
             <div className='ci-container'>
@@ -501,12 +486,6 @@ export function CiLandingPage(props: LandingPageProps) {
                 >
                   {t('Start saving')} <ArrowIcon />
                 </Link>
-                <a
-                  href='/#sell-capacity'
-                  className='ci-button ci-button--outline ci-button--size-sm'
-                >
-                  {t('Talk to sales')}
-                </a>
               </div>
             </div>
           </section>
@@ -841,35 +820,6 @@ function Trust() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function Seller() {
-  const { t } = useTranslation()
-
-  return (
-    <section className='ci-section ci-sellerSection' id='sell-capacity'>
-      <div className='ci-container ci-sellerGrid'>
-        <div className='ci-sellerCopy'>
-          <div className='ci-sectionIntro'>
-            <h2>{t('Turn unused inference capacity into revenue')}</h2>
-            <p className='ci-sectionCopy'>
-              {t(
-                'Copy your capacity details and send them to our support QQ group for review.'
-              )}
-            </p>
-          </div>
-          <ul>
-            <li>{t('Share available capacity')}</li>
-            <li>{t('We review provider fit')}</li>
-            <li>{t('Discuss supply and settlement')}</li>
-          </ul>
-        </div>
-        <div className='ci-card ci-card--flush ci-sellerCard'>
-          <SupplierApplication providers={PROVIDERS} />
         </div>
       </div>
     </section>
