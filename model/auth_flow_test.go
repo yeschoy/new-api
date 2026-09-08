@@ -107,3 +107,43 @@ func TestConsumeAuthFlowWithActionRollsBackTogether(t *testing.T) {
 	assert.Nil(t, flow.ConsumedAt)
 	require.NoError(t, ClaimExternalAuthAssertion(AuthFlowPurposeTelegramAssertion, "assertion-a", time.Now().Add(time.Minute)))
 }
+
+func TestCreateAuthFlowWithTxRollsBackWithOuterTransaction(t *testing.T) {
+	truncateTables(t)
+	rollbackErr := errors.New("rollback authorization decision")
+	var code string
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var createErr error
+		code, _, createErr = CreateAuthFlowWithTx(tx, AuthFlowCreate{
+			Purpose:   AuthFlowPurposeOAuthClientCode,
+			Provider:  "yeschoy-desktop",
+			Intent:    "exchange",
+			UserId:    42,
+			ExpiresAt: time.Now().Add(time.Minute),
+		})
+		require.NoError(t, createErr)
+		return rollbackErr
+	})
+	assert.ErrorIs(t, err, rollbackErr)
+	require.NotEmpty(t, code)
+
+	_, err = GetAuthFlow(code, AuthFlowMatch{Purpose: AuthFlowPurposeOAuthClientCode})
+	assert.ErrorIs(t, err, ErrAuthFlowInvalid)
+}
+
+func TestOAuthClientAuthFlowPurposesAreIsolated(t *testing.T) {
+	truncateTables(t)
+	requestToken, _, err := CreateAuthFlow(AuthFlowCreate{
+		Purpose:   AuthFlowPurposeOAuthClientRequest,
+		Provider:  "yeschoy-desktop",
+		Intent:    "authorize",
+		ExpiresAt: time.Now().Add(time.Minute),
+	})
+	require.NoError(t, err)
+
+	_, err = ConsumeAuthFlow(requestToken, AuthFlowMatch{Purpose: AuthFlowPurposeOAuthClientCode})
+	assert.ErrorIs(t, err, ErrAuthFlowInvalid)
+	_, err = GetAuthFlow(requestToken, AuthFlowMatch{Purpose: AuthFlowPurposeOAuthClientRequest})
+	require.NoError(t, err)
+}

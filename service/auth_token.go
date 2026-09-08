@@ -47,6 +47,7 @@ type authClaims struct {
 	SessionID       string   `json:"sid"`
 	UserAuthVersion int64    `json:"uv"`
 	SessionVersion  int64    `json:"sv"`
+	ClientID        string   `json:"client_id,omitempty"`
 	Method          string   `json:"method,omitempty"`
 	Scopes          []string `json:"scopes,omitempty"`
 	jwt.RegisteredClaims
@@ -123,6 +124,9 @@ func ParseDashboardAccessToken(raw string) (identity AuthIdentity, internal bool
 		}
 	}
 	knownTokenUse := claims.TokenUse == accessTokenUse || claims.TokenUse == securityProofTokenUse
+	if claims.Issuer == authTokenIssuer && claims.TokenUse == oauthAccessTokenUse {
+		return AuthIdentity{}, true, ErrAuthTokenInvalid
+	}
 	if claims.Issuer != authTokenIssuer || !audienceMatches || !knownTokenUse {
 		return AuthIdentity{}, false, nil
 	}
@@ -193,6 +197,10 @@ func VerifySecurityProof(raw string, identity AuthIdentity, requiredScope string
 }
 
 func parseAuthClaims(raw, expectedUse string, key []byte) (*authClaims, error) {
+	return parseAuthClaimsForAudience(raw, expectedUse, key, authTokenAudience)
+}
+
+func parseAuthClaimsForAudience(raw, expectedUse string, key []byte, audience string) (*authClaims, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, ErrAuthTokenInvalid
@@ -203,7 +211,7 @@ func parseAuthClaims(raw, expectedUse string, key []byte) (*authClaims, error) {
 			return nil, fmt.Errorf("%w: unexpected signing method", ErrAuthTokenInvalid)
 		}
 		return key, nil
-	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithIssuer(authTokenIssuer), jwt.WithAudience(authTokenAudience), jwt.WithExpirationRequired(), jwt.WithIssuedAt(), jwt.WithLeeway(5*time.Second))
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithIssuer(authTokenIssuer), jwt.WithAudience(audience), jwt.WithExpirationRequired(), jwt.WithIssuedAt(), jwt.WithLeeway(5*time.Second))
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
 			return nil, ErrAuthTokenExpired

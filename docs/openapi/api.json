@@ -921,6 +921,442 @@
         ]
       }
     },
+    "/api/oauth/authorize": {
+      "get": {
+        "summary": "发起桌面客户端 OAuth PKCE 授权",
+        "description": "固定 Public Client yeschoy-desktop。验证 PKCE S256 与 127.0.0.1 随机端口回调后进入浏览器授权页；OAuth Token 不用于 /v1/* 或普通 API Key 管理。",
+        "tags": [
+          "OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "code"
+              ]
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yeschoy-desktop"
+              ]
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "http://127.0.0.1:49182/oauth/callback"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "S256"
+              ]
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "profile offline_access sessions"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "进入受保护的浏览器授权页"
+          },
+          "400": {
+            "description": "Client、回调、PKCE 或 scope 无效；不会跳转到未验证地址"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/oauth/token": {
+      "post": {
+        "summary": "兑换或刷新 OAuth 客户端 Token",
+        "description": "只接受 UTF-8 application/x-www-form-urlencoded。支持 authorization_code 和 refresh_token；不使用 Client Secret。",
+        "tags": [
+          "OAuth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grant_type",
+                  "client_id"
+                ],
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "enum": [
+                      "authorization_code",
+                      "refresh_token"
+                    ]
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "enum": [
+                      "yeschoy-desktop"
+                    ]
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string"
+                  },
+                  "code_verifier": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string"
+                  },
+                  "device_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "device_name": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "windows",
+                      "macos",
+                      "linux"
+                    ]
+                  },
+                  "client_version": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth 请求或凭证无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/oauth/userinfo": {
+      "get": {
+        "summary": "读取 OAuth 客户端当前账号",
+        "description": "需要 profile scope。OAuth Access Token 仅适用于 OAuth 客户端资源。",
+        "tags": [
+          "OAuth"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientUserInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "insufficient_scope 或 account_disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuthClientBearer": []
+          }
+        ]
+      }
+    },
+    "/api/oauth/revoke": {
+      "post": {
+        "summary": "撤销 OAuth 客户端会话",
+        "description": "提交有效 AT 或 RT 都撤销其所属 OAuth SID。未知、过期或重复 Token 返回 200 空响应。",
+        "tags": [
+          "OAuth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "client_id",
+                  "token"
+                ],
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "enum": [
+                      "yeschoy-desktop"
+                    ]
+                  },
+                  "token": {
+                    "type": "string"
+                  },
+                  "token_type_hint": {
+                    "type": "string",
+                    "enum": [
+                      "access_token",
+                      "refresh_token"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "幂等撤销完成，无响应体"
+          },
+          "400": {
+            "description": "请求格式或 Client 无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/oauth/sessions": {
+      "get": {
+        "summary": "列出 OAuth 客户端授权设备",
+        "description": "需要 sessions scope；只返回当前用户且属于 yeschoy-desktop 的有效 OAuth 会话。",
+        "tags": [
+          "OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OAuthClientSession"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "分页参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "insufficient_scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuthClientBearer": []
+          }
+        ]
+      }
+    },
+    "/api/oauth/sessions/{session_id}": {
+      "delete": {
+        "summary": "撤销指定 OAuth 客户端设备",
+        "description": "需要 sessions scope；目标必须属于当前用户和当前 Client。",
+        "tags": [
+          "OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "撤销成功或对可确认归属的已撤销 Session 幂等成功"
+          },
+          "401": {
+            "description": "invalid_token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "insufficient_scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "目标不存在或不属于当前用户/Client",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthClientError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuthClientBearer": []
+          }
+        ]
+      }
+    },
     "/api/oauth/github": {
       "get": {
         "summary": "GitHub OAuth登录",
@@ -5271,6 +5707,151 @@
           }
         }
       },
+      "OAuthClientError": {
+        "type": "object",
+        "required": [
+          "error",
+          "error_description",
+          "request_id"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "error_description": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "OAuthClientTokenResponse": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "scope",
+          "session_id"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer"
+          },
+          "refresh_token": {
+            "type": "string"
+          },
+          "refresh_expires_in": {
+            "type": "integer"
+          },
+          "scope": {
+            "type": "string",
+            "example": "profile offline_access sessions"
+          },
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
+      "OAuthClientUserInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email",
+          "group",
+          "status",
+          "quota"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "group": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active"
+            ]
+          },
+          "quota": {
+            "type": "object",
+            "required": [
+              "remaining",
+              "unit"
+            ],
+            "properties": {
+              "remaining": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "OAuthClientSession": {
+        "type": "object",
+        "required": [
+          "id",
+          "client_id",
+          "device_name",
+          "platform",
+          "created_at",
+          "last_active_at",
+          "current"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string",
+            "enum": [
+              "yeschoy-desktop"
+            ]
+          },
+          "device_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_active_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        }
+      },
       "PageInfo": {
         "type": "object",
         "properties": {
@@ -5481,6 +6062,12 @@
         "in": "cookie",
         "name": "new_api_refresh",
         "description": "仅 refresh/logout 使用的 HttpOnly、SameSite=Strict Cookie"
+      },
+      "OAuthClientBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "OAuth access JWT",
+        "description": "固定客户端 yeschoy-desktop 的短期 OAuth Access Token；不适用于 /v1/*、PAT 或普通 API Key"
       },
       "SecurityProof": {
         "type": "apiKey",

@@ -21,6 +21,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [Registration login](./registration-login.md) | Registration auto-login, session response, failure fallback and domain boundaries | Implemented |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
 | [Custom-domain callbacks](./custom-domain-callbacks.md) | Main-Origin/Session configuration, Host routing, OAuth failure/state contracts, reset/wallet returns, and local healthchecks | Implemented; peer-main Passkey deferred |
+| [OAuth client PKCE](./oauth-client-pkce.md) | Fixed desktop Public Client, loopback/PKCE, AuthFlow/Session storage, token-purpose isolation, device management, and tests | Implemented |
 
 ---
 

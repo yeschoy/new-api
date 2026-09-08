@@ -1,0 +1,7 @@
+# OAuth client browser authorization errors
+oauth_client.authorization_error_title: "認証エラー"
+oauth_client.invalid_request: "認証リクエストが無効です。デスクトップアプリに戻り、認証をやり直してください。"
+oauth_client.invalid_client: "OAuth クライアントが無効です。"
+oauth_client.unsupported_response_type: "code レスポンスタイプのみ対応しています。"
+oauth_client.invalid_scope: "要求された権限が無効です。"
+oauth_client.server_error: "認証サーバーがリクエストを処理できませんでした。後でもう一度お試しください。"

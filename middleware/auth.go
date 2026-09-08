@@ -24,6 +24,8 @@ import (
 )
 
 const authIdentityContextKey = "auth_identity"
+const oauthClientIdentityContextKey = "oauth_client_identity"
+const oauthClientUserContextKey = "oauth_client_user"
 
 var errDesktopSessionScope = errors.New("desktop session is not allowed to access this route")
 
@@ -146,7 +148,7 @@ func GetSessionAuthIdentity(c *gin.Context) (service.AuthIdentity, bool) {
 // other operations that require the user to be present on the website.
 func GetBrowserSessionAuthIdentity(c *gin.Context) (service.AuthIdentity, bool) {
 	identity, ok := GetSessionAuthIdentity(c)
-	if !ok || strings.TrimSpace(identity.LoginMethod) == "" || identity.LoginMethod == service.DesktopLoginMethod {
+	if !ok || strings.TrimSpace(identity.LoginMethod) == "" || identity.LoginMethod == service.DesktopLoginMethod || identity.LoginMethod == model.UserSessionLoginMethodOAuthClient {
 		return service.AuthIdentity{}, false
 	}
 	return identity, true
@@ -160,6 +162,76 @@ func GetDesktopSessionAuthIdentity(c *gin.Context) (service.AuthIdentity, bool) 
 		return service.AuthIdentity{}, false
 	}
 	return identity, true
+}
+
+func OAuthClientAuth(requiredScope string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		parts := strings.Fields(c.GetHeader("Authorization"))
+		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || parts[1] == "" {
+			writeOAuthClientAuthError(c, &service.OAuthClientError{HTTPStatus: http.StatusUnauthorized, Code: "invalid_token", Description: "The access token is invalid or expired."})
+			return
+		}
+		identity, user, err := service.AuthenticateOAuthClientAccessToken(parts[1], requiredScope)
+		if err != nil {
+			writeOAuthClientAuthError(c, err)
+			return
+		}
+		c.Set(oauthClientIdentityContextKey, identity)
+		c.Set(oauthClientUserContextKey, user)
+		c.Next()
+	}
+}
+
+func GetOAuthClientIdentity(c *gin.Context) (service.OAuthAccessIdentity, bool) {
+	value, ok := c.Get(oauthClientIdentityContextKey)
+	if !ok {
+		return service.OAuthAccessIdentity{}, false
+	}
+	identity, ok := value.(service.OAuthAccessIdentity)
+	return identity, ok
+}
+
+func GetOAuthClientUser(c *gin.Context) (*model.UserBase, bool) {
+	value, ok := c.Get(oauthClientUserContextKey)
+	if !ok {
+		return nil, false
+	}
+	user, ok := value.(*model.UserBase)
+	return user, ok && user != nil
+}
+
+func writeOAuthClientAuthError(c *gin.Context, err error) {
+	status := http.StatusUnauthorized
+	code := "invalid_token"
+	description := "The access token is invalid or expired."
+	var oauthErr *service.OAuthClientError
+	if errors.As(err, &oauthErr) {
+		if oauthErr.HTTPStatus >= 400 && oauthErr.HTTPStatus <= 599 {
+			status = oauthErr.HTTPStatus
+		}
+		if oauthErr.Code != "" {
+			code = oauthErr.Code
+		}
+		if oauthErr.Description != "" {
+			description = oauthErr.Description
+		}
+	}
+	if status == http.StatusUnauthorized || code == "insufficient_scope" {
+		c.Header("WWW-Authenticate", fmt.Sprintf(`Bearer realm="yeschoy", error=%q`, code))
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	if requestID := c.GetString(common.RequestIdKey); requestID != "" {
+		c.Header("X-Request-Id", requestID)
+	}
+	if status >= http.StatusInternalServerError {
+		logger.LogError(c.Request.Context(), "OAuth client authentication failed: "+err.Error())
+	}
+	c.AbortWithStatusJSON(status, gin.H{
+		"error":             code,
+		"error_description": description,
+		"request_id":        c.GetString(common.RequestIdKey),
+	})
 }
 
 func authenticateDashboardRequest(c *gin.Context) (*model.UserBase, service.AuthIdentity, bool, error) {
@@ -188,6 +260,9 @@ func classifyDashboardCredential(c *gin.Context) (*model.UserBase, service.AuthI
 			return nil, service.AuthIdentity{}, dashboardCredentialInternal, err
 		}
 		identity.LoginMethod = strings.TrimSpace(session.LoginMethod)
+		if identity.LoginMethod == model.UserSessionLoginMethodOAuthClient {
+			return nil, identity, dashboardCredentialInternal, service.ErrAuthTokenInvalid
+		}
 		if !dashboardSessionRouteAllowed(c, identity) {
 			return nil, service.AuthIdentity{}, dashboardCredentialInternal, errDesktopSessionScope
 		}
@@ -339,6 +414,10 @@ func TokenOrUserAuth() func(c *gin.Context) {
 				return
 			}
 			identity.LoginMethod = strings.TrimSpace(session.LoginMethod)
+			if identity.LoginMethod == model.UserSessionLoginMethodOAuthClient {
+				writeDashboardAuthError(c, service.ErrAuthTokenInvalid)
+				return
+			}
 			if !dashboardSessionRouteAllowed(c, identity) {
 				writeDashboardAuthError(c, errDesktopSessionScope)
 				return
@@ -478,14 +557,14 @@ func TokenAuth() func(c *gin.Context) {
 			if strings.HasPrefix(key, "Bearer ") || strings.HasPrefix(key, "bearer ") {
 				key = strings.TrimSpace(key[7:])
 			}
-			key = strings.TrimPrefix(key, "sk-")
-			parts = strings.Split(key, "-")
-			key = parts[0]
-		} else {
-			key = strings.TrimPrefix(key, "sk-")
-			parts = strings.Split(key, "-")
-			key = parts[0]
 		}
+		if _, internal, _ := service.ParseDashboardAccessToken(key); internal {
+			abortWithOpenAiMessage(c, http.StatusUnauthorized, common.TranslateMessage(c, i18n.MsgTokenInvalid))
+			return
+		}
+		key = strings.TrimPrefix(key, "sk-")
+		parts = strings.Split(key, "-")
+		key = parts[0]
 		token, err := model.ValidateUserToken(key)
 		if token != nil {
 			id := c.GetInt("id")

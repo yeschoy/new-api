@@ -26,6 +26,7 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 	router.NoRoute(
 		pluginDispatcher,
 		middleware.RouteTag("web"),
+		oauthAuthorizationReferrerPolicy,
 		gzip.Gzip(gzip.DefaultCompression),
 		middleware.GlobalWebRateLimit(),
 		middleware.Cache(),
@@ -39,4 +40,11 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
 		},
 	)
+}
+
+func oauthAuthorizationReferrerPolicy(c *gin.Context) {
+	if strings.TrimSuffix(c.Request.URL.Path, "/") == "/oauth/authorize" {
+		c.Header("Referrer-Policy", "no-referrer")
+	}
+	c.Next()
 }

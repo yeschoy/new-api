@@ -46,6 +46,7 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)
 		apiRouter.GET("/reset_password/return", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.PasswordResetReturnDispatcher)
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.ResetPassword)
+		registerOAuthClientRoutes(apiRouter)
 		// OAuth routes - specific routes must come before :provider wildcard
 		apiRouter.POST("/oauth/state", middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.TryUserAuth(), anonymousRequestBodyLimit, controller.GenerateOAuthCode)
 		apiRouter.POST("/oauth/domain-handoff", middleware.CriticalRateLimit(), middleware.DisableCache(), anonymousRequestBodyLimit, controller.ConsumeDomainLoginHandoff)
@@ -409,6 +410,17 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
 		}
 	}
+}
+
+func registerOAuthClientRoutes(apiRouter *gin.RouterGroup) {
+	apiRouter.GET("/oauth/authorize", middleware.ScopedCriticalRateLimit("oauth-client-authorize", 30, 600), middleware.DisableCache(), controller.BeginOAuthClientAuthorization)
+	apiRouter.GET("/oauth/authorize/request", middleware.UserAuth(), middleware.DisableCache(), controller.GetOAuthClientAuthorizationRequest)
+	apiRouter.POST("/oauth/authorize/decision", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.AnonymousRequestBodyLimit(), controller.DecideOAuthClientAuthorization)
+	apiRouter.POST("/oauth/token", middleware.ScopedCriticalRateLimit("oauth-client-token", 60, 600), middleware.DisableCache(), controller.OAuthClientToken)
+	apiRouter.GET("/oauth/userinfo", middleware.OAuthClientAuth("profile"), middleware.DisableCache(), controller.OAuthClientUserInfo)
+	apiRouter.POST("/oauth/revoke", middleware.ScopedCriticalRateLimit("oauth-client-revoke", 30, 600), middleware.DisableCache(), controller.RevokeOAuthClientToken)
+	apiRouter.GET("/oauth/sessions", middleware.OAuthClientAuth("sessions"), middleware.DisableCache(), controller.GetOAuthClientSessions)
+	apiRouter.DELETE("/oauth/sessions/:session_id", middleware.OAuthClientAuth("sessions"), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.DeleteOAuthClientSession)
 }
 
 func registerDesktopRoutes(apiRouter *gin.RouterGroup) {

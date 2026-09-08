@@ -1,6 +1,14 @@
 # Chinese (Traditional) translations
 # 中文（繁體）翻譯檔案
 
+# OAuth client browser authorization errors
+oauth_client.authorization_error_title: "授權錯誤"
+oauth_client.invalid_request: "授權請求無效。請返回桌面用戶端並重新發起授權。"
+oauth_client.invalid_client: "OAuth 用戶端無效。"
+oauth_client.unsupported_response_type: "僅支援 code 回應類型。"
+oauth_client.invalid_scope: "申請的權限無效。"
+oauth_client.server_error: "授權伺服器無法處理此請求，請稍後再試。"
+
 # Common messages
 common.invalid_params: "無效的參數"
 common.database_error: "資料庫出錯，請聯繫管理員"
