@@ -16,17 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useRouterState } from '@tanstack/react-router'
+
 import { AnimatedOutlet } from '@/components/page-transition'
 import { SkipToMain } from '@/components/skip-to-main'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
 import { getCookie } from '@/lib/cookies'
+import { isOperatorRoute } from '@/lib/operator-route'
 import { cn } from '@/lib/utils'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
 
 import { AppHeader } from './app-header'
 import { AppSidebar } from './app-sidebar'
+import { TerminalLayout } from './terminal-layout'
 
 type AuthenticatedLayoutProps = {
   children?: React.ReactNode
@@ -35,23 +39,28 @@ type AuthenticatedLayoutProps = {
 export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
   const mode = useConsoleModeStore((state) => state.mode)
-  const isEasyMode = mode === 'easy'
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const useOperatorShell = mode === 'developer' || isOperatorRoute(pathname)
+  const outlet = props.children ?? <AnimatedOutlet />
+
+  if (!useOperatorShell) {
+    return <TerminalLayout>{outlet}</TerminalLayout>
+  }
 
   return (
     <LayoutProvider>
       <SearchProvider>
         <SidebarProvider
           defaultOpen={defaultOpen}
-          className={cn(
-            'dopa-console flex-col',
-            isEasyMode ? 'dopa-console--easy' : 'dopa-console--developer'
-          )}
-          data-console-mode={mode}
+          className={cn('dopa-console flex-col', 'dopa-console--developer')}
+          data-console-mode='developer'
         >
           <SkipToMain />
           <AppHeader />
           <div className='flex min-h-0 w-full flex-1'>
-            {!isEasyMode && <AppSidebar />}
+            <AppSidebar />
             <SidebarInset
               className={cn(
                 '@container/content dopa-console-page',
@@ -60,7 +69,7 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
                 'peer-data-[variant=inset]:h-[calc(100svh-var(--app-header-height,0px)-(var(--spacing)*4))]'
               )}
             >
-              {props.children ?? <AnimatedOutlet />}
+              {outlet}
             </SidebarInset>
           </div>
         </SidebarProvider>

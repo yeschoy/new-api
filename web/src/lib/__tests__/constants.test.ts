@@ -44,7 +44,7 @@ describe('resolveSystemName', () => {
 
 describe('resolveLogoUrl', () => {
   it('keeps the protected project logo', () => {
-    expect(DEFAULT_LOGO).toBe('/logo.png')
+    expect(DEFAULT_LOGO).toBe('/yecai-logo.svg')
   })
 
   it.each([undefined, null, '', '  ', '/logo.png', 'logo.png'])(

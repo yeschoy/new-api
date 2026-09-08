@@ -20,8 +20,9 @@ import { Link, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
+import { PRODUCT_NAME } from '@/lib/product-brand'
 
-import { AuthLayout } from '../auth-layout'
+import { AccessAuthLayout } from '../access-auth-layout'
 import { TermsFooter } from '../components/terms-footer'
 import { UserAuthForm } from './components/user-auth-form'
 
@@ -31,12 +32,12 @@ export function SignIn() {
   const { status } = useStatus()
 
   return (
-    <AuthLayout>
+    <AccessAuthLayout title={t('Sign in')}>
       <div className='w-full space-y-8'>
         <div className='space-y-2'>
-          <h2 className='text-center text-2xl font-semibold tracking-tight sm:text-left'>
-            {t('Sign in')}
-          </h2>
+          <p className='text-muted-foreground text-left text-sm sm:text-base'>
+            {PRODUCT_NAME}
+          </p>
           {!status?.self_use_mode_enabled &&
             status?.register_enabled !== false && (
               <p className='text-muted-foreground text-left text-sm sm:text-base'>
@@ -60,6 +61,6 @@ export function SignIn() {
           className='text-center'
         />
       </div>
-    </AuthLayout>
+    </AccessAuthLayout>
   )
 }

@@ -88,9 +88,7 @@ describe('public top navigation', () => {
       requiresAuth: true,
     })
     expect(links).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ title: 'API Access' }),
-      ])
+      expect.arrayContaining([expect.objectContaining({ title: 'API Access' })])
     )
   })
 })

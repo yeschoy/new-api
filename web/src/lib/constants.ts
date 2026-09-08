@@ -22,7 +22,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 // System Configuration Defaults
 export const DEFAULT_SYSTEM_NAME = 'New API'
-export const DEFAULT_LOGO = '/logo.png'
+export const DEFAULT_LOGO = '/yecai-logo.svg'
 
 /**
  * Preserve the protected project default and operator-defined names.
@@ -37,7 +37,7 @@ export function resolveSystemName(name?: string | null): string {
 export function resolveLogoUrl(logo?: string | null): string {
   const normalized = logo?.trim()
 
-  if (!normalized || normalized === 'logo.png') {
+  if (!normalized || normalized === 'logo.png' || normalized === '/logo.png') {
     return DEFAULT_LOGO
   }
 

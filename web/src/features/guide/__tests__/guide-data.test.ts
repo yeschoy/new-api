@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, it } from 'vitest'
 
 import { guideTools } from '../data'
+import { searchGuideDocs } from '../lib/search'
 
 describe('guide tool catalog', () => {
   it('includes the official DeepSeek Harness setup path', () => {
@@ -54,5 +55,12 @@ describe('guide tool catalog', () => {
     expect(
       guideTools.find((tool) => tool.id === 'cherry-studio')
     ).not.toHaveProperty('recommended', true)
+  })
+
+  it('finds tools and setup sections from a docs search query', () => {
+    const hits = searchGuideDocs('cursor', (key) => key)
+    expect(hits.some((hit) => hit.kind === 'tool')).toBe(true)
+    const essentials = searchGuideDocs('Base URL', (key) => key)
+    expect(essentials.some((hit) => hit.id === 'essentials')).toBe(true)
   })
 })

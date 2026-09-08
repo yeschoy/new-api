@@ -22,6 +22,7 @@ import {
 } from '@/features/pricing/lib/dynamic-price'
 import { getDisplayGroupRatio } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 
 export type ModelFamily =
   | 'openai'
@@ -37,6 +38,8 @@ export type SavingsUseCase = 'coding' | 'agents' | 'support' | 'research'
 export type SavingsModel = {
   modelName: string
   vendorName: string
+  vendorIcon?: string
+  endpointTypes?: string[]
   family: ModelFamily
   baseInputPrice: number
   baseOutputPrice: number
@@ -362,6 +365,8 @@ function toSavingsModel(
   return {
     modelName: model.model_name,
     vendorName: model.vendor_name?.trim() || getFallbackVendorName(family),
+    vendorIcon: model.vendor_icon || model.icon,
+    endpointTypes: model.supported_endpoint_types ?? [],
     family,
     baseInputPrice,
     baseOutputPrice,
@@ -443,6 +448,25 @@ export function buildSavingsCatalog(
     const savings = toSavingsModel(model, priceRate)
     return savings ? [savings] : []
   })
+}
+
+export function formatUsdPerMillion(amount: number): string {
+  if (!Number.isFinite(amount)) return '—'
+  if (amount <= 0) return '$0/M'
+  if (amount < 0.01) {
+    return `$${amount.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}/M`
+  }
+  if (amount < 10) return `$${amount.toFixed(2)}/M`
+  return `$${amount.toFixed(2)}/M`
+}
+
+export function formatPerMillionTokens(amount: number): string {
+  if (!Number.isFinite(amount) || amount <= 0) return '—'
+  return `${formatBillingCurrencyFromUSD(amount, {
+    digitsLarge: 4,
+    digitsSmall: 4,
+    locale: 'zh-CN',
+  })}/百万`
 }
 
 export function formatCnyAmount(

@@ -17,119 +17,126 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { BookOpen, KeyRound } from 'lucide-react'
+import { KeyRound } from 'lucide-react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
-import { Button } from '@/components/ui/button'
+import { TerminalLayout } from '@/components/layout/components/terminal-layout'
+import { TerminalPage } from '@/components/layout/components/terminal-page'
+import { useTheme } from '@/context/theme-provider'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { AddressKit } from './components/address-kit'
 import { Troubleshoot, UseCasePicker } from './components/help-sections'
 import { ToolExplorer } from './components/tool-explorer'
 import { useGuideAddress } from './use-guide-address'
 
-/**
- * In-site beginner onboarding guide. All interface addresses are resolved
- * from the live deployment configuration at render time — the guide keeps
- * working as-is when the domain changes.
- */
-export function Guide() {
+type GuideProps = {
+  query?: string
+  toolId?: string
+}
+
+function GuideBody(props: GuideProps) {
   const { t } = useTranslation()
   const address = useGuideAddress()
 
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '')
+    if (!hash) return
+    document
+      .getElementById(hash)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [props.query, props.toolId])
+
   return (
-    <PublicLayout showMainContainer={false}>
-      <main className='relative overflow-hidden'>
-        {/* Decorative candy blobs */}
-        <div
-          aria-hidden='true'
-          className='dopa-blob dopa-float pointer-events-none absolute -top-24 -right-24 size-72'
-          style={{ backgroundColor: 'var(--chart-3)' }}
-        />
-        <div
-          aria-hidden='true'
-          className='dopa-blob dopa-float-delayed pointer-events-none absolute top-96 -left-32 size-80'
-          style={{ backgroundColor: 'var(--chart-2)' }}
-        />
+    <div className='ci-guideBody'>
+      <section className='ci-panel' id='essentials'>
+        <header className='ci-panelHeader'>
+          <h2>{t('The three things every tool asks for')}</h2>
+          <p>
+            {t(
+              'Every tool only ever asks you for three things. Grab them below, pick your tool, and follow the steps — done in about three minutes.'
+            )}
+          </p>
+        </header>
+        <div className='ci-panelBody'>
+          <AddressKit address={address} />
+          <div className='ci-guideActions'>
+            <Link to='/keys' className='ci-button ci-button--size-sm'>
+              <KeyRound size={16} />
+              {t('Create my key')}
+            </Link>
+          </div>
+        </div>
+      </section>
 
-        <div className='dopa-guide-journey relative mx-auto flex max-w-6xl flex-col gap-14 px-6 pt-28 pb-16 md:gap-18 md:pt-36 md:pb-24'>
-          {/* Header */}
-          <header
-            className='dopa-fade-up dopa-section-shell dopa-token-grid dopa-guide-hero flex max-w-none flex-col gap-4'
-            data-section='GUIDE'
-          >
-            <span className='dopa-section-kicker'>
-              <BookOpen className='size-4' />
-              {t('Beginner guide')}
-            </span>
-            <h1 className='max-w-4xl text-4xl font-black tracking-[-0.06em] text-balance md:text-6xl'>
-              {t('Plug AI into your favorite tools,')}{' '}
-              <span className='dopa-gradient-text'>
-                {t('no tech background needed')}
-              </span>
-            </h1>
-            <p className='text-muted-foreground max-w-3xl text-base leading-relaxed text-pretty md:text-lg'>
-              {t(
-                'Every tool only ever asks you for three things. Grab them below, pick your tool, and follow the steps — done in about three minutes.'
-              )}
-            </p>
-            <div className='flex flex-wrap gap-3 pt-1'>
-              <Button
-                size='lg'
-                className='dopa-press rounded-full font-bold'
-                render={<Link to='/keys' />}
-              >
-                <KeyRound className='size-4' />
-                {t('Create my key')}
-              </Button>
-            </div>
-          </header>
-
-          {/* The three essentials */}
-          <section
-            className='dopa-fade-up dopa-section-shell flex flex-col gap-5'
-            data-section='01'
-            style={{ animationDelay: '120ms' }}
-            aria-labelledby='guide-essentials'
-          >
-            <h2
-              id='guide-essentials'
-              className='text-xl font-extrabold text-balance md:text-2xl'
-            >
-              {t('The three things every tool asks for')}
-            </h2>
-            <AddressKit address={address} />
-          </section>
-
+      <section className='ci-panel' id='usecases'>
+        <div className='ci-panelBody'>
           <UseCasePicker />
+        </div>
+      </section>
 
-          {/* Tool wall */}
-          <section
-            className='dopa-section-shell flex flex-col gap-5'
-            data-section='02'
-            aria-labelledby='guide-tools'
-          >
-            <div>
-              <h2
-                id='guide-tools'
-                className='text-xl font-extrabold text-balance md:text-2xl'
-              >
-                {t('Pick your tool, follow the steps')}
-              </h2>
-              <p className='text-muted-foreground mt-1 text-sm'>
-                {t(
-                  'Click any card for step-by-step setup. Addresses in the steps are already filled in with the real address of this site.'
-                )}
-              </p>
-            </div>
-            <ToolExplorer address={address} />
-          </section>
+      <section className='ci-panel' id='tools'>
+        <header className='ci-panelHeader'>
+          <h2>{t('Pick your tool, follow the steps')}</h2>
+          <p>
+            {t(
+              'Click any card for step-by-step setup. Addresses in the steps are already filled in with the real address of this site.'
+            )}
+          </p>
+        </header>
+        <div className='ci-panelBody'>
+          <ToolExplorer
+            address={address}
+            query={props.query}
+            openToolId={props.toolId}
+          />
+        </div>
+      </section>
 
+      <section className='ci-panel' id='troubleshoot'>
+        <div className='ci-panelBody'>
           <Troubleshoot />
         </div>
-      </main>
-      <Footer />
+      </section>
+    </div>
+  )
+}
+
+export function Guide(props: GuideProps) {
+  const { t } = useTranslation()
+  const user = useAuthStore((state) => state.auth.user)
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+  const page = (
+    <TerminalPage
+      title={t('Docs')}
+      description={t(
+        'Three things to fill in, then pick a tool and follow the steps.'
+      )}
+      wide
+    >
+      <GuideBody query={props.query} toolId={props.toolId} />
+    </TerminalPage>
+  )
+
+  if (user) {
+    return <TerminalLayout>{page}</TerminalLayout>
+  }
+
+  return (
+    <PublicLayout showMainContainer={false}>
+      <div
+        className='ci-landing ci-theme'
+        data-theme={isDark ? 'dark' : 'light'}
+      >
+        <div className='ci-handoffRoot'>
+          {page}
+          <Footer />
+        </div>
+      </div>
     </PublicLayout>
   )
 }

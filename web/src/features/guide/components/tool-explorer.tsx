@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Check, Copy, Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '@/components/ui/badge'
@@ -53,25 +53,50 @@ const STATUS_META: Record<GuideTool['status'], { label: string; hue: string }> =
 
 interface ToolExplorerProps {
   address: GuideAddress
+  query?: string
+  openToolId?: string
 }
 
 /** Category-filtered wall of tool cards with a step-by-step detail dialog. */
-export function ToolExplorer({ address }: ToolExplorerProps) {
+export function ToolExplorer({
+  address,
+  query,
+  openToolId,
+}: ToolExplorerProps) {
   const { t } = useTranslation()
   const [category, setCategory] = useState<ToolCategory | 'all'>('all')
   const [active, setActive] = useState<GuideTool | null>(null)
   const { copiedText, copyToClipboard } = useCopyToClipboard()
+  const needle = query?.trim().toLowerCase() ?? ''
+
+  useEffect(() => {
+    if (!openToolId) return
+    const match = guideTools.find((tool) => tool.id === openToolId)
+    if (match) setActive(match)
+  }, [openToolId])
 
   const tools = useMemo(() => {
     const visibleTools =
       category === 'all'
         ? [...guideTools]
         : guideTools.filter((tool) => tool.category === category)
+    const filtered = needle
+      ? visibleTools.filter((tool) => {
+          const hay = [
+            tool.name,
+            t(tool.summary),
+            ...tool.steps.map((step) => t(step)),
+          ]
+            .join(' ')
+            .toLowerCase()
+          return hay.includes(needle)
+        })
+      : visibleTools
 
-    return visibleTools.sort(
+    return filtered.sort(
       (a, b) => Number(Boolean(b.recommended)) - Number(Boolean(a.recommended))
     )
-  }, [category])
+  }, [category, needle, t])
 
   return (
     <div className='flex flex-col gap-6'>
@@ -114,6 +139,10 @@ export function ToolExplorer({ address }: ToolExplorerProps) {
           </span>
         ))}
       </div>
+
+      {tools.length === 0 ? (
+        <p className='text-muted-foreground text-sm'>{t('No matching docs')}</p>
+      ) : null}
 
       {/* Tool cards */}
       <div className='dopa-bento-tools grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
