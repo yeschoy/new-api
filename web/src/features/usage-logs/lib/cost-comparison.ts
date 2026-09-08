@@ -24,27 +24,56 @@ export type LogCostComparison = {
   savings: number
 }
 
+export type LogQuotaComparison = {
+  baseQuota: number
+  chargedQuota: number
+  savedQuota: number
+}
+
+// Reconstruct the recorded model price with the group multiplier set to one.
+// Historical logs must never be repriced using today's model configuration.
+export function getLogQuotaComparison(
+  quota: number,
+  other: LogOtherData | null
+): LogQuotaComparison | null {
+  if (other?.billing_source === 'subscription') return null
+
+  const userRatio = other?.user_group_ratio
+  const groupRatio =
+    typeof userRatio === 'number' && Number.isFinite(userRatio) && userRatio > 0
+      ? userRatio
+      : other?.group_ratio
+  const feeQuota = other?.fee_quota
+  const chargedQuota =
+    typeof feeQuota === 'number' && Number.isFinite(feeQuota) && feeQuota >= 0
+      ? feeQuota
+      : quota
+
+  if (
+    typeof groupRatio !== 'number' ||
+    !Number.isFinite(groupRatio) ||
+    groupRatio <= 0 ||
+    !Number.isFinite(chargedQuota) ||
+    chargedQuota < 0
+  ) {
+    return null
+  }
+
+  const baseQuota = chargedQuota / groupRatio
+  const savedQuota = baseQuota - chargedQuota
+  if (!Number.isFinite(baseQuota) || !Number.isFinite(savedQuota)) return null
+  return { baseQuota, chargedQuota, savedQuota }
+}
+
 export function getLogCostComparison(
   quota: number,
   other: LogOtherData | null,
   rates: { priceRate: number; quotaPerUnit: number }
 ): LogCostComparison | null {
-  if (other?.billing_source === 'subscription') return null
-
-  const userRatio = Number(other?.user_group_ratio)
-  const groupRatio =
-    Number.isFinite(userRatio) && userRatio > 0
-      ? userRatio
-      : Number(other?.group_ratio)
-  const feeQuota = Number(other?.fee_quota)
-  const chargedQuota =
-    Number.isFinite(feeQuota) && feeQuota >= 0 ? feeQuota : quota
-
+  const comparison = getLogQuotaComparison(quota, other)
   if (
-    !Number.isFinite(groupRatio) ||
-    groupRatio <= 0 ||
-    !Number.isFinite(chargedQuota) ||
-    chargedQuota <= 0 ||
+    !comparison ||
+    comparison.savedQuota <= 0 ||
     !Number.isFinite(rates.priceRate) ||
     rates.priceRate <= 0 ||
     !Number.isFinite(rates.quotaPerUnit) ||
@@ -53,11 +82,12 @@ export function getLogCostComparison(
     return null
   }
 
-  const billedCredits = chargedQuota / rates.quotaPerUnit
-  const siteCost = billedCredits * rates.priceRate
-  const baseCost = (billedCredits / groupRatio) * rates.priceRate
+  const siteCost =
+    (comparison.chargedQuota / rates.quotaPerUnit) * rates.priceRate
+  const baseCost = (comparison.baseQuota / rates.quotaPerUnit) * rates.priceRate
   const savings = baseCost - siteCost
-
-  if (!Number.isFinite(savings) || savings <= 0) return null
+  if (!Number.isFinite(baseCost) || !Number.isFinite(savings) || savings <= 0) {
+    return null
+  }
   return { baseCost, siteCost, savings }
 }

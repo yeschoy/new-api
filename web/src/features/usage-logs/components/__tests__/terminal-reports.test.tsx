@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 import { useSystemConfigStore } from '@/stores/system-config-store'
@@ -31,6 +31,10 @@ const originalAdapter = api.defaults.adapter
 const originalConfig = useSystemConfigStore.getState().config
 let client: QueryClient
 let summaryFails = false
+let requestedWindow = 0
+let requestedStart = 0
+let requestOther: Record<string, unknown> = {}
+let requestType = 2
 const summary = {
   requests: 103,
   succeeded: 101,
@@ -65,6 +69,9 @@ const summary = {
 
 beforeEach(() => {
   summaryFails = false
+  requestedWindow = 0
+  requestOther = { group_ratio: 0.5 }
+  requestType = 2
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   })
@@ -89,6 +96,11 @@ beforeEach(() => {
     const url = new URL(config.url ?? '', 'http://localhost')
     let data: unknown
     if (url.pathname === '/api/log/self/summary') {
+      requestedStart = Number(config.params.start_timestamp)
+      requestedWindow =
+        Number(config.params.end_timestamp) -
+        Number(config.params.start_timestamp) +
+        1
       data = summaryFails
         ? { success: false, message: 'Report unavailable' }
         : { success: true, data: summary }
@@ -105,7 +117,7 @@ beforeEach(() => {
               id: page,
               user_id: 1,
               created_at: Math.floor(Date.now() / 1000),
-              type: 2,
+              type: requestType,
               content: '',
               model_name: page === 1 ? 'partial-stream' : 'older-request',
               quota: 100000,
@@ -114,6 +126,7 @@ beforeEach(() => {
               use_time: 4,
               is_stream: true,
               other: JSON.stringify({
+                ...requestOther,
                 stream_status: {
                   status: 'error',
                   end_error: 'upstream timeout',
@@ -129,6 +142,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   api.defaults.adapter = originalAdapter
   client.clear()
   useSystemConfigStore.setState({ config: originalConfig })
@@ -161,10 +175,73 @@ describe('terminal usage views', () => {
     const row = (await screen.findByText('partial-stream')).closest('article')
     if (!row) throw new Error('Missing request row')
     expect(within(row).getByText('Failed')).toBeVisible()
-    expect(within(row).getByText('¥1.4')).toBeVisible()
+    expect(within(row).getByText('Spend').nextElementSibling).toHaveTextContent(
+      '¥1.4'
+    )
+    expect(
+      within(row).getByText('Original price').nextElementSibling
+    ).toHaveTextContent('¥2.8')
+    expect(within(row).getByText('Saved').nextElementSibling).toHaveTextContent(
+      '¥1.4'
+    )
     await user.click(within(row).getByRole('button'))
     expect(await screen.findByText('upstream timeout')).toBeVisible()
   })
+
+  it.each([
+    ['unrecorded multiplier', {}, 2, '¥1.4', '—', 'Saved', '—'],
+    ['full price', { group_ratio: 1 }, 2, '¥1.4', '¥1.4', 'Saved', '¥0'],
+    [
+      'surcharge',
+      { group_ratio: 2 },
+      2,
+      '¥1.4',
+      '¥0.7',
+      'Above base price',
+      '¥0.7',
+    ],
+    [
+      'recorded fee',
+      { group_ratio: 0.5, fee_quota: 84000 },
+      2,
+      '¥1.176',
+      '¥2.352',
+      'Saved',
+      '¥1.176',
+    ],
+    [
+      'subscription',
+      { group_ratio: 0.5, billing_source: 'subscription' },
+      2,
+      'Subscription',
+      '—',
+      'Saved',
+      '—',
+    ],
+    ['unbilled failure', { group_ratio: 0.5 }, 5, '—', '—', 'Saved', '—'],
+  ] as const)(
+    'shows truthful prices for %s',
+    async (_name, other, type, spent, base, savedLabel, saved) => {
+      requestOther = other
+      requestType = type
+      render(
+        <QueryClientProvider client={client}>
+          <TerminalRequests />
+        </QueryClientProvider>
+      )
+      const row = (await screen.findByText('partial-stream')).closest('article')
+      if (!row) throw new Error('Missing request row')
+      expect(
+        within(row).getByText('Spend').nextElementSibling
+      ).toHaveTextContent(spent)
+      expect(
+        within(row).getByText('Original price').nextElementSibling
+      ).toHaveTextContent(base)
+      expect(
+        within(row).getByText(savedLabel).nextElementSibling
+      ).toHaveTextContent(saved)
+    }
+  )
 
   it('renders the complete daily summary instead of rebuilding it from one log page', async () => {
     render(
@@ -176,6 +253,27 @@ describe('terminal usage views', () => {
     const row = screen.getByRole('row', { name: /2026-09-08/ })
     expect(within(row).getByText('101')).toBeVisible()
     expect(within(row).getByText('¥5.6')).toBeVisible()
+    expect(requestedWindow).toBe(10 * 86400)
+    expect(
+      screen.getByText(
+        'Review the last 10 days of usage and export daily totals.'
+      )
+    ).toBeVisible()
+  })
+
+  it('keeps ten fixed-offset days when the interval crosses a daylight-saving change', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 2, 12))
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalReports />
+      </QueryClientProvider>
+    )
+    await screen.findByText('2026-09-08')
+    expect(requestedWindow).toBe(10 * 86400)
+    expect(requestedStart).toBe(
+      Date.UTC(2026, 9, 24) / 1000 + new Date().getTimezoneOffset() * 60
+    )
   })
 
   it('shows summary failures instead of a successful empty report', async () => {

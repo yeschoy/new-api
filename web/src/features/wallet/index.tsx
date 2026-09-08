@@ -352,6 +352,11 @@ export function Wallet(props: WalletProps) {
       {consoleMode !== 'developer' ? (
         <TerminalPage
           title={t('Wallet')}
+          actions={
+            <a href='#topup' className='ci-button ci-button--size-xs'>
+              {t('Top up')}
+            </a>
+          }
           description={t(
             'Balance pays for each request. Top up or paste a code to add credit.'
           )}

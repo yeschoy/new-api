@@ -84,14 +84,30 @@ func TestGetUserLogSummaryUsesRecordedRatesAndSkipsIncomparableCharges(t *testin
 }
 
 func TestGetUserLogSummaryRejectsInvalidWindows(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Log{}))
 	for _, query := range []string{
 		"", "start_timestamp=x&end_timestamp=2", "start_timestamp=2&end_timestamp=1",
+		"start_timestamp=1&end_timestamp=864001", "start_timestamp=1&end_timestamp=950400",
 		"start_timestamp=1&end_timestamp=2678401", "start_timestamp=1&end_timestamp=2&timezone_offset=841",
 	} {
 		t.Run(query, func(t *testing.T) {
 			ctx, recorder := newAuthenticatedContext(t, http.MethodGet, "/api/log/self/summary?"+query, nil, 42)
 			GetUserLogSummary(ctx)
 			assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		})
+	}
+}
+
+func TestGetUserLogSummaryAcceptsTenDayWindow(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	for _, offset := range []int{-840, 0, 480, 840} {
+		t.Run(fmt.Sprint(offset), func(t *testing.T) {
+			ctx, recorder := newAuthenticatedContext(t, http.MethodGet,
+				fmt.Sprintf("/api/log/self/summary?start_timestamp=1&end_timestamp=864000&timezone_offset=%d", offset), nil, 42)
+			GetUserLogSummary(ctx)
+			require.Equal(t, http.StatusOK, recorder.Code)
 		})
 	}
 }

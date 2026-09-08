@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 
 import { TerminalPage } from '@/components/layout/components/terminal-page'
 import { formatConsoleMoney } from '@/lib/console-money'
+import { formatQuotaWithCurrency } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
 
@@ -31,9 +32,12 @@ import { getUserLogs } from '../api'
 import { LOG_TYPE_ENUM } from '../constants'
 import { usageLogSchema, type UsageLog } from '../data/schema'
 import { useUsageSummary } from '../hooks/use-usage-summary'
+import { getLogQuotaComparison } from '../lib/cost-comparison'
 import { parseLogOther } from '../lib/format'
 
 type RequestFilter = 'all' | 'ok' | 'error'
+
+const requestCostFormat = { digitsLarge: 6, digitsSmall: 6, abbreviate: false }
 
 function isErrorLog(log: UsageLog): boolean {
   return (
@@ -148,6 +152,13 @@ export function TerminalRequests() {
       </section>
 
       <section className='ci-panel'>
+        <header className='ci-panelHeader'>
+          <p>
+            {t(
+              'Base price is the recorded model price before the group multiplier. Savings = base price − charged amount. A dash means no comparable price is available.'
+            )}
+          </p>
+        </header>
         <div className='ci-requestFilters'>
           <span>{t('Filter this page')}</span>
           {(
@@ -194,6 +205,20 @@ export function TerminalRequests() {
               const failed = isErrorLog(log)
               const reason = failed ? errorText(log) : ''
               const other = parseLogOther(log.other)
+              const comparison =
+                log.type === LOG_TYPE_ENUM.CONSUME
+                  ? getLogQuotaComparison(log.quota, other)
+                  : null
+              let chargedAmount = '—'
+              if (log.type === LOG_TYPE_ENUM.CONSUME) {
+                chargedAmount =
+                  other?.billing_source === 'subscription'
+                    ? t('Subscription')
+                    : formatQuotaWithCurrency(
+                        comparison?.chargedQuota ?? log.quota,
+                        requestCostFormat
+                      )
+              }
               const cacheRead = other?.cache_tokens || 0
               const open = openId === log.id
               return (
@@ -230,9 +255,37 @@ export function TerminalRequests() {
                       </div>
                       <div>
                         <dt>{t('Spend')}</dt>
+                        <dd>{chargedAmount}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('Original price')}</dt>
                         <dd>
-                          {log.type === LOG_TYPE_ENUM.CONSUME
-                            ? formatConsoleMoney(log.quota)
+                          {comparison
+                            ? formatQuotaWithCurrency(
+                                comparison.baseQuota,
+                                requestCostFormat
+                              )
+                            : '—'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>
+                          {comparison && comparison.savedQuota < 0
+                            ? t('Above base price')
+                            : t('Saved')}
+                        </dt>
+                        <dd
+                          className={
+                            comparison && comparison.savedQuota > 0
+                              ? 'text-success'
+                              : undefined
+                          }
+                        >
+                          {comparison
+                            ? formatQuotaWithCurrency(
+                                Math.abs(comparison.savedQuota),
+                                requestCostFormat
+                              )
                             : '—'}
                         </dd>
                       </div>

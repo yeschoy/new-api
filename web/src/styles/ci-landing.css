@@ -6211,7 +6211,7 @@ html:lang(zh-TW) .ci-finalCta h2 i {
 .ci-requestMain dl {
   display: grid;
   margin: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 .ci-requestMain dt {
@@ -6559,7 +6559,7 @@ html:lang(zh-TW) .ci-finalCta h2 i {
     display: none;
   }
   .ci-requestMain dl {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .ci-authMain {
     grid-template-columns: 1fr;

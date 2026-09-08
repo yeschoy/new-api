@@ -17,19 +17,29 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
+import utc from 'dayjs/plugin/utc'
 
 import dayjs from '@/lib/dayjs'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getUserLogSummary } from '../api'
 
-export function useUsageSummary(days: 7 | 28) {
+dayjs.extend(utc)
+
+export function useUsageSummary(days: 7 | 10) {
   const userId = useAuthStore((state) => state.auth.user?.id)
-  const start = dayjs()
+  // Match the server's fixed-offset day buckets, including across DST changes.
+  const now = dayjs()
+  const timezoneOffset = now.utcOffset()
+  const today = dayjs.utc(now.format('YYYY-MM-DD'))
+  const start = today
     .subtract(days - 1, 'day')
-    .startOf('day')
-  const end = dayjs().endOf('day')
-  const timezoneOffset = dayjs().utcOffset()
+    .subtract(timezoneOffset, 'minute')
+    .utcOffset(timezoneOffset)
+  const end = today
+    .endOf('day')
+    .subtract(timezoneOffset, 'minute')
+    .utcOffset(timezoneOffset)
   const query = useQuery({
     queryKey: [
       'terminal',

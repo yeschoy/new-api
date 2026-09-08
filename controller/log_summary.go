@@ -16,8 +16,8 @@ func GetUserLogSummary(c *gin.Context) {
 	end, endErr := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	offset, offsetErr := strconv.Atoi(c.DefaultQuery("timezone_offset", "0"))
 	if startErr != nil || endErr != nil || offsetErr != nil || start <= 0 || end < start ||
-		end-start > 30*24*60*60 || offset < -14*60 || offset > 14*60 {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid report window (maximum 30 days)"})
+		end-start >= 10*24*60*60 || offset < -14*60 || offset > 14*60 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid report window (maximum 10 days)"})
 		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)

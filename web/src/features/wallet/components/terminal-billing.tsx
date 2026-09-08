@@ -30,7 +30,7 @@ type TerminalBillingProps = {
 
 export function TerminalBilling(props: TerminalBillingProps) {
   const { t } = useTranslation()
-  const summary = useUsageSummary(28)
+  const summary = useUsageSummary(10)
   const saved = summary.data?.saved_quota ?? 0
   const billed = summary.data?.quota ?? 0
   const percent =
@@ -46,14 +46,14 @@ export function TerminalBilling(props: TerminalBillingProps) {
       <section className='ci-panel'>
         <header className='ci-panelHeader'>
           <h2>{t('How much you saved')}</h2>
-          <p>{t('Last 28 days · recorded request rates')}</p>
+          <p>{t('Last 10 days · recorded request rates')}</p>
         </header>
         <div
           className='ci-statGrid'
           style={{ margin: 0, border: 0, borderRadius: 0 }}
         >
           <article>
-            <span>{t('Saved in the last 28 days')}</span>
+            <span>{t('Saved in the last 10 days')}</span>
             <strong className='is-saved'>
               {summary.data ? formatConsoleMoney(saved) : '—'}
             </strong>

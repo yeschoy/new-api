@@ -26,7 +26,7 @@ import { buildUsageReportCsv } from '../lib/report-export'
 
 export function TerminalReports() {
   const { t } = useTranslation()
-  const summary = useUsageSummary(28)
+  const summary = useUsageSummary(10)
   const data = summary.data
   const byDay = data?.daily ?? []
 
@@ -46,7 +46,7 @@ export function TerminalReports() {
     <TerminalPage
       title={t('Reports')}
       description={t(
-        'Review the last 28 days of usage and export daily totals.'
+        'Review the last 10 days of usage and export daily totals.'
       )}
       actions={
         <button

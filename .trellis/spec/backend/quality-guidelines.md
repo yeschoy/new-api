@@ -71,7 +71,7 @@ Changes to easy-console key creation, request history or usage/savings reporting
 ### 4. Validation & Error Matrix
 | Condition | Result |
 | --- | --- |
-| Missing/malformed bounds, nonpositive start, reversed interval, interval > 30 days, offset outside -840..840 minutes | HTTP 400 |
+| Missing/malformed bounds, nonpositive start, reversed interval, inclusive interval > 10 days, offset outside -840..840 minutes | HTTP 400 |
 | Database failure or 15-second request deadline | Error response; never a successful zero report |
 | More than 100 logs in window | All rows contribute to summary |
 | type=2 and stream_status.status=error | Failed request plus its charged quota |

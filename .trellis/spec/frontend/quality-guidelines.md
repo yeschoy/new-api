@@ -111,7 +111,8 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - SavingsModel quote numbers already incorporate the recharge price. `formatPerMillionTokens` formats that local amount without applying another USD exchange conversion.
 - `getFullApiKey(id)` reveals only through the dedicated endpoint, rejects masked results and normalizes the sk- prefix. Successful creation must refresh keys even when reveal fails.
 - `revokeAllApiKeys()` collects all IDs before deleting bounded batches and verifies the final list is empty. Partial/error outcomes refresh the list and never show an all-revoked success.
-- `useUsageSummary(7|28)` uses the authenticated complete summary. Requests keeps pagination; page-only filters are labeled. Home/wallet savings explicitly say 28 days.
+- `useUsageSummary(7|10)` uses the authenticated complete summary. Requests keeps pagination; page-only filters are labeled. Home/wallet savings explicitly say 10 days. All three views share the same user/date/offset query cache; use a fixed current UTC offset so ten daily buckets stay within the API limit across DST changes.
+- Request rows compare recorded charged quota against the same price with group multiplier 1 via `getLogQuotaComparison`. Use the logged positive user override before group ratio; preserve zero fees, exclude subscription cash comparisons, and show an unavailable mark for missing/invalid rates. Show above-base charges as a surcharge, not savings.
 - `buildUsageReportCsv(rows)` exports numeric display amounts with a currency unit, or explicitly labeled raw quota in tokens mode.
 
 ### Validation & Error Matrix

@@ -37,7 +37,7 @@ export function TerminalHome() {
   const clipboard = useCopyToClipboard({ notify: false })
   const remainQuota = Number(user?.quota ?? 0)
   const requestCount = Number(user?.request_count ?? 0)
-  const summary = useUsageSummary(28)
+  const summary = useUsageSummary(10)
 
   const keysQuery = useQuery({
     queryKey: ['terminal', 'home', 'keys'],
@@ -164,75 +164,58 @@ export function TerminalHome() {
           <strong className='is-saved'>
             {summary.data ? formatConsoleMoney(summary.data.saved_quota) : '—'}
           </strong>
-          <small>{t('Last 28 days · recorded request rates')}</small>
+          <small>{t('Last 10 days · recorded request rates')}</small>
         </article>
       </section>
 
-      <div className='ci-split'>
-        <section className='ci-panel'>
-          <header className='ci-panelHeader'>
-            <h2>{t('Top techniques')}</h2>
-            <p>
-              {t(
-                'This gateway does not attribute per-request token optimizations.'
-              )}
-            </p>
-          </header>
-          <div className='ci-empty'>
-            <p>{t('No optimization breakdown is available after requests.')}</p>
-          </div>
-        </section>
-        <section className='ci-panel'>
-          <header className='ci-panelHeader'>
-            <h2>{t('Connect your client')}</h2>
-            <p>
-              {t(
-                'Drop-in OpenAI-compatible endpoint. Swap the base URL and go.'
-              )}
-            </p>
-          </header>
-          <div className='ci-panelBody'>
-            <label className='ci-field'>
-              <span>{t('API key')}</span>
-              {hasKey ? (
-                <Link
-                  to='/keys'
-                  className='ci-button ci-button--outline ci-button--size-xs'
-                >
-                  {t('Manage keys')}
-                </Link>
-              ) : (
-                <Link to='/keys' className='ci-button ci-button--size-xs'>
-                  <KeyRound size={14} />
-                  {t('Create your first key')}
-                </Link>
-              )}
-            </label>
-            <label className='ci-field'>
-              <span>{t('Base URL')}</span>
-              <div className='ci-inlineCopy'>
-                <code>{address.baseUrl}</code>
-                <button
-                  type='button'
-                  className='ci-button ci-button--ghost ci-button--size-icon-xs'
-                  onClick={() => {
-                    void clipboard.copyToClipboard(address.baseUrl)
-                  }}
-                >
-                  <Copy size={14} />
-                </button>
-              </div>
-            </label>
-            <Link
-              to='/guide'
-              className='ci-button ci-button--outline ci-button--size-xs'
-              style={{ marginTop: 12 }}
-            >
-              {t('Read the docs')}
-            </Link>
-          </div>
-        </section>
-      </div>
+      <section className='ci-panel'>
+        <header className='ci-panelHeader'>
+          <h2>{t('Connect your client')}</h2>
+          <p>
+            {t('Drop-in OpenAI-compatible endpoint. Swap the base URL and go.')}
+          </p>
+        </header>
+        <div className='ci-panelBody'>
+          <label className='ci-field'>
+            <span>{t('API key')}</span>
+            {hasKey ? (
+              <Link
+                to='/keys'
+                className='ci-button ci-button--outline ci-button--size-xs'
+              >
+                {t('Manage keys')}
+              </Link>
+            ) : (
+              <Link to='/keys' className='ci-button ci-button--size-xs'>
+                <KeyRound size={14} />
+                {t('Create your first key')}
+              </Link>
+            )}
+          </label>
+          <label className='ci-field'>
+            <span>{t('Base URL')}</span>
+            <div className='ci-inlineCopy'>
+              <code>{address.baseUrl}</code>
+              <button
+                type='button'
+                className='ci-button ci-button--ghost ci-button--size-icon-xs'
+                onClick={() => {
+                  void clipboard.copyToClipboard(address.baseUrl)
+                }}
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+          </label>
+          <Link
+            to='/guide'
+            className='ci-button ci-button--outline ci-button--size-xs'
+            style={{ marginTop: 12 }}
+          >
+            {t('Read the docs')}
+          </Link>
+        </div>
+      </section>
     </TerminalPage>
   )
 }
