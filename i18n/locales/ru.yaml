@@ -1,0 +1,7 @@
+# OAuth client browser authorization errors
+oauth_client.authorization_error_title: "Ошибка авторизации"
+oauth_client.invalid_request: "Недействительный запрос авторизации. Вернитесь в настольное приложение и запустите авторизацию снова."
+oauth_client.invalid_client: "Недействительный клиент OAuth."
+oauth_client.unsupported_response_type: "Поддерживается только тип ответа code."
+oauth_client.invalid_scope: "Запрошены недопустимые разрешения."
+oauth_client.server_error: "Сервер авторизации не смог обработать запрос. Повторите попытку позже."

@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 const (
@@ -58,6 +59,10 @@ func CreateLoginSessionAtAuthVersion(userID int, expectedAuthVersion int64, logi
 }
 
 func createLoginSession(userID int, expectedAuthVersion int64, loginMethod, ip, userAgent string) (*AuthBundle, error) {
+	loginMethod = strings.TrimSpace(loginMethod)
+	if loginMethod == model.UserSessionLoginMethodOAuthClient {
+		return nil, ErrLoginSessionMethod
+	}
 	user, err := model.GetUserCache(userID)
 	if err != nil {
 		return nil, err
@@ -69,14 +74,14 @@ func createLoginSession(userID int, expectedAuthVersion int64, loginMethod, ip, 
 		return nil, ErrLoginSessionRevoked
 	}
 	now := time.Now().Unix()
-	activeCount, err := model.CountActiveUserSessions(userID, now)
+	activeCount, err := model.CountActiveNonOAuthUserSessions(userID, now)
 	if err != nil {
 		return nil, err
 	}
 	if activeCount >= int64(common.UserSessionActiveLimit) {
 		return nil, model.ErrUserSessionLimit
 	}
-	issuanceCount, err := model.CountUserSessionsCreatedSince(userID, now-common.UserSessionIssuanceWindowSeconds)
+	issuanceCount, err := model.CountNonOAuthUserSessionsCreatedSince(userID, now-common.UserSessionIssuanceWindowSeconds)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +99,7 @@ func createLoginSession(userID int, expectedAuthVersion int64, loginMethod, ip, 
 		UserAuthVersion: user.AuthVersion,
 		Status:          model.UserSessionStatusActive,
 		RefreshHash:     hashRefreshSecret(refreshSecret),
-		LoginMethod:     strings.TrimSpace(loginMethod),
+		LoginMethod:     loginMethod,
 		IP:              truncateAuthMetadata(ip, 64),
 		UserAgent:       truncateAuthMetadata(userAgent, 512),
 		CreatedAt:       now,
@@ -219,68 +224,75 @@ func RefreshLoginSessionForMethod(rawRefreshToken, expectedSID, expectedLoginMet
 }
 
 func refreshLoginSession(rawRefreshToken, expectedSID, expectedLoginMethod, ip, userAgent string) (*AuthBundle, *model.User, error) {
+	rotated, user, nextRefreshToken, err := rotateLoginSessionRefresh(rawRefreshToken, expectedSID, expectedLoginMethod, ip, userAgent, RefreshReplayWindow)
+	if err != nil {
+		return nil, nil, err
+	}
+	bundle, err := issueAuthBundle(rotated, nextRefreshToken, true)
+	if err != nil {
+		return nil, nil, err
+	}
+	return bundle, user, nil
+}
+
+func rotateLoginSessionRefresh(rawRefreshToken, expectedSID, expectedLoginMethod, ip, userAgent string, replayWindow time.Duration) (*model.UserSession, *model.User, string, error) {
 	sid, secret, ok := splitRefreshToken(rawRefreshToken)
 	if !ok {
-		return nil, nil, ErrRefreshTokenInvalid
+		return nil, nil, "", ErrRefreshTokenInvalid
 	}
 	if expectedSID = strings.TrimSpace(expectedSID); expectedSID != "" && expectedSID != sid {
-		return nil, nil, ErrLoginSessionMismatch
+		return nil, nil, "", ErrLoginSessionMismatch
 	}
 	session, err := model.GetUserSessionCached(sid)
 	if err != nil {
 		if errors.Is(err, model.ErrUserSessionInactive) {
-			return nil, nil, ErrLoginSessionRevoked
+			return nil, nil, "", ErrLoginSessionRevoked
 		}
-		return nil, nil, ErrRefreshTokenInvalid
+		return nil, nil, "", ErrRefreshTokenInvalid
 	}
 	if session.Status != model.UserSessionStatusActive || session.RevokedAt != 0 || session.ExpiresAt <= time.Now().Unix() {
-		return nil, nil, ErrLoginSessionRevoked
+		return nil, nil, "", ErrLoginSessionRevoked
 	}
 	if expectedLoginMethod != "" && session.LoginMethod != expectedLoginMethod {
-		return nil, nil, ErrLoginSessionMethod
+		return nil, nil, "", ErrLoginSessionMethod
+	}
+	if expectedLoginMethod == "" && session.LoginMethod == model.UserSessionLoginMethodOAuthClient {
+		return nil, nil, "", ErrLoginSessionMethod
 	}
 	userCache, err := model.GetUserCache(session.UserID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	currentUser, err := model.GetUserById(session.UserID, false)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	if userCache.Status != common.UserStatusEnabled || userCache.AuthVersion != session.UserAuthVersion ||
 		currentUser.Status != common.UserStatusEnabled || currentUser.AuthVersion != session.UserAuthVersion {
 		_, _ = model.RevokeUserSession(session.UserID, session.SID, "user_security_changed")
-		return nil, nil, ErrLoginSessionRevoked
+		return nil, nil, "", ErrLoginSessionRevoked
 	}
 	nextSecret := deriveNextRefreshSecret(sid, secret)
-	rotated, err := model.RotateUserSessionRefresh(session.UserID, sid, hashRefreshSecret(secret), hashRefreshSecret(nextSecret), time.Now().Unix(), RefreshReplayWindow)
+	rotated, err := model.RotateUserSessionRefresh(session.UserID, sid, hashRefreshSecret(secret), hashRefreshSecret(nextSecret), time.Now().Unix(), replayWindow)
 	if err != nil {
 		if errors.Is(err, model.ErrUserSessionRefreshRace) && rotated != nil &&
 			hashRefreshSecret(nextSecret) == rotated.RefreshHash {
-			bundle, issueErr := issueAuthBundle(rotated, sid+"."+nextSecret, true)
-			if issueErr != nil {
-				return nil, nil, issueErr
-			}
-			return bundle, currentUser, nil
+			return rotated, currentUser, sid + "." + nextSecret, nil
 		}
 		if errors.Is(err, model.ErrUserSessionRefreshReuse) {
-			return nil, nil, ErrLoginSessionRevoked
+			return nil, nil, "", ErrLoginSessionRevoked
 		}
 		if errors.Is(err, model.ErrUserSessionRefreshInvalid) {
-			return nil, nil, ErrRefreshTokenInvalid
+			return nil, nil, "", ErrRefreshTokenInvalid
 		}
 		if errors.Is(err, model.ErrUserSessionRefreshRace) {
-			return nil, nil, ErrRefreshRace
+			return nil, nil, "", ErrRefreshRace
 		}
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	rotated.IP = truncateAuthMetadata(ip, 64)
 	rotated.UserAgent = truncateAuthMetadata(userAgent, 512)
-	bundle, err := issueAuthBundle(rotated, sid+"."+nextSecret, true)
-	if err != nil {
-		return nil, nil, err
-	}
-	return bundle, currentUser, nil
+	return rotated, currentUser, sid + "." + nextSecret, nil
 }
 
 func RevokeByRefreshToken(rawRefreshToken, expectedSID, reason string) error {
@@ -291,7 +303,17 @@ func RevokeByRefreshToken(rawRefreshToken, expectedSID, reason string) error {
 	if expectedSID = strings.TrimSpace(expectedSID); expectedSID != "" && expectedSID != sid {
 		return ErrLoginSessionMismatch
 	}
-	_, err := model.RevokeUserSessionByRefreshHash(sid, hashRefreshSecret(secret), reason)
+	session, err := model.GetUserSessionBySID(sid)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if session.LoginMethod == model.UserSessionLoginMethodOAuthClient || session.LoginMethod == DesktopLoginMethod {
+		return ErrLoginSessionMethod
+	}
+	_, err = model.RevokeUserSessionByRefreshHash(sid, hashRefreshSecret(secret), reason)
 	return err
 }
 

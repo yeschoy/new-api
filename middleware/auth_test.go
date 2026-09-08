@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +30,7 @@ func setupDashboardAuthMiddlewareTest(t *testing.T) {
 	previousSecret := common.SessionSecret
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.OAuthClientSession{}, &model.Token{}))
 	model.DB = db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	common.RedisEnabled = false
@@ -45,8 +46,8 @@ func setupDashboardAuthMiddlewareTest(t *testing.T) {
 func issueExpiredDashboardAccessToken(t *testing.T, identity service.AuthIdentity) string {
 	t.Helper()
 	claims := jwt.MapClaims{
-		"iss":       "new-api",
-		"aud":       []string{"new-api-dashboard"},
+		"iss":       "yeschoy-api",
+		"aud":       []string{"yeschoy-api-dashboard"},
 		"sub":       fmt.Sprintf("%d", identity.UserID),
 		"token_use": "access",
 		"sid":       identity.SessionID,
@@ -132,6 +133,106 @@ func TestUserAuthNeverFallsBackForRecognizedInvalidInternalJWT(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, response.Code)
 	assert.Contains(t, response.Body.String(), "AUTH_UNAUTHORIZED")
+}
+
+func createMiddlewareOAuthAccessToken(t *testing.T, scopes []string) (*model.User, string) {
+	t.Helper()
+	user := createMiddlewarePATUser(t, "oauth-client-middleware-user", "oauth-client-middleware-pat")
+	now := time.Now().Unix()
+	session := &model.UserSession{
+		SID:             "oauth-client-middleware-session",
+		UserID:          user.Id,
+		Version:         1,
+		UserAuthVersion: user.AuthVersion,
+		Status:          model.UserSessionStatusActive,
+		RefreshHash:     "oauth-client-middleware-refresh",
+		LoginMethod:     model.UserSessionLoginMethodOAuthClient,
+		CreatedAt:       now,
+		LastActiveAt:    now,
+		ExpiresAt:       now + 3600,
+	}
+	require.NoError(t, model.CreateUserSession(session))
+	require.NoError(t, model.DB.Create(&model.OAuthClientSession{
+		SessionID: session.SID,
+		UserID:    user.Id,
+		ClientID:  service.OAuthClientID,
+		Scopes:    strings.Join(scopes, " "),
+		CreatedAt: now,
+	}).Error)
+	token, _, err := service.IssueOAuthAccessToken(service.OAuthAccessIdentity{
+		AuthIdentity: service.AuthIdentity{
+			UserID:          user.Id,
+			SessionID:       session.SID,
+			UserAuthVersion: session.UserAuthVersion,
+			SessionVersion:  session.Version,
+		},
+		ClientID: service.OAuthClientID,
+		Scopes:   scopes,
+	}, session.ExpiresAt)
+	require.NoError(t, err)
+	return user, token
+}
+
+func TestOAuthClientAuthAcceptsOnlyOAuthTokenWithRequiredScope(t *testing.T) {
+	setupDashboardAuthMiddlewareTest(t)
+	user, oauthToken := createMiddlewareOAuthAccessToken(t, []string{"profile"})
+	patUser := createMiddlewarePATUser(t, "oauth-client-pat-user", "oauth-client-pat")
+
+	router := gin.New()
+	router.GET("/profile", OAuthClientAuth("profile"), func(c *gin.Context) {
+		identity, ok := GetOAuthClientIdentity(c)
+		require.True(t, ok)
+		c.JSON(http.StatusOK, gin.H{"user_id": identity.UserID, "session_id": identity.SessionID})
+	})
+	router.GET("/sessions", OAuthClientAuth("sessions"), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	router.GET("/dashboard", UserAuth(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	router.GET("/token-or-user", TokenOrUserAuth(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	router.GET("/relay", TokenAuth(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	profileRequest := httptest.NewRequest(http.MethodGet, "/profile", nil)
+	profileRequest.Header.Set("Authorization", "Bearer "+oauthToken)
+	profileResponse := httptest.NewRecorder()
+	router.ServeHTTP(profileResponse, profileRequest)
+	assert.Equal(t, http.StatusOK, profileResponse.Code)
+	assert.Contains(t, profileResponse.Body.String(), fmt.Sprintf(`"user_id":%d`, user.Id))
+
+	sessionsRequest := httptest.NewRequest(http.MethodGet, "/sessions", nil)
+	sessionsRequest.Header.Set("Authorization", "Bearer "+oauthToken)
+	sessionsResponse := httptest.NewRecorder()
+	router.ServeHTTP(sessionsResponse, sessionsRequest)
+	assert.Equal(t, http.StatusForbidden, sessionsResponse.Code)
+	assert.Contains(t, sessionsResponse.Body.String(), `"error":"insufficient_scope"`)
+
+	patRequest := httptest.NewRequest(http.MethodGet, "/profile", nil)
+	patRequest.Header.Set("Authorization", "Bearer "+patUser.GetAccessToken())
+	patResponse := httptest.NewRecorder()
+	router.ServeHTTP(patResponse, patRequest)
+	assert.Equal(t, http.StatusUnauthorized, patResponse.Code)
+	assert.Contains(t, patResponse.Body.String(), `"error":"invalid_token"`)
+
+	dashboardRequest := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	dashboardRequest.Header.Set("Authorization", "Bearer "+oauthToken)
+	dashboardResponse := httptest.NewRecorder()
+	router.ServeHTTP(dashboardResponse, dashboardRequest)
+	assert.Equal(t, http.StatusUnauthorized, dashboardResponse.Code)
+
+	oauthIdentity, err := service.ParseOAuthAccessToken(oauthToken)
+	require.NoError(t, err)
+	wrongAudienceToken, _, err := service.IssueAccessToken(oauthIdentity.AuthIdentity)
+	require.NoError(t, err)
+	wrongAudienceRequest := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	wrongAudienceRequest.Header.Set("Authorization", "Bearer "+wrongAudienceToken)
+	wrongAudienceResponse := httptest.NewRecorder()
+	router.ServeHTTP(wrongAudienceResponse, wrongAudienceRequest)
+	assert.Equal(t, http.StatusUnauthorized, wrongAudienceResponse.Code)
+
+	for _, path := range []string{"/token-or-user", "/relay"} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Header.Set("Authorization", "Bearer "+oauthToken)
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		assert.Equal(t, http.StatusUnauthorized, response.Code, path)
+	}
 }
 
 func TestDesktopSessionUsesClosedDashboardRouteScope(t *testing.T) {

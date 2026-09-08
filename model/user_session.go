@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	UserSessionStatusActive   = "active"
-	UserSessionStatusRevoking = "revoking"
-	UserSessionStatusRevoked  = "revoked"
+	UserSessionStatusActive           = "active"
+	UserSessionStatusRevoking         = "revoking"
+	UserSessionStatusRevoked          = "revoked"
+	UserSessionLoginMethodOAuthClient = "oauth_client"
 
 	userSessionCacheSchema      = 1
 	userSessionListLimit        = 100
@@ -131,8 +132,27 @@ func userSessionCacheDeadline() time.Time {
 }
 
 func CreateUserSession(session *UserSession) error {
+	cacheDeadline := userSessionCacheDeadline()
+	if err := CreateUserSessionWithTx(DB, session); err != nil {
+		return err
+	}
+	if err := writeUserSessionCache(session.cacheEntry(), cacheDeadline); err != nil {
+		if errors.Is(err, errUserSessionCacheObservationStale) {
+			return confirmUserSessionActiveSnapshot(session)
+		}
+		if errors.Is(err, ErrUserSessionInactive) {
+			return err
+		}
+		common.SysLog("failed to populate newly created user session cache: " + err.Error())
+	}
+	return nil
+}
+
+// CreateUserSessionWithTx validates and inserts a Session in the caller's
+// transaction. Cache publication is intentionally left until after commit.
+func CreateUserSessionWithTx(tx *gorm.DB, session *UserSession) error {
 	now := time.Now().Unix()
-	if session == nil || session.SID == "" || session.UserID <= 0 || session.UserAuthVersion <= 0 || session.RefreshHash == "" || session.ExpiresAt <= now {
+	if tx == nil || session == nil || session.SID == "" || session.UserID <= 0 || session.UserAuthVersion <= 0 || session.RefreshHash == "" || session.ExpiresAt <= now {
 		return ErrUserSessionInvalid
 	}
 	if session.Version <= 0 {
@@ -150,20 +170,7 @@ func CreateUserSession(session *UserSession) error {
 	if session.CreatedAt == 0 {
 		session.CreatedAt = now
 	}
-	cacheDeadline := userSessionCacheDeadline()
-	if err := DB.Create(session).Error; err != nil {
-		return err
-	}
-	if err := writeUserSessionCache(session.cacheEntry(), cacheDeadline); err != nil {
-		if errors.Is(err, errUserSessionCacheObservationStale) {
-			return confirmUserSessionActiveSnapshot(session)
-		}
-		if errors.Is(err, ErrUserSessionInactive) {
-			return err
-		}
-		common.SysLog("failed to populate newly created user session cache: " + err.Error())
-	}
-	return nil
+	return tx.Create(session).Error
 }
 
 func CountActiveUserSessions(userID int, now int64) (int64, error) {
@@ -176,6 +183,20 @@ func CountActiveUserSessions(userID int, now int64) (int64, error) {
 	var count int64
 	err := DB.Model(&UserSession{}).
 		Where("user_id = ? AND status = ? AND expires_at > ?", userID, UserSessionStatusActive, now).
+		Count(&count).Error
+	return count, err
+}
+
+func CountActiveNonOAuthUserSessions(userID int, now int64) (int64, error) {
+	if userID <= 0 {
+		return 0, ErrUserSessionInvalid
+	}
+	if now <= 0 {
+		now = time.Now().Unix()
+	}
+	var count int64
+	err := DB.Model(&UserSession{}).
+		Where("user_id = ? AND status = ? AND expires_at > ? AND login_method <> ?", userID, UserSessionStatusActive, now, UserSessionLoginMethodOAuthClient).
 		Count(&count).Error
 	return count, err
 }
@@ -195,6 +216,20 @@ func CountUserSessionsCreatedSince(userID int, createdAfter int64) (int64, error
 	return count, err
 }
 
+func CountNonOAuthUserSessionsCreatedSince(userID int, createdAfter int64) (int64, error) {
+	if userID < 0 || createdAfter <= 0 {
+		return 0, ErrUserSessionInvalid
+	}
+	query := DB.Model(&UserSession{}).
+		Where("created_at > ? AND login_method <> ?", createdAfter, UserSessionLoginMethodOAuthClient)
+	if userID > 0 {
+		query = query.Where("user_id = ?", userID)
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count, err
+}
+
 func GetUserSessionBySID(sid string) (*UserSession, error) {
 	if sid == "" {
 		return nil, ErrUserSessionInvalid
@@ -204,6 +239,22 @@ func GetUserSessionBySID(sid string) (*UserSession, error) {
 		return nil, err
 	}
 	return &session, nil
+}
+
+func TouchUserSessionLastActive(userID int, sid string, now int64) error {
+	if userID <= 0 || sid == "" {
+		return ErrUserSessionInvalid
+	}
+	if now <= 0 {
+		now = time.Now().Unix()
+	}
+	result := DB.Model(&UserSession{}).
+		Where("user_id = ? AND sid = ? AND status = ? AND revoked_at = ? AND expires_at > ?", userID, sid, UserSessionStatusActive, 0, now).
+		Update("last_active_at", now)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
 }
 
 // GetUserSessionCached validates cached state first and falls back to the
@@ -506,7 +557,7 @@ func RotateUserSessionRefresh(userID int, sid, presentedHash, nextHash string, n
 		if session.PreviousRefreshHash == "" || !hmac.Equal([]byte(session.PreviousRefreshHash), []byte(presentedHash)) {
 			return nil, ErrUserSessionRefreshInvalid
 		}
-		if now <= session.PreviousValidUntil {
+		if graceSeconds > 0 && now <= session.PreviousValidUntil {
 			return &session, ErrUserSessionRefreshRace
 		}
 

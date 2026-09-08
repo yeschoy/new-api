@@ -1,0 +1,7 @@
+# OAuth client browser authorization errors
+oauth_client.authorization_error_title: "Erreur d’autorisation"
+oauth_client.invalid_request: "La demande d’autorisation est invalide. Revenez à l’application de bureau et relancez l’autorisation."
+oauth_client.invalid_client: "Le client OAuth est invalide."
+oauth_client.unsupported_response_type: "Seul le type de réponse code est pris en charge."
+oauth_client.invalid_scope: "Les autorisations demandées sont invalides."
+oauth_client.server_error: "Le serveur d’autorisation n’a pas pu traiter la demande. Réessayez plus tard."

@@ -22,6 +22,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
 | [Registration login](../backend/registration-login.md) | Auth-bundle validation, automatic sign-in and registration-only fallback | Implemented |
 | [Custom-domain callbacks](../backend/custom-domain-callbacks.md) | Cross-layer OAuth bridge and return actions | Implemented |
+| [OAuth client PKCE](../backend/oauth-client-pkce.md) | Browser consent page, scope display, loopback navigation, and cross-layer OAuth contracts | Implemented |
 
 ---
 

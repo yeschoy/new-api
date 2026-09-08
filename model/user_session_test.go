@@ -308,6 +308,39 @@ func TestUserSessionPreviousRefreshHashNormalizesLegacyPadding(t *testing.T) {
 	assert.True(t, revoked, "refresh-cookie logout must accept a legacy CHAR-padded previous digest inside its grace window")
 }
 
+func TestUserSessionZeroGraceRefreshReuseRevokesSession(t *testing.T) {
+	setupUserSessionTest(t)
+	now := time.Now().Unix()
+	session := newTestUserSession("strict-refresh-session", 1210, now)
+	session.RefreshHash = "current-refresh-hash"
+	require.NoError(t, CreateUserSession(session))
+
+	_, err := RotateUserSessionRefresh(
+		session.UserID,
+		session.SID,
+		"current-refresh-hash",
+		"next-refresh-hash",
+		now,
+		0,
+	)
+	require.NoError(t, err)
+
+	_, err = RotateUserSessionRefresh(
+		session.UserID,
+		session.SID,
+		"current-refresh-hash",
+		"another-refresh-hash",
+		now,
+		0,
+	)
+	assert.ErrorIs(t, err, ErrUserSessionRefreshReuse)
+
+	stored, err := GetUserSessionBySID(session.SID)
+	require.NoError(t, err)
+	assert.Equal(t, UserSessionStatusRevoked, stored.Status)
+	assert.Equal(t, "refresh_reuse", stored.RevokedReason)
+}
+
 func TestUserSessionCacheExcludesRefreshDigests(t *testing.T) {
 	setupUserSessionTest(t)
 	useUserCacheMiniRedis(t)

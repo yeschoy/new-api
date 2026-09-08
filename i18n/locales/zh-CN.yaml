@@ -1,6 +1,14 @@
 # Chinese (Simplified) translations
 # 中文（简体）翻译文件
 
+# OAuth client browser authorization errors
+oauth_client.authorization_error_title: "授权错误"
+oauth_client.invalid_request: "授权请求无效。请返回桌面客户端并重新发起授权。"
+oauth_client.invalid_client: "OAuth 客户端无效。"
+oauth_client.unsupported_response_type: "仅支持 code 响应类型。"
+oauth_client.invalid_scope: "申请的权限无效。"
+oauth_client.server_error: "授权服务器无法处理此请求，请稍后重试。"
+
 # Common messages
 common.invalid_params: "无效的参数"
 common.database_error: "数据库出错，请联系管理员"

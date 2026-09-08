@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
@@ -36,23 +37,33 @@ func SetUpLogger(server *gin.Engine) {
 			param.Latency,
 			param.ClientIP,
 			param.Method,
-			redactCustomDomainCallbackLogPath(param.Path),
+			redactSensitiveLogPath(param.Path),
 		)
 	}))
 }
 
-func redactCustomDomainCallbackLogPath(rawPath string) string {
+func redactSensitiveLogPath(rawPath string) string {
 	parsed, err := url.ParseRequestURI(rawPath)
 	if err != nil {
+		if queryIndex := strings.IndexByte(rawPath, '?'); queryIndex >= 0 {
+			return rawPath[:queryIndex] + "?[REDACTED]"
+		}
 		return rawPath
 	}
-	switch parsed.Path {
-	case "/api/stripe/return", "/api/user/epay/return", "/api/reset_password/return", "/user/reset":
+	path := strings.TrimRight(parsed.Path, "/")
+	var sensitiveKeys []string
+	switch {
+	case path == "/api/stripe/return", path == "/api/user/epay/return", path == "/api/reset_password/return", path == "/user/reset":
+		sensitiveKeys = []string{"trade_no", "out_trade_no", "sign", "email", "token", "context"}
+	case path == "/api/oauth", strings.HasPrefix(path, "/api/oauth/"), path == "/oauth/authorize":
+		sensitiveKeys = []string{"redirect_uri", "state", "code_challenge", "request", "code", "code_verifier", "access_token", "refresh_token", "token"}
+	case path == "/sign-in":
+		sensitiveKeys = []string{"redirect"}
 	default:
 		return rawPath
 	}
 	query := parsed.Query()
-	for _, key := range []string{"trade_no", "out_trade_no", "sign", "email", "token", "context"} {
+	for _, key := range sensitiveKeys {
 		if query.Has(key) {
 			query.Set(key, "[REDACTED]")
 		}

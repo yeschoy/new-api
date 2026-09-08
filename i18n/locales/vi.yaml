@@ -1,0 +1,7 @@
+# OAuth client browser authorization errors
+oauth_client.authorization_error_title: "Lỗi ủy quyền"
+oauth_client.invalid_request: "Yêu cầu ủy quyền không hợp lệ. Quay lại ứng dụng máy tính và bắt đầu ủy quyền lại."
+oauth_client.invalid_client: "Ứng dụng OAuth không hợp lệ."
+oauth_client.unsupported_response_type: "Chỉ hỗ trợ kiểu phản hồi code."
+oauth_client.invalid_scope: "Quyền được yêu cầu không hợp lệ."
+oauth_client.server_error: "Máy chủ ủy quyền không thể xử lý yêu cầu. Vui lòng thử lại sau."

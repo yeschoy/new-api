@@ -1,5 +1,13 @@
 # English translations
 
+# OAuth client browser authorization errors
+oauth_client.authorization_error_title: "Authorization error"
+oauth_client.invalid_request: "The authorization request is invalid. Return to the desktop app and start authorization again."
+oauth_client.invalid_client: "The OAuth client is invalid."
+oauth_client.unsupported_response_type: "Only the code response type is supported."
+oauth_client.invalid_scope: "The requested scope is invalid."
+oauth_client.server_error: "The authorization server could not process the request. Please try again later."
+
 # Common messages
 common.invalid_params: "Invalid parameters"
 common.database_error: "Database error, please contact the administrator"
