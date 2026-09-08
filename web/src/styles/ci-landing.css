@@ -60,7 +60,8 @@ For commercial licensing, please contact support@quantumnous.com
 }
 @layer utilities;
 .ci-landing,
-.ci-theme {
+.ci-theme,
+:where(body:has(.dopa-console--developer):not([data-theme-preset])) {
   color-scheme: light;
   --ci-observed-canvas: #fbfbf8;
   --ci-observed-ink: #040d10;
@@ -307,7 +308,9 @@ For commercial licensing, please contact support@quantumnous.com
 .dark .ci-landing,
 .ci-landing[data-theme='dark'],
 .dark .ci-landing,
-[data-theme='dark'] .ci-theme {
+[data-theme='dark'] .ci-theme,
+:is(.dark, [data-theme='dark'])
+  :where(body:has(.dopa-console--developer):not([data-theme-preset])) {
   color-scheme: dark;
   --ci-color-background: var(--ci-neutral-950);
   --ci-color-canvas: var(--ci-color-background);
@@ -377,7 +380,9 @@ For commercial licensing, please contact support@quantumnous.com
 .dark .ci-landing,
 .ci-landing[data-theme='dark'],
 .dark .ci-landing,
-[data-theme='dark'] .ci-theme {
+[data-theme='dark'] .ci-theme,
+:is(.dark, [data-theme='dark'])
+  :where(body:has(.dopa-console--developer):not([data-theme-preset])) {
   color-scheme: dark;
   --ci-color-background: var(--ci-neutral-950);
   --ci-color-canvas: var(--ci-color-background);
