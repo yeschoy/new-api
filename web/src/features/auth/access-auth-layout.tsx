@@ -34,57 +34,6 @@ import {
 import { usePricingData } from '@/features/pricing/hooks'
 import { PRODUCT_NAME } from '@/lib/product-brand'
 
-const FALLBACK_TICKER: TickerRow[] = [
-  {
-    name: 'gpt-5.6-luna',
-    vendor: 'OpenAI',
-    off: 60,
-    price: '',
-    src: '/ci/lobe/openai-avatar.svg',
-    mono: true,
-  },
-  {
-    name: 'glm-5.3-flash',
-    vendor: 'Z.ai',
-    off: 60,
-    price: '',
-    src: '/ci/lobe/zai-avatar.svg',
-    mono: false,
-  },
-  {
-    name: 'deepseek-v4-flash',
-    vendor: 'DeepSeek',
-    off: 45,
-    price: '',
-    src: '/ci/lobe/deepseek-avatar.svg',
-    mono: false,
-  },
-  {
-    name: 'claude-sonnet-5',
-    vendor: 'Anthropic',
-    off: 30,
-    price: '',
-    src: '/ci/lobe/claude-avatar.svg',
-    mono: false,
-  },
-  {
-    name: 'gemini-2.5-flash',
-    vendor: 'Google',
-    off: 30,
-    price: '',
-    src: '/ci/lobe/gemini-avatar.svg',
-    mono: false,
-  },
-  {
-    name: 'kimi-k3',
-    vendor: 'Moonshot',
-    off: 30,
-    price: '',
-    src: '/ci/lobe/meta-avatar.svg',
-    mono: false,
-  },
-]
-
 type TickerRow = {
   name: string
   vendor: string
@@ -95,12 +44,14 @@ type TickerRow = {
 }
 
 function toTickerRow(model: SavingsModel): TickerRow {
-  const priceValue = model.siteInputPrice || model.siteOutputPrice
+  const priceValue = model.siteInputPrice
   return {
     name: model.modelName,
     vendor: model.vendorName,
     off: model.savingsPercent,
-    price: priceValue > 0 ? formatPerMillionTokens(priceValue) : '',
+    price: Number.isFinite(priceValue)
+      ? formatPerMillionTokens(priceValue)
+      : '',
     src: vendorAvatar(model),
     mono: vendorAvatarIsMono(model),
   }
@@ -121,12 +72,11 @@ export function AccessAuthLayout(props: AccessAuthLayoutProps) {
     [models, priceRate]
   )
   const ticker = useMemo(() => {
-    const live = catalog
-      .filter((model) => model.savingsPercent > 0)
+    const live = [...catalog]
       .sort((a, b) => b.savingsPercent - a.savingsPercent)
       .slice(0, 12)
       .map(toTickerRow)
-    return live.length > 0 ? live : FALLBACK_TICKER
+    return live
   }, [catalog])
   const belowCount = ticker.filter((row) => row.off > 0).length
   const lanes = [0, 1]
@@ -159,6 +109,7 @@ export function AccessAuthLayout(props: AccessAuthLayoutProps) {
               })}
             </small>
           </div>
+          {ticker.length === 0 ? <p>{t('No models available')}</p> : null}
           <div className='ci-authTickerViewport'>
             <div className='ci-authTickerTrack'>
               {lanes.flatMap((lane) =>
@@ -178,7 +129,7 @@ export function AccessAuthLayout(props: AccessAuthLayoutProps) {
                         {item.price ? ` · ${item.price}` : null}
                       </span>
                     </div>
-                    <b>−{item.off}%</b>
+                    <b>{item.off > 0 ? `−${item.off}%` : t('List price')}</b>
                   </article>
                 ))
               )}

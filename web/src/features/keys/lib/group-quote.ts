@@ -33,7 +33,7 @@ export type GroupUsageQuote = {
 
 export function parseGroupRatio(value: number | string | undefined): number {
   const ratio = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(ratio) || ratio <= 0) return 1
+  if (!Number.isFinite(ratio) || ratio < 0) return 1
   return ratio
 }
 

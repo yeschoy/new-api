@@ -17,8 +17,54 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { ENDPOINT_TYPES } from '@/features/pricing/constants'
+import type { PricingModel } from '@/features/pricing/types'
 
-import type { SavingsModel } from './pricing-savings'
+import { buildSavingsCatalog, type SavingsModel } from './pricing-savings'
+
+export type CatalogIdentity = Pick<
+  SavingsModel,
+  | 'modelName'
+  | 'vendorName'
+  | 'vendorIcon'
+  | 'family'
+  | 'endpointTypes'
+  | 'savingsPercent'
+> & {
+  siteInputPrice?: number
+  siteOutputPrice?: number
+}
+
+export type CatalogEntry = CatalogIdentity & {
+  pricingModel: PricingModel
+  quote: SavingsModel | null
+}
+
+export function buildModelCatalog(
+  models: PricingModel[],
+  priceRate: number
+): CatalogEntry[] {
+  const quotes = new Map(
+    buildSavingsCatalog(models, priceRate).map((quote) => [
+      quote.modelName,
+      quote,
+    ])
+  )
+  return models.map((model) => {
+    const quote = quotes.get(model.model_name) ?? null
+    return {
+      modelName: model.model_name,
+      vendorName: model.vendor_name?.trim() || quote?.vendorName || 'AI',
+      vendorIcon: model.vendor_icon || model.icon,
+      family: quote?.family ?? 'other',
+      endpointTypes: model.supported_endpoint_types ?? [],
+      savingsPercent: quote?.savingsPercent ?? 0,
+      siteInputPrice: quote?.siteInputPrice,
+      siteOutputPrice: quote?.siteOutputPrice,
+      pricingModel: model,
+      quote,
+    }
+  })
+}
 
 export type CatalogModality = 'all' | 'text' | 'image' | 'video'
 export type CatalogSort = 'discount-desc' | 'discount-asc' | 'price-asc'
@@ -27,7 +73,7 @@ const IMAGE_ENDPOINTS = new Set<string>([ENDPOINT_TYPES.IMAGE_GENERATION])
 const VIDEO_ENDPOINTS = new Set<string>([ENDPOINT_TYPES.OPENAI_VIDEO])
 
 export function getCatalogModality(
-  model: SavingsModel
+  model: CatalogIdentity
 ): Exclude<CatalogModality, 'all'> {
   const endpoints = model.endpointTypes ?? []
   if (endpoints.some((endpoint) => VIDEO_ENDPOINTS.has(endpoint))) {
@@ -39,12 +85,12 @@ export function getCatalogModality(
   return 'text'
 }
 
-export function filterCatalog(
-  models: SavingsModel[],
+export function filterCatalog<T extends CatalogIdentity>(
+  models: T[],
   query: string,
   vendor: string,
   modality: CatalogModality
-): SavingsModel[] {
+): T[] {
   const needle = query.trim().toLowerCase()
   return models.filter((model) => {
     if (vendor && vendor !== 'all' && model.vendorName !== vendor) {
@@ -61,10 +107,10 @@ export function filterCatalog(
   })
 }
 
-export function sortCatalog(
-  models: SavingsModel[],
+export function sortCatalog<T extends CatalogIdentity>(
+  models: T[],
   sort: CatalogSort
-): SavingsModel[] {
+): T[] {
   const sorted = [...models]
   switch (sort) {
     case 'discount-asc':
@@ -77,8 +123,10 @@ export function sortCatalog(
     case 'price-asc':
       sorted.sort(
         (left, right) =>
-          left.siteOutputPrice - right.siteOutputPrice ||
-          left.siteInputPrice - right.siteInputPrice ||
+          (left.siteOutputPrice ?? Infinity) -
+            (right.siteOutputPrice ?? Infinity) ||
+          (left.siteInputPrice ?? Infinity) -
+            (right.siteInputPrice ?? Infinity) ||
           left.modelName.localeCompare(right.modelName)
       )
       break
@@ -86,21 +134,26 @@ export function sortCatalog(
       sorted.sort(
         (left, right) =>
           right.savingsPercent - left.savingsPercent ||
-          left.siteOutputPrice - right.siteOutputPrice ||
+          (left.siteOutputPrice ?? Infinity) -
+            (right.siteOutputPrice ?? Infinity) ||
           left.modelName.localeCompare(right.modelName)
       )
   }
   return sorted
 }
 
-export function uniqueVendors(models: SavingsModel[]): string[] {
+export function uniqueVendors(models: CatalogIdentity[]): string[] {
   return [...new Set(models.map((model) => model.vendorName))].sort(
     (left, right) => left.localeCompare(right)
   )
 }
 
-export function catalogVendorAvatar(model: SavingsModel): string {
-  if (model.vendorIcon) return model.vendorIcon
+export function catalogVendorAvatar(model: CatalogIdentity): string | null {
+  if (model.vendorIcon) {
+    return /^(https?:\/\/|\/|data:image\/)/i.test(model.vendorIcon)
+      ? model.vendorIcon
+      : null
+  }
   switch (model.family) {
     case 'openai':
       return '/ci/lobe/openai-avatar.svg'
@@ -115,7 +168,7 @@ export function catalogVendorAvatar(model: SavingsModel): string {
   }
 }
 
-export function familyIconName(model: SavingsModel): string {
+export function familyIconName(model: CatalogIdentity): string {
   if (model.vendorIcon) return model.vendorIcon
   switch (model.family) {
     case 'openai':

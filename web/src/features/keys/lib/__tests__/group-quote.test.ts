@@ -20,7 +20,11 @@ import { describe, expect, it } from 'vitest'
 
 import type { SavingsModel } from '@/features/home/lib/pricing-savings'
 
-import { describeGroupDiscount, quoteGroupUsage } from '../group-quote'
+import {
+  describeGroupDiscount,
+  parseGroupRatio,
+  quoteGroupUsage,
+} from '../group-quote'
 
 const model: SavingsModel = {
   modelName: 'demo',
@@ -46,6 +50,18 @@ describe('describeGroupDiscount', () => {
 })
 
 describe('quoteGroupUsage', () => {
+  it('keeps a zero-rate group free including cached input', () => {
+    expect(parseGroupRatio(0)).toBe(0)
+    expect(parseGroupRatio('0')).toBe(0)
+    expect(quoteGroupUsage(model, 0)).toEqual({
+      input: 0,
+      output: 0,
+      cacheHitInput: 0,
+      savingsPercent: 100,
+      ratio: 0,
+    })
+  })
+
   it('scales list rates and estimates a 95% cache-hit input', () => {
     const quote = quoteGroupUsage(model, 0.5)
     expect(quote.input).toBe(5)

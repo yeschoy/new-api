@@ -30,12 +30,17 @@ import { cn } from '@/lib/utils'
 import { getUserLogs } from '../api'
 import { LOG_TYPE_ENUM } from '../constants'
 import { usageLogSchema, type UsageLog } from '../data/schema'
+import { useUsageSummary } from '../hooks/use-usage-summary'
 import { parseLogOther } from '../lib/format'
 
 type RequestFilter = 'all' | 'ok' | 'error'
 
 function isErrorLog(log: UsageLog): boolean {
-  return log.type === LOG_TYPE_ENUM.ERROR
+  return (
+    log.type === LOG_TYPE_ENUM.ERROR ||
+    (log.is_stream &&
+      parseLogOther(log.other)?.stream_status?.status === 'error')
+  )
 }
 
 function isVisibleLog(log: UsageLog): boolean {
@@ -60,34 +65,38 @@ export function TerminalRequests() {
   const { t } = useTranslation()
   const [filter, setFilter] = useState<RequestFilter>('all')
   const [openId, setOpenId] = useState<number | null>(null)
-  const start = dayjs().subtract(6, 'day').startOf('day')
-  const end = dayjs().endOf('day')
+  const [page, setPage] = useState(1)
+  const summary = useUsageSummary(7)
+  const { start, end } = summary
 
   const logsQuery = useQuery({
-    queryKey: ['terminal', 'requests', start.unix(), end.unix()],
+    queryKey: ['terminal', 'requests', start.unix(), end.unix(), page],
     queryFn: async () => {
       const result = await getUserLogs({
-        p: 1,
+        p: page,
         page_size: 50,
         type: 0,
         start_timestamp: start.unix(),
         end_timestamp: end.unix(),
       })
-      if (!result.success) return []
-      return (result.data?.items ?? []).flatMap((item) => {
-        const parsed = usageLogSchema.safeParse(item)
-        return parsed.success && isVisibleLog(parsed.data) ? [parsed.data] : []
-      })
+      if (!result.success || !result.data) {
+        throw new Error(result.message || t('Failed to load usage report'))
+      }
+      return {
+        total: result.data.total,
+        items: result.data.items.flatMap((item) => {
+          const parsed = usageLogSchema.safeParse(item)
+          return parsed.success && isVisibleLog(parsed.data)
+            ? [parsed.data]
+            : []
+        }),
+      }
     },
   })
 
-  const logs = logsQuery.data ?? []
+  const logs = logsQuery.data?.items ?? []
   const errorCount = logs.filter(isErrorLog).length
   const okCount = logs.length - errorCount
-  const billed = logs.reduce(
-    (sum, log) => (isErrorLog(log) ? sum : sum + log.quota),
-    0
-  )
   const visible = logs.filter((log) => {
     if (filter === 'error') return isErrorLog(log)
     if (filter === 'ok') return !isErrorLog(log)
@@ -100,33 +109,47 @@ export function TerminalRequests() {
       title={t('Requests')}
       description={t('See each call, what it cost, and why it failed.')}
     >
+      {summary.error || logsQuery.error ? (
+        <p role='alert' className='text-destructive'>
+          {t(
+            summary.error?.message ||
+              logsQuery.error?.message ||
+              'Failed to load usage report'
+          )}
+        </p>
+      ) : null}
       <section className='ci-statGrid'>
         <article>
           <span>{t('Last 7 days')}</span>
-          <strong>{logs.length.toLocaleString()}</strong>
+          <strong>{summary.data?.requests.toLocaleString() ?? '—'}</strong>
           <small>{t('Calls')}</small>
         </article>
         <article>
           <span>{t('Worked')}</span>
-          <strong>{okCount.toLocaleString()}</strong>
+          <strong>{summary.data?.succeeded.toLocaleString() ?? '—'}</strong>
           <small>{t('Finished normally')}</small>
         </article>
         <article>
           <span>{t('Failed')}</span>
-          <strong className={errorCount > 0 ? 'is-empty' : undefined}>
-            {errorCount.toLocaleString()}
+          <strong
+            className={(summary.data?.failed ?? 0) > 0 ? 'is-empty' : undefined}
+          >
+            {summary.data?.failed.toLocaleString() ?? '—'}
           </strong>
           <small>{t('Tap a row to read the error')}</small>
         </article>
         <article>
           <span>{t('Spent')}</span>
-          <strong>{formatConsoleMoney(billed)}</strong>
-          <small>{t('Charged in yuan')}</small>
+          <strong>
+            {summary.data ? formatConsoleMoney(summary.data.quota) : '—'}
+          </strong>
+          <small>{t('Charged to this workspace')}</small>
         </article>
       </section>
 
       <section className='ci-panel'>
         <div className='ci-requestFilters'>
+          <span>{t('Filter this page')}</span>
           {(
             [
               ['all', t('All'), logs.length],
@@ -144,12 +167,15 @@ export function TerminalRequests() {
             </button>
           ))}
         </div>
-        {empty ? (
+        {logsQuery.isPending && (
+          <div className='ci-empty'>{t('Loading...')}</div>
+        )}
+        {!logsQuery.isPending && !logsQuery.error && empty && (
           <div className='ci-empty'>
             <span className='ci-emptyIcon'>
               <Inbox size={18} />
             </span>
-            <h3>{t('No requests yet')}</h3>
+            <h3>{t('No matching requests on this page')}</h3>
             <p>
               {t('Create a key, fill it into your tool, then come back here.')}
             </p>
@@ -161,7 +187,8 @@ export function TerminalRequests() {
               {t('Go create a key')}
             </Link>
           </div>
-        ) : (
+        )}
+        {!logsQuery.isPending && !logsQuery.error && !empty && (
           <div className='ci-requestList'>
             {visible.map((log) => {
               const failed = isErrorLog(log)
@@ -203,7 +230,11 @@ export function TerminalRequests() {
                       </div>
                       <div>
                         <dt>{t('Spend')}</dt>
-                        <dd>{failed ? '—' : formatConsoleMoney(log.quota)}</dd>
+                        <dd>
+                          {log.type === LOG_TYPE_ENUM.CONSUME
+                            ? formatConsoleMoney(log.quota)
+                            : '—'}
+                        </dd>
                       </div>
                       <div>
                         <dt>{t('Time taken')}</dt>
@@ -229,6 +260,35 @@ export function TerminalRequests() {
           </div>
         )}
       </section>
+      <div className='ci-tablePager'>
+        <button
+          type='button'
+          className='ci-button ci-button--ghost ci-button--size-xs'
+          disabled={page === 1 || logsQuery.isFetching}
+          onClick={() => {
+            setPage(page - 1)
+            setOpenId(null)
+          }}
+        >
+          {t('Previous')}
+        </button>
+        <span>
+          {page} / {Math.max(1, Math.ceil((logsQuery.data?.total ?? 0) / 50))}
+        </span>
+        <button
+          type='button'
+          className='ci-button ci-button--ghost ci-button--size-xs'
+          disabled={
+            page * 50 >= (logsQuery.data?.total ?? 0) || logsQuery.isFetching
+          }
+          onClick={() => {
+            setPage(page + 1)
+            setOpenId(null)
+          }}
+        >
+          {t('Next')}
+        </button>
+      </div>
     </TerminalPage>
   )
 }

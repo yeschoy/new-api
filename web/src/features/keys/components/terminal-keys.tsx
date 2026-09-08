@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import type { TFunction } from 'i18next'
 import { Copy, KeyRound } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -24,20 +25,18 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { TerminalPage } from '@/components/layout/components/terminal-page'
-import {
-  buildSavingsCatalog,
-  formatPerMillionTokens,
-} from '@/features/home/lib/pricing-savings'
+import { buildModelCatalog } from '@/features/home/lib/catalog'
+import { formatPerMillionTokens } from '@/features/home/lib/pricing-savings'
 import { usePricingData } from '@/features/pricing/hooks'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getUserGroups } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 import {
-  batchDeleteApiKeys,
+  revokeAllApiKeys,
   createApiKey,
   deleteApiKey,
-  fetchTokenKey,
+  getFullApiKey,
   getApiKeys,
 } from '../api'
 import { getApiKeyFormDefaultValues, transformFormDataToPayload } from '../lib'
@@ -71,13 +70,19 @@ export function TerminalKeys() {
   const [createdKey, setCreatedKey] = useState<string | null>(null)
   const [modelName, setModelName] = useState('')
   const [groupName, setGroupName] = useState('')
+  const [page, setPage] = useState(1)
+  const [actionError, setActionError] = useState<string | null>(null)
   const { models, priceRate } = usePricingData()
   const catalog = useMemo(
-    () => buildSavingsCatalog(models || [], priceRate),
+    () => buildModelCatalog(models || [], priceRate),
     [models, priceRate]
   )
   const selectedModel =
     catalog.find((model) => model.modelName === modelName) ?? catalog[0] ?? null
+
+  const selectedPricingModel = models.find(
+    (model) => model.model_name === selectedModel?.modelName
+  )
 
   const groupsQuery = useQuery({
     queryKey: ['user-groups'],
@@ -92,22 +97,37 @@ export function TerminalKeys() {
         desc: String(info.desc || value),
         ratio: parseGroupRatio(info.ratio),
       }))
-      .filter((group) => group.value !== 'auto')
+      .filter(
+        (group) =>
+          group.value !== 'auto' &&
+          selectedPricingModel?.enable_groups?.includes(group.value)
+      )
       .sort((a, b) => a.ratio - b.ratio)
-  }, [groupsQuery.data])
+  }, [groupsQuery.data, selectedPricingModel])
   const selectedGroup =
     groups.find((group) => group.value === groupName) ?? groups[0] ?? null
 
   const keysQuery = useQuery({
-    queryKey: ['terminal', 'keys'],
+    queryKey: ['terminal', 'keys', page],
     queryFn: async () => {
-      const result = await getApiKeys({ p: 1, size: 100 })
-      return result.success ? (result.data?.items ?? []) : []
+      const result = await getApiKeys({ p: page, size: 100 })
+      if (!result.success || !result.data) {
+        throw new Error(result.message || t('Failed to load API keys'))
+      }
+      return result.data
     },
   })
 
+  const refreshKeys = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['terminal'] }),
+      queryClient.invalidateQueries({ queryKey: ['keys'] }),
+    ])
+  }
+
   const createMutation = useMutation({
     mutationFn: async () => {
+      setActionError(null)
       const payload = transformFormDataToPayload({
         ...getApiKeyFormDefaultValues(false),
         name: name.trim() || t('Daily key'),
@@ -117,49 +137,78 @@ export function TerminalKeys() {
         cross_group_retry: false,
       })
       const created = await createApiKey(payload)
-      if (!created.success || !created.data) {
+      if (!created.success) {
         throw new Error(created.message || t('Failed to create API key'))
       }
-      const revealed = await fetchTokenKey(created.data.id)
-      return {
-        itemsNeedRefresh: true,
-        key: revealed.data?.key ?? created.data.key,
+      return created.data
+    },
+    onSuccess: async (created) => {
+      setCreatedKey(null)
+      setPage(1)
+      await refreshKeys()
+      toast.success(t('API key created'))
+      // Older servers may omit data. Creation still succeeded; the refreshed
+      // list supplies an explicit copy action instead of creating again.
+      if (created?.id) {
+        try {
+          setCreatedKey(await getFullApiKey(created.id))
+        } catch (error) {
+          setActionError(
+            error instanceof Error
+              ? t(error.message)
+              : t('Failed to load API keys')
+          )
+        }
       }
     },
-    onSuccess: async (result) => {
-      setCreatedKey(result.key)
-      await queryClient.invalidateQueries({ queryKey: ['terminal'] })
-      await queryClient.invalidateQueries({ queryKey: ['keys'] })
-      toast.success(t('API key created'))
+    onError: (error: Error) => setActionError(t(error.message)),
+  })
+
+  const copyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      setActionError(null)
+      const value = await getFullApiKey(id)
+      await clipboard.copyToClipboard(value)
     },
-    onError: (error: Error) => {
-      toast.error(error.message)
-    },
+    onError: (error: Error) => setActionError(t(error.message)),
   })
 
   const revokeOne = useMutation({
-    mutationFn: (id: number) => deleteApiKey(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['terminal'] })
-      await queryClient.invalidateQueries({ queryKey: ['keys'] })
+    mutationFn: async (id: number) => {
+      setActionError(null)
+      const result = await deleteApiKey(id)
+      if (!result.success) {
+        throw new Error(result.message || t('Failed to delete API key'))
+      }
+    },
+    onError: (error: Error) => setActionError(t(error.message)),
+    onSettled: async () => {
+      setPage(1)
+      setCreatedKey(null)
+      await refreshKeys()
     },
   })
 
   const revokeAll = useMutation({
     mutationFn: async () => {
-      const ids = (keysQuery.data ?? []).map((item) => item.id)
-      if (ids.length === 0) return
-      await batchDeleteApiKeys(ids)
+      setActionError(null)
+      await revokeAllApiKeys()
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       setCreatedKey(null)
-      await queryClient.invalidateQueries({ queryKey: ['terminal'] })
-      await queryClient.invalidateQueries({ queryKey: ['keys'] })
+      setPage(1)
       toast.success(t('All keys revoked'))
+    },
+    onError: (error: Error) => setActionError(t(error.message)),
+    onSettled: async () => {
+      setPage(1)
+      setCreatedKey(null)
+      await refreshKeys()
     },
   })
 
-  const keys = keysQuery.data ?? []
+  const keys = keysQuery.data?.items ?? []
+  const pageCount = Math.max(1, Math.ceil((keysQuery.data?.total ?? 0) / 100))
 
   return (
     <TerminalPage
@@ -168,7 +217,7 @@ export function TerminalKeys() {
         'Pick a model to see the price, then pick a group. The key bills at that group rate.'
       )}
       actions={
-        keys.length > 0 ? (
+        (keysQuery.data?.total ?? 0) > 0 ? (
           <button
             type='button'
             className='ci-button ci-button--danger-quiet ci-button--size-xs'
@@ -180,6 +229,11 @@ export function TerminalKeys() {
         ) : null
       }
     >
+      {actionError || keysQuery.error ? (
+        <p role='alert' className='text-destructive'>
+          {actionError || keysQuery.error?.message}
+        </p>
+      ) : null}
       <section className='ci-panel'>
         <header className='ci-panelHeader'>
           <h2>{t('1. Pick a model')}</h2>
@@ -221,15 +275,23 @@ export function TerminalKeys() {
           </p>
         </header>
         <div className='ci-panelBody'>
+          {selectedModel && !selectedModel.quote ? (
+            <Link
+              to='/pricing/$modelId'
+              params={{ modelId: selectedModel.modelName }}
+            >
+              {t('View pricing details')}
+            </Link>
+          ) : null}
           {groups.length === 0 ? (
             <p className='ci-formNote'>
-              {t('No groups yet. A new key will use the default lane.')}
+              {t('No billing groups are available for this model.')}
             </p>
           ) : (
             <div className='ci-quoteGrid'>
               {groups.map((group) => {
-                const groupQuote = selectedModel
-                  ? quoteGroupUsage(selectedModel, group.ratio)
+                const groupQuote = selectedModel?.quote
+                  ? quoteGroupUsage(selectedModel.quote, group.ratio)
                   : null
                 const discount = describeGroupDiscount(group.ratio)
                 const selected = selectedGroup?.value === group.value
@@ -239,6 +301,7 @@ export function TerminalKeys() {
                     type='button'
                     className={cn('ci-quoteCard', selected && 'is-selected')}
                     onClick={() => setGroupName(group.value)}
+                    aria-pressed={selected}
                   >
                     <strong>{group.desc || group.label}</strong>
                     <span className='ci-quoteLane'>
@@ -305,7 +368,11 @@ export function TerminalKeys() {
                 type='button'
                 className='ci-button ci-button--size-xs'
                 onClick={() => createMutation.mutate()}
-                disabled={createMutation.isPending}
+                disabled={
+                  createMutation.isPending ||
+                  groupsQuery.isLoading ||
+                  !selectedGroup
+                }
               >
                 <KeyRound size={14} />
                 {t('Create key')}
@@ -365,6 +432,14 @@ export function TerminalKeys() {
                     <button
                       type='button'
                       className='ci-button ci-button--ghost ci-button--size-xs'
+                      disabled={copyMutation.isPending}
+                      onClick={() => copyMutation.mutate(key.id)}
+                    >
+                      <Copy size={14} /> {t('Copy')}
+                    </button>
+                    <button
+                      type='button'
+                      className='ci-button ci-button--ghost ci-button--size-xs'
                       onClick={() => revokeOne.mutate(key.id)}
                     >
                       {t('Revoke')}
@@ -376,6 +451,29 @@ export function TerminalKeys() {
           </table>
         )}
       </section>
+      {pageCount > 1 ? (
+        <div className='ci-tablePager'>
+          <button
+            className='ci-button ci-button--ghost ci-button--size-xs'
+            type='button'
+            disabled={page <= 1 || keysQuery.isFetching}
+            onClick={() => setPage(page - 1)}
+          >
+            {t('Previous')}
+          </button>
+          <span>
+            {page} / {pageCount}
+          </span>
+          <button
+            className='ci-button ci-button--ghost ci-button--size-xs'
+            type='button'
+            disabled={page >= pageCount || keysQuery.isFetching}
+            onClick={() => setPage(page + 1)}
+          >
+            {t('Next')}
+          </button>
+        </div>
+      ) : null}
     </TerminalPage>
   )
 }

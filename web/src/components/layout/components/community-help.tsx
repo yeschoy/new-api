@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { SUPPORT_QQ_GROUP } from '@/lib/support-contact'
+
 export function CommunityHelp() {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -64,7 +66,9 @@ export function CommunityHelp() {
             width={180}
             height={180}
           />
-          <strong>{t('QQ group: 1065665694')}</strong>
+          <strong>
+            {t('QQ group: {{group}}', { group: SUPPORT_QQ_GROUP })}
+          </strong>
           <p>{t('Scan to join the QQ group for setup help.')}</p>
         </div>
       ) : null}

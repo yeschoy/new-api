@@ -16,29 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { getLobeIcon } from '@/lib/lobe-icon'
 
-import { defineConfig } from 'vitest/config'
+import {
+  catalogVendorAvatar,
+  familyIconName,
+  type CatalogIdentity,
+} from '../lib/catalog'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-export default defineConfig({
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  test: {
-    server: {
-      deps: {
-        inline: ['@lobehub/icons', '@lobehub/ui', '@lobehub/fluent-emoji'],
-      },
-    },
-    environment: 'jsdom',
-    setupFiles: ['./src/test-setup.ts'],
-    clearMocks: true,
-    restoreMocks: true,
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-  },
-})
+export function CatalogVendorIcon(props: { model: CatalogIdentity }) {
+  const source = catalogVendorAvatar(props.model)
+  return source ? (
+    <img src={source} alt='' width={28} height={28} />
+  ) : (
+    <span aria-hidden='true'>
+      {getLobeIcon(familyIconName(props.model), 28)}
+    </span>
+  )
+}

@@ -26,7 +26,7 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
 import {
-  formatUsdPerMillion,
+  formatPerMillionTokens,
   type SavingsModel,
 } from '../../lib/pricing-savings'
 
@@ -118,13 +118,13 @@ apiKey: "sk-..."`}
                   <div className='flex items-end justify-between gap-3'>
                     <span>{t('This site')}</span>
                     <span className='text-lg font-semibold'>
-                      {formatUsdPerMillion(featured.siteOutputPrice)}
+                      {formatPerMillionTokens(featured.siteOutputPrice)}
                     </span>
                   </div>
                   <div className='text-muted-foreground flex items-end justify-between gap-3'>
                     <span>{t('Base price')}</span>
                     <span className='line-through'>
-                      {formatUsdPerMillion(featured.baseOutputPrice)}
+                      {formatPerMillionTokens(featured.baseOutputPrice)}
                     </span>
                   </div>
                 </div>

@@ -99,3 +99,41 @@ consume billing expressions, while sidebar sizing composes with Base UI state.
 - Correct: validate the entire supported formula and retain term presence.
 - Wrong: apply expanded `sidebar-gap` sizing regardless of `data-state`.
 - Correct: scope expanded geometry to `data-state="expanded"`.
+
+
+## Easy-console pricing, keys and reports
+
+### Scope / Trigger
+Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting.
+
+### Signatures and Contracts
+- `buildModelCatalog(models, priceRate)` retains every PricingModel and exposes an optional supported estimator quote. Do not filter discoverable models by calculator eligibility.
+- SavingsModel quote numbers already incorporate the recharge price. `formatPerMillionTokens` formats that local amount without applying another USD exchange conversion.
+- `getFullApiKey(id)` reveals only through the dedicated endpoint, rejects masked results and normalizes the sk- prefix. Successful creation must refresh keys even when reveal fails.
+- `revokeAllApiKeys()` collects all IDs before deleting bounded batches and verifies the final list is empty. Partial/error outcomes refresh the list and never show an all-revoked success.
+- `useUsageSummary(7|28)` uses the authenticated complete summary. Requests keeps pagination; page-only filters are labeled. Home/wallet savings explicitly say 28 days.
+- `buildUsageReportCsv(rows)` exports numeric display amounts with a currency unit, or explicitly labeled raw quota in tokens mode.
+
+### Validation & Error Matrix
+| Input/state | Behavior |
+| --- | --- |
+| Group ratio/cache rate zero | Preserve free pricing |
+| Selected model has no usable group | Disable creation and show an honest empty state |
+| Model uses per-request/task/complex tier pricing | Keep it discoverable with a details link |
+| Summary unavailable | Error/pending display; no fabricated zero totals |
+| Empty/undiscounted auth catalog | Real data or empty state, no fallback marketing prices |
+| Supplier application copied | Explicitly require manual sending to the configured support QQ group |
+
+### Good / Base / Bad Cases
+- Good: priceRate=7 and displayed quote=7 yields ¥7, not ¥49.
+- Base: an existing masked key gets an explicit copy action after reload.
+- Bad: reuse the on/off translation for a percentage discount, or apply flex display to td elements.
+
+### Tests Required
+Cover 101-key revoke and incomplete deletion, reveal retry without duplicate creation, group changes/free pricing, all pricing modes, complete reports vs a paginated list, stream failures and currency export. Browser/DOM tests cover mobile anchor-close behavior, table-cell layout, visible rate comparisons and manual supplier-copy guidance.
+
+### Wrong vs Correct
+- Wrong: use catalog discount percentages to estimate savings for historical logs.
+- Correct: use recorded-rate summary data from the backend.
+- Wrong: use an icon identifier as img.src.
+- Correct: use the existing icon renderer for identifiers; image URLs remain image sources.

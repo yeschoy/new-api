@@ -16,87 +16,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { TerminalPage } from '@/components/layout/components/terminal-page'
-import { buildSavingsCatalog } from '@/features/home/lib/pricing-savings'
-import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
-import {
-  estimateGatewayListSavings,
-  formatConsoleMoney,
-} from '@/lib/console-money'
-import dayjs from '@/lib/dayjs'
+import { formatConsoleMoney } from '@/lib/console-money'
 
-import { getUserLogs } from '../api'
-import { usageLogSchema } from '../data/schema'
+import { useUsageSummary } from '../hooks/use-usage-summary'
+import { buildUsageReportCsv } from '../lib/report-export'
 
 export function TerminalReports() {
   const { t } = useTranslation()
-  const { models, priceRate } = usePricingData()
-  const start = dayjs().subtract(27, 'day').startOf('day')
-  const end = dayjs().endOf('day')
-
-  const logsQuery = useQuery({
-    queryKey: ['terminal', 'reports', start.unix(), end.unix()],
-    queryFn: async () => {
-      const result = await getUserLogs({
-        p: 1,
-        page_size: 100,
-        type: 2,
-        start_timestamp: start.unix(),
-        end_timestamp: end.unix(),
-      })
-      if (!result.success) return []
-      return (result.data?.items ?? []).flatMap((item) => {
-        const parsed = usageLogSchema.safeParse(item)
-        return parsed.success ? [parsed.data] : []
-      })
-    },
-  })
-
-  const catalog = useMemo(
-    () => buildSavingsCatalog(models || [], priceRate),
-    [models, priceRate]
-  )
-  const logs = logsQuery.data ?? []
-  const billed = logs.reduce((sum, log) => sum + log.quota, 0)
-  const tokens = logs.reduce(
-    (sum, log) => sum + log.prompt_tokens + log.completion_tokens,
-    0
-  )
-  const saved = estimateGatewayListSavings(logs, catalog)
-  const byDay = useMemo(() => {
-    const source = logsQuery.data ?? []
-    const rows = new Map<
-      string,
-      { date: string; requests: number; tokens: number; billed: number }
-    >()
-    for (const log of source) {
-      const date = dayjs.unix(log.created_at).format('YYYY-MM-DD')
-      const current = rows.get(date) ?? {
-        date,
-        requests: 0,
-        tokens: 0,
-        billed: 0,
-      }
-      current.requests += 1
-      current.tokens += log.prompt_tokens + log.completion_tokens
-      current.billed += log.quota
-      rows.set(date, current)
-    }
-    return [...rows.values()].sort((left, right) =>
-      right.date.localeCompare(left.date)
-    )
-  }, [logsQuery.data])
+  const summary = useUsageSummary(28)
+  const data = summary.data
+  const byDay = data?.daily ?? []
 
   const exportCsv = () => {
-    const header = 'Date,Requests,Tokens,Billed\n'
-    const body = byDay
-      .map((row) => `${row.date},${row.requests},${row.tokens},${row.billed}`)
-      .join('\n')
-    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([buildUsageReportCsv(byDay)], {
+      type: 'text/csv;charset=utf-8',
+    })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -109,54 +46,61 @@ export function TerminalReports() {
     <TerminalPage
       title={t('Reports')}
       description={t(
-        'Review spend by day for any date range, then export the report.'
+        'Review the last 28 days of usage and export daily totals.'
       )}
       actions={
         <button
           type='button'
           className='ci-button ci-button--size-xs'
           onClick={exportCsv}
-          disabled={byDay.length === 0}
+          disabled={summary.isError || !data || byDay.length === 0}
         >
           {t('Export report')}
         </button>
       }
     >
+      {summary.error ? (
+        <p role='alert' className='text-destructive'>
+          {t(summary.error.message)}
+        </p>
+      ) : null}
       <section className='ci-statGrid'>
         <article>
           <span>{t('Requests')}</span>
-          <strong>{logs.length.toLocaleString()}</strong>
+          <strong>{data?.requests.toLocaleString() ?? '—'}</strong>
           <small>
-            {start.format('MMM D')} – {end.format('MMM D, YYYY')}
+            {summary.start.format('MMM D')} –{' '}
+            {summary.end.format('MMM D, YYYY')}
           </small>
         </article>
         <article>
           <span>{t('Saved')}</span>
-          <strong className='is-saved'>{formatConsoleMoney(saved)}</strong>
-          <small>{t("vs. this gateway's list rates")}</small>
+          <strong className='is-saved'>
+            {data ? formatConsoleMoney(data.saved_quota) : '—'}
+          </strong>
+          <small>{t('Based on recorded request rates')}</small>
         </article>
         <article>
           <span>{t('Billed')}</span>
-          <strong>{formatConsoleMoney(billed)}</strong>
+          <strong>{data ? formatConsoleMoney(data.quota) : '—'}</strong>
           <small>{t('Charged to this workspace')}</small>
         </article>
         <article>
           <span>{t('Tokens')}</span>
-          <strong>{tokens.toLocaleString()}</strong>
+          <strong>{data?.tokens.toLocaleString() ?? '—'}</strong>
           <small>{t('{{count}} active days', { count: byDay.length })}</small>
         </article>
       </section>
-
       <section className='ci-panel'>
-        {byDay.length === 0 ? (
+        {summary.isPending ? (
+          <div className='ci-empty'>{t('Loading...')}</div>
+        ) : null}
+        {data && byDay.length === 0 ? (
           <div className='ci-empty'>
-            <p>
-              {t(
-                'No requests in this window. Pick a wider range, or send your first request from the playground.'
-              )}
-            </p>
+            <p>{t('No requests in this window.')}</p>
           </div>
-        ) : (
+        ) : null}
+        {byDay.length > 0 ? (
           <table className='ci-catalogTable'>
             <thead>
               <tr>
@@ -172,12 +116,12 @@ export function TerminalReports() {
                   <td>{row.date}</td>
                   <td>{row.requests}</td>
                   <td>{row.tokens.toLocaleString()}</td>
-                  <td>{formatConsoleMoney(row.billed)}</td>
+                  <td>{formatConsoleMoney(row.quota)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
+        ) : null}
       </section>
     </TerminalPage>
   )

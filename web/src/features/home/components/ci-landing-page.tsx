@@ -46,13 +46,14 @@ import {
   uniqueVendors,
   type CatalogModality,
   type CatalogSort,
+  type CatalogEntry,
 } from '../lib/catalog'
-import {
-  formatPerMillionTokens,
-  type SavingsModel,
-} from '../lib/pricing-savings'
+import { formatPerMillionTokens } from '../lib/pricing-savings'
 import { vendorAvatar, vendorAvatarIsMono } from '../lib/vendor-avatar'
+import { CatalogPrice } from './catalog-price'
+import { CatalogVendorIcon } from './catalog-vendor-icon'
 import { CiMark } from './ci-mark'
+import { SupplierApplication } from './supplier-application'
 
 const PROVIDERS = [
   { name: 'OpenAI', src: '/ci/lobe/openai-avatar.svg', mono: true },
@@ -115,7 +116,7 @@ function AnimatedPercent(props: { value: number }) {
 
 interface LandingPageProps {
   isAuthenticated: boolean
-  models: SavingsModel[]
+  models: CatalogEntry[]
   maxSavingsPercent: number
 }
 
@@ -136,7 +137,9 @@ export function CiLandingPage(props: LandingPageProps) {
 
   const featured = useMemo(
     () =>
-      [...props.models].sort((a, b) => b.savingsPercent - a.savingsPercent)[0],
+      props.models
+        .filter((model) => model.quote)
+        .sort((a, b) => b.savingsPercent - a.savingsPercent)[0],
     [props.models]
   )
 
@@ -158,7 +161,11 @@ export function CiLandingPage(props: LandingPageProps) {
               aria-label={t('Main navigation')}
             >
               <div className='ci-navLinks'>
-                <a className='ci-navItem' href='/#models'>
+                <a
+                  className='ci-navItem'
+                  href='/#models'
+                  onClick={() => setNavOpen(false)}
+                >
                   <Boxes className='ci-mobileNavIcon' size={18} />
                   <span>{t('Models')}</span>
                 </a>
@@ -168,7 +175,11 @@ export function CiLandingPage(props: LandingPageProps) {
                 <Link className='ci-navItem' to='/guide'>
                   <span>{t('Docs')}</span>
                 </Link>
-                <a className='ci-navItem' href='/#sell-capacity'>
+                <a
+                  className='ci-navItem'
+                  href='/#sell-capacity'
+                  onClick={() => setNavOpen(false)}
+                >
                   <span>{t('Sell capacity')}</span>
                 </a>
               </div>
@@ -219,6 +230,8 @@ export function CiLandingPage(props: LandingPageProps) {
                 className='ci-button ci-button--ghost ci-button--size-icon-sm ci-menuButton'
                 type='button'
                 aria-label={t('Open navigation')}
+                aria-expanded={navOpen}
+                aria-controls='main-navigation'
                 onClick={() => setNavOpen((v) => !v)}
               >
                 <Menu size={20} />
@@ -380,8 +393,8 @@ export function CiLandingPage(props: LandingPageProps) {
                         </p>
                       </div>
                     </div>
-                    {featured ? (
-                      <div className='ci-rateComparison'>
+                    {featured?.quote ? (
+                      <div className='ci-rateComparison ci-rateComparisonActive'>
                         <div className='ci-rateComparisonHeader'>
                           <span>
                             <span aria-hidden='true'>// </span>
@@ -394,21 +407,25 @@ export function CiLandingPage(props: LandingPageProps) {
                         <div className='ci-rateRow'>
                           <span>{PRODUCT_NAME}</span>
                           <progress
-                            max={Math.max(featured.baseOutputPrice, 0.01)}
-                            value={featured.siteOutputPrice}
+                            max={Math.max(featured.quote.baseOutputPrice, 0.01)}
+                            value={featured.quote.siteOutputPrice}
                           />
                           <strong>
-                            {formatPerMillionTokens(featured.siteOutputPrice)}
+                            {formatPerMillionTokens(
+                              featured.quote.siteOutputPrice
+                            )}
                           </strong>
                         </div>
                         <div className='ci-rateRow'>
                           <span>{t('List price')}</span>
                           <progress
-                            max={Math.max(featured.baseOutputPrice, 0.01)}
-                            value={featured.baseOutputPrice}
+                            max={Math.max(featured.quote.baseOutputPrice, 0.01)}
+                            value={featured.quote.baseOutputPrice}
                           />
                           <strong>
-                            {formatPerMillionTokens(featured.baseOutputPrice)}
+                            {formatPerMillionTokens(
+                              featured.quote.baseOutputPrice
+                            )}
                           </strong>
                         </div>
                       </div>
@@ -518,7 +535,7 @@ export function CiLandingPage(props: LandingPageProps) {
   )
 }
 
-function Catalog(props: { models: SavingsModel[] }) {
+function Catalog(props: { models: CatalogEntry[] }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [vendor, setVendor] = useState('all')
@@ -656,18 +673,15 @@ function Catalog(props: { models: SavingsModel[] }) {
                 {rows.map((model) => (
                   <tr key={model.modelName}>
                     <td>
-                      <div className='ci-modelIdentity'>
-                        <img
-                          alt=''
-                          width={28}
-                          height={28}
-                          src={vendorAvatar(model)}
-                        />
+                      <div className='ci-modelCell'>
+                        <CatalogVendorIcon model={model} />
                         <div>
                           <strong>{model.modelName}</strong>
                           {model.savingsPercent > 0 ? (
                             <span className='ci-discountValue'>
-                              {model.savingsPercent}% {t('off')}
+                              {t('Save {{percent}}%', {
+                                percent: model.savingsPercent,
+                              })}
                             </span>
                           ) : null}
                           <small>
@@ -676,17 +690,17 @@ function Catalog(props: { models: SavingsModel[] }) {
                         </div>
                       </div>
                     </td>
-                    <td className='ci-priceCell'>
-                      <s>{formatPerMillionTokens(model.baseInputPrice)}</s>
-                      <b>{formatPerMillionTokens(model.siteInputPrice)}</b>
+                    <td>
+                      <CatalogPrice model={model} side='input' />
                     </td>
-                    <td className='ci-priceCell'>
-                      <s>{formatPerMillionTokens(model.baseOutputPrice)}</s>
-                      <b>{formatPerMillionTokens(model.siteOutputPrice)}</b>
+                    <td>
+                      <CatalogPrice model={model} side='output' />
                     </td>
                     <td>
                       {model.savingsPercent > 0
-                        ? `${model.savingsPercent}% ${t('off')}`
+                        ? t('Save {{percent}}%', {
+                            percent: model.savingsPercent,
+                          })
                         : '—'}
                     </td>
                     <td>—</td>
@@ -835,9 +849,6 @@ function Trust() {
 
 function Seller() {
   const { t } = useTranslation()
-  const [contact, setContact] = useState('')
-  const [provider, setProvider] = useState('')
-  const [capacity, setCapacity] = useState('')
 
   return (
     <section className='ci-section ci-sellerSection' id='sell-capacity'>
@@ -847,7 +858,7 @@ function Seller() {
             <h2>{t('Turn unused inference capacity into revenue')}</h2>
             <p className='ci-sectionCopy'>
               {t(
-                'Tell us where you have spare capacity and roughly how much it is worth in yuan. We will check the fit and contact you.'
+                'Copy your capacity details and send them to our support QQ group for review.'
               )}
             </p>
           </div>
@@ -858,66 +869,7 @@ function Seller() {
           </ul>
         </div>
         <div className='ci-card ci-card--flush ci-sellerCard'>
-          <form
-            className='ci-sellerForm'
-            aria-label={t('Sell capacity')}
-            onSubmit={(event) => event.preventDefault()}
-          >
-            <label htmlFor='seller-contact'>
-              {t('How can we reach you')}{' '}
-              <span className='ci-requiredMark'>*</span>
-            </label>
-            <input
-              id='seller-contact'
-              className='ci-input ci-input--sm'
-              type='text'
-              required
-              placeholder={t('WeChat, phone, or email')}
-              value={contact}
-              onChange={(event) => setContact(event.target.value)}
-            />
-            <label htmlFor='seller-provider'>
-              {t('Provider')} <span className='ci-requiredMark'>*</span>
-            </label>
-            <select
-              id='seller-provider'
-              className='ci-input ci-input--sm'
-              required
-              value={provider}
-              onChange={(event) => setProvider(event.target.value)}
-            >
-              <option value=''>{t('Select a provider')}</option>
-              {PROVIDERS.map((item) => (
-                <option key={item.name} value={item.name}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-            <label htmlFor='seller-capacity'>
-              {t('Spare capacity in yuan')}{' '}
-              <span className='ci-requiredMark'>*</span>
-            </label>
-            <input
-              id='seller-capacity'
-              className='ci-input ci-input--sm'
-              inputMode='decimal'
-              required
-              placeholder='¥'
-              value={capacity}
-              onChange={(event) => setCapacity(event.target.value)}
-            />
-            <button
-              className='ci-button ci-button--default ci-button--size-sm ci-sellerSubmit'
-              type='submit'
-            >
-              {t('Submit capacity')}
-            </button>
-            <p className='ci-formNote'>
-              {t(
-                'We will only use these details to review and respond to your submission.'
-              )}
-            </p>
-          </form>
+          <SupplierApplication providers={PROVIDERS} />
         </div>
       </div>
     </section>

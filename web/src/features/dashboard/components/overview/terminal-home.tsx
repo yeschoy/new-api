@@ -19,21 +19,14 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Copy, KeyRound, Rocket, Wallet } from 'lucide-react'
-import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { TerminalPage } from '@/components/layout/components/terminal-page'
 import { useGuideAddress } from '@/features/guide/use-guide-address'
-import { buildSavingsCatalog } from '@/features/home/lib/pricing-savings'
 import { getApiKeys } from '@/features/keys/api'
-import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
-import { getUserLogs } from '@/features/usage-logs/api'
-import { usageLogSchema } from '@/features/usage-logs/data/schema'
+import { useUsageSummary } from '@/features/usage-logs/hooks/use-usage-summary'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import {
-  estimateGatewayListSavings,
-  formatConsoleMoney,
-} from '@/lib/console-money'
+import { formatConsoleMoney } from '@/lib/console-money'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -44,7 +37,7 @@ export function TerminalHome() {
   const clipboard = useCopyToClipboard({ notify: false })
   const remainQuota = Number(user?.quota ?? 0)
   const requestCount = Number(user?.request_count ?? 0)
-  const { models, priceRate } = usePricingData()
+  const summary = useUsageSummary(28)
 
   const keysQuery = useQuery({
     queryKey: ['terminal', 'home', 'keys'],
@@ -54,30 +47,9 @@ export function TerminalHome() {
     },
     staleTime: 60 * 1000,
   })
-  const logsQuery = useQuery({
-    queryKey: ['terminal', 'home', 'logs'],
-    queryFn: async () => {
-      const result = await getUserLogs({ p: 1, page_size: 100, type: 2 })
-      if (!result.success) return []
-      return (result.data?.items ?? []).flatMap((item) => {
-        const parsed = usageLogSchema.safeParse(item)
-        return parsed.success ? [parsed.data] : []
-      })
-    },
-    staleTime: 60 * 1000,
-  })
-
-  const catalog = useMemo(
-    () => buildSavingsCatalog(models || [], priceRate),
-    [models, priceRate]
-  )
-  const estimatedSaved = useMemo(
-    () => estimateGatewayListSavings(logsQuery.data ?? [], catalog),
-    [catalog, logsQuery.data]
-  )
   const hasKey = (keysQuery.data?.length ?? 0) > 0
   const funded = remainQuota > 0
-  const requested = requestCount > 0 || (logsQuery.data?.length ?? 0) > 0
+  const requested = requestCount > 0 || (summary.data?.requests ?? 0) > 0
   const completedSteps = Number(funded) + Number(hasKey) + Number(requested)
   let currentStep = 1
   if (funded && hasKey) currentStep = 3
@@ -106,6 +78,11 @@ export function TerminalHome() {
       title={t('Overview')}
       description={t('What you spend, and how to send the first request.')}
     >
+      {summary.error ? (
+        <p role='alert' className='text-destructive'>
+          {t(summary.error.message)}
+        </p>
+      ) : null}
       <section className='ci-onboard'>
         <span className='ci-onboardBadge'>{t('In progress')}</span>
         <div className='ci-onboardHead'>
@@ -185,9 +162,9 @@ export function TerminalHome() {
         <article>
           <span>{t('Estimated saved')}</span>
           <strong className='is-saved'>
-            {formatConsoleMoney(estimatedSaved)}
+            {summary.data ? formatConsoleMoney(summary.data.saved_quota) : '—'}
           </strong>
-          <small>{t("vs. this gateway's list rates")}</small>
+          <small>{t('Last 28 days · recorded request rates')}</small>
         </article>
       </section>
 

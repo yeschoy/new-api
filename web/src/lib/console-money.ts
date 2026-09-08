@@ -16,24 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { SavingsModel } from '@/features/home/lib/pricing-savings'
 import { formatQuota } from '@/lib/format'
 
 export function formatConsoleMoney(quota: number): string {
   return formatQuota(Number.isFinite(quota) ? quota : 0)
-}
-
-export function estimateGatewayListSavings(
-  logs: Array<{ quota: number; model_name: string }>,
-  catalog: SavingsModel[]
-): number {
-  const byName = new Map(catalog.map((model) => [model.modelName, model]))
-  let saved = 0
-  for (const log of logs) {
-    const model = byName.get(log.model_name)
-    if (!model) continue
-    if (model.savingsPercent <= 0 || model.savingsPercent >= 100) continue
-    saved += log.quota * (model.savingsPercent / (100 - model.savingsPercent))
-  }
-  return saved
 }

@@ -16,29 +16,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
+import { quotaUnitsToDollars } from '@/lib/format'
 
-import { defineConfig } from 'vitest/config'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-
-export default defineConfig({
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  test: {
-    server: {
-      deps: {
-        inline: ['@lobehub/icons', '@lobehub/ui', '@lobehub/fluent-emoji'],
-      },
-    },
-    environment: 'jsdom',
-    setupFiles: ['./src/test-setup.ts'],
-    clearMocks: true,
-    restoreMocks: true,
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-  },
-})
+export function buildUsageReportCsv(
+  rows: Array<{ date: string; requests: number; tokens: number; quota: number }>
+): string {
+  const { meta } = getCurrencyDisplay()
+  const unit =
+    meta.kind === 'tokens' ? 'Quota (tokens)' : `Billed (${getCurrencyLabel()})`
+  const header =
+    unit.includes(',') || unit.includes('"') || unit.includes('\n')
+      ? `"${unit.replaceAll('"', '""')}"`
+      : unit
+  const body = rows
+    .map(
+      (row) =>
+        `${row.date},${row.requests},${row.tokens},${quotaUnitsToDollars(row.quota)}`
+    )
+    .join('\n')
+  return `Date,Requests,Tokens,${header}\n${body}\n`
+}

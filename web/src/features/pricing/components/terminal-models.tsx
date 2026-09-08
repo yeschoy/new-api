@@ -22,8 +22,10 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { TerminalPage } from '@/components/layout/components/terminal-page'
+import { CatalogPrice } from '@/features/home/components/catalog-price'
+import { CatalogVendorIcon } from '@/features/home/components/catalog-vendor-icon'
 import {
-  catalogVendorAvatar,
+  buildModelCatalog,
   filterCatalog,
   getCatalogModality,
   sortCatalog,
@@ -31,11 +33,7 @@ import {
   type CatalogModality,
   type CatalogSort,
 } from '@/features/home/lib/catalog'
-import {
-  buildSavingsCatalog,
-  formatUsdPerMillion,
-  getMaximumSavingsPercent,
-} from '@/features/home/lib/pricing-savings'
+import { getMaximumSavingsPercent } from '@/features/home/lib/pricing-savings'
 
 import { usePricingData } from '../hooks/use-pricing-data'
 
@@ -59,7 +57,7 @@ export function TerminalModels() {
   const [page, setPage] = useState(0)
 
   const catalog = useMemo(
-    () => buildSavingsCatalog(models || [], priceRate),
+    () => buildModelCatalog(models || [], priceRate),
     [models, priceRate]
   )
   const vendors = useMemo(() => uniqueVendors(catalog), [catalog])
@@ -202,25 +200,25 @@ export function TerminalModels() {
                   <tr key={model.modelName}>
                     <td>
                       <div className='ci-modelCell'>
-                        <img src={catalogVendorAvatar(model)} alt='' />
+                        <CatalogVendorIcon model={model} />
                         <div>
                           {model.modelName}
                           <small>{model.vendorName}</small>
                         </div>
                       </div>
                     </td>
-                    <td className='ci-priceCell'>
-                      <s>{formatUsdPerMillion(model.baseInputPrice)}</s>
-                      <b>{formatUsdPerMillion(model.siteInputPrice)}</b>
+                    <td>
+                      <CatalogPrice model={model} side='input' />
                     </td>
-                    <td className='ci-priceCell'>
-                      <s>{formatUsdPerMillion(model.baseOutputPrice)}</s>
-                      <b>{formatUsdPerMillion(model.siteOutputPrice)}</b>
+                    <td>
+                      <CatalogPrice model={model} side='output' />
                     </td>
                     <td>
                       {model.savingsPercent > 0 ? (
                         <span className='ci-offBadge'>
-                          {model.savingsPercent}% off
+                          {t('Save {{percent}}%', {
+                            percent: model.savingsPercent,
+                          })}
                         </span>
                       ) : (
                         '—'

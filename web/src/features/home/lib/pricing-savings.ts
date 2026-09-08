@@ -22,7 +22,7 @@ import {
 } from '@/features/pricing/lib/dynamic-price'
 import { getDisplayGroupRatio } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
-import { formatBillingCurrencyFromUSD } from '@/lib/currency'
+import { formatLocalCurrencyAmount } from '@/lib/currency'
 
 export type ModelFamily =
   | 'openai'
@@ -461,8 +461,8 @@ export function formatUsdPerMillion(amount: number): string {
 }
 
 export function formatPerMillionTokens(amount: number): string {
-  if (!Number.isFinite(amount) || amount <= 0) return '—'
-  return `${formatBillingCurrencyFromUSD(amount, {
+  if (!Number.isFinite(amount) || amount < 0) return '—'
+  return `${formatLocalCurrencyAmount(amount, {
     digitsLarge: 4,
     digitsSmall: 4,
     locale: 'zh-CN',
@@ -505,7 +505,9 @@ export function formatTokenMillions(
   }).format(tokens)
 }
 
-export function getMaximumSavingsPercent(models: SavingsModel[]): number {
+export function getMaximumSavingsPercent(
+  models: Array<{ savingsPercent: number }>
+): number {
   return models.reduce(
     (maximum, model) => Math.max(maximum, model.savingsPercent),
     0

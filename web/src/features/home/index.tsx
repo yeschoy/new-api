@@ -28,15 +28,13 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { CiLandingPage } from './components/ci-landing-page'
 import { useHomePageContent } from './hooks'
-import {
-  buildSavingsCatalog,
-  getMaximumSavingsPercent,
-} from './lib/pricing-savings'
+import { buildModelCatalog } from './lib/catalog'
+import { getMaximumSavingsPercent } from './lib/pricing-savings'
 
 function DefaultHome(props: { isAuthenticated: boolean }) {
   const { models, priceRate } = usePricingData(true, { publicPreview: true })
   const savingsCatalog = useMemo(
-    () => buildSavingsCatalog(models, priceRate),
+    () => buildModelCatalog(models, priceRate),
     [models, priceRate]
   )
   const maxSavingsPercent = useMemo(

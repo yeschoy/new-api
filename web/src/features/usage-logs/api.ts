@@ -22,6 +22,8 @@ import { buildQueryParams } from './lib/query-params'
 import { parseTaskArtifactsResponse } from './lib/task-artifacts'
 import type {
   GetLogsParams,
+  UserLogSummary,
+  UserLogSummaryParams,
   GetLogsResponse,
   GetLogStatsParams,
   GetLogStatsResponse,
@@ -124,4 +126,18 @@ export async function getTaskArtifacts(taskId: string) {
     taskArtifactRequestConfig
   )
   return parseTaskArtifactsResponse(response.data)
+}
+
+export async function getUserLogSummary(
+  params: UserLogSummaryParams
+): Promise<UserLogSummary> {
+  const response = await api.get<{
+    success: boolean
+    message?: string
+    data?: UserLogSummary
+  }>('/api/log/self/summary', { params })
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || 'Failed to load usage report')
+  }
+  return response.data.data
 }

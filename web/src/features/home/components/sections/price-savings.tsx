@@ -34,7 +34,7 @@ import {
   type CatalogSort,
 } from '../../lib/catalog'
 import {
-  formatUsdPerMillion,
+  formatPerMillionTokens,
   type SavingsModel,
 } from '../../lib/pricing-savings'
 
@@ -77,7 +77,7 @@ function CatalogRow(props: { model: SavingsModel }) {
             <span className='truncate font-medium'>{model.modelName}</span>
             {model.savingsPercent > 0 ? (
               <span className='rounded-full bg-[var(--ci-lime)] px-2 py-0.5 text-[11px] font-medium text-[#040d10]'>
-                {model.savingsPercent}% {t('off')}
+                {t('Save {{percent}}%', { percent: model.savingsPercent })}
               </span>
             ) : null}
           </div>
@@ -101,7 +101,7 @@ function CatalogRow(props: { model: SavingsModel }) {
           {t('Discount')}
         </span>
         {model.savingsPercent > 0
-          ? `${model.savingsPercent}% ${t('off')}`
+          ? t('Save {{percent}}%', { percent: model.savingsPercent })
           : t('Base price')}
       </div>
       <ArrowUpRight className='text-muted-foreground hidden size-4 md:block' />
@@ -116,9 +116,11 @@ function PriceCell(props: { list: number; live: number; label: string }) {
         {props.label}
       </span>
       <span className='text-muted-foreground mr-1.5 line-through'>
-        {formatUsdPerMillion(props.list)}
+        {formatPerMillionTokens(props.list)}
       </span>
-      <span className='font-semibold'>{formatUsdPerMillion(props.live)}</span>
+      <span className='font-semibold'>
+        {formatPerMillionTokens(props.live)}
+      </span>
     </div>
   )
 }
