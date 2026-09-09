@@ -64,6 +64,9 @@ func TestGetUserLogSummaryUsesRecordedRatesAndSkipsIncomparableCharges(t *testin
 		{Other: `{"group_ratio":0}`},
 		{Other: `{"group_ratio":0.5,"user_group_ratio":0}`},
 		{Other: `not-json`},
+		{Other: `{"group_ratio":0.5,"violation_fee":true}`},
+		{Other: `{"group_ratio":0.5,"violation_fee_code":"penalty"}`},
+		{Other: `{"group_ratio":0.5,"violation_fee_marker":"penalty"}`},
 	}
 	for i := range logs {
 		logs[i].UserId = 42
@@ -80,7 +83,7 @@ func TestGetUserLogSummaryUsesRecordedRatesAndSkipsIncomparableCharges(t *testin
 	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &result))
 	// A user override of zero denotes the legacy unset sentinel; use group 0.5.
 	assert.InDelta(t, 300+900, result.Data.SavedQuota, 0.001)
-	assert.EqualValues(t, 6300, result.Data.Quota)
+	assert.EqualValues(t, 9000, result.Data.Quota)
 }
 
 func TestGetUserLogSummaryRejectsInvalidWindows(t *testing.T) {

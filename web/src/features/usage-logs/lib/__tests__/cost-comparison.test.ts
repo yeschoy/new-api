@@ -85,6 +85,7 @@ describe('recorded request price comparison', () => {
     ['nonfinite charge', Infinity, { group_ratio: 0.5 }],
     ['negative charge', -100, { group_ratio: 0.5 }],
     ['overflow', Number.MAX_VALUE, { group_ratio: Number.MIN_VALUE }],
+    ['penalty charge', 100, { group_ratio: 0.5, violation_fee: true }],
     ['subscription', 100, { group_ratio: 0.5, billing_source: 'subscription' }],
   ])('%s has no monetary comparison', (_name, quota, other) => {
     expect(

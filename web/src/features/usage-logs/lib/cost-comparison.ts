@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { LogOtherData } from '../types'
+import { isViolationFeeLog } from './format'
 
 export type LogCostComparison = {
   baseCost: number
@@ -30,24 +31,43 @@ export type LogQuotaComparison = {
   savedQuota: number
 }
 
+export function getLogGroupRatio(other: LogOtherData | null): number | null {
+  const userRatio = other?.user_group_ratio
+  const groupRatio =
+    typeof userRatio === 'number' && Number.isFinite(userRatio) && userRatio > 0
+      ? userRatio
+      : other?.group_ratio
+  return typeof groupRatio === 'number' &&
+    Number.isFinite(groupRatio) &&
+    groupRatio >= 0
+    ? groupRatio
+    : null
+}
+
+export function getLogChargedQuota(
+  quota: number,
+  other: LogOtherData | null
+): number {
+  const feeQuota = other?.fee_quota
+  return typeof feeQuota === 'number' &&
+    Number.isFinite(feeQuota) &&
+    feeQuota >= 0
+    ? feeQuota
+    : quota
+}
+
 // Reconstruct the recorded model price with the group multiplier set to one.
 // Historical logs must never be repriced using today's model configuration.
 export function getLogQuotaComparison(
   quota: number,
   other: LogOtherData | null
 ): LogQuotaComparison | null {
-  if (other?.billing_source === 'subscription') return null
+  if (other?.billing_source === 'subscription' || isViolationFeeLog(other)) {
+    return null
+  }
 
-  const userRatio = other?.user_group_ratio
-  const groupRatio =
-    typeof userRatio === 'number' && Number.isFinite(userRatio) && userRatio > 0
-      ? userRatio
-      : other?.group_ratio
-  const feeQuota = other?.fee_quota
-  const chargedQuota =
-    typeof feeQuota === 'number' && Number.isFinite(feeQuota) && feeQuota >= 0
-      ? feeQuota
-      : quota
+  const groupRatio = getLogGroupRatio(other)
+  const chargedQuota = getLogChargedQuota(quota, other)
 
   if (
     typeof groupRatio !== 'number' ||

@@ -60,6 +60,7 @@ import { useConsoleModeStore } from '@/stores/console-mode-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { CommunityHelp } from './community-help'
+import { ConsoleModeControl } from './console-mode-switcher'
 import { DocsSearch } from './docs-search'
 
 const NAV_ICONS = {
@@ -427,6 +428,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
           </button>
           <DocsSearch />
           <div className='ci-appTopbarRight'>
+            <ConsoleModeControl compact />
             <span className='ci-appUsd'>¥</span>
             <LanguageSwitcher />
             <button

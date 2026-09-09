@@ -16,24 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-const OPERATOR_PREFIXES = [
-  '/channels',
-  '/users',
-  '/redemption-codes',
-  '/subscriptions',
-  '/system-settings',
-  '/system-info',
-  '/task-plugins',
-  '/models',
-  '/dashboard/models',
-  '/dashboard/flow',
-  '/dashboard/users',
-  '/usage-logs/task',
-  '/usage-logs/drawing',
-]
+import { useRouterState } from '@tanstack/react-router'
 
-export function isOperatorRoute(pathname: string): boolean {
-  return OPERATOR_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  )
+import { isOperatorRoute } from '@/lib/operator-route'
+import { useConsoleModeStore } from '@/stores/console-mode-store'
+
+// Operator-only pages always use the developer shell, regardless of the saved preference.
+export function useConsoleMode() {
+  const preference = useConsoleModeStore((state) => state.mode)
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  return isOperatorRoute(pathname) ? 'developer' : preference
 }

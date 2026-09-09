@@ -66,7 +66,7 @@ Changes to easy-console key creation, request history or usage/savings reporting
 - Summary binds identity to the authenticated user, not a query parameter. Its totals and daily rows expose requests, succeeded, failed, quota, tokens, saved_quota and comparable_requests. Daily rows include a YYYY-MM-DD date and are sorted descending.
 - Scan the entire bounded LOG_DB window using GORM Rows/ScanRows and request context. Keep only day aggregates in memory; do not depend on optional/delayed QuotaData exports or SQL-vendor JSON/date functions.
 - Failed consume streams still count toward charged quota/tokens. Stream error classification is separate from whether the row incurred a charge.
-- Savings use recorded positive user_group_ratio before group_ratio, optional valid fee_quota, and exclude subscription/incomparable charges. Never reconstruct historical discounts from current model prices.
+- Savings use recorded positive user_group_ratio before group_ratio, optional valid fee_quota, and exclude subscription, violation-fee, and incomparable charges. Never reconstruct historical discounts from current model prices.
 
 ### 4. Validation & Error Matrix
 | Condition | Result |

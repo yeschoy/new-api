@@ -22,8 +22,8 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
+import { AuthenticatedLayout } from '@/components/layout/components/authenticated-layout'
 import { Footer } from '@/components/layout/components/footer'
-import { TerminalLayout } from '@/components/layout/components/terminal-layout'
 import { TerminalPage } from '@/components/layout/components/terminal-page'
 import { useTheme } from '@/context/theme-provider'
 import { useAuthStore } from '@/stores/auth-store'
@@ -123,7 +123,7 @@ export function Guide(props: GuideProps) {
   )
 
   if (user) {
-    return <TerminalLayout>{page}</TerminalLayout>
+    return <AuthenticatedLayout>{page}</AuthenticatedLayout>
   }
 
   return (

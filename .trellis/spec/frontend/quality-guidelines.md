@@ -115,6 +115,11 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Request rows compare recorded charged quota against the same price with group multiplier 1 via `getLogQuotaComparison`. Use the logged positive user override before group ratio; preserve zero fees, exclude subscription cash comparisons, and show an unavailable mark for missing/invalid rates. Show above-base charges as a surcharge, not savings.
 - `buildUsageReportCsv(rows)` exports numeric display amounts with a currency unit, or explicitly labeled raw quota in tokens mode.
 
+- Shared console chrome resolves the active mode with `useConsoleMode`: operator-only paths render developer controls even when the saved preference is easy. Choosing easy on those paths navigates to the easy overview; choosing developer from the easy report opens model analytics. Keep the mode control in the terminal header and use authenticated chrome for signed-in catalog/detail/guide pages.
+- Every request row opens the same accessible details sheet. Read billing and usage facts from the selected log; never query current model prices to fill historical gaps. Preserve trigger focus and hide operator diagnostics from the easy sheet.
+- Recorded fee quota remains the charged amount even without a valid comparison multiplier. Subscription and violation-fee logs must not invent cash savings. Unit prices are explicitly labeled as pre-discount rates per million tokens; variable dynamic prices remain labeled as dynamic.
+- Do not display an unconnected reserved-balance metric as a hardcoded zero.
+
 ### Validation & Error Matrix
 | Input/state | Behavior |
 | --- | --- |

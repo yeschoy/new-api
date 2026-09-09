@@ -21,8 +21,8 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
+import { useConsoleMode } from '@/hooks/use-console-mode'
 import { useNotifications } from '@/hooks/use-notifications'
-import { useConsoleModeStore } from '@/stores/console-mode-store'
 
 import { ConsoleModeControl } from './console-mode-switcher'
 import { EasyTaskDock } from './easy-task-dock'
@@ -105,7 +105,7 @@ export function AppHeader({
   showConfigDrawer = true,
   showProfileDropdown = true,
 }: AppHeaderProps) {
-  const mode = useConsoleModeStore((state) => state.mode)
+  const mode = useConsoleMode()
   const isEasyMode = mode === 'easy'
 
   return (

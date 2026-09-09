@@ -137,7 +137,7 @@ export function TerminalHome() {
         <div className='ci-panelBody'>{setupAction}</div>
       </section>
 
-      <section className='ci-statGrid'>
+      <section className='ci-statGrid ci-statGrid--three'>
         <article>
           <span>{t('Balance')}</span>
           <strong className={remainQuota <= 0 ? 'is-empty' : undefined}>
@@ -148,11 +148,6 @@ export function TerminalHome() {
               ? t('Too low to cover requests.')
               : t('Balance you can still spend')}
           </small>
-        </article>
-        <article>
-          <span>{t('Reserved')}</span>
-          <strong>{formatConsoleMoney(0)}</strong>
-          <small>{t('Not held separately on this gateway')}</small>
         </article>
         <article>
           <span>{t('Available')}</span>

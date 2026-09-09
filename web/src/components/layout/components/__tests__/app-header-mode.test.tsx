@@ -16,11 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { render, screen } from '@testing-library/react'
+import { QueryClient } from '@tanstack/react-query'
+import { screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useConsoleModeStore } from '@/stores/console-mode-store'
+import { renderApp } from '@/test-utils/render-app'
 
 import { AppHeader } from '../app-header'
 
@@ -61,14 +63,25 @@ vi.mock('../system-brand', () => ({
   SystemBrand: () => <span>野菜API</span>,
 }))
 
+let client: QueryClient
+const previousMode = useConsoleModeStore.getState().mode
+
+afterEach(() => {
+  client.clear()
+  useConsoleModeStore.getState().setMode(previousMode)
+})
+
 describe('application header console mode', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    })
   })
 
-  it('removes developer navigation, search, and notifications in easy mode', () => {
+  it('removes developer navigation, search, and notifications in easy mode', async () => {
     useConsoleModeStore.getState().setMode('easy')
-    render(<AppHeader />)
+    await renderApp(<AppHeader />, client)
 
     expect(screen.getByText('Easy task dock')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Search' })).toBeNull()
@@ -81,9 +94,9 @@ describe('application header console mode', () => {
     ).toHaveClass('shrink-0')
   })
 
-  it('restores developer search and notifications without public site links', () => {
+  it('restores developer search and notifications without public site links', async () => {
     useConsoleModeStore.getState().setMode('developer')
-    render(<AppHeader />)
+    await renderApp(<AppHeader />, client)
 
     expect(screen.queryByText('Easy task dock')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Search' })).toBeVisible()

@@ -49,11 +49,14 @@ func GetUserLogSummary(ctx context.Context, userID int, start, end int64, timezo
 			return nil, err
 		}
 		var other struct {
-			GroupRatio     *float64 `json:"group_ratio"`
-			UserGroupRatio *float64 `json:"user_group_ratio"`
-			FeeQuota       *float64 `json:"fee_quota"`
-			BillingSource  string   `json:"billing_source"`
-			StreamStatus   struct {
+			GroupRatio         *float64 `json:"group_ratio"`
+			UserGroupRatio     *float64 `json:"user_group_ratio"`
+			FeeQuota           *float64 `json:"fee_quota"`
+			BillingSource      string   `json:"billing_source"`
+			ViolationFee       bool     `json:"violation_fee"`
+			ViolationFeeCode   string   `json:"violation_fee_code"`
+			ViolationFeeMarker string   `json:"violation_fee_marker"`
+			StreamStatus       struct {
 				Status string `json:"status"`
 			} `json:"stream_status"`
 		}
@@ -61,7 +64,8 @@ func GetUserLogSummary(ctx context.Context, userID int, start, end int64, timezo
 		failed := log.Type == LogTypeError || (log.IsStream && other.StreamStatus.Status == "error")
 		var saved float64
 		comparable := false
-		if validOther && log.Type == LogTypeConsume && other.BillingSource != "subscription" {
+		if validOther && log.Type == LogTypeConsume && other.BillingSource != "subscription" &&
+			!other.ViolationFee && other.ViolationFeeCode == "" && other.ViolationFeeMarker == "" {
 			ratio := other.GroupRatio
 			if other.UserGroupRatio != nil && *other.UserGroupRatio > 0 {
 				ratio = other.UserGroupRatio

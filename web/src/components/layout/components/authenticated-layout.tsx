@@ -16,17 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useRouterState } from '@tanstack/react-router'
 
 import { AnimatedOutlet } from '@/components/page-transition'
 import { SkipToMain } from '@/components/skip-to-main'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
+import { useConsoleMode } from '@/hooks/use-console-mode'
 import { getCookie } from '@/lib/cookies'
-import { isOperatorRoute } from '@/lib/operator-route'
 import { cn } from '@/lib/utils'
-import { useConsoleModeStore } from '@/stores/console-mode-store'
 
 import { AppHeader } from './app-header'
 import { AppSidebar } from './app-sidebar'
@@ -38,11 +36,8 @@ type AuthenticatedLayoutProps = {
 
 export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
   const defaultOpen = getCookie('sidebar_state') !== 'false'
-  const mode = useConsoleModeStore((state) => state.mode)
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  })
-  const useOperatorShell = mode === 'developer' || isOperatorRoute(pathname)
+  const mode = useConsoleMode()
+  const useOperatorShell = mode === 'developer'
   const outlet = props.children ?? <AnimatedOutlet />
 
   if (!useOperatorShell) {

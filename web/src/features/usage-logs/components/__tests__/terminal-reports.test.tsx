@@ -21,8 +21,10 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { TerminalHome } from '@/features/dashboard/components/overview/terminal-home'
 import { api } from '@/lib/api'
 import { useSystemConfigStore } from '@/stores/system-config-store'
+import { renderApp } from '@/test-utils/render-app'
 
 import { TerminalReports } from '../terminal-reports'
 import { TerminalRequests } from '../terminal-requests'
@@ -35,6 +37,7 @@ let requestedWindow = 0
 let requestedStart = 0
 let requestOther: Record<string, unknown> = {}
 let requestType = 2
+let streamFails = true
 const summary = {
   requests: 103,
   succeeded: 101,
@@ -72,6 +75,7 @@ beforeEach(() => {
   requestedWindow = 0
   requestOther = { group_ratio: 0.5 }
   requestType = 2
+  streamFails = true
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   })
@@ -104,6 +108,8 @@ beforeEach(() => {
       data = summaryFails
         ? { success: false, message: 'Report unavailable' }
         : { success: true, data: summary }
+    } else if (url.pathname === '/api/token/') {
+      data = { success: true, data: { items: [] } }
     } else if (url.pathname === '/api/log/self') {
       const page = Number(url.searchParams.get('p') ?? 1)
       data = {
@@ -119,6 +125,8 @@ beforeEach(() => {
               created_at: Math.floor(Date.now() / 1000),
               type: requestType,
               content: '',
+              token_name: 'work-key',
+              request_id: 'request-001',
               model_name: page === 1 ? 'partial-stream' : 'older-request',
               quota: 100000,
               prompt_tokens: 4,
@@ -126,11 +134,11 @@ beforeEach(() => {
               use_time: 4,
               is_stream: true,
               other: JSON.stringify({
-                ...requestOther,
                 stream_status: {
-                  status: 'error',
-                  end_error: 'upstream timeout',
+                  status: streamFails ? 'error' : 'ok',
+                  end_error: streamFails ? 'upstream timeout' : undefined,
                 },
+                ...requestOther,
               }),
             },
           ],
@@ -185,11 +193,29 @@ describe('terminal usage views', () => {
       '¥1.4'
     )
     await user.click(within(row).getByRole('button'))
-    expect(await screen.findByText('upstream timeout')).toBeVisible()
+    const details = await screen.findByRole('dialog', {
+      name: 'Request details',
+    })
+    expect(
+      within(details).getByText(
+        'The response was interrupted before it finished.'
+      )
+    ).toBeVisible()
+    await user.click(within(details).getByText('Original error'))
+    expect(within(details).getByText('upstream timeout')).toBeVisible()
   })
 
   it.each([
     ['unrecorded multiplier', {}, 2, '¥1.4', '—', 'Saved', '—'],
+    [
+      'unrecorded multiplier with a recorded fee',
+      { fee_quota: 84000 },
+      2,
+      '¥1.176',
+      '—',
+      'Saved',
+      '—',
+    ],
     ['full price', { group_ratio: 1 }, 2, '¥1.4', '¥1.4', 'Saved', '¥0'],
     [
       'surcharge',
@@ -242,6 +268,62 @@ describe('terminal usage views', () => {
       ).toHaveTextContent(saved)
     }
   )
+
+  it('opens complete details for a successful request and returns focus after closing', async () => {
+    const user = userEvent.setup()
+    streamFails = false
+    requestOther = {
+      group_ratio: 0.5,
+      model_ratio: 1,
+      completion_ratio: 2,
+      cache_tokens: 2,
+      admin_info: { use_channel: [555] },
+    }
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalRequests />
+      </QueryClientProvider>
+    )
+    const row = (await screen.findByText('partial-stream')).closest('article')
+    if (!row) throw new Error('Missing request row')
+    const trigger = within(row).getByRole('button')
+    await user.click(trigger)
+    const details = await screen.findByRole('dialog', {
+      name: 'Request details',
+    })
+    expect(
+      within(details).getByText('Input Tokens').nextElementSibling
+    ).toHaveTextContent('4')
+    expect(
+      within(details).getByText('Output Tokens').nextElementSibling
+    ).toHaveTextContent('1')
+    expect(
+      within(details).getByText('Cache Read').nextElementSibling
+    ).toHaveTextContent('2')
+    expect(
+      within(details).getByText('Discount on this request').nextElementSibling
+    ).toHaveTextContent('50%')
+    expect(
+      within(details).getByText('Base input price').nextElementSibling
+    ).toHaveTextContent('¥14')
+    expect(
+      within(details).getByText('Base output price').nextElementSibling
+    ).toHaveTextContent('¥28')
+    expect(within(details).queryByText('555')).toBeNull()
+    await user.click(
+      within(details).getByRole('button', { name: 'Copy request ID' })
+    )
+    expect(await navigator.clipboard.readText()).toBe('request-001')
+    await user.click(within(details).getByRole('button', { name: 'Close' }))
+    expect(trigger).toHaveFocus()
+  })
+
+  it('removes the unsupported reserved-balance card from the overview', async () => {
+    await renderApp(<TerminalHome />, client)
+    await screen.findByText('Connect your client')
+    expect(screen.queryByText('Reserved')).toBeNull()
+    expect(screen.queryByText('Not held separately on this gateway')).toBeNull()
+  })
 
   it('renders the complete daily summary instead of rebuilding it from one log page', async () => {
     render(

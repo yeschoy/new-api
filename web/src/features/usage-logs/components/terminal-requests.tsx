@@ -18,11 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Inbox } from 'lucide-react'
+import { ChevronRight, Inbox } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { TerminalPage } from '@/components/layout/components/terminal-page'
+import { Sheet, SheetTrigger } from '@/components/ui/sheet'
 import { formatConsoleMoney } from '@/lib/console-money'
 import { formatQuotaWithCurrency } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
@@ -32,43 +33,27 @@ import { getUserLogs } from '../api'
 import { LOG_TYPE_ENUM } from '../constants'
 import { usageLogSchema, type UsageLog } from '../data/schema'
 import { useUsageSummary } from '../hooks/use-usage-summary'
-import { getLogQuotaComparison } from '../lib/cost-comparison'
+import {
+  getLogQuotaComparison,
+  getLogChargedQuota,
+} from '../lib/cost-comparison'
 import { parseLogOther } from '../lib/format'
+import { isFailedRequest } from '../lib/request-details'
+import { TerminalRequestDetails } from './terminal-request-details'
 
 type RequestFilter = 'all' | 'ok' | 'error'
 
 const requestCostFormat = { digitsLarge: 6, digitsSmall: 6, abbreviate: false }
 
-function isErrorLog(log: UsageLog): boolean {
-  return (
-    log.type === LOG_TYPE_ENUM.ERROR ||
-    (log.is_stream &&
-      parseLogOther(log.other)?.stream_status?.status === 'error')
-  )
-}
-
 function isVisibleLog(log: UsageLog): boolean {
   return log.type === LOG_TYPE_ENUM.CONSUME || log.type === LOG_TYPE_ENUM.ERROR
-}
-
-function errorText(log: UsageLog): string {
-  const other = parseLogOther(log.other)
-  const stream = other?.stream_status
-  const parts = [
-    other?.reject_reason,
-    stream?.end_error,
-    ...(Array.isArray(stream?.errors) ? stream.errors : []),
-    log.content,
-  ]
-  return parts
-    .filter((part) => typeof part === 'string' && part.trim())
-    .join('\n')
 }
 
 export function TerminalRequests() {
   const { t } = useTranslation()
   const [filter, setFilter] = useState<RequestFilter>('all')
-  const [openId, setOpenId] = useState<number | null>(null)
+  const [selectedLog, setSelectedLog] = useState<UsageLog | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [page, setPage] = useState(1)
   const summary = useUsageSummary(7)
   const { start, end } = summary
@@ -99,249 +84,248 @@ export function TerminalRequests() {
   })
 
   const logs = logsQuery.data?.items ?? []
-  const errorCount = logs.filter(isErrorLog).length
+  const errorCount = logs.filter(isFailedRequest).length
   const okCount = logs.length - errorCount
   const visible = logs.filter((log) => {
-    if (filter === 'error') return isErrorLog(log)
-    if (filter === 'ok') return !isErrorLog(log)
+    if (filter === 'error') return isFailedRequest(log)
+    if (filter === 'ok') return !isFailedRequest(log)
     return true
   })
   const empty = logs.length === 0
 
   return (
-    <TerminalPage
-      title={t('Requests')}
-      description={t('See each call, what it cost, and why it failed.')}
-    >
-      {summary.error || logsQuery.error ? (
-        <p role='alert' className='text-destructive'>
-          {t(
-            summary.error?.message ||
-              logsQuery.error?.message ||
-              'Failed to load usage report'
-          )}
-        </p>
-      ) : null}
-      <section className='ci-statGrid'>
-        <article>
-          <span>{t('Last 7 days')}</span>
-          <strong>{summary.data?.requests.toLocaleString() ?? '—'}</strong>
-          <small>{t('Calls')}</small>
-        </article>
-        <article>
-          <span>{t('Worked')}</span>
-          <strong>{summary.data?.succeeded.toLocaleString() ?? '—'}</strong>
-          <small>{t('Finished normally')}</small>
-        </article>
-        <article>
-          <span>{t('Failed')}</span>
-          <strong
-            className={(summary.data?.failed ?? 0) > 0 ? 'is-empty' : undefined}
-          >
-            {summary.data?.failed.toLocaleString() ?? '—'}
-          </strong>
-          <small>{t('Tap a row to read the error')}</small>
-        </article>
-        <article>
-          <span>{t('Spent')}</span>
-          <strong>
-            {summary.data ? formatConsoleMoney(summary.data.quota) : '—'}
-          </strong>
-          <small>{t('Charged to this workspace')}</small>
-        </article>
-      </section>
-
-      <section className='ci-panel'>
-        <header className='ci-panelHeader'>
-          <p>
+    <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+      <TerminalPage
+        title={t('Requests')}
+        description={t('See each call, what it cost, and why it failed.')}
+      >
+        {summary.error || logsQuery.error ? (
+          <p role='alert' className='text-destructive'>
             {t(
-              'Base price is the recorded model price before the group multiplier. Savings = base price − charged amount. A dash means no comparable price is available.'
+              summary.error?.message ||
+                logsQuery.error?.message ||
+                'Failed to load usage report'
             )}
           </p>
-        </header>
-        <div className='ci-requestFilters'>
-          <span>{t('Filter this page')}</span>
-          {(
-            [
-              ['all', t('All'), logs.length],
-              ['ok', t('Worked'), okCount],
-              ['error', t('Failed'), errorCount],
-            ] as const
-          ).map(([value, label, count]) => (
-            <button
-              key={value}
-              type='button'
-              className={cn('ci-chip', filter === value && 'is-active')}
-              onClick={() => setFilter(value)}
-            >
-              {label} {count}
-            </button>
-          ))}
-        </div>
-        {logsQuery.isPending && (
-          <div className='ci-empty'>{t('Loading...')}</div>
-        )}
-        {!logsQuery.isPending && !logsQuery.error && empty && (
-          <div className='ci-empty'>
-            <span className='ci-emptyIcon'>
-              <Inbox size={18} />
-            </span>
-            <h3>{t('No matching requests on this page')}</h3>
-            <p>
-              {t('Create a key, fill it into your tool, then come back here.')}
-            </p>
-            <Link
-              to='/keys'
-              className='ci-button ci-button--size-sm'
-              style={{ marginTop: 12 }}
-            >
-              {t('Go create a key')}
-            </Link>
-          </div>
-        )}
-        {!logsQuery.isPending && !logsQuery.error && !empty && (
-          <div className='ci-requestList'>
-            {visible.map((log) => {
-              const failed = isErrorLog(log)
-              const reason = failed ? errorText(log) : ''
-              const other = parseLogOther(log.other)
-              const comparison =
-                log.type === LOG_TYPE_ENUM.CONSUME
-                  ? getLogQuotaComparison(log.quota, other)
-                  : null
-              let chargedAmount = '—'
-              if (log.type === LOG_TYPE_ENUM.CONSUME) {
-                chargedAmount =
-                  other?.billing_source === 'subscription'
-                    ? t('Subscription')
-                    : formatQuotaWithCurrency(
-                        comparison?.chargedQuota ?? log.quota,
-                        requestCostFormat
-                      )
+        ) : null}
+        <section className='ci-statGrid'>
+          <article>
+            <span>{t('Last 7 days')}</span>
+            <strong>{summary.data?.requests.toLocaleString() ?? '—'}</strong>
+            <small>{t('Calls')}</small>
+          </article>
+          <article>
+            <span>{t('Worked')}</span>
+            <strong>{summary.data?.succeeded.toLocaleString() ?? '—'}</strong>
+            <small>{t('Finished normally')}</small>
+          </article>
+          <article>
+            <span>{t('Failed')}</span>
+            <strong
+              className={
+                (summary.data?.failed ?? 0) > 0 ? 'is-empty' : undefined
               }
-              const cacheRead = other?.cache_tokens || 0
-              const open = openId === log.id
-              return (
-                <article
-                  key={log.id}
-                  className={cn('ci-requestRow', failed && 'is-failed')}
-                >
-                  <button
-                    type='button'
-                    className='ci-requestMain'
-                    onClick={() => setOpenId(open ? null : log.id)}
-                  >
-                    <div>
-                      <strong>{log.model_name || t('Unknown model')}</strong>
-                      <span>
-                        {dayjs.unix(log.created_at).format('M月D日 HH:mm')}
-                        {log.token_name ? ` · ${log.token_name}` : ''}
-                      </span>
-                    </div>
-                    <b className={failed ? 'is-failed' : 'is-ok'}>
-                      {failed ? t('Failed') : t('Worked')}
-                    </b>
-                    <dl>
-                      <div>
-                        <dt>{t('Tokens')}</dt>
-                        <dd>
-                          {(
-                            log.prompt_tokens + log.completion_tokens
-                          ).toLocaleString()}
-                          {cacheRead > 0
-                            ? ` · ${t('cache {{count}}', { count: cacheRead.toLocaleString() })}`
-                            : ''}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>{t('Spend')}</dt>
-                        <dd>{chargedAmount}</dd>
-                      </div>
-                      <div>
-                        <dt>{t('Original price')}</dt>
-                        <dd>
-                          {comparison
-                            ? formatQuotaWithCurrency(
-                                comparison.baseQuota,
-                                requestCostFormat
-                              )
-                            : '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>
-                          {comparison && comparison.savedQuota < 0
-                            ? t('Above base price')
-                            : t('Saved')}
-                        </dt>
-                        <dd
-                          className={
-                            comparison && comparison.savedQuota > 0
-                              ? 'text-success'
-                              : undefined
-                          }
-                        >
-                          {comparison
-                            ? formatQuotaWithCurrency(
-                                Math.abs(comparison.savedQuota),
-                                requestCostFormat
-                              )
-                            : '—'}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>{t('Time taken')}</dt>
-                        <dd>
-                          {log.use_time > 0
-                            ? `${log.use_time.toFixed(1)}s`
-                            : '—'}
-                        </dd>
-                      </div>
-                    </dl>
-                  </button>
-                  {open && reason ? (
-                    <pre className='ci-requestError'>{reason}</pre>
-                  ) : null}
-                  {open && !reason && failed ? (
-                    <p className='ci-requestError'>
-                      {t('Failed, but no error text was saved.')}
-                    </p>
-                  ) : null}
-                </article>
-              )
-            })}
+            >
+              {summary.data?.failed.toLocaleString() ?? '—'}
+            </strong>
+            <small>{t('Tap a row to read the error')}</small>
+          </article>
+          <article>
+            <span>{t('Spent')}</span>
+            <strong>
+              {summary.data ? formatConsoleMoney(summary.data.quota) : '—'}
+            </strong>
+            <small>{t('Charged to this workspace')}</small>
+          </article>
+        </section>
+
+        <section className='ci-panel'>
+          <header className='ci-panelHeader'>
+            <p>
+              {t(
+                'Base price is the recorded model price before the group multiplier. Savings = base price − charged amount. A dash means no comparable price is available.'
+              )}
+            </p>
+          </header>
+          <div className='ci-requestFilters'>
+            <span>{t('Filter this page')}</span>
+            {(
+              [
+                ['all', t('All'), logs.length],
+                ['ok', t('Worked'), okCount],
+                ['error', t('Failed'), errorCount],
+              ] as const
+            ).map(([value, label, count]) => (
+              <button
+                key={value}
+                type='button'
+                className={cn('ci-chip', filter === value && 'is-active')}
+                onClick={() => setFilter(value)}
+              >
+                {label} {count}
+              </button>
+            ))}
           </div>
-        )}
-      </section>
-      <div className='ci-tablePager'>
-        <button
-          type='button'
-          className='ci-button ci-button--ghost ci-button--size-xs'
-          disabled={page === 1 || logsQuery.isFetching}
-          onClick={() => {
-            setPage(page - 1)
-            setOpenId(null)
-          }}
-        >
-          {t('Previous')}
-        </button>
-        <span>
-          {page} / {Math.max(1, Math.ceil((logsQuery.data?.total ?? 0) / 50))}
-        </span>
-        <button
-          type='button'
-          className='ci-button ci-button--ghost ci-button--size-xs'
-          disabled={
-            page * 50 >= (logsQuery.data?.total ?? 0) || logsQuery.isFetching
-          }
-          onClick={() => {
-            setPage(page + 1)
-            setOpenId(null)
-          }}
-        >
-          {t('Next')}
-        </button>
-      </div>
-    </TerminalPage>
+          {logsQuery.isPending && (
+            <div className='ci-empty'>{t('Loading...')}</div>
+          )}
+          {!logsQuery.isPending && !logsQuery.error && empty && (
+            <div className='ci-empty'>
+              <span className='ci-emptyIcon'>
+                <Inbox size={18} />
+              </span>
+              <h3>{t('No matching requests on this page')}</h3>
+              <p>
+                {t(
+                  'Create a key, fill it into your tool, then come back here.'
+                )}
+              </p>
+              <Link
+                to='/keys'
+                className='ci-button ci-button--size-sm'
+                style={{ marginTop: 12 }}
+              >
+                {t('Go create a key')}
+              </Link>
+            </div>
+          )}
+          {!logsQuery.isPending && !logsQuery.error && !empty && (
+            <div className='ci-requestList'>
+              {visible.map((log) => {
+                const failed = isFailedRequest(log)
+                const other = parseLogOther(log.other)
+                const comparison =
+                  log.type === LOG_TYPE_ENUM.CONSUME
+                    ? getLogQuotaComparison(log.quota, other)
+                    : null
+                let chargedAmount = '—'
+                if (log.type === LOG_TYPE_ENUM.CONSUME) {
+                  chargedAmount =
+                    other?.billing_source === 'subscription'
+                      ? t('Subscription')
+                      : formatQuotaWithCurrency(
+                          getLogChargedQuota(log.quota, other),
+                          requestCostFormat
+                        )
+                }
+                const cacheRead = other?.cache_tokens || 0
+                return (
+                  <article
+                    key={log.id}
+                    className={cn('ci-requestRow', failed && 'is-failed')}
+                  >
+                    <SheetTrigger
+                      className='ci-requestMain'
+                      onClick={() => setSelectedLog(log)}
+                    >
+                      <ChevronRight
+                        className='ci-requestDisclosure'
+                        size={16}
+                        aria-hidden='true'
+                      />
+                      <div>
+                        <strong>{log.model_name || t('Unknown model')}</strong>
+                        <span>
+                          {dayjs.unix(log.created_at).format('M月D日 HH:mm')}
+                          {log.token_name ? ` · ${log.token_name}` : ''}
+                        </span>
+                      </div>
+                      <b className={failed ? 'is-failed' : 'is-ok'}>
+                        {failed ? t('Failed') : t('Worked')}
+                      </b>
+                      <dl>
+                        <div>
+                          <dt>{t('Tokens')}</dt>
+                          <dd>
+                            {(
+                              log.prompt_tokens + log.completion_tokens
+                            ).toLocaleString()}
+                            {cacheRead > 0
+                              ? ` · ${t('cache {{count}}', { count: cacheRead.toLocaleString() })}`
+                              : ''}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{t('Spend')}</dt>
+                          <dd>{chargedAmount}</dd>
+                        </div>
+                        <div>
+                          <dt>{t('Original price')}</dt>
+                          <dd>
+                            {comparison
+                              ? formatQuotaWithCurrency(
+                                  comparison.baseQuota,
+                                  requestCostFormat
+                                )
+                              : '—'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>
+                            {comparison && comparison.savedQuota < 0
+                              ? t('Above base price')
+                              : t('Saved')}
+                          </dt>
+                          <dd
+                            className={
+                              comparison && comparison.savedQuota > 0
+                                ? 'text-success'
+                                : undefined
+                            }
+                          >
+                            {comparison
+                              ? formatQuotaWithCurrency(
+                                  Math.abs(comparison.savedQuota),
+                                  requestCostFormat
+                                )
+                              : '—'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{t('Time taken')}</dt>
+                          <dd>
+                            {log.use_time > 0
+                              ? `${log.use_time.toFixed(1)}s`
+                              : '—'}
+                          </dd>
+                        </div>
+                      </dl>
+                    </SheetTrigger>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+        <div className='ci-tablePager'>
+          <button
+            type='button'
+            className='ci-button ci-button--ghost ci-button--size-xs'
+            disabled={page === 1 || logsQuery.isFetching}
+            onClick={() => {
+              setPage(page - 1)
+            }}
+          >
+            {t('Previous')}
+          </button>
+          <span>
+            {page} / {Math.max(1, Math.ceil((logsQuery.data?.total ?? 0) / 50))}
+          </span>
+          <button
+            type='button'
+            className='ci-button ci-button--ghost ci-button--size-xs'
+            disabled={
+              page * 50 >= (logsQuery.data?.total ?? 0) || logsQuery.isFetching
+            }
+            onClick={() => {
+              setPage(page + 1)
+            }}
+          >
+            {t('Next')}
+          </button>
+        </div>
+      </TerminalPage>
+      {selectedLog && <TerminalRequestDetails log={selectedLog} />}
+    </Sheet>
   )
 }

@@ -19,8 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { PublicLayout } from '@/components/layout'
-import { TerminalLayout } from '@/components/layout/components/terminal-layout'
 import { PageTransition } from '@/components/page-transition'
 import { useAuthStore } from '@/stores/auth-store'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
@@ -35,6 +33,7 @@ import {
   ModelCardGrid,
   ModelDetailsDrawer,
 } from './components'
+import { CatalogPageLayout } from './components/catalog-page-layout'
 import { TerminalModels } from './components/terminal-models'
 import { EXCLUDED_GROUPS, VIEW_MODES } from './constants'
 import { useFilters } from './hooks/use-filters'
@@ -157,9 +156,9 @@ export function Pricing() {
 
   if (useTerminal) {
     return (
-      <TerminalLayout>
+      <CatalogPageLayout showMainContainer={false}>
         <TerminalModels />
-      </TerminalLayout>
+      </CatalogPageLayout>
     )
   }
 
@@ -169,7 +168,9 @@ export function Pricing() {
         <LoadingSkeleton viewMode={viewMode} />
       </div>
     )
-    return <PublicLayout showMainContainer={false}>{loading}</PublicLayout>
+    return (
+      <CatalogPageLayout showMainContainer={false}>{loading}</CatalogPageLayout>
+    )
   }
 
   const pricingInner = (
@@ -309,5 +310,9 @@ export function Pricing() {
     </div>
   )
 
-  return <PublicLayout showMainContainer={false}>{pricingInner}</PublicLayout>
+  return (
+    <CatalogPageLayout showMainContainer={false}>
+      {pricingInner}
+    </CatalogPageLayout>
+  )
 }

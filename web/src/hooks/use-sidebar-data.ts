@@ -39,8 +39,8 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
+import { useConsoleMode } from '@/hooks/use-console-mode'
 import { ROLE } from '@/lib/roles'
-import { useConsoleModeStore } from '@/stores/console-mode-store'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -50,7 +50,7 @@ import { useConsoleModeStore } from '@/stores/console-mode-store'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
-  const mode = useConsoleModeStore((state) => state.mode)
+  const mode = useConsoleMode()
 
   if (mode === 'easy') {
     return {
