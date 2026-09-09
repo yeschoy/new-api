@@ -83,7 +83,7 @@ export function TerminalReports() {
         <article>
           <span>{t('Billed')}</span>
           <strong>{data ? formatConsoleMoney(data.quota) : '—'}</strong>
-          <small>{t('Charged to this workspace')}</small>
+          <small>{t('Total spent in the last 10 days')}</small>
         </article>
         <article>
           <span>{t('Tokens')}</span>

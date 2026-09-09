@@ -128,14 +128,14 @@ export function TerminalRequests() {
             >
               {summary.data?.failed.toLocaleString() ?? '—'}
             </strong>
-            <small>{t('Tap a row to read the error')}</small>
+            <small>{t('Click a request to view error details')}</small>
           </article>
           <article>
             <span>{t('Spent')}</span>
             <strong>
               {summary.data ? formatConsoleMoney(summary.data.quota) : '—'}
             </strong>
-            <small>{t('Charged to this workspace')}</small>
+            <small>{t('Total spent in the last 7 days')}</small>
           </article>
         </section>
 
