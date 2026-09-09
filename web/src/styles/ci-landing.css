@@ -5458,8 +5458,12 @@ html:lang(zh-TW) .ci-finalCta h2 i {
 }
 
 .ci-app {
+  --ci-sidebar-motion: 320ms;
+  --ci-sidebar-ease: cubic-bezier(0.22, 1, 0.36, 1);
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
+  transition:
+    grid-template-columns var(--ci-sidebar-motion) var(--ci-sidebar-ease);
   height: 100svh;
   min-height: 100svh;
   overflow: hidden;
@@ -5469,6 +5473,7 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   grid-template-columns: 72px minmax(0, 1fr);
 }
 .ci-appSidebar {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -5503,6 +5508,7 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   color: var(--ci-color-text-muted);
 }
 .ci-appSearch input {
+  min-width: 0;
   width: 100%;
   border: 0;
   background: transparent;
@@ -5520,11 +5526,18 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   overflow: auto;
   padding: 0 10px 12px;
 }
+.ci-appNav {
+  overflow-x: hidden;
+}
 .ci-appNavGroup {
   display: grid;
   gap: 2px;
 }
 .ci-appNavLabel {
+  max-height: 16px;
+  line-height: 16px;
+  overflow: hidden;
+  white-space: nowrap;
   margin: 0 8px 4px;
   color: var(--ci-color-text-muted);
   font-size: 10px;
@@ -5533,6 +5546,8 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   text-transform: uppercase;
 }
 .ci-appNavItem {
+  overflow: hidden;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -5663,6 +5678,83 @@ html:lang(zh-TW) .ci-finalCta h2 i {
 }
 .ci-appBackdrop {
   display: none;
+}
+/* Keep labels mounted so width and content can reverse smoothly mid-transition. */
+.ci-appBrand .ci-mark,
+.ci-appNavText,
+.ci-appUserName {
+  white-space: nowrap;
+}
+.ci-appBrand img,
+.ci-appSearch > svg,
+.ci-appNavItem > svg,
+.ci-appUserMark,
+.ci-appUser > svg {
+  flex-shrink: 0;
+}
+.ci-appBrand .ci-mark > span,
+.ci-appSearch input,
+.ci-appNavText,
+.ci-appUserName,
+.ci-appUser > svg {
+  transition:
+    opacity 180ms ease 60ms,
+    transform var(--ci-sidebar-motion) var(--ci-sidebar-ease),
+    visibility 0s;
+}
+.ci-appNavLabel {
+  transition:
+    max-height var(--ci-sidebar-motion) var(--ci-sidebar-ease),
+    margin-bottom var(--ci-sidebar-motion) var(--ci-sidebar-ease),
+    opacity 180ms ease 60ms;
+}
+.ci-appUser {
+  overflow: hidden;
+}
+.ci-appBalanceRegion {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--ci-sidebar-motion) var(--ci-sidebar-ease),
+    opacity 180ms ease;
+}
+.ci-appBalanceRegion > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.ci-appBalance {
+  width: 223px;
+}
+.ci-appSidebarToggle {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 120ms ease;
+}
+.ci-appSidebarToggle:active {
+  transform: scale(0.94);
+}
+@media (min-width: 901px) {
+  .ci-app--collapsed .ci-appBrand .ci-mark > span,
+  .ci-app--collapsed .ci-appSearch input,
+  .ci-app--collapsed .ci-appNavText,
+  .ci-app--collapsed .ci-appUserName,
+  .ci-app--collapsed .ci-appUser > svg {
+    opacity: 0;
+    transform: translateX(-6px);
+    visibility: hidden;
+    transition-delay: 0s, 0s, 180ms;
+  }
+  .ci-app--collapsed .ci-appNavLabel {
+    max-height: 0;
+    margin-bottom: 0;
+    opacity: 0;
+    transition-delay: 0s;
+  }
+  .ci-app--collapsed .ci-appBalanceRegion {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
 }
 .ci-appFrame {
   display: flex;
@@ -6534,23 +6626,41 @@ html:lang(zh-TW) .ci-finalCta h2 i {
     grid-template-columns: 1fr;
   }
   .ci-appSidebar {
-    display: none;
     position: fixed;
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition:
+      transform var(--ci-sidebar-motion) var(--ci-sidebar-ease),
+      visibility 0s var(--ci-sidebar-motion);
     inset: 0 auto 0 0;
     z-index: 60;
     width: min(248px, 86vw);
     box-shadow: var(--ci-shadow-lg);
   }
   .ci-app:not(.ci-app--collapsed) .ci-appSidebar {
-    display: flex;
+    visibility: visible;
+    transform: translateX(0);
+    transition-delay: 0s;
   }
   .ci-appBackdrop {
     display: block;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity var(--ci-sidebar-motion) ease,
+      visibility 0s var(--ci-sidebar-motion);
     position: fixed;
     inset: 0;
     z-index: 55;
     border: 0;
     background: rgb(4 13 16 / 0.32);
+  }
+  .ci-app:not(.ci-app--collapsed) .ci-appBackdrop {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
   }
   .ci-appDocsSearch,
   .ci-appDocsSearchWrap,
@@ -6621,5 +6731,21 @@ html:lang(zh-TW) .ci-finalCta h2 i {
 
   .ci-trustGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ci-app,
+  .ci-appSidebar,
+  .ci-appBackdrop,
+  .ci-appSidebarToggle,
+  .ci-appBrand .ci-mark > span,
+  .ci-appSearch input,
+  .ci-appNavText,
+  .ci-appNavLabel,
+  .ci-appUserName,
+  .ci-appUser > svg,
+  .ci-appBalanceRegion {
+    transition: none !important;
   }
 }
