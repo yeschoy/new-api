@@ -52,6 +52,7 @@ SectionPageLayoutBreadcrumb.displayName = 'SectionPageLayout.Breadcrumb'
 export type SectionPageLayoutProps = {
   children: ReactNode
   fixedContent?: boolean
+  stackActionsOnMobile?: boolean
 }
 
 export function SectionPageLayout(props: SectionPageLayoutProps) {
@@ -67,9 +68,14 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
   Children.forEach(props.children, (node) => {
     if (!isValidElement(node)) return
     const child = node as ReactElement<SlotProps>
+<<<<<<< HEAD
     if (child.type === SectionPageLayoutTitle) {
       title = child.props.children
     } else if (child.type === SectionPageLayoutActions) {
+=======
+    if (child.type === SectionPageLayoutTitle) title = child.props.children
+    else if (child.type === SectionPageLayoutActions) {
+>>>>>>> v1.0.0-rc.36
       actions = child.props.children
     } else if (child.type === SectionPageLayoutContent) {
       content = child.props.children
@@ -80,11 +86,35 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
 
   return (
     <PageFooterProvider container={footerContainer}>
+<<<<<<< HEAD
       <Main className='dopa-console-page dopa-section-page'>
         {(title != null || actions != null || breadcrumb != null) && (
           <div className='dopa-section-page__header shrink-0 px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4'>
             {breadcrumb != null && (
               <div className='mb-2 sm:mb-3'>{breadcrumb}</div>
+=======
+      <Main>
+        <div className='shrink-0 px-3 pt-3 pb-2.5 sm:px-4 sm:pt-5 sm:pb-3'>
+          {breadcrumb != null && (
+            <div className='mb-2 sm:mb-3'>{breadcrumb}</div>
+          )}
+          <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:gap-x-4'>
+            <div
+              className={
+                props.stackActionsOnMobile
+                  ? 'min-w-0 flex-1 max-sm:basis-full'
+                  : 'min-w-0 flex-1'
+              }
+            >
+              <h2 className='truncate text-base font-bold tracking-tight sm:text-lg'>
+                {title}
+              </h2>
+            </div>
+            {actions != null && (
+              <div className='flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-x-4'>
+                {actions}
+              </div>
+>>>>>>> v1.0.0-rc.36
             )}
             <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:gap-x-4'>
               <div className='min-w-0 flex-1'>

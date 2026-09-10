@@ -20,6 +20,7 @@ import {
   Activity,
   BookOpen,
   Box,
+  ClipboardList,
   CreditCard,
   FileText,
   FlaskConical,
@@ -31,6 +32,7 @@ import {
   Radio,
   ServerCog,
   Settings,
+  ShieldCheck,
   Ticket,
   User,
   Users,
@@ -39,7 +41,10 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
+<<<<<<< HEAD
 import { useConsoleMode } from '@/hooks/use-console-mode'
+=======
+>>>>>>> v1.0.0-rc.36
 import { ROLE } from '@/lib/roles'
 
 /**
@@ -133,6 +138,11 @@ export function useSidebarData(): SidebarData {
             icon: FileText,
           },
           {
+            title: t('Audit Logs'),
+            url: '/usage-logs/audit',
+            icon: ClipboardList,
+          },
+          {
             title: t('Task Logs'),
             url: '/usage-logs/task',
             activeUrls: ['/usage-logs/drawing'],
@@ -175,6 +185,11 @@ export function useSidebarData(): SidebarData {
             title: t('Profile'),
             url: '/profile',
             icon: User,
+          },
+          {
+            title: t('Security & Access'),
+            url: '/security',
+            icon: ShieldCheck,
           },
         ],
       },
