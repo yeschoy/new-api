@@ -165,20 +165,9 @@ export function TerminalLayout(props: TerminalLayoutProps) {
         inert={compactViewport && collapsed}
         aria-hidden={(compactViewport && collapsed) || undefined}
       >
-        {user ? (
-          <Link
-            to='/dashboard/$section'
-            params={{ section: 'overview' }}
-            className='ci-appBrand'
-            aria-label={PRODUCT_NAME}
-          >
-            <CiMark size={22} withWordmark />
-          </Link>
-        ) : (
-          <Link to='/' className='ci-appBrand' aria-label={PRODUCT_NAME}>
-            <CiMark size={22} withWordmark />
-          </Link>
-        )}
+        <Link to='/' className='ci-appBrand' aria-label={PRODUCT_NAME}>
+          <CiMark size={22} withWordmark />
+        </Link>
         <label className='ci-appSearch'>
           <Search size={14} />
           <input

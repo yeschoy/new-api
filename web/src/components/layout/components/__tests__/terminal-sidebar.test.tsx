@@ -20,25 +20,33 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
   createRootRoute,
+  createRoute,
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { useAuthStore } from '@/stores/auth-store'
+import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 
 import { TerminalLayout } from '../terminal-layout'
 
 let client: QueryClient
+const originalAuth = useAuthStore.getState()
 
 beforeEach(() => {
   window.localStorage.clear()
+  useAuthStore.getState().auth.reset()
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   })
 })
 
 afterEach(() => {
+  useAuthStore.setState(originalAuth)
   client.clear()
   window.localStorage.clear()
   vi.restoreAllMocks()
@@ -66,6 +74,43 @@ async function renderLayout() {
 }
 
 describe('terminal sidebar transitions', () => {
+  it('returns a signed-in user to the public home when the brand is clicked', async () => {
+    const user = userEvent.setup()
+    useAuthStore.getState().auth.setBundle(createTestAuthBundle())
+    client.setQueryData(['status'], {})
+    const root = createRootRoute()
+    const home = createRoute({
+      getParentRoute: () => root,
+      path: '/',
+      component: () => <h1>Public home</h1>,
+    })
+    const consolePage = createRoute({
+      getParentRoute: () => root,
+      path: '/dashboard/overview',
+      component: () => (
+        <TerminalLayout>
+          <h1>Console overview</h1>
+        </TerminalLayout>
+      ),
+    })
+    const router = createRouter({
+      routeTree: root.addChildren([home, consolePage]),
+      history: createMemoryHistory({ initialEntries: ['/dashboard/overview'] }),
+    })
+    await act(() => router.load())
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    )
+    await user.click(
+      await screen.findByRole('link', { name: '野菜' })
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Public home' })
+    ).toBeVisible()
+    expect(router.state.location.pathname).toBe('/')
+  })
   it('keeps search input and page state while collapsing and reopening', async () => {
     const user = userEvent.setup()
     await renderLayout()
