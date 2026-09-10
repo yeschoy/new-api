@@ -118,6 +118,9 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Shared console chrome resolves the active mode with `useConsoleMode`: operator-only paths render developer controls even when the saved preference is easy. Choosing easy on those paths navigates to the easy overview; choosing developer from the easy report opens model analytics. Keep the mode control in the terminal header and use authenticated chrome for signed-in catalog/detail/guide pages.
 - Every request row opens the same accessible details sheet. Read billing and usage facts from the selected log; never query current model prices to fill historical gaps. Preserve trigger focus and hide operator diagnostics from the easy sheet.
 - Recorded fee quota remains the charged amount even without a valid comparison multiplier. Subscription and violation-fee logs must not invent cash savings. Unit prices are explicitly labeled as pre-discount rates per million tokens; variable dynamic prices remain labeled as dynamic.
+- Developer price comparisons use the "Official price" label with a tooltip explaining that values are recorded-base estimates, not independently verified provider prices. Recognized overseas model families display the native official USD amount; domestic and unknown families display CNY. Keep the actual site charge in CNY and compute discounts after converting the overseas reference at `OFFICIAL_PRICE_USD_TO_CNY = 6.75`. Use the unrounded amount for this conversion and do not apply the recharge price to the native USD number. Currency recognition follows the same model-family resolver as the model badge; no official-price feed is implied.
+- Per-request billing (`isPerCallBilling(other.model_price)`) does not show original-price or savings comparisons in developer cost cells, easy request rows, or request details. Preserve the actual charge and any subscription/tool-surcharge indicators.
+- Configured cache-write ratios, including zero, are displayed even when no cache was written. Claude's recorded 5-minute and 1-hour rates remain separate. Missing historical rates are not filled from current catalog settings.
 - Do not display an unconnected reserved-balance metric as a hardcoded zero.
 
 ### Validation & Error Matrix
@@ -143,3 +146,54 @@ Cover 101-key revoke and incomplete deletion, reveal retry without duplicate cre
 - Correct: use recorded-rate summary data from the backend.
 - Wrong: use an icon identifier as img.src.
 - Correct: use the existing icon renderer for identifiers; image URLs remain image sources.
+
+## Preload-safe authentication navigation
+
+### Scope / Trigger
+Authentication guards, legacy URL redirects, and asynchronous profile writes.
+
+### Signatures
+- `createInternalRedirect(href: string)` accepts an already validated internal path.
+- `auth.setUser(user, expectedSessionId?)` updates the current authenticated profile;
+  only `setBundle` establishes authentication.
+
+### Contracts
+- Internal guard redirects must provide `to`, parsed `search`, and `hash`. In the
+  installed router, `preloadRoute` does not resolve href-only redirects like
+  `navigate` does: sign-in can repeatedly preload itself and starve the UI thread.
+- Keep intent preloading enabled. Preserve validated return queries, typed search
+  values, and fragments through the shared redirect helper.
+- Sign-in/sign-up and protected routes must agree that both user and access token
+  are required before redirecting an already-authenticated visitor.
+- Non-null profile updates require a current token, session, and matching user ID.
+  Async callers pass the session ID captured before their request so a late
+  response cannot affect a later session, including the same account signing in again.
+
+### Validation & Error Matrix
+| Condition | Expected behavior |
+| --- | --- |
+| Authenticated sign-in preload | Finishes at the validated return target or dashboard |
+| User remains without a token | Auth pages remain accessible, no redirect bounce |
+| Legacy URL preload | Reaches its mapped target, not the home-page fallback |
+| Profile response after sign-out/account or session switch | Does not restore or replace the current user |
+| Profile response for the current session | Updates profile while preserving credentials |
+
+### Good / Base / Bad Cases
+- Good: `/keys?page=2&tags=["text"]#recent` keeps its typed search and fragment.
+- Base: signed-in `/sign-in` preloads the dashboard once; anonymous sign-in remains a form.
+- Bad: `redirect({ href: '/dashboard' })` from sign-in with intent preloading enabled.
+
+### Tests Required
+- Exercise the actual route guards through a real router's `preloadRoute`, with a
+  bounded failure guard so regressions cannot hang the test runner.
+- Cover anonymous, complete, and residual-user authentication states, legacy
+  targets, query/fragment preservation, and stale profile response transitions.
+- Verify desktop/mobile login clicks and continued navigation/scrolling in-browser.
+
+### Wrong vs Correct
+```ts
+// Wrong for a route guard: the preload path does not interpret href.
+throw redirect({ href: validatedTarget, replace: true })
+// Correct: normalize the trusted path into router navigation fields.
+throw createInternalRedirect(validatedTarget)
+```

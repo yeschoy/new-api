@@ -21,6 +21,49 @@ import { describe, expect, it } from 'vitest'
 import { getRecordedUnitPrices } from '../request-details'
 
 describe('recorded request unit prices', () => {
+  it('derives cache-read and cache-write unit prices only from recorded ratios', () => {
+    expect(
+      getRecordedUnitPrices({
+        model_ratio: 2,
+        completion_ratio: 3,
+        cache_ratio: 0.1,
+        cache_creation_ratio: 1.25,
+        cache_creation_ratio_5m: 1.25,
+        cache_creation_ratio_1h: 2,
+      })
+    ).toMatchObject({
+      input: 4,
+      output: 12,
+      cacheRead: 0.4,
+      cacheWrite: 5,
+      cacheWrite5m: 5,
+      cacheWrite1h: 8,
+    })
+  })
+
+  it('preserves free cache prices and does not invent missing or invalid cache rates', () => {
+    expect(
+      getRecordedUnitPrices({
+        model_ratio: 2,
+        cache_ratio: 0,
+        cache_creation_ratio: 0,
+      })
+    ).toMatchObject({ cacheRead: 0, cacheWrite: 0 })
+    expect(getRecordedUnitPrices({ model_ratio: 2 })).toMatchObject({
+      cacheRead: null,
+      cacheWrite: null,
+      cacheWrite5m: null,
+      cacheWrite1h: null,
+    })
+    expect(
+      getRecordedUnitPrices({
+        model_ratio: 2,
+        cache_ratio: -1,
+        cache_creation_ratio: Infinity,
+        cache_creation_ratio_1h: Number.MAX_VALUE,
+      })
+    ).toMatchObject({ cacheRead: null, cacheWrite: null, cacheWrite1h: null })
+  })
   it('uses historical model rates and preserves explicit free input or output', () => {
     expect(
       getRecordedUnitPrices({ model_ratio: 2, completion_ratio: 3 })

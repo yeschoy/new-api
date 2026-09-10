@@ -81,7 +81,13 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
         )
   }
   let discount = '—'
-  if (billed && !subscription && prices.mode !== 'fee' && ratio !== null) {
+  if (
+    billed &&
+    !subscription &&
+    prices.mode !== 'fee' &&
+    prices.mode !== 'request' &&
+    ratio !== null
+  ) {
     discount = `${Number((Math.max(0, 1 - ratio) * 100).toFixed(2))}%`
   }
   const requestFacts = [
@@ -131,12 +137,46 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
     })
   }
 
+  const unitPriceFacts =
+    prices.mode === 'tokens'
+      ? [
+          { label: t('Base input price'), value: prices.input },
+          { label: t('Base output price'), value: prices.output },
+          { label: t('Base cache read price'), value: prices.cacheRead },
+        ]
+      : []
+  if (prices.mode === 'tokens') {
+    const hasTimedWrites =
+      prices.cacheWrite5m !== null ||
+      prices.cacheWrite1h !== null ||
+      cacheWrite5m > 0 ||
+      cacheWrite1h > 0
+    if (!hasTimedWrites && (prices.cacheWrite !== null || cacheWrite > 0)) {
+      unitPriceFacts.push({
+        label: t('Base cache write price'),
+        value: prices.cacheWrite,
+      })
+    }
+    if (prices.cacheWrite5m !== null || cacheWrite5m > 0) {
+      unitPriceFacts.push({
+        label: t('Base cache write price (5m)'),
+        value: prices.cacheWrite5m,
+      })
+    }
+    if (prices.cacheWrite1h !== null || cacheWrite1h > 0) {
+      unitPriceFacts.push({
+        label: t('Base cache write price (1h)'),
+        value: prices.cacheWrite1h,
+      })
+    }
+  }
+
   return (
     <SheetContent
       side='right'
       overlayClassName='z-[65]'
       className={sideDrawerContentClassName(
-        'ci-landing ci-theme ci-requestDetails z-[70] sm:max-w-[560px]'
+        'ci-landing ci-theme ci-requestDetails z-[70] sm:max-w-[760px]'
       )}
       data-theme={resolvedTheme}
       showCloseButton={false}
@@ -185,120 +225,117 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
             ))}
           </dl>
         </section>
-        <section className='ci-requestDetailsSection'>
-          <h3>{t('Billing Details')}</h3>
-          <dl className='ci-requestFacts'>
-            <div>
-              <dt>{t('Original price')}</dt>
-              <dd>
-                {comparison
-                  ? formatQuotaWithCurrency(comparison.baseQuota, moneyOptions)
-                  : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt>{t('You actually paid')}</dt>
-              <dd>{charged}</dd>
-            </div>
-            <div>
-              <dt>
-                {comparison && comparison.savedQuota < 0
-                  ? t('Above base price')
-                  : t('Saved')}
-              </dt>
-              <dd
-                className={
-                  comparison && comparison.savedQuota > 0
-                    ? 'text-success'
-                    : undefined
-                }
-              >
-                {comparison
-                  ? formatQuotaWithCurrency(
-                      Math.abs(comparison.savedQuota),
+        <div className='ci-requestBilling'>
+          <section
+            className='ci-requestDetailsSection'
+            aria-label={t('Request cost')}
+          >
+            <h3>{t('Request cost')}</h3>
+            <dl className='ci-requestFacts'>
+              {prices.mode !== 'request' && (
+                <div>
+                  <dt>{t('Before-discount estimate')}</dt>
+                  <dd>
+                    {comparison
+                      ? formatQuotaWithCurrency(
+                          comparison.baseQuota,
+                          moneyOptions
+                        )
+                      : '—'}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt>{t('Charge')}</dt>
+                <dd>{charged}</dd>
+              </div>
+              {comparison && comparison.savedQuota > 0 && (
+                <div>
+                  <dt>{t('Saved')}</dt>
+                  <dd className='text-success'>
+                    {formatQuotaWithCurrency(
+                      comparison.savedQuota,
                       moneyOptions
-                    )
-                  : '—'}
-              </dd>
-            </div>
-            <div>
-              <dt>{t('Discount on this request')}</dt>
-              <dd>{discount}</dd>
-            </div>
-          </dl>
-          {subscription && (
-            <p className='ci-requestDetailsNote'>
-              {t(
-                'This request used a subscription; cash savings are not comparable.'
-              )}
-            </p>
-          )}
-          {!subscription && !comparison && billed && prices.mode !== 'fee' && (
-            <p className='ci-requestDetailsNote'>
-              {t(
-                'The recorded price is incomplete, so savings cannot be calculated.'
-              )}
-            </p>
-          )}
-          {prices.mode === 'tokens' && (
-            <>
-              <dl className='ci-requestFacts'>
-                <div>
-                  <dt>{t('Base input price')}</dt>
-                  <dd>
-                    {prices.input === null
-                      ? '—'
-                      : formatBillingCurrencyFromUSD(
-                          prices.input,
-                          moneyOptions
-                        )}
+                    )}
                   </dd>
                 </div>
+              )}
+              {prices.mode !== 'request' && (
                 <div>
-                  <dt>{t('Base output price')}</dt>
-                  <dd>
-                    {prices.output === null
-                      ? '—'
-                      : formatBillingCurrencyFromUSD(
-                          prices.output,
-                          moneyOptions
-                        )}
-                  </dd>
+                  <dt>{t('Discount rate')}</dt>
+                  <dd>{discount}</dd>
                 </div>
-              </dl>
+              )}
+            </dl>
+            {subscription && (
               <p className='ci-requestDetailsNote'>
                 {t(
-                  'Unit prices are per million tokens, before the request discount, using the rates recorded at the time.'
+                  'This request used a subscription; cash savings are not comparable.'
                 )}
               </p>
-            </>
-          )}
-          {prices.mode === 'request' && (
-            <dl className='ci-requestFacts'>
-              <div>
-                <dt>{t('Base price per request')}</dt>
-                <dd>
-                  {prices.perRequest === null
-                    ? '—'
-                    : formatBillingCurrencyFromUSD(
-                        prices.perRequest,
-                        moneyOptions
-                      )}
-                </dd>
-              </div>
-            </dl>
-          )}
-          {prices.mode === 'dynamic' && (
-            <p className='ci-requestDetailsNote'>
-              {t(
-                'This request used dynamic pricing. The recorded charge above includes its usage-based calculation.'
+            )}
+            {!subscription &&
+              !comparison &&
+              billed &&
+              prices.mode !== 'request' &&
+              prices.mode !== 'fee' && (
+                <p className='ci-requestDetailsNote'>
+                  {t(
+                    'The recorded price is incomplete, so savings cannot be calculated.'
+                  )}
+                </p>
               )}
-            </p>
+            {prices.mode === 'fee' && (
+              <p className='ci-requestDetailsNote'>{t('Violation Fee')}</p>
+            )}
+          </section>
+          {prices.mode !== 'fee' && prices.mode !== 'request' && (
+            <section
+              className='ci-requestDetailsSection'
+              aria-label={t('Base unit prices')}
+            >
+              <h3>{t('Base unit prices')}</h3>
+              {prices.mode === 'tokens' && (
+                <>
+                  <dl className='ci-requestFacts'>
+                    {unitPriceFacts.map((fact) => (
+                      <div key={fact.label}>
+                        <dt>{fact.label}</dt>
+                        <dd>
+                          {fact.value === null ? (
+                            '—'
+                          ) : (
+                            <>
+                              {formatBillingCurrencyFromUSD(
+                                fact.value,
+                                moneyOptions
+                              )}{' '}
+                              <span className='text-muted-foreground font-normal'>
+                                /M
+                              </span>
+                            </>
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className='ci-requestDetailsNote'>
+                    {t(
+                      'Unit prices are per million tokens, before the request discount, using the rates recorded at the time.'
+                    )}
+                  </p>
+                </>
+              )}
+              {prices.mode === 'dynamic' && (
+                <p className='ci-requestDetailsNote'>
+                  {t(
+                    'This request used dynamic pricing. The recorded charge includes its usage-based calculation.'
+                  )}
+                </p>
+              )}
+            </section>
           )}
-          {prices.mode === 'fee' && (
-            <p className='ci-requestDetailsNote'>{t('Violation Fee')}</p>
-          )}
-        </section>
+        </div>
         <section className='ci-requestDetailsSection'>
           <h3>{t('Token Breakdown')}</h3>
           <dl className='ci-requestFacts'>

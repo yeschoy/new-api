@@ -64,21 +64,26 @@ export function TerminalReports() {
           {t(summary.error.message)}
         </p>
       ) : null}
+      <p className='ci-requestPeriod'>
+        {t('Last 10 days: {{start}} – {{end}}', {
+          start: summary.start.format('YYYY-MM-DD'),
+          end: summary.end.format('YYYY-MM-DD'),
+        })}
+      </p>
       <section className='ci-statGrid'>
         <article>
           <span>{t('Requests')}</span>
           <strong>{data?.requests.toLocaleString() ?? '—'}</strong>
-          <small>
-            {summary.start.format('MMM D')} –{' '}
-            {summary.end.format('MMM D, YYYY')}
-          </small>
+          <small>{t('Total requests in the last 10 days')}</small>
         </article>
         <article>
           <span>{t('Saved')}</span>
           <strong className='is-saved'>
             {data ? formatConsoleMoney(data.saved_quota) : '—'}
           </strong>
-          <small>{t('Based on recorded request rates')}</small>
+          <small>
+            {t('Savings in the last 10 days, based on recorded rates')}
+          </small>
         </article>
         <article>
           <span>{t('Billed')}</span>
@@ -88,7 +93,7 @@ export function TerminalReports() {
         <article>
           <span>{t('Tokens')}</span>
           <strong>{data?.tokens.toLocaleString() ?? '—'}</strong>
-          <small>{t('{{count}} active days', { count: byDay.length })}</small>
+          <small>{t('Total tokens used in the last 10 days')}</small>
         </article>
       </section>
       <section className='ci-panel'>

@@ -18,6 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { LogOtherData } from '../types'
 import { isViolationFeeLog } from './format'
+import { isPerCallBilling } from './utils'
+
+// Fixed conversion for official-price comparisons; independent of wallet billing.
+export const OFFICIAL_PRICE_USD_TO_CNY = 6.75
 
 export type LogCostComparison = {
   baseCost: number
@@ -62,7 +66,11 @@ export function getLogQuotaComparison(
   quota: number,
   other: LogOtherData | null
 ): LogQuotaComparison | null {
-  if (other?.billing_source === 'subscription' || isViolationFeeLog(other)) {
+  if (
+    other?.billing_source === 'subscription' ||
+    isViolationFeeLog(other) ||
+    isPerCallBilling(other?.model_price)
+  ) {
     return null
   }
 
@@ -88,12 +96,15 @@ export function getLogQuotaComparison(
 export function getLogCostComparison(
   quota: number,
   other: LogOtherData | null,
-  rates: { priceRate: number; quotaPerUnit: number }
+  rates: {
+    priceRate: number
+    quotaPerUnit: number
+    referenceCurrency?: 'CNY' | 'USD'
+  }
 ): LogCostComparison | null {
   const comparison = getLogQuotaComparison(quota, other)
   if (
     !comparison ||
-    comparison.savedQuota <= 0 ||
     !Number.isFinite(rates.priceRate) ||
     rates.priceRate <= 0 ||
     !Number.isFinite(rates.quotaPerUnit) ||
@@ -104,9 +115,20 @@ export function getLogCostComparison(
 
   const siteCost =
     (comparison.chargedQuota / rates.quotaPerUnit) * rates.priceRate
-  const baseCost = (comparison.baseQuota / rates.quotaPerUnit) * rates.priceRate
+  let referenceRate = rates.priceRate
+  if (rates.referenceCurrency === 'USD') {
+    referenceRate = OFFICIAL_PRICE_USD_TO_CNY
+  }
+  if (rates.referenceCurrency === 'CNY') referenceRate = 1
+  // Compare both amounts in CNY, without altering the site's recharge price.
+  const baseCost = (comparison.baseQuota / rates.quotaPerUnit) * referenceRate
   const savings = baseCost - siteCost
-  if (!Number.isFinite(baseCost) || !Number.isFinite(savings) || savings <= 0) {
+  if (
+    !Number.isFinite(baseCost) ||
+    !Number.isFinite(siteCost) ||
+    !Number.isFinite(savings) ||
+    savings <= 0
+  ) {
     return null
   }
   return { baseCost, siteCost, savings }

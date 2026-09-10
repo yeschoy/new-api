@@ -352,18 +352,14 @@ export function Wallet(props: WalletProps) {
       {consoleMode !== 'developer' ? (
         <TerminalPage
           title={t('Wallet')}
-          actions={
-            <a href='#topup' className='ci-button ci-button--size-xs'>
-              {t('Top up')}
-            </a>
-          }
           description={t(
             'Balance pays for each request. Top up or paste a code to add credit.'
           )}
         >
           <TerminalBilling
-            remainQuota={Number(user?.quota ?? 0)}
-            usedQuota={Number(user?.used_quota ?? 0)}
+            remainQuota={user ? Number(user.quota) : undefined}
+            usedQuota={user ? Number(user.used_quota) : undefined}
+            loading={userLoading}
           >
             <section id='topup' className='ci-panel'>
               <header className='ci-panelHeader'>

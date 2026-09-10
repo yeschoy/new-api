@@ -34,6 +34,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { LanguageSwitcher } from '@/components/language-switcher'
+import { ProfileDropdown } from '@/components/profile-dropdown'
 import { useTheme } from '@/context/theme-provider'
 import { useGuideAddress } from '@/features/guide/use-guide-address'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -53,6 +54,9 @@ import { vendorAvatar, vendorAvatarIsMono } from '../lib/vendor-avatar'
 import { CatalogPrice } from './catalog-price'
 import { CatalogVendorIcon } from './catalog-vendor-icon'
 import { CiMark } from './ci-mark'
+import { GlassCursor } from './glass-cursor'
+
+import './home-glass.css'
 
 const PROVIDERS = [
   { name: 'OpenAI', src: '/ci/lobe/openai-avatar.svg', mono: true },
@@ -143,7 +147,11 @@ export function CiLandingPage(props: LandingPageProps) {
   )
 
   return (
-    <div className='ci-landing ci-theme' data-theme={isDark ? 'dark' : 'light'}>
+    <div
+      className='ci-landing ci-theme ci-liquidHome'
+      data-theme={isDark ? 'dark' : 'light'}
+    >
+      <GlassCursor />
       <div className='ci-handoffRoot'>
         <header className='ci-header'>
           <div className='ci-headerInner'>
@@ -168,25 +176,24 @@ export function CiLandingPage(props: LandingPageProps) {
                   <Boxes className='ci-mobileNavIcon' size={18} />
                   <span>{t('Models')}</span>
                 </a>
-                <Link className='ci-navItem' to='/pricing'>
-                  <span>{t('Model Price')}</span>
-                </Link>
                 <Link className='ci-navItem' to='/guide'>
                   <span>{t('Docs')}</span>
                 </Link>
               </div>
               <div className='ci-mobileNavActions'>
-                <Link
-                  to='/sign-in'
-                  className='ci-button ci-button--outline ci-button--size-xs'
-                >
-                  {t('Sign in')}
-                </Link>
+                {!props.isAuthenticated && (
+                  <Link
+                    to='/sign-in'
+                    className='ci-button ci-button--outline ci-button--size-xs'
+                  >
+                    {t('Sign in')}
+                  </Link>
+                )}
                 <Link
                   to={primaryTo}
                   className='ci-button ci-button--default ci-button--size-xs'
                 >
-                  {t('Start saving')}
+                  {props.isAuthenticated ? t('Overview') : t('Start saving')}
                 </Link>
               </div>
             </nav>
@@ -204,18 +211,22 @@ export function CiLandingPage(props: LandingPageProps) {
                 {isDark ? <Moon size={18} /> : <Sun size={18} />}
               </button>
               <LanguageSwitcher />
+              {props.isAuthenticated && <ProfileDropdown />}
               <div className='ci-desktopNavActions'>
-                <Link
-                  to='/sign-in'
-                  className='ci-button ci-button--ghost ci-button--size-xs'
-                >
-                  {t('Sign in')}
-                </Link>
+                {!props.isAuthenticated && (
+                  <Link
+                    to='/sign-in'
+                    className='ci-button ci-button--ghost ci-button--size-xs'
+                  >
+                    {t('Sign in')}
+                  </Link>
+                )}
                 <Link
                   to={primaryTo}
                   className='ci-button ci-button--default ci-button--size-xs'
                 >
-                  {t('Start saving')} <ArrowIcon />
+                  {props.isAuthenticated ? t('Overview') : t('Start saving')}{' '}
+                  <ArrowIcon />
                 </Link>
               </div>
               <button
@@ -236,6 +247,10 @@ export function CiLandingPage(props: LandingPageProps) {
           <section className='ci-hero' id='top'>
             <div className='ci-heroGrid'>
               <div className='ci-heroCopy'>
+                <div className='ci-heroBrand'>
+                  <CiMark size={56} />
+                  <span>{PRODUCT_NAME}</span>
+                </div>
                 <h1
                   className={cn(
                     'ci-revealHeading',
@@ -493,16 +508,23 @@ export function CiLandingPage(props: LandingPageProps) {
 
         <footer className='ci-siteFooter'>
           <div className='ci-container'>
-            <CiMark size={36} withWordmark />
-            <p>
-              <span>{t('Marketplace prices, never above list.')}</span>
-            </p>
+            <div className='ci-siteFooterBrand'>
+              <CiMark size={36} withWordmark />
+              <p>{t('Professional AI model platform')}</p>
+            </div>
             <p className='ci-attribution'>
-              {t('Frontend design and development by New API contributors.')}{' '}
+              <span className='sr-only'>
+                {t(
+                  'Frontend design and development by New API contributors.'
+                )}{' '}
+              </span>
               <a
                 href='https://github.com/QuantumNous/new-api'
                 target='_blank'
                 rel='noopener noreferrer'
+                title={t(
+                  'Frontend design and development by New API contributors.'
+                )}
               >
                 New API
               </a>

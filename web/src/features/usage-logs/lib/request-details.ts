@@ -44,6 +44,22 @@ export function getRequestErrorText(log: UsageLog): string {
     .join('\n')
 }
 
+function recordedTokenPrice(
+  base: number | null,
+  ratio: unknown
+): number | null {
+  if (
+    base === null ||
+    typeof ratio !== 'number' ||
+    !Number.isFinite(ratio) ||
+    ratio < 0
+  ) {
+    return null
+  }
+  const price = base * ratio
+  return Number.isFinite(price) ? price : null
+}
+
 export function getRecordedUnitPrices(other: LogOtherData | null) {
   if (isViolationFeeLog(other)) {
     return { mode: 'fee' as const, input: null, output: null, perRequest: null }
@@ -66,25 +82,15 @@ export function getRecordedUnitPrices(other: LogOtherData | null) {
         typeof price === 'number' && Number.isFinite(price) ? price : null,
     }
   }
-  const modelRatio = other?.model_ratio
-  const outputRatio = other?.completion_ratio
-  const input =
-    typeof modelRatio === 'number' &&
-    Number.isFinite(modelRatio) &&
-    modelRatio >= 0
-      ? modelRatio * 2
-      : null
-  const output =
-    input !== null &&
-    typeof outputRatio === 'number' &&
-    Number.isFinite(outputRatio) &&
-    outputRatio >= 0
-      ? input * outputRatio
-      : null
+  const input = recordedTokenPrice(2, other?.model_ratio)
   return {
     mode: 'tokens' as const,
-    input: input !== null && Number.isFinite(input) ? input : null,
-    output: output !== null && Number.isFinite(output) ? output : null,
+    input,
+    output: recordedTokenPrice(input, other?.completion_ratio),
+    cacheRead: recordedTokenPrice(input, other?.cache_ratio),
+    cacheWrite: recordedTokenPrice(input, other?.cache_creation_ratio),
+    cacheWrite5m: recordedTokenPrice(input, other?.cache_creation_ratio_5m),
+    cacheWrite1h: recordedTokenPrice(input, other?.cache_creation_ratio_1h),
     perRequest: null,
   }
 }

@@ -81,13 +81,10 @@ export function TerminalModels() {
       wide
       title={t('Models')}
       description={t(
-        'Compare live model rates on this gateway. Traffic and peak TPM are not measured here.'
+        'Find available models and compare prices and integration options.'
       )}
     >
-      <section
-        className='ci-statGrid'
-        style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}
-      >
+      <section className='ci-statGrid ci-statGrid--three'>
         <article>
           <span>{t('Available models')}</span>
           <strong>{catalog.length}</strong>
@@ -99,9 +96,9 @@ export function TerminalModels() {
           <small>{t('Live catalog')}</small>
         </article>
         <article>
-          <span>{t('Highest listed discount')}</span>
+          <span>{t('Maximum savings')}</span>
           <strong>{maxSavings}%</strong>
-          <small>{t("vs. this gateway's list rates")}</small>
+          <small>{t('Compared with pre-discount prices')}</small>
         </article>
       </section>
 
@@ -190,7 +187,6 @@ export function TerminalModels() {
                   <th>{t('Input')}</th>
                   <th>{t('Output')}</th>
                   <th>{t('Discount')}</th>
-                  <th>{t('24h traffic')}</th>
                   <th>{t('Modality')}</th>
                   <th />
                 </tr>
@@ -224,7 +220,6 @@ export function TerminalModels() {
                         '—'
                       )}
                     </td>
-                    <td>—</td>
                     <td>{getCatalogModality(model)}</td>
                     <td>
                       <Link

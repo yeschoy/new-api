@@ -17,131 +17,74 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { ArrowLeft, Moon, Sun } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { LanguageSwitcher } from '@/components/language-switcher'
 import { useTheme } from '@/context/theme-provider'
 import { CiMark } from '@/features/home/components/ci-mark'
-import {
-  buildSavingsCatalog,
-  formatPerMillionTokens,
-  type SavingsModel,
-} from '@/features/home/lib/pricing-savings'
-import {
-  vendorAvatar,
-  vendorAvatarIsMono,
-} from '@/features/home/lib/vendor-avatar'
-import { usePricingData } from '@/features/pricing/hooks'
+import { GlassCursor } from '@/features/home/components/glass-cursor'
+import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 import { PRODUCT_NAME } from '@/lib/product-brand'
 
-type TickerRow = {
-  name: string
-  vendor: string
-  off: number
-  price: string
-  src: string
-  mono: boolean
-}
-
-function toTickerRow(model: SavingsModel): TickerRow {
-  const priceValue = model.siteInputPrice
-  return {
-    name: model.modelName,
-    vendor: model.vendorName,
-    off: model.savingsPercent,
-    price: Number.isFinite(priceValue)
-      ? formatPerMillionTokens(priceValue)
-      : '',
-    src: vendorAvatar(model),
-    mono: vendorAvatarIsMono(model),
-  }
-}
+import './access-auth-layout.css'
 
 type AccessAuthLayoutProps = {
-  title?: string
+  title?: React.ReactNode
+  description?: string
   children: React.ReactNode
 }
 
 export function AccessAuthLayout(props: AccessAuthLayoutProps) {
   const { t } = useTranslation()
-  const { resolvedTheme } = useTheme()
+  const { resolvedTheme, setTheme } = useTheme()
+  const links = useTopNavLinks({ surface: 'public' })
   const isDark = resolvedTheme === 'dark'
-  const { models, priceRate } = usePricingData(true, { publicPreview: true })
-  const catalog = useMemo(
-    () => buildSavingsCatalog(models, priceRate),
-    [models, priceRate]
-  )
-  const ticker = useMemo(() => {
-    const live = [...catalog]
-      .sort((a, b) => b.savingsPercent - a.savingsPercent)
-      .slice(0, 12)
-      .map(toTickerRow)
-    return live
-  }, [catalog])
-  const belowCount = ticker.filter((row) => row.off > 0).length
-  const lanes = [0, 1]
 
   return (
-    <div
-      className='ci-landing ci-theme ci-auth'
-      data-theme={isDark ? 'dark' : 'light'}
-    >
-      <header className='ci-header'>
-        <div className='ci-headerInner'>
-          <Link to='/' className='ci-logo' aria-label={`${PRODUCT_NAME} home`}>
-            <CiMark size={22} withWordmark />
+    <div className='yecai-auth' data-theme={resolvedTheme}>
+      <GlassCursor scopeSelector='.yecai-auth' />
+      <header className='yecai-authHeader'>
+        <Link to='/' className='yecai-authBrand' aria-label={PRODUCT_NAME}>
+          <CiMark size={32} withWordmark />
+        </Link>
+        <nav className='yecai-authNav' aria-label={t('Main navigation')}>
+          <Link to='/' className='yecai-authBack'>
+            <ArrowLeft size={15} aria-hidden='true' />
+            <span>{t('Back to home')}</span>
           </Link>
-        </div>
+          {links.map((link) => (
+            <Link key={link.href} to={link.href} className='yecai-authNavLink'>
+              {link.title}
+            </Link>
+          ))}
+          <span className='yecai-authNavDivider' aria-hidden='true' />
+          <LanguageSwitcher />
+          <button
+            type='button'
+            className='yecai-authTheme'
+            aria-label={
+              isDark ? t('Switch to light mode') : t('Switch to dark mode')
+            }
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          >
+            {isDark ? (
+              <Sun size={18} aria-hidden='true' />
+            ) : (
+              <Moon size={18} aria-hidden='true' />
+            )}
+          </button>
+        </nav>
       </header>
-      <main className='ci-authMain'>
-        <section className='ci-authTicker' aria-hidden='true'>
-          <p>
-            {PRODUCT_NAME} · {t('Access terminal')}
-          </p>
-          <div className='ci-authTickerMeta'>
-            <span className='ci-liveBadge ci-liveBadgeNoDot'>
-              {t('Live prices')}
-            </span>
-            <small>
-              {t('{{count}} models · {{below}} below list', {
-                count: ticker.length,
-                below: belowCount,
-              })}
-            </small>
-          </div>
-          {ticker.length === 0 ? <p>{t('No models available')}</p> : null}
-          <div className='ci-authTickerViewport'>
-            <div className='ci-authTickerTrack'>
-              {lanes.flatMap((lane) =>
-                ticker.map((item) => (
-                  <article key={`${lane}-${item.name}`}>
-                    <img
-                      src={item.src}
-                      alt=''
-                      width={36}
-                      height={36}
-                      className={item.mono ? 'is-mono' : undefined}
-                    />
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>
-                        {item.vendor}
-                        {item.price ? ` · ${item.price}` : null}
-                      </span>
-                    </div>
-                    <b>{item.off > 0 ? `−${item.off}%` : t('List price')}</b>
-                  </article>
-                ))
-              )}
-            </div>
-          </div>
-          <div className='ci-authTickerFoot'>
-            <span>{t('Live catalog · Never above published list')}</span>
-            <Link to='/pricing'>{t('Browse catalog')}</Link>
-          </div>
-        </section>
-        <section className='ci-authPanel'>
+      <main className='yecai-authMain'>
+        <section className='yecai-authWelcome'>
+          <p className='yecai-authEyebrow'>{PRODUCT_NAME} API</p>
           {props.title ? <h1>{props.title}</h1> : null}
+          <p className='yecai-authDescription'>
+            {props.description || t('One account for your AI workflow.')}
+          </p>
+        </section>
+        <section className='yecai-authPanel' aria-label={t('Account access')}>
           {props.children}
         </section>
       </main>

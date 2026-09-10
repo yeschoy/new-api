@@ -26,7 +26,7 @@ import { getUserLogSummary } from '../api'
 
 dayjs.extend(utc)
 
-export function useUsageSummary(days: 7 | 10) {
+export function useUsageSummary(days: 1 | 7 | 10) {
   const userId = useAuthStore((state) => state.auth.user?.id)
   // Match the server's fixed-offset day buckets, including across DST changes.
   const now = dayjs()

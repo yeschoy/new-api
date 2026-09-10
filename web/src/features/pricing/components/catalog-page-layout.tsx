@@ -18,6 +18,9 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { AuthenticatedLayout } from '@/components/layout/components/authenticated-layout'
 import { PublicLayout } from '@/components/layout/components/public-layout'
+import { GlassCursor } from '@/features/home/components/glass-cursor'
+import { useConsoleMode } from '@/hooks/use-console-mode'
+import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
 type CatalogPageLayoutProps = {
@@ -27,22 +30,31 @@ type CatalogPageLayoutProps = {
 
 export function CatalogPageLayout(props: CatalogPageLayoutProps) {
   const user = useAuthStore((state) => state.auth.user)
+  const mode = useConsoleMode()
   if (user) {
     return (
-      <AuthenticatedLayout>
-        <div
-          className={
-            props.showMainContainer === false ? undefined : 'px-4 py-6'
-          }
-        >
-          {props.children}
-        </div>
-      </AuthenticatedLayout>
+      <>
+        <GlassCursor scopeSelector='.ci-app, .dopa-console, .ci-landing' />
+        <AuthenticatedLayout>
+          <div
+            className={cn(
+              mode === 'developer' &&
+                'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+              props.showMainContainer !== false && 'px-4 py-6'
+            )}
+          >
+            {props.children}
+          </div>
+        </AuthenticatedLayout>
+      </>
     )
   }
   return (
-    <PublicLayout showMainContainer={props.showMainContainer}>
-      {props.children}
-    </PublicLayout>
+    <>
+      <GlassCursor scopeSelector='.ci-landing' />
+      <PublicLayout showMainContainer={props.showMainContainer}>
+        {props.children}
+      </PublicLayout>
+    </>
   )
 }

@@ -44,10 +44,13 @@ describe('public product journey', () => {
         .getAllByRole('link', { name: 'Start saving' })
         .every((link) => link.getAttribute('href') === '/sign-up')
     ).toBe(true)
-    expect(screen.getByRole('link', { name: 'Model Price' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Models' })).toHaveAttribute(
       'href',
-      '/pricing'
+      '/#models'
     )
+    expect(
+      screen.queryByRole('link', { name: 'Model Price' })
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute(
       'href',
       '/guide'

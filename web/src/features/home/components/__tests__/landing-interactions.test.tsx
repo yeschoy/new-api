@@ -19,10 +19,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient } from '@tanstack/react-query'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { useAuthStore } from '@/stores/auth-store'
+import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 import { renderApp } from '@/test-utils/render-app'
 
 import { buildModelCatalog } from '../../lib/catalog'
@@ -30,7 +32,9 @@ import { CiLandingPage } from '../ci-landing-page'
 
 let client: QueryClient
 let style: HTMLStyleElement
+const originalAuth = useAuthStore.getState()
 beforeEach(() => {
+  useAuthStore.getState().auth.reset()
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   })
@@ -39,6 +43,7 @@ beforeEach(() => {
   document.head.append(style)
 })
 afterEach(() => {
+  useAuthStore.setState(originalAuth)
   client.clear()
   style.remove()
 })
@@ -58,6 +63,49 @@ const models = buildModelCatalog(
 )
 
 describe('landing interactions and price layout', () => {
+  it('shows the signed-in account menu and overview entry instead of sign-in links', async () => {
+    const user = userEvent.setup()
+    const bundle = createTestAuthBundle()
+    useAuthStore.getState().auth.setBundle({
+      ...bundle,
+      user: { ...bundle.user, display_name: 'Demo User' },
+    })
+    await renderApp(
+      <CiLandingPage isAuthenticated models={models} maxSavingsPercent={0} />,
+      client
+    )
+    const header = screen.getByRole('banner')
+    expect(
+      within(header).queryByRole('link', { name: 'Sign in' })
+    ).not.toBeInTheDocument()
+    expect(
+      within(header).queryByRole('link', { name: 'Start saving' })
+    ).not.toBeInTheDocument()
+    for (const link of within(header).getAllByRole('link', {
+      name: 'Overview',
+    })) {
+      expect(link).toHaveAttribute('href', '/dashboard')
+    }
+    const avatar = within(header).getByRole('button', { name: 'Profile' })
+    await user.click(avatar)
+    expect(await screen.findByText('Demo User')).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: 'Profile' })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: 'Wallet' })).toBeVisible()
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeVisible()
+    await user.keyboard('{Escape}')
+    await user.click(
+      within(header).getByRole('button', { name: 'Open navigation' })
+    )
+    const navigation = within(header).getByRole('navigation', {
+      name: 'Main navigation',
+    })
+    expect(
+      within(navigation).queryByRole('link', { name: 'Sign in' })
+    ).not.toBeInTheDocument()
+    expect(
+      within(navigation).getByRole('link', { name: 'Overview' })
+    ).toHaveAttribute('href', '/dashboard')
+  })
   it('uses the savings translation instead of the on/off control translation', async () => {
     const discounted = buildModelCatalog(
       [{ ...models[0].pricingModel, group_ratio: { default: 0.5 } }],
@@ -86,6 +134,24 @@ describe('landing interactions and price layout', () => {
     const trigger = screen.getByRole('button', { name: 'Open navigation' })
     await user.click(trigger)
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    const navigation = screen.getByRole('navigation', {
+      name: 'Main navigation',
+    })
+    expect(
+      within(navigation).getByRole('link', { name: 'Sign in' })
+    ).toHaveAttribute('href', '/sign-in')
+    expect(
+      within(navigation).getByRole('link', { name: 'Start saving' })
+    ).toHaveAttribute('href', '/sign-up')
+    expect(
+      screen.queryByRole('button', { name: 'Profile' })
+    ).not.toBeInTheDocument()
+    expect(
+      within(navigation).queryByRole('link', { name: 'Model Price' })
+    ).not.toBeInTheDocument()
+    expect(
+      within(navigation).getByRole('link', { name: 'Docs' })
+    ).toHaveAttribute('href', '/guide')
     await user.click(screen.getByRole('link', { name: 'Models' }))
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })

@@ -17,7 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -35,6 +41,8 @@ let client: QueryClient
 let summaryFails = false
 let requestedWindow = 0
 let requestedStart = 0
+let summaryRequests = 0
+let listWindow = 0
 let requestOther: Record<string, unknown> = {}
 let requestType = 2
 let streamFails = true
@@ -73,11 +81,13 @@ const summary = {
 beforeEach(() => {
   summaryFails = false
   requestedWindow = 0
+  summaryRequests = 0
+  listWindow = 0
   requestOther = { group_ratio: 0.5 }
   requestType = 2
   streamFails = true
   client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   })
   client.setQueryData(['status'], {}, { updatedAt: Date.now() + 60000 })
   client.setQueryData(
@@ -100,6 +110,7 @@ beforeEach(() => {
     const url = new URL(config.url ?? '', 'http://localhost')
     let data: unknown
     if (url.pathname === '/api/log/self/summary') {
+      summaryRequests++
       requestedStart = Number(config.params.start_timestamp)
       requestedWindow =
         Number(config.params.end_timestamp) -
@@ -111,6 +122,10 @@ beforeEach(() => {
     } else if (url.pathname === '/api/token/') {
       data = { success: true, data: { items: [] } }
     } else if (url.pathname === '/api/log/self') {
+      listWindow =
+        Number(url.searchParams.get('end_timestamp')) -
+        Number(url.searchParams.get('start_timestamp')) +
+        1
       const page = Number(url.searchParams.get('p') ?? 1)
       data = {
         success: true,
@@ -150,6 +165,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
   api.defaults.adapter = originalAdapter
   client.clear()
@@ -166,9 +182,30 @@ describe('terminal usage views', () => {
     )
     await screen.findByText('partial-stream')
     expect(
-      screen.getByText('Last 7 days').closest('article')
+      screen.getByText('Requests today').closest('article')
     ).toHaveTextContent('103')
-    expect(screen.getByText('Spent').closest('article')).toHaveTextContent('¥7')
+    expect(screen.queryByText('Successful requests')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Failed requests').closest('article')
+    ).toHaveTextContent('2')
+    expect(
+      screen.getByText('Usage today').closest('article')
+    ).toHaveTextContent('¥7')
+    expect(requestedWindow).toBe(86400)
+    expect(listWindow).toBe(86400)
+    expect(screen.queryByText('Successful + failed requests')).toBeNull()
+    expect(
+      screen.queryByText(
+        'Before-discount amounts are estimates. Charges may apply even if a request fails or is interrupted.'
+      )
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Finished normally')).toBeNull()
+    expect(
+      screen.queryByText('Includes interrupted responses; charges may apply.')
+    ).toBeNull()
+    expect(
+      screen.queryByText('Billed usage today, including subscription usage.')
+    ).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Next' }))
     expect(await screen.findByText('older-request')).toBeVisible()
   })
@@ -183,12 +220,17 @@ describe('terminal usage views', () => {
     const row = (await screen.findByText('partial-stream')).closest('article')
     if (!row) throw new Error('Missing request row')
     expect(within(row).getByText('Failed')).toBeVisible()
-    expect(within(row).getByText('Spend').nextElementSibling).toHaveTextContent(
-      '¥1.4'
-    )
     expect(
-      within(row).getByText('Original price').nextElementSibling
-    ).toHaveTextContent('¥2.8')
+      within(row)
+        .getAllByRole('term')
+        .map((term) => term.textContent)
+    ).toEqual(['Tokens', 'Charge', 'Saved', 'Time taken'])
+    expect(
+      within(row).getByText('Charge').nextElementSibling
+    ).toHaveTextContent('¥1.4')
+    expect(
+      within(row).queryByText('Before-discount estimate')
+    ).not.toBeInTheDocument()
     expect(within(row).getByText('Saved').nextElementSibling).toHaveTextContent(
       '¥1.4'
     )
@@ -244,10 +286,18 @@ describe('terminal usage views', () => {
       'Saved',
       '—',
     ],
-    ['unbilled failure', { group_ratio: 0.5 }, 5, '—', '—', 'Saved', '—'],
+    [
+      'unbilled failure',
+      { group_ratio: 0.5 },
+      5,
+      'No charge',
+      '—',
+      'Saved',
+      '—',
+    ],
   ] as const)(
     'shows truthful prices for %s',
-    async (_name, other, type, spent, base, savedLabel, saved) => {
+    async (_name, other, type, spent, _base, savedLabel, saved) => {
       requestOther = other
       requestType = type
       render(
@@ -258,11 +308,11 @@ describe('terminal usage views', () => {
       const row = (await screen.findByText('partial-stream')).closest('article')
       if (!row) throw new Error('Missing request row')
       expect(
-        within(row).getByText('Spend').nextElementSibling
+        within(row).getByText('Charge').nextElementSibling
       ).toHaveTextContent(spent)
       expect(
-        within(row).getByText('Original price').nextElementSibling
-      ).toHaveTextContent(base)
+        within(row).queryByText('Before-discount estimate')
+      ).not.toBeInTheDocument()
       expect(
         within(row).getByText(savedLabel).nextElementSibling
       ).toHaveTextContent(saved)
@@ -276,6 +326,8 @@ describe('terminal usage views', () => {
       group_ratio: 0.5,
       model_ratio: 1,
       completion_ratio: 2,
+      cache_ratio: 0.1,
+      cache_creation_ratio: 1.25,
       cache_tokens: 2,
       admin_info: { use_channel: [555] },
     }
@@ -301,14 +353,41 @@ describe('terminal usage views', () => {
       within(details).getByText('Cache Read').nextElementSibling
     ).toHaveTextContent('2')
     expect(
-      within(details).getByText('Discount on this request').nextElementSibling
+      within(details).getByText('Discount rate').nextElementSibling
     ).toHaveTextContent('50%')
     expect(
       within(details).getByText('Base input price').nextElementSibling
-    ).toHaveTextContent('¥14')
+    ).toHaveTextContent('¥14 /M')
     expect(
       within(details).getByText('Base output price').nextElementSibling
-    ).toHaveTextContent('¥28')
+    ).toHaveTextContent('¥28 /M')
+    expect(
+      within(details).getByText('Base cache read price').nextElementSibling
+    ).toHaveTextContent('¥1.4 /M')
+    expect(
+      within(details).getByText('Base cache write price').nextElementSibling
+    ).toHaveTextContent('¥17.5 /M')
+    const requestCost = within(details).getByRole('region', {
+      name: 'Request cost',
+    })
+    const basePrices = within(details).getByRole('region', {
+      name: 'Base unit prices',
+    })
+    expect(
+      within(requestCost).getByText('Charge').nextElementSibling
+    ).toHaveTextContent('¥1.4')
+    expect(
+      within(requestCost).queryByText('Base input price')
+    ).not.toBeInTheDocument()
+    expect(
+      within(basePrices).getByText('Base input price').nextElementSibling
+    ).toHaveTextContent('¥14 /M')
+    expect(within(basePrices).queryByText('Charge')).not.toBeInTheDocument()
+    expect(
+      within(basePrices).getByText(
+        'Unit prices are per million tokens, before the request discount, using the rates recorded at the time.'
+      )
+    ).toBeVisible()
     expect(within(details).queryByText('555')).toBeNull()
     await user.click(
       within(details).getByRole('button', { name: 'Copy request ID' })
@@ -318,11 +397,163 @@ describe('terminal usage views', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('omits original prices and savings for per-request billing in rows and details', async () => {
+    const user = userEvent.setup()
+    requestOther = { model_price: 0.05, group_ratio: 0.5 }
+    streamFails = false
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalRequests />
+      </QueryClientProvider>
+    )
+    const row = (await screen.findByText('partial-stream')).closest('article')
+    if (!row) throw new Error('Missing request row')
+    expect(within(row).queryByText('Saved')).not.toBeInTheDocument()
+    expect(
+      within(row).getByText('Charge').nextElementSibling
+    ).toHaveTextContent('¥1.4')
+    await user.click(within(row).getByRole('button'))
+    const details = await screen.findByRole('dialog', {
+      name: 'Request details',
+    })
+    expect(
+      within(details).getByText('Charge').nextElementSibling
+    ).toHaveTextContent('¥1.4')
+    for (const label of [
+      'Before-discount estimate',
+      'Discount rate',
+      'Saved',
+      'Base unit prices',
+      'Base price per request',
+    ]) {
+      expect(within(details).queryByText(label)).not.toBeInTheDocument()
+    }
+    expect(
+      within(details).queryByText(
+        'The recorded price is incomplete, so savings cannot be calculated.'
+      )
+    ).not.toBeInTheDocument()
+  })
+
+  it('omits the above-base comparison from easy request details without changing the charged amount', async () => {
+    const user = userEvent.setup()
+    requestOther = { group_ratio: 1.2, model_ratio: 1, completion_ratio: 2 }
+    streamFails = false
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalRequests />
+      </QueryClientProvider>
+    )
+    await screen.findByText('partial-stream')
+    await user.click(screen.getByRole('button', { name: /partial-stream/ }))
+    const details = await screen.findByRole('dialog', {
+      name: 'Request details',
+    })
+    expect(
+      within(details).queryByText('Above base price')
+    ).not.toBeInTheDocument()
+    expect(within(details).queryByText('Saved')).not.toBeInTheDocument()
+    expect(
+      within(details).getByText('Charge').nextElementSibling
+    ).toHaveTextContent('¥1.4')
+    expect(
+      within(details).getByText('Discount rate').nextElementSibling
+    ).toHaveTextContent('0%')
+  })
+
+  it('shows free cache reads and separate timed cache-write prices with per-million units', async () => {
+    const user = userEvent.setup()
+    requestOther = {
+      group_ratio: 0.5,
+      model_ratio: 0.5,
+      completion_ratio: 3,
+      cache_ratio: 0,
+      cache_creation_ratio: 1.25,
+      cache_creation_ratio_5m: 1.25,
+      cache_creation_ratio_1h: 2,
+    }
+    streamFails = false
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalRequests />
+      </QueryClientProvider>
+    )
+    await screen.findByText('partial-stream')
+    await user.click(screen.getByRole('button', { name: /partial-stream/ }))
+    const details = await screen.findByRole('dialog', {
+      name: 'Request details',
+    })
+    expect(
+      within(details).getByText('Base cache read price').nextElementSibling
+    ).toHaveTextContent('¥0 /M')
+    expect(
+      within(details).getByText('Base cache write price (5m)')
+        .nextElementSibling
+    ).toHaveTextContent('¥8.75 /M')
+    expect(
+      within(details).getByText('Base cache write price (1h)')
+        .nextElementSibling
+    ).toHaveTextContent('¥14 /M')
+    expect(
+      within(details).queryByText('Base cache write price')
+    ).not.toBeInTheDocument()
+  })
+
   it('removes the unsupported reserved-balance card from the overview', async () => {
     await renderApp(<TerminalHome />, client)
     await screen.findByText('Connect your client')
     expect(screen.queryByText('Reserved')).toBeNull()
     expect(screen.queryByText('Not held separately on this gateway')).toBeNull()
+  })
+
+  it('shows distinct balance, daily usage and savings while reusing the daily summary on requests', async () => {
+    const home = await renderApp(<TerminalHome />, client)
+    expect(await screen.findByText('Usage today')).toBeVisible()
+    await waitFor(() =>
+      expect(
+        screen.getByText('Usage today').closest('article')
+      ).toHaveTextContent('¥7')
+    )
+    expect(
+      screen.getByText('Savings today').closest('article')
+    ).toHaveTextContent('¥3.5')
+    expect(screen.getByText('Available balance')).toBeVisible()
+    expect(screen.queryByText('Available')).toBeNull()
+    expect(requestedWindow).toBe(86400)
+    expect(requestedStart).toBe(
+      Math.floor(new Date().setHours(0, 0, 0, 0) / 1000)
+    )
+    home.unmount()
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalRequests />
+      </QueryClientProvider>
+    )
+    await screen.findByText('partial-stream')
+    expect(summaryRequests).toBe(1)
+  })
+
+  it('explains a page-only filter with no matching requests without changing daily totals', async () => {
+    const user = userEvent.setup()
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalRequests />
+      </QueryClientProvider>
+    )
+    await screen.findByText('partial-stream')
+    await user.click(screen.getByRole('button', { name: 'Worked 0' }))
+    expect(screen.getByRole('button', { name: 'Worked 0' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(
+      screen.getByText(
+        'No matching requests on this page. Try another filter or page.'
+      )
+    ).toBeVisible()
+    expect(
+      screen.getByText('Requests today').closest('article')
+    ).toHaveTextContent('103')
   })
 
   it('renders the complete daily summary instead of rebuilding it from one log page', async () => {
@@ -336,6 +567,10 @@ describe('terminal usage views', () => {
     expect(within(row).getByText('101')).toBeVisible()
     expect(within(row).getByText('¥5.6')).toBeVisible()
     expect(requestedWindow).toBe(10 * 86400)
+    expect(screen.queryByText('Cumulative usage')).not.toBeInTheDocument()
+    for (const card of screen.getAllByRole('article')) {
+      expect(card).toHaveTextContent(/last 10 days/i)
+    }
     expect(
       screen.getByText(
         'Review the last 10 days of usage and export daily totals.'

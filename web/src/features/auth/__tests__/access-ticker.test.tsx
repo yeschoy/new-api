@@ -17,9 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient } from '@tanstack/react-query'
-import { screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { cleanup, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { api } from '@/lib/api'
 import { renderApp } from '@/test-utils/render-app'
 
 import { AccessAuthLayout } from '../access-auth-layout'
@@ -27,52 +28,56 @@ import { AccessAuthLayout } from '../access-auth-layout'
 let client: QueryClient
 beforeEach(() => {
   client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   })
   client.setQueryData(['status'], {}, { updatedAt: Date.now() + 60000 })
 })
-afterEach(() => client.clear())
-describe('auth live ticker', () => {
-  it('shows real undiscounted models without fabricated offers', async () => {
-    client.setQueryData(
-      ['pricing', 'home', null],
-      {
-        vendors: [],
-        data: [
-          {
-            id: 1,
-            model_name: 'real-model',
-            quota_type: 0,
-            model_ratio: 1,
-            completion_ratio: 2,
-            enable_groups: ['default'],
-          },
-        ],
-        group_ratio: { default: 1 },
-      },
-      { updatedAt: Date.now() + 60000 }
-    )
+afterEach(() => {
+  cleanup()
+  client.clear()
+  vi.restoreAllMocks()
+})
+
+describe('auth welcome layout', () => {
+  it('keeps the login form available without querying the model catalog', async () => {
+    const requests = vi
+      .spyOn(api, 'get')
+      .mockResolvedValue({ data: { success: true, data: [] } })
     await renderApp(
-      <AccessAuthLayout>
-        <p>Login form</p>
+      <AccessAuthLayout title='Welcome back'>
+        <label>
+          Username
+          <input />
+        </label>
+        <button type='submit'>Sign in</button>
       </AccessAuthLayout>,
       client
     )
-    expect(screen.getAllByText('real-model').length).toBeGreaterThan(0)
-    expect(screen.queryAllByText('gpt-5.6-luna')).toHaveLength(0)
-    expect(screen.getAllByText('List price').length).toBeGreaterThan(0)
+
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'Username' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    expect(screen.queryByText('Live prices')).toBeNull()
+    expect(
+      requests.mock.calls.some(([url]) => url.includes('/api/pricing'))
+    ).toBe(false)
   })
-  it('uses an honest empty state when no prices are accessible', async () => {
-    client.setQueryData(['pricing', 'home', null], null, {
-      updatedAt: Date.now() + 60000,
-    })
+
+  it('offers a home link and accessible appearance controls around the form', async () => {
     await renderApp(
-      <AccessAuthLayout>
+      <AccessAuthLayout title='Sign in'>
         <p>Login form</p>
       </AccessAuthLayout>,
       client
     )
-    expect(screen.queryAllByText('gpt-5.6-luna')).toHaveLength(0)
-    expect(screen.getByText('No models available')).toBeVisible()
+
+    expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute(
+      'href',
+      '/'
+    )
+    expect(
+      screen.getByRole('button', { name: 'Switch to dark mode' })
+    ).toBeVisible()
+    expect(screen.getByText('Login form')).toBeVisible()
   })
 })

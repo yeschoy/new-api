@@ -37,7 +37,7 @@ export function TerminalHome() {
   const clipboard = useCopyToClipboard({ notify: false })
   const remainQuota = Number(user?.quota ?? 0)
   const requestCount = Number(user?.request_count ?? 0)
-  const summary = useUsageSummary(10)
+  const summary = useUsageSummary(1)
 
   const keysQuery = useQuery({
     queryKey: ['terminal', 'home', 'keys'],
@@ -139,7 +139,7 @@ export function TerminalHome() {
 
       <section className='ci-statGrid ci-statGrid--three'>
         <article>
-          <span>{t('Balance')}</span>
+          <span>{t('Available balance')}</span>
           <strong className={remainQuota <= 0 ? 'is-empty' : undefined}>
             {formatConsoleMoney(remainQuota)}
           </strong>
@@ -150,16 +150,20 @@ export function TerminalHome() {
           </small>
         </article>
         <article>
-          <span>{t('Available')}</span>
-          <strong>{formatConsoleMoney(remainQuota)}</strong>
-          <small>{t('Balance you can still spend')}</small>
+          <span>{t('Usage today')}</span>
+          <strong>
+            {summary.data ? formatConsoleMoney(summary.data.quota) : '—'}
+          </strong>
+          <small>
+            {t('Billed usage today, including subscription usage.')}
+          </small>
         </article>
         <article>
-          <span>{t('Estimated saved')}</span>
+          <span>{t('Savings today')}</span>
           <strong className='is-saved'>
             {summary.data ? formatConsoleMoney(summary.data.saved_quota) : '—'}
           </strong>
-          <small>{t('Last 10 days · recorded request rates')}</small>
+          <small>{t('Today · recorded request rates')}</small>
         </article>
       </section>
 

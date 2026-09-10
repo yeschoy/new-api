@@ -117,9 +117,9 @@ export function useTopNavLinks(
     links.push({ title: t('Home'), href: '/' })
   }
 
-  // Console -> /dashboard (new console path)
+  // Match the developer sidebar's overview destination.
   if (modules?.console !== false) {
-    links.push({ title: t('Console'), href: '/dashboard' })
+    links.push({ title: t('Overview'), href: '/dashboard/overview' })
   }
 
   // Pricing

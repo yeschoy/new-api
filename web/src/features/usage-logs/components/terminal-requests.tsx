@@ -28,6 +28,7 @@ import { formatConsoleMoney } from '@/lib/console-money'
 import { formatQuotaWithCurrency } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { getUserLogs } from '../api'
 import { LOG_TYPE_ENUM } from '../constants'
@@ -39,6 +40,7 @@ import {
 } from '../lib/cost-comparison'
 import { parseLogOther } from '../lib/format'
 import { isFailedRequest } from '../lib/request-details'
+import { isPerCallBilling } from '../lib/utils'
 import { TerminalRequestDetails } from './terminal-request-details'
 
 type RequestFilter = 'all' | 'ok' | 'error'
@@ -55,11 +57,12 @@ export function TerminalRequests() {
   const [selectedLog, setSelectedLog] = useState<UsageLog | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [page, setPage] = useState(1)
-  const summary = useUsageSummary(7)
+  const userId = useAuthStore((state) => state.auth.user?.id)
+  const summary = useUsageSummary(1)
   const { start, end } = summary
 
   const logsQuery = useQuery({
-    queryKey: ['terminal', 'requests', start.unix(), end.unix(), page],
+    queryKey: ['terminal', 'requests', userId, start.unix(), end.unix(), page],
     queryFn: async () => {
       const result = await getUserLogs({
         p: page,
@@ -108,19 +111,18 @@ export function TerminalRequests() {
             )}
           </p>
         ) : null}
-        <section className='ci-statGrid'>
+        <p className='ci-requestPeriod'>
+          {t('Today ({{date}}) · since 00:00 in your time zone', {
+            date: start.format('YYYY-MM-DD'),
+          })}
+        </p>
+        <section className='ci-statGrid ci-requestStats'>
           <article>
-            <span>{t('Last 7 days')}</span>
+            <span>{t('Requests today')}</span>
             <strong>{summary.data?.requests.toLocaleString() ?? '—'}</strong>
-            <small>{t('Calls')}</small>
           </article>
           <article>
-            <span>{t('Worked')}</span>
-            <strong>{summary.data?.succeeded.toLocaleString() ?? '—'}</strong>
-            <small>{t('Finished normally')}</small>
-          </article>
-          <article>
-            <span>{t('Failed')}</span>
+            <span>{t('Failed requests')}</span>
             <strong
               className={
                 (summary.data?.failed ?? 0) > 0 ? 'is-empty' : undefined
@@ -128,14 +130,12 @@ export function TerminalRequests() {
             >
               {summary.data?.failed.toLocaleString() ?? '—'}
             </strong>
-            <small>{t('Click a request to view error details')}</small>
           </article>
           <article>
-            <span>{t('Spent')}</span>
+            <span>{t('Usage today')}</span>
             <strong>
               {summary.data ? formatConsoleMoney(summary.data.quota) : '—'}
             </strong>
-            <small>{t('Total spent in the last 7 days')}</small>
           </article>
         </section>
 
@@ -143,9 +143,10 @@ export function TerminalRequests() {
           <header className='ci-panelHeader'>
             <p>
               {t(
-                'Base price is the recorded model price before the group multiplier. Savings = base price − charged amount. A dash means no comparable price is available.'
+                'Charges may apply even if a request fails or is interrupted.'
               )}
             </p>
+            <p>{t('Page filters do not change the daily totals above.')}</p>
           </header>
           <div className='ci-requestFilters'>
             <span>{t('Filter this page')}</span>
@@ -159,6 +160,7 @@ export function TerminalRequests() {
               <button
                 key={value}
                 type='button'
+                aria-pressed={filter === value}
                 className={cn('ci-chip', filter === value && 'is-active')}
                 onClick={() => setFilter(value)}
               >
@@ -169,6 +171,18 @@ export function TerminalRequests() {
           {logsQuery.isPending && (
             <div className='ci-empty'>{t('Loading...')}</div>
           )}
+          {!logsQuery.isPending &&
+            !logsQuery.error &&
+            !empty &&
+            visible.length === 0 && (
+              <div className='ci-empty'>
+                <p>
+                  {t(
+                    'No matching requests on this page. Try another filter or page.'
+                  )}
+                </p>
+              </div>
+            )}
           {!logsQuery.isPending && !logsQuery.error && empty && (
             <div className='ci-empty'>
               <span className='ci-emptyIcon'>
@@ -198,7 +212,7 @@ export function TerminalRequests() {
                   log.type === LOG_TYPE_ENUM.CONSUME
                     ? getLogQuotaComparison(log.quota, other)
                     : null
-                let chargedAmount = '—'
+                let chargedAmount = t('No charge')
                 if (log.type === LOG_TYPE_ENUM.CONSUME) {
                   chargedAmount =
                     other?.billing_source === 'subscription'
@@ -218,21 +232,30 @@ export function TerminalRequests() {
                       className='ci-requestMain'
                       onClick={() => setSelectedLog(log)}
                     >
-                      <ChevronRight
-                        className='ci-requestDisclosure'
-                        size={16}
-                        aria-hidden='true'
-                      />
-                      <div>
-                        <strong>{log.model_name || t('Unknown model')}</strong>
-                        <span>
-                          {dayjs.unix(log.created_at).format('M月D日 HH:mm')}
-                          {log.token_name ? ` · ${log.token_name}` : ''}
-                        </span>
+                      <div className='ci-requestHeading'>
+                        <div className='ci-requestIdentity'>
+                          <strong>
+                            {log.model_name || t('Unknown model')}
+                          </strong>
+                          <span>
+                            {dayjs.unix(log.created_at).format('M月D日 HH:mm')}
+                            {log.token_name ? ` · ${log.token_name}` : ''}
+                          </span>
+                        </div>
+                        <b
+                          className={cn(
+                            'ci-requestStatus',
+                            failed ? 'is-failed' : 'is-ok'
+                          )}
+                        >
+                          {failed ? t('Failed') : t('Worked')}
+                        </b>
+                        <ChevronRight
+                          className='ci-requestDisclosure'
+                          size={16}
+                          aria-hidden='true'
+                        />
                       </div>
-                      <b className={failed ? 'is-failed' : 'is-ok'}>
-                        {failed ? t('Failed') : t('Worked')}
-                      </b>
                       <dl>
                         <div>
                           <dt>{t('Tokens')}</dt>
@@ -246,41 +269,32 @@ export function TerminalRequests() {
                           </dd>
                         </div>
                         <div>
-                          <dt>{t('Spend')}</dt>
+                          <dt>{t('Charge')}</dt>
                           <dd>{chargedAmount}</dd>
                         </div>
-                        <div>
-                          <dt>{t('Original price')}</dt>
-                          <dd>
-                            {comparison
-                              ? formatQuotaWithCurrency(
-                                  comparison.baseQuota,
-                                  requestCostFormat
-                                )
-                              : '—'}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>
-                            {comparison && comparison.savedQuota < 0
-                              ? t('Above base price')
-                              : t('Saved')}
-                          </dt>
-                          <dd
-                            className={
-                              comparison && comparison.savedQuota > 0
-                                ? 'text-success'
-                                : undefined
-                            }
-                          >
-                            {comparison
-                              ? formatQuotaWithCurrency(
-                                  Math.abs(comparison.savedQuota),
-                                  requestCostFormat
-                                )
-                              : '—'}
-                          </dd>
-                        </div>
+                        {!isPerCallBilling(other?.model_price) && (
+                          <div>
+                            <dt>
+                              {comparison && comparison.savedQuota < 0
+                                ? t('Above base price')
+                                : t('Saved')}
+                            </dt>
+                            <dd
+                              className={
+                                comparison && comparison.savedQuota > 0
+                                  ? 'text-success'
+                                  : undefined
+                              }
+                            >
+                              {comparison
+                                ? formatQuotaWithCurrency(
+                                    Math.abs(comparison.savedQuota),
+                                    requestCostFormat
+                                  )
+                                : '—'}
+                            </dd>
+                          </div>
+                        )}
                         <div>
                           <dt>{t('Time taken')}</dt>
                           <dd>

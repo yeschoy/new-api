@@ -129,6 +129,52 @@ body:where(:has(.dopa-console--developer)) {
   background: var(--accent);
 }
 
+/* Keep site links visible. Narrow headers use a second row, sharing the
+ * height token with the fixed sidebar and the remaining content viewport. */
+.dopa-console--developer:has(.dopa-site-nav) {
+  --app-header-height: 5.5rem;
+}
+
+.dopa-developer-header:has(.dopa-site-nav) > div {
+  flex-wrap: wrap;
+  align-content: center;
+  row-gap: 0;
+}
+
+.dopa-developer-header .dopa-site-nav {
+  order: 1;
+  flex: 0 0 100%;
+  min-inline-size: 0;
+  block-size: 2.25rem;
+  gap: 1.125rem;
+  overflow-x: auto;
+  justify-content: safe flex-end;
+  scrollbar-width: thin;
+}
+
+.dopa-site-nav > :is(a, span) {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-block-size: 2rem;
+}
+
+@media (min-width: 80rem) {
+  .dopa-console--developer:has(.dopa-site-nav) {
+    --app-header-height: 3.25rem;
+  }
+
+  .dopa-developer-header:has(.dopa-site-nav) > div {
+    flex-wrap: nowrap;
+  }
+
+  .dopa-developer-header .dopa-site-nav {
+    order: 0;
+    flex: 0 1 auto;
+    margin-inline-start: auto;
+  }
+}
+
 .dopa-console--developer
   .dopa-section-page
   :is(input, textarea, select):focus-visible {

@@ -20,7 +20,6 @@ import { Link, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
-import { PRODUCT_NAME } from '@/lib/product-brand'
 
 import { AccessAuthLayout } from '../access-auth-layout'
 import { TermsFooter } from '../components/terms-footer'
@@ -32,15 +31,22 @@ export function SignIn() {
   const { status } = useStatus()
 
   return (
-    <AccessAuthLayout title={t('Sign in')}>
-      <div className='w-full space-y-8'>
-        <div className='space-y-2'>
-          <p className='text-muted-foreground text-left text-sm sm:text-base'>
-            {PRODUCT_NAME}
-          </p>
+    <AccessAuthLayout
+      title={
+        <>
+          {t('Welcome back.')}
+          <br />
+          {t('Keep creating.')}
+        </>
+      }
+      description={t('Sign in to manage your API keys, usage, and account.')}
+    >
+      <div className='yecai-authFormContent'>
+        <UserAuthForm redirectTo={redirect} />
+        <div className='yecai-authAccountSwitch'>
           {!status?.self_use_mode_enabled &&
             status?.register_enabled !== false && (
-              <p className='text-muted-foreground text-left text-sm sm:text-base'>
+              <p>
                 {t("Don't have an account?")}{' '}
                 <Link
                   to='/sign-up'
@@ -48,12 +54,9 @@ export function SignIn() {
                 >
                   {t('Sign up')}
                 </Link>
-                .
               </p>
             )}
         </div>
-
-        <UserAuthForm redirectTo={redirect} />
 
         <TermsFooter
           variant='sign-in'

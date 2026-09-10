@@ -16,90 +16,120 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { BarChart3 } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { useUsageSummary } from '@/features/usage-logs/hooks/use-usage-summary'
-import { formatConsoleMoney } from '@/lib/console-money'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatQuotaWithCurrency } from '@/lib/currency'
+
+import './terminal-billing.css'
 
 type TerminalBillingProps = {
-  remainQuota: number
-  usedQuota: number
+  remainQuota: number | undefined
+  usedQuota: number | undefined
+  loading?: boolean
   children: React.ReactNode
 }
 
 export function TerminalBilling(props: TerminalBillingProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const summary = useUsageSummary(10)
   const saved = summary.data?.saved_quota ?? 0
   const billed = summary.data?.quota ?? 0
   const percent =
     billed + saved > 0 ? Math.round((saved / (billed + saved)) * 100) : null
+  const moneyOptions = {
+    minimumFractionDigits: 2,
+    locale: toIntlLocale(i18n.language),
+  }
+  const balance = Number.isFinite(props.remainQuota)
+    ? formatQuotaWithCurrency(props.remainQuota, moneyOptions)
+    : '—'
+  const lifetimeSpending = Number.isFinite(props.usedQuota)
+    ? formatQuotaWithCurrency(props.usedQuota, moneyOptions)
+    : '—'
 
   return (
     <>
-      {summary.error ? (
-        <p role='alert' className='text-destructive'>
-          {t(summary.error.message)}
-        </p>
-      ) : null}
-      <section className='ci-panel'>
-        <header className='ci-panelHeader'>
-          <h2>{t('How much you saved')}</h2>
-          <p>{t('Last 10 days · recorded request rates')}</p>
-        </header>
-        <div
-          className='ci-statGrid'
-          style={{ margin: 0, border: 0, borderRadius: 0 }}
+      <div className='ci-walletOverview'>
+        <section
+          className='ci-walletBalance'
+          aria-label={t('Available balance')}
+          aria-busy={props.loading}
         >
-          <article>
-            <span>{t('Saved in the last 10 days')}</span>
-            <strong className='is-saved'>
-              {summary.data ? formatConsoleMoney(saved) : '—'}
-            </strong>
-          </article>
-          <article>
-            <span>{t('If you paid list price')}</span>
-            <strong>
-              {summary.data ? formatConsoleMoney(billed + saved) : '—'}
-            </strong>
-          </article>
-          <article>
-            <span>{t('You actually paid')}</span>
-            <strong>{summary.data ? formatConsoleMoney(billed) : '—'}</strong>
-          </article>
-          <article>
-            <span>{t('Share you saved')}</span>
-            <strong className='is-saved'>
-              {percent == null ? '—' : `${percent}%`}
-            </strong>
-          </article>
-        </div>
-      </section>
-
-      <section className='ci-panel'>
-        <header className='ci-panelHeader'>
-          <h2>{t('What you spent')}</h2>
-          <p>{t('Total from requests that already billed.')}</p>
-        </header>
-        {billed <= 0 && props.usedQuota <= 0 ? (
-          <div className='ci-empty'>
-            <span className='ci-emptyIcon'>
-              <BarChart3 size={18} />
-            </span>
-            <h3>{t('Nothing spent yet')}</h3>
-            <p>{t('This fills in after you start calling models.')}</p>
-          </div>
-        ) : (
-          <div className='ci-panelBody'>
-            <p>
-              {t('Charged')}:{' '}
-              {formatConsoleMoney(Math.max(billed, props.usedQuota))}
+          <div>
+            <p className='ci-walletBalanceLabel'>{t('Available balance')}</p>
+            <strong className='ci-walletBalanceAmount'>{balance}</strong>
+            <p className='ci-walletLifetime'>
+              <span>{t('Lifetime spending')}</span>
+              <span>{lifetimeSpending}</span>
             </p>
           </div>
-        )}
-      </section>
+          <a href='#topup' className='ci-button ci-button--size-sm'>
+            {t('Top up')}
+          </a>
+        </section>
 
+        {summary.error && (
+          <p role='alert' className='ci-walletSavingsStatus'>
+            {t('Savings unavailable')}
+          </p>
+        )}
+        {!summary.error && summary.data && (
+          <Collapsible
+            className='ci-walletSavings'
+            open={detailsOpen}
+            onOpenChange={setDetailsOpen}
+          >
+            <div className='ci-walletSavingsRow'>
+              <p className='ci-walletSavingsSummary'>
+                <span>
+                  {t('Saved {{amount}} in the last 10 days', {
+                    amount: formatQuotaWithCurrency(saved, moneyOptions),
+                  })}
+                </span>
+                {percent != null && <span>({percent}%)</span>}
+              </p>
+              <CollapsibleTrigger className='ci-walletSavingsToggle'>
+                {detailsOpen ? t('Hide details') : t('View details')}
+                <ChevronDown size={14} aria-hidden='true' />
+              </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent
+              className='ci-walletSavingsDetails'
+              role='region'
+              aria-label={t('How much you saved')}
+            >
+              <p>{t('Last 10 days · recorded request rates')}</p>
+              <dl>
+                <div>
+                  <dt>{t('You actually paid')}</dt>
+                  <dd>{formatQuotaWithCurrency(billed, moneyOptions)}</dd>
+                </div>
+                <div>
+                  <dt>{t('If you paid list price')}</dt>
+                  <dd>
+                    {formatQuotaWithCurrency(billed + saved, moneyOptions)}
+                  </dd>
+                </div>
+              </dl>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+        {!summary.error && !summary.data && (
+          <p className='ci-walletSavingsStatus' role='status'>
+            {t('Loading...')}
+          </p>
+        )}
+      </div>
       {props.children}
     </>
   )

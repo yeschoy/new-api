@@ -87,6 +87,7 @@ describe('recorded request price comparison', () => {
     ['overflow', Number.MAX_VALUE, { group_ratio: Number.MIN_VALUE }],
     ['penalty charge', 100, { group_ratio: 0.5, violation_fee: true }],
     ['subscription', 100, { group_ratio: 0.5, billing_source: 'subscription' }],
+    ['per-request billing', 100, { group_ratio: 0.5, model_price: 0.05 }],
   ])('%s has no monetary comparison', (_name, quota, other) => {
     expect(
       getLogQuotaComparison(quota as number, other as LogOtherData)
@@ -104,5 +105,44 @@ describe('recorded request price comparison', () => {
     ).toEqual({ baseCost: 1, siteCost: 0.4, savings: 0.6 })
     expect(getLogCostComparison(100, { group_ratio: 1 }, rates)).toBeNull()
     expect(getLogCostComparison(100, { group_ratio: 2 }, rates)).toBeNull()
+  })
+
+  it('uses 6.75 to convert the USD price without changing the recharge cost', () => {
+    expect(
+      getLogCostComparison(
+        250000,
+        { group_ratio: 0.5 },
+        {
+          quotaPerUnit: 500000,
+          priceRate: 3,
+          referenceCurrency: 'USD',
+        }
+      )
+    ).toEqual({ baseCost: 6.75, siteCost: 1.5, savings: 5.25 })
+  })
+
+  it('compares a native CNY reference against the actual recharge cost', () => {
+    expect(
+      getLogCostComparison(
+        250000,
+        { group_ratio: 0.25 },
+        {
+          quotaPerUnit: 500000,
+          priceRate: 3,
+          referenceCurrency: 'CNY',
+        }
+      )
+    ).toEqual({ baseCost: 2, siteCost: 1.5, savings: 0.5 })
+    expect(
+      getLogCostComparison(
+        250000,
+        { group_ratio: 0.25 },
+        {
+          quotaPerUnit: 500000,
+          priceRate: 5,
+          referenceCurrency: 'CNY',
+        }
+      )
+    ).toBeNull()
   })
 })

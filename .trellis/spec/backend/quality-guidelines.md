@@ -67,6 +67,7 @@ Changes to easy-console key creation, request history or usage/savings reporting
 - Scan the entire bounded LOG_DB window using GORM Rows/ScanRows and request context. Keep only day aggregates in memory; do not depend on optional/delayed QuotaData exports or SQL-vendor JSON/date functions.
 - Failed consume streams still count toward charged quota/tokens. Stream error classification is separate from whether the row incurred a charge.
 - Savings use recorded positive user_group_ratio before group_ratio, optional valid fee_quota, and exclude subscription, violation-fee, and incomparable charges. Never reconstruct historical discounts from current model prices.
+- `ModelPriceHelper` retains whether the cache-write ratio was explicitly configured in the request's `PriceData`. `GenerateTextOtherInfo` records that snapshotted rate even for zero cache-write usage, preserving explicit free prices and ignoring later configuration changes. Claude log generation records both duration rates independently of whether their token counters are present. This metadata must not change quota arithmetic.
 
 ### 4. Validation & Error Matrix
 | Condition | Result |
