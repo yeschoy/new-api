@@ -72,13 +72,8 @@ export function ModelCardGrid(props: ModelCardGridProps) {
   }
 
   return (
-<<<<<<< HEAD
     <div className='space-y-4 sm:space-y-5'>
       <div className='grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-3 sm:gap-4'>
-=======
-    <div className='flex flex-col gap-4 sm:gap-5'>
-      <div className='grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3'>
->>>>>>> v1.0.0-rc.36
         {pagedModels.map((model) => (
           <ModelCard
             key={model.id ?? model.model_name}

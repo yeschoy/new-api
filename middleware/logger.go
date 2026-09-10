@@ -2,11 +2,7 @@ package middleware
 
 import (
 	"fmt"
-<<<<<<< HEAD
 	"net/url"
-=======
-	"strings"
->>>>>>> v1.0.0-rc.36
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
@@ -32,12 +28,6 @@ func SetUpLogger(server *gin.Engine) {
 		if tag == "" {
 			tag = "web"
 		}
-		path := param.Path
-		// OAuth callbacks carry one-time codes and state in the query string.
-		// Redact the log value only; the handler still needs the original query.
-		if strings.HasPrefix(path, "/api/oauth/") || strings.HasPrefix(path, "/oauth/") {
-			path, _, _ = strings.Cut(path, "?")
-		}
 		return fmt.Sprintf("[GIN] %s | %s | %s | %3d | %13v | %15s | %7s %s\n",
 			param.TimeStamp.Format("2006/01/02 - 15:04:05"),
 			tag,
@@ -46,11 +36,7 @@ func SetUpLogger(server *gin.Engine) {
 			param.Latency,
 			param.ClientIP,
 			param.Method,
-<<<<<<< HEAD
 			redactCustomDomainCallbackLogPath(param.Path),
-=======
-			path,
->>>>>>> v1.0.0-rc.36
 		)
 	}))
 }

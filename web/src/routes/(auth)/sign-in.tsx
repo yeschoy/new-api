@@ -21,11 +21,7 @@ import { z } from 'zod'
 
 import { sanitizeAuthRedirect } from '@/features/auth/lib/auth-redirect'
 import { SignIn } from '@/features/auth/sign-in'
-<<<<<<< HEAD
 import { createInternalRedirect } from '@/lib/internal-redirect'
-=======
-import { resolveAuthentication } from '@/lib/auth-session'
->>>>>>> v1.0.0-rc.36
 import { useAuthStore } from '@/stores/auth-store'
 
 const searchSchema = z.object({
@@ -36,10 +32,6 @@ export const Route = createFileRoute('/(auth)/sign-in')({
   component: SignIn,
   validateSearch: searchSchema,
   beforeLoad: async ({ search }) => {
-    // 根 guard 可能因为没有会话提示而跳过了 refresh。此处必须回源确认，
-    // 否则持有有效 Refresh Cookie 的用户会被要求重新输入密码。
-    await resolveAuthentication()
-
     const { auth } = useAuthStore.getState()
 
     // Keep the authentication check consistent with protected routes.

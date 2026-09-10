@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -138,7 +137,7 @@ func Compile(source string, options Options) (*Engine, error) {
 		return nil, fmt.Errorf("unsupported plugin syntax %q: plugins must be synchronous and cannot import modules", strings.TrimSpace(match))
 	}
 
-	resolve := func(_ any, specifier string) (sobek.ModuleRecord, error) {
+	resolve := func(_ interface{}, specifier string) (sobek.ModuleRecord, error) {
 		return nil, fmt.Errorf("plugin imports are disabled: %s", specifier)
 	}
 	// Plugin source is untrusted; without this option a sourceMappingURL
@@ -447,7 +446,13 @@ func resolveExportPath(instance *runtimeInstance, exportName string, members []s
 	for _, member := range members {
 		hookName += "." + member
 		object := value.ToObject(instance.runtime)
-		own := slices.Contains(object.GetOwnPropertyNames(), member)
+		own := false
+		for _, name := range object.GetOwnPropertyNames() {
+			if name == member {
+				own = true
+				break
+			}
+		}
 		if !own {
 			return nil, hookName, false
 		}
@@ -495,7 +500,7 @@ func (e *Engine) newRuntime(ctx context.Context) (instance *runtimeInstance, err
 			panic(recovered)
 		}
 	}()
-	promise := runtime.CyclicModuleRecordEvaluate(e.module, func(_ any, specifier string) (sobek.ModuleRecord, error) {
+	promise := runtime.CyclicModuleRecordEvaluate(e.module, func(_ interface{}, specifier string) (sobek.ModuleRecord, error) {
 		return nil, fmt.Errorf("plugin imports are disabled: %s", specifier)
 	})
 	if promise.State() != sobek.PromiseStateFulfilled {

@@ -223,7 +223,6 @@ export function Pricing() {
           </div>
         </header>
 
-<<<<<<< HEAD
         <div
           className='dopa-section-shell dopa-catalog-workbench grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]'
           data-section='CATALOG'
@@ -261,10 +260,6 @@ export function Pricing() {
               onRechargePriceChange={setShowRechargePrice}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
-=======
-          <div className='grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]'>
-            <PricingSidebar
->>>>>>> v1.0.0-rc.36
               quotaTypeFilter={quotaTypeFilter}
               endpointTypeFilter={endpointTypeFilter}
               vendorFilter={vendorFilter}
@@ -283,10 +278,6 @@ export function Pricing() {
               hasActiveFilters={hasActiveFilters}
               activeFilterCount={activeFilterCount}
               onClearFilters={clearFilters}
-<<<<<<< HEAD
-=======
-              className='hover-scrollbar sticky top-20 hidden max-h-[calc(100dvh-6rem)] self-start overflow-y-auto xl:block'
->>>>>>> v1.0.0-rc.36
             />
 
             {renderPricingContent()}

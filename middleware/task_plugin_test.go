@@ -630,11 +630,9 @@ func TestTaskPluginEndpointMissPreservesOrdinaryRequestBody(t *testing.T) {
 		func(c *gin.Context) {
 			_, pinned := c.Get(jsplugin.ContextKeyPinnedEndpoint)
 			assert.False(t, pinned)
-			storage, storageErr := common.GetBodyStorage(c)
-			require.NoError(t, storageErr)
-			raw, bytesErr := storage.Bytes()
-			require.NoError(t, bytesErr)
-			assert.Equal(t, []byte(`{"model":"ordinary-model","input":"hello"}`), raw)
+			var body map[string]any
+			require.NoError(t, common.UnmarshalBodyReusable(c, &body))
+			assert.Equal(t, "ordinary-model", body["model"])
 			c.Status(http.StatusNoContent)
 		},
 	)

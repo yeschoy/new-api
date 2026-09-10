@@ -194,6 +194,8 @@ export function SubscriptionPlansCard({
   const isSubPref =
     billingPreference === 'subscription_first' ||
     billingPreference === 'subscription_only'
+  const displayPref =
+    disablePref && isSubPref ? 'wallet_first' : billingPreference
 
   const planPurchaseCountMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -330,12 +332,12 @@ export function SubscriptionPlansCard({
                     label: getBillingPreferenceLabel('wallet_only', t),
                   },
                 ]}
-                value={billingPreference}
+                value={displayPref}
                 onValueChange={(v) => v !== null && handlePreferenceChange(v)}
               >
                 <SelectTrigger className='h-8 flex-1 text-xs sm:w-[140px] sm:flex-none'>
                   <SelectValue>
-                    {getBillingPreferenceLabel(billingPreference, t)}
+                    {getBillingPreferenceLabel(displayPref, t)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false}>
@@ -379,15 +381,15 @@ export function SubscriptionPlansCard({
 
           {disablePref && isSubPref && (
             <p className='text-muted-foreground mt-2 text-xs'>
-              {billingPreference === 'subscription_only'
-                ? t(
-                    'Preference saved as {{pref}}, but no active subscription. Requests will be rejected.',
-                    { pref: t('Subscription Only') }
-                  )
-                : t(
-                    'Preference saved as {{pref}}, but no active subscription. Wallet will be used automatically.',
-                    { pref: t('Subscription First') }
-                  )}
+              {t(
+                'Preference saved as {{pref}}, but no active subscription. Wallet will be used automatically.',
+                {
+                  pref:
+                    billingPreference === 'subscription_only'
+                      ? t('Subscription Only')
+                      : t('Subscription First'),
+                }
+              )}
             </p>
           )}
 

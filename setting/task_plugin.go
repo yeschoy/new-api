@@ -1,7 +1,6 @@
 package setting
 
 import (
-	"slices"
 	"sort"
 	"strings"
 
@@ -112,5 +111,10 @@ func SetTaskPluginDisabledFactoryKeysOption(keys []string) error {
 }
 
 func IsTaskPluginFactoryDisabled(key string) bool {
-	return slices.Contains(GetTaskPluginDisabledFactoryKeys(), key)
+	for _, item := range GetTaskPluginDisabledFactoryKeys() {
+		if item == key {
+			return true
+		}
+	}
+	return false
 }
