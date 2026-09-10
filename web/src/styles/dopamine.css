@@ -2817,12 +2817,15 @@ For commercial licensing, please contact support@quantumnous.com
 .dopa-cost-stack {
   display: grid;
   gap: 0.15rem;
-  min-inline-size: 7.25rem;
+  min-inline-size: 11rem;
 }
 
 .dopa-cost-stack__official {
   color: var(--muted-foreground);
   font-size: 0.68rem;
+}
+
+.dopa-cost-stack__official del {
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }

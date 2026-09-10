@@ -483,3 +483,21 @@ export interface UserInfo {
   aff_quota?: number
   remark?: string
 }
+
+export type UserLogSummaryTotals = {
+  requests: number
+  succeeded: number
+  failed: number
+  quota: number
+  tokens: number
+  saved_quota: number
+  comparable_requests: number
+}
+
+export type DailyLogSummary = UserLogSummaryTotals & { date: string }
+export type UserLogSummary = UserLogSummaryTotals & { daily: DailyLogSummary[] }
+export type UserLogSummaryParams = {
+  start_timestamp: number
+  end_timestamp: number
+  timezone_offset: number
+}
