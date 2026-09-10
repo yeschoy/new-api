@@ -74,13 +74,13 @@
   </g>
 
   <g id="face">
-    <path d="M177 222C182 214 190 212 199 215M310 215C320 212 328 215 333 222" stroke="#2E633B" stroke-width="10" stroke-linecap="round"/>
-    <ellipse cx="197" cy="257" rx="27" ry="28" fill="#2D603A"/>
-    <ellipse cx="315" cy="257" rx="27" ry="28" fill="#2D603A"/>
-    <circle cx="190" cy="249" r="9.5" fill="#FFFFF6"/>
-    <circle cx="308" cy="249" r="9.5" fill="#FFFFF6"/>
-    <circle cx="205" cy="265" r="4.5" fill="#FFFFF6"/>
-    <circle cx="323" cy="265" r="4.5" fill="#FFFFF6"/>
+    <path d="M177 218C182 210 190 208 199 211M310 211C320 208 328 211 333 218" stroke="#2E633B" stroke-width="10" stroke-linecap="round"/>
+    <ellipse cx="197" cy="254" rx="32" ry="33" fill="#2D603A"/>
+    <ellipse cx="315" cy="254" rx="32" ry="33" fill="#2D603A"/>
+    <circle cx="189" cy="245" r="11.5" fill="#FFFFF6"/>
+    <circle cx="307" cy="245" r="11.5" fill="#FFFFF6"/>
+    <circle cx="206" cy="263" r="5.5" fill="#FFFFF6"/>
+    <circle cx="324" cy="263" r="5.5" fill="#FFFFF6"/>
     <ellipse cx="184" cy="296" rx="22" ry="11" fill="url(#yc-blush)"/>
     <ellipse cx="327" cy="296" rx="22" ry="11" fill="url(#yc-blush)"/>
     <path d="M235 283C240 303 272 304 278 283" stroke="#2E633B" stroke-width="10" stroke-linecap="round"/>
