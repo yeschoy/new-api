@@ -68,6 +68,7 @@ Changes to easy-console key creation, request history or usage/savings reporting
 - Failed consume streams still count toward charged quota/tokens. Stream error classification is separate from whether the row incurred a charge.
 - Savings use recorded positive user_group_ratio before group_ratio, optional valid fee_quota, and exclude subscription, violation-fee, and incomparable charges. Never reconstruct historical discounts from current model prices.
 - `ModelPriceHelper` retains whether the cache-write ratio was explicitly configured in the request's `PriceData`. `GenerateTextOtherInfo` records that snapshotted rate even for zero cache-write usage, preserving explicit free prices and ignoring later configuration changes. Claude log generation records both duration rates independently of whether their token counters are present. This metadata must not change quota arithmetic.
+- Pricing vendor metadata explicitly configured on a model always wins. Default vendor inference uses an ordered rule list whose order is the documented priority; never use Go map iteration for overlapping model-name patterns. In particular, an OpenAI `gpt-*` name containing `spark` remains OpenAI, while a standalone `spark-*` model maps to 讯飞.
 
 ### 4. Validation & Error Matrix
 | Condition | Result |

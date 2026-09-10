@@ -23,6 +23,7 @@ import type { PricingModel } from '@/features/pricing/types'
 import {
   buildModelCatalog,
   catalogVendorAvatar,
+  familyIconName,
   filterCatalog,
 } from '../catalog'
 
@@ -88,5 +89,30 @@ describe('complete model catalog', () => {
     expect(
       catalogVendorAvatar({ ...catalog[0], vendorIcon: '/logo.png' })
     ).toBe('/logo.png')
+  })
+
+  it('uses configured vendor names for icon fallback without impersonating Zhipu', () => {
+    const catalog = buildModelCatalog(
+      [
+        { ...model, id: 11, model_name: 'mimo-v2.5', vendor_name: 'Xiaomi' },
+        { ...model, id: 12, model_name: 'hy4-preview', vendor_name: 'Tencent' },
+        { ...model, id: 13, model_name: 'kimi-k3', vendor_name: 'Moonshot AI' },
+        { ...model, id: 14, model_name: 'private-model', vendor_name: 'Acme' },
+      ],
+      1
+    )
+
+    expect(
+      catalog.map((entry) => ({
+        vendor: entry.vendorName,
+        image: catalogVendorAvatar(entry),
+        icon: familyIconName(entry),
+      }))
+    ).toEqual([
+      { vendor: 'Xiaomi', image: null, icon: 'XiaomiMiMo' },
+      { vendor: 'Tencent', image: null, icon: 'Hunyuan.Color' },
+      { vendor: 'Moonshot AI', image: null, icon: 'Kimi.Color' },
+      { vendor: 'Acme', image: null, icon: 'Acme' },
+    ])
   })
 })
