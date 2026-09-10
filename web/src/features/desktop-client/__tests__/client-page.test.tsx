@@ -150,4 +150,16 @@ describe('desktop client page', () => {
     await renderApp(<DesktopClientPage runtime={WINDOWS_RUNTIME} />, client)
     expect(screen.getAllByRole('img', { name: /Yecai Client/ })).toHaveLength(4)
   })
+
+  it('presents the hero screenshot inside an accessible laptop frame', async () => {
+    await renderApp(<DesktopClientPage runtime={WINDOWS_RUNTIME} />, client)
+    const laptop = screen.getByRole('figure', {
+      name: 'Yecai Client application overview',
+    })
+    expect(laptop).toHaveClass('client-laptop')
+    expect(
+      laptop.querySelector('img[src="/client/yecai-client-apps.png"]')
+    ).toBeInTheDocument()
+    expect(laptop.querySelector('.client-laptop__base')).toBeInTheDocument()
+  })
 })

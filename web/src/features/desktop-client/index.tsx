@@ -162,14 +162,23 @@ export function DesktopClientPage(props: DesktopClientPageProps = {}) {
               </div>
             </div>
             <div className='client-product-plane'>
-              <img
-                src='/client/yecai-client-apps.png'
-                alt={t('Yecai Client application overview')}
-                width={2220}
-                height={1564}
-                fetchPriority='high'
-                decoding='async'
-              />
+              <figure
+                className='client-laptop'
+                aria-label={t('Yecai Client application overview')}
+              >
+                <div className='client-laptop__screen'>
+                  <span className='client-laptop__camera' aria-hidden='true' />
+                  <img
+                    src='/client/yecai-client-apps.png'
+                    alt={t('Yecai Client application overview')}
+                    width={2220}
+                    height={1564}
+                    fetchPriority='high'
+                    decoding='async'
+                  />
+                </div>
+                <div className='client-laptop__base' aria-hidden='true' />
+              </figure>
             </div>
           </section>
 
