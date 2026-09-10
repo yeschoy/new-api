@@ -122,6 +122,7 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Per-request billing (`isPerCallBilling(other.model_price)`) does not show original-price or savings comparisons in developer cost cells, easy request rows, or request details. Preserve the actual charge and any subscription/tool-surcharge indicators.
 - Configured cache-write ratios, including zero, are displayed even when no cache was written. Claude's recorded 5-minute and 1-hour rates remain separate. Missing historical rates are not filled from current catalog settings.
 - Catalog vendor names and icons come from `/api/pricing` metadata. Preserve an explicit vendor icon identifier or image URL. When the icon is absent, resolve known normalized vendor names to their matching icon; an unknown vendor uses its neutral name/initial fallback and must never inherit another provider's branded icon.
+- Public visual surfaces mount at most one shared `GlassCursor`, scoped to their page root. The home, authentication, catalog and desktop-client pages use the same implementation so fine-pointer tracking, interactive-control scaling, input avoidance, reduced-motion handling and listener cleanup remain consistent.
 - Do not display an unconnected reserved-balance metric as a hardcoded zero.
 
 ### Validation & Error Matrix

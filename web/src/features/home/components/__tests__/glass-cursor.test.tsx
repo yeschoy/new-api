@@ -26,6 +26,7 @@ import { FontProvider } from '@/context/font-provider'
 import { ThemeCustomizationProvider } from '@/context/theme-customization-provider'
 import { ThemeProvider } from '@/context/theme-provider'
 import { AccessAuthLayout } from '@/features/auth/access-auth-layout'
+import { DesktopClientPage } from '@/features/desktop-client'
 import { CatalogPageLayout } from '@/features/pricing/components/catalog-page-layout'
 import { useAuthStore } from '@/stores/auth-store'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
@@ -190,6 +191,42 @@ describe('home glass cursor', () => {
 })
 
 describe('glass cursor on related public surfaces', () => {
+  it('follows interactive controls on the desktop client page', async () => {
+    const rendered = await renderApp(
+      <ThemeProvider>
+        <FontProvider>
+          <DirectionProvider>
+            <ThemeCustomizationProvider>
+              <DesktopClientPage
+                runtime={{
+                  hostname: 'example.com',
+                  environment: {
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                    platform: 'Win32',
+                    maxTouchPoints: 0,
+                  },
+                }}
+              />
+            </ThemeCustomizationProvider>
+          </DirectionProvider>
+        </FontProvider>
+      </ThemeProvider>,
+      client
+    )
+
+    const download = screen.getByRole('link', { name: 'Download for Windows' })
+    moveMouse(download)
+    drawFrame()
+    const cursor = screen.getByTestId('glass-cursor')
+    expect(cursor).toBeVisible()
+    expect(cursor).toHaveAttribute('data-interactive', 'true')
+
+    moveMouse(document.body)
+    expect(cursor).not.toBeVisible()
+    rendered.unmount()
+    expect(screen.queryByTestId('glass-cursor')).not.toBeInTheDocument()
+  })
+
   it('follows explicitly enabled modal surfaces portalled outside the page', async () => {
     await renderApp(
       <AccessAuthLayout title='Sign in'>
