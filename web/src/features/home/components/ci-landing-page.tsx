@@ -19,22 +19,17 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link } from '@tanstack/react-router'
 import {
   ArrowRight,
-  Boxes,
   CalendarOff,
   Copy,
   ExternalLink,
   Gauge,
-  Menu,
-  Moon,
   Search,
-  Sun,
   Wallet,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { LanguageSwitcher } from '@/components/language-switcher'
-import { ProfileDropdown } from '@/components/profile-dropdown'
+import { MarketingHeader } from '@/components/layout/components/marketing-header'
 import { useTheme } from '@/context/theme-provider'
 import { useGuideAddress } from '@/features/guide/use-guide-address'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
@@ -125,9 +120,8 @@ interface LandingPageProps {
 
 export function CiLandingPage(props: LandingPageProps) {
   const { t } = useTranslation()
-  const { resolvedTheme, setTheme } = useTheme()
+  const { resolvedTheme } = useTheme()
   const [revealed, setRevealed] = useState(false)
-  const [navOpen, setNavOpen] = useState(false)
   const address = useGuideAddress()
   const clipboard = useCopyToClipboard({ notify: false })
   const primaryTo = props.isAuthenticated ? '/dashboard' : '/sign-up'
@@ -153,95 +147,10 @@ export function CiLandingPage(props: LandingPageProps) {
     >
       <GlassCursor />
       <div className='ci-handoffRoot'>
-        <header className='ci-header'>
-          <div className='ci-headerInner'>
-            <a
-              className='ci-logo'
-              aria-label={`${PRODUCT_NAME} home`}
-              href='/#top'
-            >
-              <CiMark size={22} withWordmark />
-            </a>
-            <nav
-              id='main-navigation'
-              className={cn('ci-nav', navOpen && 'is-open')}
-              aria-label={t('Main navigation')}
-            >
-              <div className='ci-navLinks'>
-                <a
-                  className='ci-navItem'
-                  href='/#models'
-                  onClick={() => setNavOpen(false)}
-                >
-                  <Boxes className='ci-mobileNavIcon' size={18} />
-                  <span>{t('Models')}</span>
-                </a>
-                <Link className='ci-navItem' to='/guide'>
-                  <span>{t('Docs')}</span>
-                </Link>
-              </div>
-              <div className='ci-mobileNavActions'>
-                {!props.isAuthenticated && (
-                  <Link
-                    to='/sign-in'
-                    className='ci-button ci-button--outline ci-button--size-xs'
-                  >
-                    {t('Sign in')}
-                  </Link>
-                )}
-                <Link
-                  to={primaryTo}
-                  className='ci-button ci-button--default ci-button--size-xs'
-                >
-                  {props.isAuthenticated ? t('Overview') : t('Start saving')}
-                </Link>
-              </div>
-            </nav>
-            <div className='ci-headerControls'>
-              <button
-                className='ci-button ci-button--ghost ci-button--size-icon-sm ci-themeToggle'
-                type='button'
-                aria-label={
-                  isDark
-                    ? t('Switch to light theme')
-                    : t('Switch to dark theme')
-                }
-                onClick={() => setTheme(isDark ? 'light' : 'dark')}
-              >
-                {isDark ? <Moon size={18} /> : <Sun size={18} />}
-              </button>
-              <LanguageSwitcher />
-              {props.isAuthenticated && <ProfileDropdown />}
-              <div className='ci-desktopNavActions'>
-                {!props.isAuthenticated && (
-                  <Link
-                    to='/sign-in'
-                    className='ci-button ci-button--ghost ci-button--size-xs'
-                  >
-                    {t('Sign in')}
-                  </Link>
-                )}
-                <Link
-                  to={primaryTo}
-                  className='ci-button ci-button--default ci-button--size-xs'
-                >
-                  {props.isAuthenticated ? t('Overview') : t('Start saving')}{' '}
-                  <ArrowIcon />
-                </Link>
-              </div>
-              <button
-                className='ci-button ci-button--ghost ci-button--size-icon-sm ci-menuButton'
-                type='button'
-                aria-label={t('Open navigation')}
-                aria-expanded={navOpen}
-                aria-controls='main-navigation'
-                onClick={() => setNavOpen((v) => !v)}
-              >
-                <Menu size={20} />
-              </button>
-            </div>
-          </div>
-        </header>
+        <MarketingHeader
+          isAuthenticated={props.isAuthenticated}
+          currentPage='home'
+        />
 
         <main>
           <section className='ci-hero' id='top'>

@@ -1654,6 +1654,10 @@ html:not([data-theme='light']) .ci-publicHeaderScope .ci-header {
   color: var(--ci-ink);
 }
 
+.ci-navLinks > .ci-navItem[aria-current='page'] {
+  color: var(--ci-ink);
+}
+
 .ci-navActions {
   gap: 10px;
 }

@@ -1,0 +1,432 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+.client-landing {
+  position: relative;
+  overflow: clip;
+  background:
+    radial-gradient(circle at 18% 8%, rgb(216 255 0 / 0.13), transparent 28rem),
+    radial-gradient(
+      circle at 86% 30%,
+      rgb(255 194 122 / 0.14),
+      transparent 34rem
+    ),
+    var(--ci-canvas);
+}
+
+.client-landing main {
+  position: relative;
+  z-index: 1;
+}
+
+.client-hero,
+.client-story,
+.client-downloads {
+  width: min(100% - 96px, var(--ci-content));
+  margin-inline: auto;
+}
+
+.client-hero {
+  position: relative;
+  display: grid;
+  min-height: calc(100svh - 60px);
+  grid-template-rows: auto minmax(20rem, 1fr);
+  align-content: center;
+  gap: clamp(2rem, 5vw, 4rem);
+  padding-block: clamp(3.5rem, 7vw, 6rem) 0;
+}
+
+.client-ambient {
+  position: absolute;
+  top: 2rem;
+  right: -10rem;
+  width: min(40vw, 34rem);
+  height: min(40vw, 34rem);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgb(216 255 0 / 0.25),
+    rgb(216 255 0 / 0) 70%
+  );
+  pointer-events: none;
+  animation: client-ambient-drift 14s ease-in-out infinite alternate;
+}
+
+.client-hero__copy {
+  position: relative;
+  z-index: 1;
+  max-width: 50rem;
+  animation: client-copy-in 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.client-hero__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1.75rem;
+  color: var(--ci-ink);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.client-hero__brand > span:last-child {
+  margin-left: 0.25rem;
+  color: var(--ci-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.client-kicker {
+  margin: 0 0 1rem;
+  color: var(--ci-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.client-hero h1,
+.client-story h2,
+.client-downloads h2 {
+  margin: 0;
+  color: var(--ci-ink);
+  font-family: var(--ci-font-display);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+}
+
+.client-hero h1 {
+  max-width: 12ch;
+  font-size: clamp(3.4rem, 8vw, 7.8rem);
+  line-height: 0.92;
+}
+
+.client-hero__description {
+  max-width: 38rem;
+  margin: 1.8rem 0 0;
+  color: var(--ci-muted);
+  font-size: clamp(1rem, 1.7vw, 1.25rem);
+  line-height: 1.5;
+}
+
+.client-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.4rem;
+  margin-top: 2rem;
+}
+
+.client-downloadButton {
+  min-height: 3rem;
+  padding-inline: 1.15rem;
+}
+
+.client-secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 3rem;
+  color: var(--ci-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    gap 180ms ease,
+    color 180ms ease;
+}
+
+.client-secondaryLink:hover {
+  gap: 0.65rem;
+  color: var(--ci-muted);
+}
+
+.client-downloadButton:focus-visible,
+.client-secondaryLink:focus-visible,
+.client-downloadOption:focus-visible,
+.client-downloads h2:focus-visible {
+  outline: 3px solid var(--ci-color-focus);
+  outline-offset: 4px;
+}
+
+.client-product-plane {
+  position: relative;
+  z-index: 1;
+  min-height: 20rem;
+  overflow: hidden;
+  border-top: 1px solid var(--ci-border-subtle);
+  box-shadow: 0 40px 100px rgb(4 13 16 / 0.18);
+  animation: client-plane-in 900ms 100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  perspective: 1200px;
+}
+
+.client-product-plane img,
+.client-story__image img,
+.client-pricing-gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.client-product-plane img {
+  height: 100%;
+  min-height: 20rem;
+  object-fit: cover;
+  object-position: top center;
+  transform: rotateX(0deg);
+}
+
+.client-story {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.65fr) minmax(0, 1.35fr);
+  align-items: center;
+  gap: clamp(2rem, 7vw, 8rem);
+  padding-block: clamp(6rem, 13vw, 12rem);
+  border-top: 1px solid var(--ci-border-subtle);
+}
+
+.client-story__copy {
+  max-width: 28rem;
+}
+
+.client-story h2,
+.client-downloads h2 {
+  font-size: clamp(2.6rem, 5vw, 5.5rem);
+  line-height: 0.97;
+}
+
+.client-story__copy > p:last-child {
+  margin: 1.4rem 0 0;
+  color: var(--ci-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.client-story__image {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--ci-border-subtle);
+  background: var(--ci-surface);
+  box-shadow: 0 28px 80px rgb(4 13 16 / 0.12);
+}
+
+.client-story--pricing {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.client-story--pricing .client-story__copy {
+  max-width: 38rem;
+}
+
+.client-pricing-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.client-pricing-gallery figure {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ci-border-subtle);
+  background: var(--ci-surface);
+  box-shadow: 0 28px 80px rgb(4 13 16 / 0.1);
+}
+
+.client-pricing-gallery__dark {
+  background: #071013;
+}
+
+.client-downloads {
+  padding-block: clamp(5rem, 10vw, 9rem) clamp(6rem, 12vw, 11rem);
+  border-top: 1px solid var(--ci-border-subtle);
+}
+
+.client-downloads__intro {
+  max-width: 38rem;
+}
+
+.client-downloads__intro > p[role='status'] {
+  min-height: 1.5rem;
+  margin: 1.25rem 0 0;
+  color: var(--ci-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.client-download-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 3rem;
+}
+
+.client-downloadOption {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 6rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--ci-border);
+  border-radius: 0.75rem;
+  background: var(--ci-surface);
+  color: var(--ci-ink);
+  text-decoration: none;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.client-downloadOption:hover {
+  border-color: var(--ci-border-strong);
+  background: var(--ci-soft-fill);
+  transform: translateY(-2px);
+}
+
+.client-downloadOption__icon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--ci-accent);
+  color: var(--ci-accent-foreground);
+}
+
+.client-downloadOption__body {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.client-downloadOption__body strong {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.client-downloadOption__body span {
+  overflow: hidden;
+  color: var(--ci-muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client-downloadOption--dark {
+  background: var(--ci-color-surface-inverse);
+  color: var(--ci-color-text-inverse);
+}
+
+@keyframes client-copy-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes client-plane-in {
+  from {
+    opacity: 0;
+    transform: translateY(36px) rotateX(2deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg);
+  }
+}
+
+@keyframes client-ambient-drift {
+  from {
+    transform: translate3d(-3%, 0, 0);
+  }
+  to {
+    transform: translate3d(3%, 3%, 0);
+  }
+}
+
+@media (max-width: 860px) {
+  .client-hero,
+  .client-story,
+  .client-downloads {
+    width: min(100% - 28px, var(--ci-content));
+  }
+
+  .client-hero {
+    min-height: auto;
+    padding-top: 4.5rem;
+  }
+
+  .client-hero h1 {
+    max-width: 10ch;
+    font-size: clamp(3rem, 16vw, 5.5rem);
+  }
+
+  .client-hero__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .client-downloadButton,
+  .client-secondaryLink {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .client-story {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+
+  .client-pricing-gallery,
+  .client-download-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-downloadOption__body span {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-ambient,
+  .client-hero__copy,
+  .client-product-plane,
+  .client-secondaryLink,
+  .client-downloadOption {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .client-hero__copy,
+  .client-product-plane {
+    opacity: 1;
+    transform: none;
+  }
+
+  .client-landing {
+    scroll-behavior: auto;
+  }
+}

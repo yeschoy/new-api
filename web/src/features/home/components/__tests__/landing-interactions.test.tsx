@@ -152,6 +152,9 @@ describe('landing interactions and price layout', () => {
     expect(
       within(navigation).getByRole('link', { name: 'Docs' })
     ).toHaveAttribute('href', '/guide')
+    expect(
+      within(navigation).getByRole('link', { name: 'Client' })
+    ).toHaveAttribute('href', '/client')
     await user.click(screen.getByRole('link', { name: 'Models' }))
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })

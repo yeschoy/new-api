@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient } from '@tanstack/react-query'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { CiLandingPage } from '@/features/home/components/ci-landing-page'
@@ -54,6 +54,16 @@ describe('public product journey', () => {
     expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute(
       'href',
       '/guide'
+    )
+    const navigation = screen.getByRole('navigation', {
+      name: 'Main navigation',
+    })
+    const docsLink = within(navigation).getByRole('link', { name: 'Docs' })
+    const clientLink = within(navigation).getByRole('link', { name: 'Client' })
+    const orderedLinks = within(navigation).getAllByRole('link')
+    expect(clientLink).toHaveAttribute('href', '/client')
+    expect(orderedLinks.indexOf(clientLink)).toBe(
+      orderedLinks.indexOf(docsLink) + 1
     )
     expect(
       screen.getByRole('heading', {
