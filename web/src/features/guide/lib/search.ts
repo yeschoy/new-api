@@ -16,74 +16,43 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { guideTools, troubleshootRows } from '../data'
-
-export type GuideSearchHit = {
-  id: string
-  kind: 'tool' | 'section'
-  title: string
-  snippet: string
-  toolId?: string
-  hash?: string
-}
+import { getGuideSectionSearchText, guideDocs } from '../catalog'
+import type { GuideSearchHit } from '../types'
 
 export function searchGuideDocs(
   query: string,
-  t: (key: string) => string
+  translate: (key: string) => string
 ): GuideSearchHit[] {
-  const needle = query.trim().toLowerCase()
-  if (needle.length === 0) return []
+  const needle = query.trim().toLocaleLowerCase()
+  if (!needle) return []
 
   const hits: GuideSearchHit[] = []
+  for (const doc of guideDocs) {
+    const translatedTitle = translate(doc.title)
+    const summary = translate(doc.summary)
+    if (`${translatedTitle} ${summary}`.toLocaleLowerCase().includes(needle)) {
+      hits.push({
+        id: `${doc.slug}-overview`,
+        slug: doc.slug,
+        sectionId: doc.sections[0]?.id ?? '',
+        title: translatedTitle,
+        snippet: summary,
+      })
+    }
 
-  const sections: GuideSearchHit[] = [
-    {
-      id: 'essentials',
-      kind: 'section',
-      title: t('The three things every tool asks for'),
-      snippet: t('Fill this when a tool asks for Base URL / API address'),
-      hash: 'essentials',
-    },
-    {
-      id: 'tools',
-      kind: 'section',
-      title: t('Pick your tool, follow the steps'),
-      snippet: t(
-        'Click any card for step-by-step setup. Addresses in the steps are already filled in with the real address of this site.'
-      ),
-      hash: 'tools',
-    },
-    {
-      id: 'troubleshoot',
-      kind: 'section',
-      title: t('Saw an error? Decode it here'),
-      snippet: t(troubleshootRows[0]?.error ?? 'The model list is empty'),
-      hash: 'troubleshoot',
-    },
-  ]
-
-  for (const section of sections) {
-    const extra =
-      section.id === 'essentials'
-        ? ` ${t('Interface address')} ${t('API key')} ${t('Model ID')}`
-        : ''
-    const hay = `${section.title} ${section.snippet}${extra}`.toLowerCase()
-    if (hay.includes(needle)) hits.push(section)
+    for (const section of doc.sections) {
+      if (hits.length >= 10) return hits
+      const sectionText = getGuideSectionSearchText(section, translate)
+      if (!sectionText.toLocaleLowerCase().includes(needle)) continue
+      if (hits.some((hit) => hit.slug === doc.slug)) continue
+      hits.push({
+        id: `${doc.slug}-${section.id}`,
+        slug: doc.slug,
+        sectionId: section.id,
+        title: translatedTitle,
+        snippet: translate(section.title),
+      })
+    }
   }
-
-  for (const tool of guideTools) {
-    const summary = t(tool.summary)
-    const steps = tool.steps.map((step) => t(step)).join(' ')
-    const hay = `${tool.name} ${summary} ${steps}`.toLowerCase()
-    if (!hay.includes(needle)) continue
-    hits.push({
-      id: tool.id,
-      kind: 'tool',
-      title: tool.name,
-      snippet: summary,
-      toolId: tool.id,
-    })
-  }
-
-  return hits.slice(0, 8)
+  return hits.slice(0, 10)
 }

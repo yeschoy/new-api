@@ -109,6 +109,14 @@ describe('terminal sidebar transitions', () => {
     ).toBeVisible()
     expect(router.state.location.pathname).toBe('/')
   })
+
+  it('keeps private developer documentation out of the easy sidebar', async () => {
+    await renderLayout()
+
+    expect(screen.queryByRole('link', { name: 'Docs' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'API keys' })).toBeVisible()
+  })
+
   it('keeps search input and page state while collapsing and reopening', async () => {
     const user = userEvent.setup()
     await renderLayout()

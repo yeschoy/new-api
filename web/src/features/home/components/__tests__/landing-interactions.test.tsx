@@ -150,8 +150,8 @@ describe('landing interactions and price layout', () => {
       within(navigation).queryByRole('link', { name: 'Model Price' })
     ).not.toBeInTheDocument()
     expect(
-      within(navigation).getByRole('link', { name: 'Docs' })
-    ).toHaveAttribute('href', '/guide')
+      within(navigation).queryByRole('link', { name: 'Docs' })
+    ).not.toBeInTheDocument()
     expect(
       within(navigation).getByRole('link', { name: 'Client' })
     ).toHaveAttribute('href', '/client')

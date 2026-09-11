@@ -63,11 +63,6 @@ export function buildPublicTopNavLinks(
     })
   }
 
-  links.push({
-    title: options.translate('Beginner guide'),
-    href: '/guide',
-  })
-
   return links
 }
 
@@ -141,7 +136,7 @@ export function useTopNavLinks(
     if (docsLink) {
       links.push({ title: t('Docs'), href: docsLink, external: true })
     } else {
-      links.push({ title: t('Docs'), href: '/docs' })
+      links.push({ title: t('Docs'), href: '/guide' })
     }
   }
 

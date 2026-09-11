@@ -72,18 +72,20 @@ export function MarketingHeader(props: MarketingHeaderProps) {
               />
               <span>{t('Models')}</span>
             </a>
-            <Link
-              className='ci-navItem'
-              to='/guide'
-              onClick={() => setNavOpen(false)}
-            >
-              <BookOpen
-                className='ci-mobileNavIcon'
-                size={18}
-                aria-hidden='true'
-              />
-              <span>{t('Docs')}</span>
-            </Link>
+            {props.isAuthenticated ? (
+              <Link
+                className='ci-navItem'
+                to='/guide'
+                onClick={() => setNavOpen(false)}
+              >
+                <BookOpen
+                  className='ci-mobileNavIcon'
+                  size={18}
+                  aria-hidden='true'
+                />
+                <span>{t('Docs')}</span>
+              </Link>
+            ) : null}
             <Link
               className='ci-navItem'
               to='/client'

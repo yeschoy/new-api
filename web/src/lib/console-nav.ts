@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-
 export type ConsoleNavGroupId = 'main' | 'build' | 'account' | 'resources'
 
 export type ConsoleNavItem = {
@@ -64,7 +63,6 @@ export const CONSOLE_NAV: ConsoleNavItem[] = [
   },
   { id: 'keys', title: 'API keys', href: '/keys', group: 'build' },
   { id: 'billing', title: 'Wallet', href: '/wallet', group: 'account' },
-  { id: 'docs', title: 'Docs', href: '/guide', group: 'resources' },
 ]
 
 export function consoleNavPath(href: string): string {

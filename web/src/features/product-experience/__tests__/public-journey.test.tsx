@@ -51,20 +51,19 @@ describe('public product journey', () => {
     expect(
       screen.queryByRole('link', { name: 'Model Price' })
     ).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute(
-      'href',
-      '/guide'
-    )
     const navigation = screen.getByRole('navigation', {
       name: 'Main navigation',
     })
-    const docsLink = within(navigation).getByRole('link', { name: 'Docs' })
     const clientLink = within(navigation).getByRole('link', { name: 'Client' })
-    const orderedLinks = within(navigation).getAllByRole('link')
     expect(clientLink).toHaveAttribute('href', '/client')
-    expect(orderedLinks.indexOf(clientLink)).toBe(
-      orderedLinks.indexOf(docsLink) + 1
-    )
+    expect(
+      within(navigation).queryByRole('link', { name: 'Docs' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen
+        .queryAllByRole('link')
+        .some((link) => link.getAttribute('href')?.startsWith('/guide'))
+    ).toBe(false)
     expect(
       screen.getByRole('heading', {
         name: 'Change two values. Access every leading provider.',

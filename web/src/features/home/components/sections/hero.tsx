@@ -91,14 +91,16 @@ export function Hero(props: HeroProps) {
             {primaryLabel}
             <ArrowRight className='size-4' />
           </Button>
-          <Button
-            variant='outline'
-            size='lg'
-            className='h-10 rounded-md px-4 text-sm'
-            render={<Link to='/guide' />}
-          >
-            {t('Read the docs')}
-          </Button>
+          {props.isAuthenticated ? (
+            <Button
+              variant='outline'
+              size='lg'
+              className='h-10 rounded-md px-4 text-sm'
+              render={<Link to='/guide' />}
+            >
+              {t('Read the docs')}
+            </Button>
+          ) : null}
         </div>
         <ul className='text-muted-foreground mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm'>
           <li>{t('Pay as you go')}</li>

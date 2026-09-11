@@ -53,7 +53,7 @@ describe('compact console navigation', () => {
   })
 
   it.each([320, 390, 767])(
-    'replaces the six inline links with a keyboard-accessible menu at %i px',
+    'replaces the five inline links with a keyboard-accessible menu at %i px',
     async (width) => {
       setViewport(width)
       await renderApp(<EasyTaskDock />, client)
@@ -76,8 +76,8 @@ describe('compact console navigation', () => {
         screen.getByRole('menuitem', { name: 'Model prices' })
       ).toHaveAttribute('href', '/pricing')
       expect(
-        screen.getByRole('menuitem', { name: 'Beginner guide' })
-      ).toHaveAttribute('href', '/guide')
+        screen.queryByRole('menuitem', { name: 'Beginner guide' })
+      ).not.toBeInTheDocument()
       expect(
         screen.getByRole('menuitem', { name: 'Spending details' })
       ).toHaveAttribute('href', '/usage-logs')
@@ -93,13 +93,13 @@ describe('compact console navigation', () => {
     }
   )
 
-  it('keeps all six named inline links on desktop', async () => {
+  it('keeps all five named inline links on desktop', async () => {
     setViewport(1280)
     await renderApp(<EasyTaskDock />, client)
     expect(
       screen.queryByRole('button', { name: 'Toggle navigation menu' })
     ).toBeNull()
-    expect(screen.getAllByRole('link')).toHaveLength(6)
+    expect(screen.getAllByRole('link')).toHaveLength(5)
     expect(screen.getByRole('link', { name: 'My key' })).toBeVisible()
   })
 

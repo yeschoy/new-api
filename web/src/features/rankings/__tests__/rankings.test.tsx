@@ -157,8 +157,13 @@ it.each(['anonymous', 'developer', 'easy'] as const)(
       )
     } else {
       expect(
-        screen.getAllByRole('link', { name: 'Beginner guide' }).length
-      ).toBeGreaterThan(0)
+        screen.queryByRole('link', { name: 'Beginner guide' })
+      ).not.toBeInTheDocument()
+      expect(
+        screen
+          .getAllByRole('link', { name: 'Model Price' })
+          .every((link) => link.getAttribute('href') === '/pricing')
+      ).toBe(true)
     }
     payload = {
       models: [],

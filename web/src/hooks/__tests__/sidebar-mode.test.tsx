@@ -65,7 +65,6 @@ describe('console mode sidebar', () => {
       '/dashboard/overview',
       '/keys',
       '/pricing',
-      '/guide',
       '/usage-logs/common',
       '/wallet',
     ])
@@ -76,6 +75,7 @@ describe('console mode sidebar', () => {
 
     const urls = await getSidebarUrls()
     expect(urls).toContain('/playground')
+    expect(urls).toContain('/guide')
     expect(urls).toContain('/dashboard/models')
     expect(urls).toContain('/usage-logs/task')
     expect(urls).toContain('/channels')

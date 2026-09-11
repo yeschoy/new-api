@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
-  BookOpen,
   Boxes,
   ChevronDown,
   FileText,
@@ -64,7 +63,6 @@ import { useSystemConfigStore } from '@/stores/system-config-store'
 import type { NavGroup } from '../types'
 import { CommunityHelp } from './community-help'
 import { ConsoleModeControl } from './console-mode-switcher'
-import { DocsSearch } from './docs-search'
 
 const NAV_ICONS = {
   overview: LayoutGrid,
@@ -74,7 +72,6 @@ const NAV_ICONS = {
   playground: MessageSquare,
   keys: KeyRound,
   billing: Wallet,
-  docs: BookOpen,
 } as const
 
 const SIDEBAR_STORAGE_KEY = 'ci_sidebar_collapsed'
@@ -449,7 +446,6 @@ export function TerminalLayout(props: TerminalLayoutProps) {
           >
             <PanelLeft size={16} />
           </button>
-          <DocsSearch />
           <div className='ci-appTopbarRight'>
             <ConsoleModeControl compact />
             <span className='ci-appUsd'>¥</span>

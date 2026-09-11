@@ -35,5 +35,7 @@ describe('isOperatorRoute', () => {
     expect(isOperatorRoute('/channels')).toBe(true)
     expect(isOperatorRoute('/system-settings/site')).toBe(true)
     expect(isOperatorRoute('/models/metadata')).toBe(true)
+    expect(isOperatorRoute('/guide')).toBe(true)
+    expect(isOperatorRoute('/guide/codex')).toBe(true)
   })
 })
