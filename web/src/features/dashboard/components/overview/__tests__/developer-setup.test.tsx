@@ -58,9 +58,28 @@ beforeEach(() => {
   })
   client.setQueryData(['dashboard', 'overview', 'api-keys', bundle.user.id], [])
   client.setQueryData(
-    ['dashboard', 'overview', 'user-models', bundle.user.id],
+    ['dashboard', 'overview', 'user-models', bundle.user.id, 'default'],
     ['example-model']
   )
+  client.setQueryData(['pricing'], {
+    success: true,
+    data: [
+      {
+        id: 1,
+        model_name: 'example-model',
+        quota_type: 0,
+        model_ratio: 1,
+        completion_ratio: 1,
+        enable_groups: ['default'],
+        supported_endpoint_types: ['openai'],
+      },
+    ],
+    vendors: [],
+    group_ratio: {},
+    usable_group: {},
+    supported_endpoint: {},
+    auto_groups: [],
+  })
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     if (url === '/api/log/self/summary') {
       return {
@@ -152,7 +171,17 @@ describe('developer setup guide', () => {
         'api-keys',
         useAuthStore.getState().auth.user?.id,
       ],
-      [{ id: 42, status: 1, name: 'test key', key: 'masked****' }]
+      [
+        {
+          id: 42,
+          status: 1,
+          name: 'test key',
+          key: 'masked****',
+          group: 'default',
+          model_limits_enabled: false,
+          model_limits: '',
+        },
+      ]
     )
     await renderApp(<DeveloperSetupGuide />, client)
     expect(reveal).not.toHaveBeenCalled()
@@ -166,6 +195,103 @@ describe('developer setup guide', () => {
     expect(command).toContain('"model":"example-model"')
     expect(command).not.toContain('masked')
     expect(screen.queryByText(/sk-example-preview-key/)).toBeNull()
+  })
+
+  it('copies a Chat Completions model available to the selected key group', async () => {
+    const user = userEvent.setup()
+    const userId = useAuthStore.getState().auth.user?.id
+    const clipboard = vi
+      .spyOn(navigator.clipboard, 'writeText')
+      .mockResolvedValue()
+    vi.spyOn(api, 'post').mockResolvedValue({
+      data: { success: true, data: { key: 'sk-compatible-key' } },
+    })
+    client.setQueryData(
+      ['dashboard', 'overview', 'api-keys', userId],
+      [
+        {
+          id: 42,
+          status: 1,
+          name: 'default key',
+          key: 'masked****',
+          group: 'default',
+          model_limits_enabled: false,
+          model_limits: '',
+        },
+      ]
+    )
+    client.removeQueries({
+      queryKey: ['dashboard', 'overview', 'user-models', userId],
+    })
+    client.removeQueries({ queryKey: ['pricing'] })
+    vi.mocked(api.get).mockImplementation(async (url, config) => {
+      if (url === '/api/user/models') {
+        return {
+          data: {
+            success: true,
+            data:
+              config?.params?.group === 'default'
+                ? ['default-responses', 'default-chat']
+                : ['vip-chat', 'default-responses', 'default-chat'],
+          },
+        }
+      }
+      if (url === '/api/pricing') {
+        return {
+          data: {
+            success: true,
+            data: [
+              {
+                id: 1,
+                model_name: 'vip-chat',
+                quota_type: 0,
+                model_ratio: 1,
+                completion_ratio: 1,
+                enable_groups: ['vip'],
+                supported_endpoint_types: ['openai'],
+              },
+              {
+                id: 2,
+                model_name: 'default-responses',
+                quota_type: 0,
+                model_ratio: 1,
+                completion_ratio: 1,
+                enable_groups: ['default'],
+                supported_endpoint_types: ['openai-response'],
+              },
+              {
+                id: 3,
+                model_name: 'default-chat',
+                quota_type: 0,
+                model_ratio: 1,
+                completion_ratio: 1,
+                enable_groups: ['default'],
+                supported_endpoint_types: ['openai'],
+              },
+            ],
+            vendors: [],
+            group_ratio: {},
+            usable_group: {},
+            supported_endpoint: {},
+            auto_groups: [],
+          },
+        }
+      }
+      return { data: { success: true, data: [] } }
+    })
+
+    await renderApp(<DeveloperSetupGuide />, client)
+    const copyButton = await screen.findByRole('button', {
+      name: 'Copy ready-to-run curl',
+    })
+    await waitFor(() => expect(copyButton).toBeEnabled())
+    await user.click(copyButton)
+    await waitFor(() => expect(clipboard).toHaveBeenCalled())
+
+    const command = clipboard.mock.calls[0][0]
+    expect(command).toContain('"model":"default-chat"')
+    expect(command).not.toContain('vip-chat')
+    expect(command).not.toContain('default-responses')
   })
 
   it('copies the Base URL without revealing an API key or expanding setup', async () => {
@@ -193,10 +319,20 @@ describe('developer setup guide', () => {
     const userId = useAuthStore.getState().auth.user?.id
     client.setQueryData(
       ['dashboard', 'overview', 'api-keys', userId],
-      [{ id: 42, status: 1, name: 'test key', key: 'masked****' }]
+      [
+        {
+          id: 42,
+          status: 1,
+          name: 'test key',
+          key: 'masked****',
+          group: 'default',
+          model_limits_enabled: false,
+          model_limits: '',
+        },
+      ]
     )
     client.removeQueries({
-      queryKey: ['dashboard', 'overview', 'user-models', userId],
+      queryKey: ['dashboard', 'overview', 'user-models', userId, 'default'],
     })
     let resolveModels: (value: {
       data: { success: boolean; data: string[] }

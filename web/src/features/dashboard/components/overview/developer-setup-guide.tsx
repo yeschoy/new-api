@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Check, ChevronDown, Circle, Copy } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -32,8 +32,10 @@ import {
 } from '@/components/ui/collapsible'
 import { getApiKeys, getFullApiKey } from '@/features/keys/api'
 import type { ApiKey } from '@/features/keys/types'
+import { getPricing } from '@/features/pricing/api'
+import { ENDPOINT_TYPES } from '@/features/pricing/constants'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
-import { getUserModels } from '@/lib/api'
+import { getUserGroupModels } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { useApiInfo } from '../../hooks/use-status-data'
@@ -143,20 +145,39 @@ export function DeveloperSetupGuide() {
   const complete = completedCount === steps.length
   const expanded =
     manualExpanded ?? (keysQuery.isSuccess && Boolean(user) && !complete)
+  const selectedGroup = preferredKey?.group?.trim() ?? ''
   const modelsQuery = useQuery({
-    queryKey: ['dashboard', 'overview', 'user-models', user?.id],
+    queryKey: ['dashboard', 'overview', 'user-models', user?.id, selectedGroup],
     queryFn: async () => {
-      const result = await getUserModels()
+      const result = await getUserGroupModels(selectedGroup)
       if (!result.success) throw new Error('Failed to load models')
       return result.data ?? []
     },
-    enabled: expanded,
+    enabled: expanded && Boolean(selectedGroup),
+    staleTime: 300_000,
+  })
+  const pricingQuery = useQuery({
+    queryKey: ['pricing'],
+    queryFn: getPricing,
+    enabled: expanded && Boolean(selectedGroup),
     staleTime: 300_000,
   })
   const endpoint = normalizeEndpoint(apiInfoItems[0]?.url)
   const baseUrl = endpoint.replace(/\/chat\/completions$/, '')
-  const model = modelsQuery.data?.[0]
+  const model = useMemo(() => {
+    const chatModels = new Set(
+      (pricingQuery.data?.success ? pricingQuery.data.data : [])
+        .filter((item) =>
+          item.supported_endpoint_types?.includes(ENDPOINT_TYPES.OPENAI)
+        )
+        .map((item) => item.model_name)
+    )
+    return modelsQuery.data?.find((candidate) => chatModels.has(candidate))
+  }, [modelsQuery.data, pricingQuery.data])
   const ready = Boolean(preferredKey?.id && model)
+  const environmentLoading =
+    Boolean(preferredKey && selectedGroup) &&
+    (modelsQuery.isPending || pricingQuery.isPending)
   const preview = buildCurlCommand({
     endpoint,
     model: model ?? '<model>',
@@ -281,12 +302,12 @@ export function DeveloperSetupGuide() {
             <pre className='bg-muted/50 max-w-full overflow-x-auto rounded-md p-3 font-mono text-xs leading-6'>
               <code>{preview}</code>
             </pre>
-            {modelsQuery.isPending && (
+            {environmentLoading && (
               <p className='text-muted-foreground mt-2 text-xs'>
                 {t('Loading...')}
               </p>
             )}
-            {!modelsQuery.isPending && !ready && (
+            {!environmentLoading && !ready && (
               <p className='text-muted-foreground mt-2 text-xs'>
                 {preferredKey
                   ? t('No models available')

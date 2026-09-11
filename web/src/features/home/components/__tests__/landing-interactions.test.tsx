@@ -121,6 +121,44 @@ describe('landing interactions and price layout', () => {
     )
     expect(screen.getAllByText('Save 50%').length).toBeGreaterThan(0)
   })
+  it.each([
+    ['qwen-max', 'Qwen', 'Qwen.Color', null],
+    ['kimi-k2', 'Moonshot', 'Moonshot', null],
+    ['private-model', 'Acme', undefined, 'A'],
+  ])(
+    'uses the matching or neutral hero icon for %s',
+    async (modelName, vendorName, vendorIcon, fallbackText) => {
+      const catalog = buildModelCatalog(
+        [
+          {
+            ...models[0].pricingModel,
+            model_name: modelName,
+            vendor_name: vendorName,
+            vendor_icon: vendorIcon,
+            group_ratio: { default: 0.5 },
+          },
+        ],
+        1
+      )
+      const { container } = await renderApp(
+        <CiLandingPage
+          isAuthenticated={false}
+          models={catalog}
+          maxSavingsPercent={50}
+        />,
+        client
+      )
+      const logo = container.querySelector('.ci-heroModelLogo')
+
+      expect(logo).not.toBeNull()
+      expect(logo?.querySelector('img')).toBeNull()
+      if (fallbackText) {
+        expect(logo).toHaveTextContent(fallbackText)
+      } else {
+        expect(logo?.querySelector('svg')).not.toBeNull()
+      }
+    }
+  )
   it('closes mobile navigation when an in-page destination is selected', async () => {
     const user = userEvent.setup()
     await renderApp(

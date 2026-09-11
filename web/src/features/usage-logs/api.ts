@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { api, type ApiRequestConfig } from '@/lib/api'
 
 import { LOG_TYPE_ENUM } from './constants'
-import type { UsageLog } from './data/schema'
 import { buildQueryParams } from './lib/query-params'
 import { parseTaskArtifactsResponse } from './lib/task-artifacts'
 import type {
@@ -89,72 +88,15 @@ type UserRequestLogsParams = Omit<
 >
 
 const REQUEST_LOG_TYPES = [LOG_TYPE_ENUM.CONSUME, LOG_TYPE_ENUM.ERROR] as const
-const MAX_LOG_PAGE_SIZE = 100
-
-async function getUserLogPrefix(
-  params: Omit<UserRequestLogsParams, 'p' | 'page_size'>,
-  type: (typeof REQUEST_LOG_TYPES)[number],
-  itemCount: number
-) {
-  const pageSize = Math.min(itemCount, MAX_LOG_PAGE_SIZE)
-  const items: UsageLog[] = []
-  let total = 0
-
-  for (
-    let page = 1;
-    items.length < Math.min(itemCount, total || itemCount);
-    page++
-  ) {
-    const response = await getUserLogs({
-      ...params,
-      type,
-      p: page,
-      page_size: pageSize,
-    })
-    if (!response.success || !response.data) {
-      return { response }
-    }
-
-    total = response.data.total
-    const pageItems = response.data.items as UsageLog[]
-    items.push(...pageItems)
-    if (pageItems.length === 0) break
-  }
-
-  return { items, total }
-}
 
 export async function getUserRequestLogs(
   params: UserRequestLogsParams = {}
 ): Promise<GetLogsResponse> {
-  const page = Math.max(1, Math.trunc(params.p ?? 1))
-  const pageSize = Math.max(1, Math.trunc(params.page_size ?? 20))
-  const prefixSize = page * pageSize
-  const { p: _page, page_size: _pageSize, ...filters } = params
-  const streams = await Promise.all(
-    REQUEST_LOG_TYPES.map((type) => getUserLogPrefix(filters, type, prefixSize))
+  return fetchLogs(
+    '/api/log',
+    { ...params, types: [...REQUEST_LOG_TYPES] },
+    false
   )
-  const failedStream = streams.find((stream) => stream.response)
-  if (failedStream?.response) return failedStream.response
-
-  const allItems = streams.flatMap((stream) => stream.items ?? [])
-  allItems.sort(
-    (left, right) =>
-      right.created_at - left.created_at ||
-      right.type - left.type ||
-      // The self-log endpoint rewrites IDs to ascending display positions.
-      left.id - right.id
-  )
-
-  return {
-    success: true,
-    data: {
-      items: allItems.slice((page - 1) * pageSize, prefixSize),
-      total: streams.reduce((sum, stream) => sum + (stream.total ?? 0), 0),
-      page,
-      page_size: pageSize,
-    },
-  }
 }
 
 export const getLogStats = (params: GetLogStatsParams = {}) =>
