@@ -43,6 +43,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { SignOutDialog } from '@/components/sign-out-dialog'
 import { useTheme } from '@/context/theme-provider'
 import { CiMark } from '@/features/home/components/ci-mark'
+import { GlassCursor } from '@/features/home/components/glass-cursor'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 import { useUserDisplay } from '@/hooks/use-user-display'
@@ -191,6 +192,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
       )}
       data-theme={isDark ? 'dark' : 'light'}
     >
+      <GlassCursor scopeSelector='.ci-app' />
       <aside
         id={sidebarId}
         className='ci-appSidebar'

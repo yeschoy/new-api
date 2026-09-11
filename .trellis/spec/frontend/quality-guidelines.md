@@ -122,7 +122,7 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Per-request billing (`isPerCallBilling(other.model_price)`) does not show original-price or savings comparisons in developer cost cells, easy request rows, or request details. Preserve the actual charge and any subscription/tool-surcharge indicators.
 - Configured cache-write ratios, including zero, are displayed even when no cache was written. Claude's recorded 5-minute and 1-hour rates remain separate. Missing historical rates are not filled from current catalog settings.
 - Catalog vendor names and icons come from `/api/pricing` metadata. Preserve an explicit vendor icon identifier or image URL. When the icon is absent, resolve known normalized vendor names to their matching icon; an unknown vendor uses its neutral name/initial fallback and must never inherit another provider's branded icon.
-- Public visual surfaces mount at most one shared `GlassCursor`, scoped to their page root. The home, authentication, catalog and desktop-client pages use the same implementation so fine-pointer tracking, interactive-control scaling, input avoidance, reduced-motion handling and listener cleanup remain consistent.
+- Public visual surfaces and the easy-mode authenticated shell mount at most one shared `GlassCursor`, scoped to their root. `TerminalLayout` owns the `.ci-app` cursor in easy mode, so an authenticated `CatalogPageLayout` defers to that instance in easy mode and keeps its page-owned instance only in developer mode; the anonymous catalog keeps its public-root instance. Home, authentication, catalog and desktop-client pages use the same implementation so fine-pointer tracking, interactive-control scaling, input avoidance, reduced-motion handling and listener cleanup remain consistent.
 - Do not display an unconnected reserved-balance metric as a hardcoded zero.
 
 ### Validation & Error Matrix
@@ -141,7 +141,7 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Bad: reuse the on/off translation for a percentage discount, or apply flex display to td elements.
 
 ### Tests Required
-Cover 101-key revoke and incomplete deletion, reveal retry without duplicate creation, group changes/free pricing, all pricing modes, complete reports vs a paginated list, stream failures and currency export. Browser/DOM tests cover mobile anchor-close behavior, table-cell layout, visible rate comparisons and absence of retired supplier entry points.
+Cover 101-key revoke and incomplete deletion, reveal retry without duplicate creation, group changes/free pricing, all pricing modes, complete reports vs a paginated list, stream failures and currency export. Browser/DOM tests cover mobile anchor-close behavior, table-cell layout, visible rate comparisons, absence of retired supplier entry points, a generic easy-mode shell cursor, and exactly one cursor on authenticated catalog pages in either console mode.
 
 ### Wrong vs Correct
 - Wrong: use catalog discount percentages to estimate savings for historical logs.

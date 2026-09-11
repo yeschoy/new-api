@@ -21,6 +21,7 @@ import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { createPortal } from 'react-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { AuthenticatedLayout } from '@/components/layout/components/authenticated-layout'
 import { DirectionProvider } from '@/context/direction-provider'
 import { FontProvider } from '@/context/font-provider'
 import { ThemeCustomizationProvider } from '@/context/theme-customization-provider'
@@ -282,7 +283,9 @@ describe('glass cursor on related public surfaces', () => {
         </ThemeProvider>,
         client
       )
-      const cursor = screen.getByTestId('glass-cursor')
+      const cursors = screen.getAllByTestId('glass-cursor')
+      expect(cursors).toHaveLength(1)
+      const cursor = cursors[0]
       moveMouse(screen.getByRole('button', { name: 'Explore models' }))
       drawFrame()
       expect(cursor).toBeVisible()
@@ -296,4 +299,60 @@ describe('glass cursor on related public surfaces', () => {
       expect(mediaListeners.size).toBe(0)
     }
   )
+})
+
+describe('glass cursor in the authenticated console', () => {
+  it('stays active as one shared instance throughout the easy-mode shell', async () => {
+    useAuthStore.getState().auth.setBundle(createTestAuthBundle())
+    useConsoleModeStore.getState().setMode('easy')
+
+    await renderApp(
+      <ThemeProvider>
+        <FontProvider>
+          <DirectionProvider>
+            <ThemeCustomizationProvider>
+              <AuthenticatedLayout>
+                <button type='button'>Open report</button>
+              </AuthenticatedLayout>
+            </ThemeCustomizationProvider>
+          </DirectionProvider>
+        </FontProvider>
+      </ThemeProvider>,
+      client
+    )
+
+    const button = screen.getByRole('button', { name: 'Open report' })
+    moveMouse(button)
+    drawFrame()
+
+    const cursors = screen.getAllByTestId('glass-cursor')
+    expect(cursors).toHaveLength(1)
+    expect(cursors[0]).toBeVisible()
+    expect(cursors[0]).toHaveAttribute('data-interactive', 'true')
+  })
+
+  it('does not expand the effect to the generic developer shell', async () => {
+    useAuthStore.getState().auth.setBundle(createTestAuthBundle())
+    useConsoleModeStore.getState().setMode('developer')
+
+    await renderApp(
+      <ThemeProvider>
+        <FontProvider>
+          <DirectionProvider>
+            <ThemeCustomizationProvider>
+              <AuthenticatedLayout>
+                <button type='button'>Open report</button>
+              </AuthenticatedLayout>
+            </ThemeCustomizationProvider>
+          </DirectionProvider>
+        </FontProvider>
+      </ThemeProvider>,
+      client
+    )
+
+    moveMouse(screen.getByRole('button', { name: 'Open report' }))
+    drawFrame()
+
+    expect(screen.queryByTestId('glass-cursor')).not.toBeInTheDocument()
+  })
 })
