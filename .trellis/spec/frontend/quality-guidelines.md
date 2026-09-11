@@ -100,6 +100,108 @@ consume billing expressions, while sidebar sizing composes with Base UI state.
 - Wrong: apply expanded `sidebar-gap` sizing regardless of `data-state`.
 - Correct: scope expanded geometry to `data-state="expanded"`.
 
+## Authenticated account-aware developer documentation
+
+### 1. Scope / Trigger
+
+Use this contract when adding or changing internal setup documentation that
+combines deployment URLs, account models, billing groups, and client protocol
+examples. It prevents public exposure, leaked credentials, and examples that
+look valid but use an incompatible model/endpoint pair.
+
+### 2. Signatures
+
+- Routes: `/guide` and `/guide/$slug` live under `routes/_authenticated/guide/`.
+- `isOperatorRoute('/guide' | '/guide/...')` returns `true` so the developer
+  shell wins over a saved easy-mode preference.
+- `useGuideEnvironment(audience, requested, onSelectionChange)` composes
+  `getUserModels()`, `getUserGroups()`, `getUserGroupModels(group)`,
+  `getPricing()`, and `useGuideAddress()`.
+- `fillGuideTemplate(template, runtime)` resolves only approved deployment,
+  model, group, and masked-key placeholders.
+
+### 3. Contracts
+
+- Public navigation and easy-mode navigation do not link to the internal guide.
+  Contextual help inside an authenticated setup flow may link to `/guide`.
+- Protocol-specific articles intersect account model IDs with pricing
+  `supported_endpoint_types`: `openai-response` for Codex, `anthropic` for
+  Claude Code, and `openai` for Chat Completions clients.
+- A selected group is shown only after `/api/user/models?group=<group>` confirms
+  it contains the selected model.
+- The billing/routing group belongs to the API key. Select the model/group
+  before key creation and create or edit the key in that group; do not describe
+  the group as a client request field or custom header without a separate API
+  contract that explicitly supports one.
+- Guide code never calls key-list or key-reveal APIs. Every API-key slot resolves
+  to the literal masked placeholder `sk-••••••`.
+- Dynamic guide prose uses English i18n keys and must be enumerated by the guide
+  localization test because a static `t('...')` extractor cannot see catalog
+  data.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Anonymous request to `/guide...` | Existing authenticated-route redirect to sign-in |
+| Invalid route slug | Not-found experience; never a silent article fallback |
+| Requested model/group is unavailable | Replace with a verified deterministic default |
+| No model supports the article protocol | Honest empty state with a Models action |
+| Pricing or group verification fails | Retryable error state; do not emit an unverified config |
+| Pricing success response omits `data` | Retryable error state; no render exception |
+| Selected model declares context below 1M | Do not claim or generate a 1M configuration |
+
+### 5. Good / Base / Bad Cases
+
+- Good: an account has a Responses model in `default`; the Codex article shows
+  that pair and regenerates its visible/copyable TOML together.
+- Base: a protocol-neutral troubleshooting article may list all account models,
+  but it does not claim that one model supports every client.
+- Bad: choose the first account model for a Chat Completions curl example
+  without checking `supported_endpoint_types`.
+- Bad: retrieve a full key so a documentation snippet can be copied in one click.
+
+### 6. Tests Required
+
+- Catalog/runtime unit tests: seven stable articles, neighboring articles,
+  placeholder resolution, protocol filtering, and immutable inputs.
+- Hook tests: verified model/group combinations, invalid requested values,
+  model changes that invalidate a group, empty protocols, rejected queries, and
+  unsuccessful responses without payloads.
+- Component tests: platform tabs, visible resolved config, safe copy text,
+  translated search, mobile titled Sheet, and desktop table-of-contents
+  breakpoint.
+- Navigation tests: no public/easy guide destination, developer sidebar entry,
+  developer-header `/guide` fallback, and operator-route recognition.
+- Localization tests: every catalog/component key exists in all seven locales
+  and preserves the English placeholder multiset.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+const model = userModels[0]
+const apiKey = await getFullApiKey(keyId)
+return template.replace('{{MODEL}}', model).replace('{{KEY}}', apiKey)
+```
+
+#### Correct
+
+```ts
+const models = filterModelsForAudience(userModels, pricing, audience)
+const groups = verifiedGroupsFor(models[0])
+return fillGuideTemplate(template, {
+  ...runtimeAddress,
+  model: models[0],
+  group: groups[0],
+  platform,
+})
+```
+
+The correct path derives only display-safe values, and the template resolver
+owns the constant masked API-key placeholder.
+
 
 ## Easy-console pricing, keys and reports
 
