@@ -48,8 +48,11 @@ type domainLoginFallbackPayload struct {
 }
 
 func issueDomainLoginHandoff(c *gin.Context, userID int, providerName string, statePayload oauthFlowPayload) (bool, error) {
-	if statePayload.BrowserBindingHash == "" {
+	if statePayload.OriginHost == "" {
 		return false, nil
+	}
+	if statePayload.BrowserBindingHash == "" {
+		return false, model.ErrAuthFlowInvalid
 	}
 	expectedHost, _, err := resolveOAuthReturnTarget(statePayload)
 	if err != nil {
@@ -180,7 +183,11 @@ func issueDomainBindHandoff(c *gin.Context, provider oauth.Provider, oauthUser *
 	}
 	providerColumn := provider.ProviderUserIDColumn()
 	if providerColumn == "" {
-		return fmt.Errorf("custom-domain OAuth bind handoff does not support provider %s", pendingFlow.Provider)
+		if _, ok := provider.(*oauth.GenericOAuthProvider); ok {
+			providerColumn = "custom"
+		} else {
+			return fmt.Errorf("custom-domain OAuth bind handoff does not support provider %s", pendingFlow.Provider)
+		}
 	}
 	if _, _, err := service.ValidateLoginSession(service.AuthIdentity{
 		UserID:          pendingFlow.UserId,
@@ -405,20 +412,46 @@ func ConsumeDomainBindHandoff(c *gin.Context) {
 		return
 	}
 	provider := oauth.GetProvider(flow.Provider)
-	if provider == nil || !provider.IsEnabled() || provider.ProviderUserIDColumn() != payload.ProviderColumn || provider.IsUserIDTaken(payload.ProviderUserID) {
+	if provider == nil || !provider.IsEnabled() || provider.IsUserIDTaken(payload.ProviderUserID) {
+		writeInvalidDomainBindHandoff(c, http.StatusForbidden)
+		return
+	}
+	if custom, ok := provider.(*oauth.GenericOAuthProvider); ok {
+		if payload.ProviderColumn != "custom" || custom.GetProviderId() <= 0 {
+			writeInvalidDomainBindHandoff(c, http.StatusForbidden)
+			return
+		}
+	} else if provider.ProviderUserIDColumn() != payload.ProviderColumn {
 		writeInvalidDomainBindHandoff(c, http.StatusForbidden)
 		return
 	}
 	if _, err := model.ConsumeAuthFlowWithAction(request.Ticket, match, func(tx *gorm.DB, _ *model.AuthFlow) error {
-		return model.UpdateUserBindColumnWithTx(tx, identity.UserID, payload.ProviderColumn, payload.ProviderUserID)
+		if flow.Provider == "telegram" {
+			return model.BindTelegramForSessionWithTx(tx, identity, payload.ProviderUserID)
+		}
+		if custom, ok := provider.(*oauth.GenericOAuthProvider); ok {
+			return model.UpdateUserOAuthBindingForSessionWithTx(tx, identity, custom.GetProviderId(), payload.ProviderUserID)
+		}
+		return model.UpdateUserBindColumnForSessionWithTx(tx, identity, payload.ProviderColumn, payload.ProviderUserID)
 	}); err != nil {
 		writeInvalidDomainBindHandoff(c, http.StatusForbidden)
 		return
 	}
+	user, err := model.GetUserById(identity.UserID, false)
+	if err != nil {
+		writeInvalidDomainBindHandoff(c, http.StatusInternalServerError)
+		return
+	}
+	notificationFailed := service.NotifyAccountSecurityChange(user.Email, "Login account linked: "+provider.GetName()) != nil
+	recordUserSecurityAudit(c, identity.UserID, "user.binding_bind", map[string]any{
+		"provider":            flow.Provider,
+		"success":             true,
+		"notification_failed": notificationFailed,
+	})
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    gin.H{"action": "bind"},
+		"data":    gin.H{"action": "bind", "notification_warning": notificationFailed},
 	})
 }
 

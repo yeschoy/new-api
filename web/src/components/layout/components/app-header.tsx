@@ -20,6 +20,7 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
+import { SystemUpdateAction } from '@/features/system-update/system-update-action'
 import { useConsoleMode } from '@/hooks/use-console-mode'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
@@ -118,7 +119,10 @@ export function AppHeader({
       showSidebarTrigger={!isEasyMode}
       className={isEasyMode ? 'dopa-easy-header' : 'dopa-developer-header'}
     >
-      <SystemBrand variant='inline' />
+      <div className='@container/system-brand flex min-w-0 items-center gap-1'>
+        <SystemBrand variant='inline' />
+        {!isEasyMode && <SystemUpdateAction presentation='version' />}
+      </div>
 
       {isEasyMode && <EasyTaskDock />}
 

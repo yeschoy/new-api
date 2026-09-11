@@ -694,7 +694,7 @@ func TestDomainLoginHandoffConsumesTheBoundTicketOnceAndWritesOnlyACustomHostCoo
 	previousSecure := common.SessionCookieSecure
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.AuthFlow{}, &model.CustomDomain{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.AuthFlow{}, &model.CustomDomain{}, &model.Log{}, &model.AuditLog{}))
 	model.DB = db
 	model.LOG_DB = db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -766,16 +766,16 @@ func TestDomainLoginHandoffConsumesTheBoundTicketOnceAndWritesOnlyACustomHostCoo
 	var sessionCount int64
 	require.NoError(t, db.Model(&model.UserSession{}).Count(&sessionCount).Error)
 	assert.EqualValues(t, 1, sessionCount)
-	var loginLog model.Log
-	require.NoError(t, db.Where("user_id = ? AND type = ?", user.Id, model.LogTypeLogin).First(&loginLog).Error)
+	var loginLog model.AuditLog
+	require.NoError(t, db.Where("user_id = ? AND category = ?", user.Id, model.AuditCategoryLogin).First(&loginLog).Error)
 	assert.Equal(t, user.Username, loginLog.Username)
-	assert.Contains(t, loginLog.Other, `"login_method":"oauth:github"`)
+	assert.Equal(t, "oauth:github", loginLog.Other.LoginMethod)
 	response = requestHandoff(ticket, binding)
 	assert.Equal(t, http.StatusForbidden, response.Code)
 	require.NoError(t, db.Model(&model.UserSession{}).Count(&sessionCount).Error)
 	assert.EqualValues(t, 1, sessionCount)
 	var loginLogCount int64
-	require.NoError(t, db.Model(&model.Log{}).Where("user_id = ? AND type = ?", user.Id, model.LogTypeLogin).Count(&loginLogCount).Error)
+	require.NoError(t, db.Model(&model.AuditLog{}).Where("user_id = ? AND category = ?", user.Id, model.AuditCategoryLogin).Count(&loginLogCount).Error)
 	assert.EqualValues(t, 1, loginLogCount)
 }
 
@@ -877,12 +877,21 @@ func testDomainLoginHandoffCreatesAnIndependentSessionOnAPeerMainHost(t *testing
 			assert.Empty(t, response.Header().Get("Set-Cookie"), attempt.name)
 			continue
 		}
-		require.NotEmpty(t, response.Result().Cookies())
+		require.Len(t, response.Result().Cookies(), 2)
 		for _, cookie := range response.Result().Cookies() {
 			assert.Empty(t, cookie.Domain)
-			assert.Equal(t, service.RefreshCookieName, cookie.Name)
 			assert.True(t, cookie.Secure)
-			assert.True(t, cookie.HttpOnly)
+			switch cookie.Name {
+			case service.RefreshCookieName:
+				assert.True(t, cookie.HttpOnly)
+				assert.Equal(t, "/api/user/auth", cookie.Path)
+			case service.SessionHintCookieName:
+				assert.False(t, cookie.HttpOnly)
+				assert.Equal(t, "/", cookie.Path)
+				assert.Equal(t, service.SessionHintCookieValue, cookie.Value)
+			default:
+				t.Fatalf("unexpected login cookie %q", cookie.Name)
+			}
 		}
 	}
 
@@ -1116,7 +1125,7 @@ func TestHandleOAuthBindWithRevokedSessionConsumesStateAndReturnsFailed(t *testi
 	assert.ErrorIs(t, err, model.ErrAuthFlowConsumed)
 }
 
-func TestHandleOAuthBindOnMainIssuesATicketWithoutChangingTheUserBinding(t *testing.T) {
+func TestHandleOAuthBindOnMainRejectsMissingStepUpAuthorization(t *testing.T) {
 	setupAuthFlowControllerTest(t)
 	require.NoError(t, appI18n.Init())
 	previousRedisEnabled := common.RedisEnabled
@@ -1183,9 +1192,9 @@ func TestHandleOAuthBindOnMainIssuesATicketWithoutChangingTheUserBinding(t *test
 		} `json:"data"`
 	}
 	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &body))
-	assert.True(t, body.Success)
-	assert.Equal(t, "domain_bind_handoff", body.Data.Action)
-	assert.NotEmpty(t, body.Data.Ticket)
+	assert.False(t, body.Success)
+	assert.Equal(t, "domain_bind_return", body.Data.Action)
+	assert.Empty(t, body.Data.Ticket)
 	assert.Equal(t, "https://alpha.yeschoy.io", body.Data.TargetOrigin)
 	assert.Equal(t, "domain-bind-test", body.Data.Provider)
 
@@ -1203,18 +1212,20 @@ func TestHandleOAuthBindDefersAPeerMainMutationBackToTheOriginSession(t *testing
 func testHandleOAuthBindDefersAPeerMainMutationBackToTheOriginSession(t *testing.T, host string) {
 	t.Helper()
 	setupAuthFlowControllerTest(t)
-	require.NoError(t, appI18n.Init())
-	require.NoError(t, model.DB.AutoMigrate(&model.User{}, &model.UserSession{}))
+	require.NoError(t, model.DB.AutoMigrate(&model.User{}, &model.UserSession{}, &model.TwoFA{}, &model.PasskeyCredential{}))
 	previousRedisEnabled := common.RedisEnabled
+	previousPasswordLoginEnabled := common.PasswordLoginEnabled
 	previousCustomDomainEnabled := common.CustomDomainEnabled
 	previousMainOrigin := common.CustomDomainMainOrigin
 	previousMainOrigins := common.CustomDomainMainOrigins
 	common.RedisEnabled = false
+	common.PasswordLoginEnabled = true
 	common.CustomDomainEnabled = true
 	common.CustomDomainMainOrigin = "https://yeschoy.com"
 	common.CustomDomainMainOrigins = []string{"https://yeschoy.com", "https://yeschoy.pro", "https://*.yeschoy.com"}
 	t.Cleanup(func() {
 		common.RedisEnabled = previousRedisEnabled
+		common.PasswordLoginEnabled = previousPasswordLoginEnabled
 		common.CustomDomainEnabled = previousCustomDomainEnabled
 		common.CustomDomainMainOrigin = previousMainOrigin
 		common.CustomDomainMainOrigins = previousMainOrigins
@@ -1223,9 +1234,18 @@ func testHandleOAuthBindDefersAPeerMainMutationBackToTheOriginSession(t *testing
 	provider := &domainBindTestProvider{}
 	oauth.Register("peer-main-bind-test", provider)
 	t.Cleanup(func() { oauth.Unregister("peer-main-bind-test") })
-	user := model.User{Username: "peer-main-bind-user", Status: common.UserStatusEnabled, AuthVersion: 1}
+	user := model.User{Username: "peer-main-bind-user", Password: "step-up-enabled", Status: common.UserStatusEnabled, AuthVersion: 1}
 	require.NoError(t, model.DB.Create(&user).Error)
 	bundle, err := service.CreateLoginSession(user.Id, "password", "127.0.0.1", "test-agent")
+	require.NoError(t, err)
+	identity := service.AuthIdentity{
+		UserID: user.Id, SessionID: bundle.Session.SID, UserAuthVersion: user.AuthVersion, SessionVersion: 1,
+	}
+	context, err := common.Marshal(service.AccountBindingContext{Provider: "peer-main-bind-test"})
+	require.NoError(t, err)
+	verificationBinding, err := service.BindVerificationOperation(service.VerificationOperation{
+		Scope: service.VerificationScopeAccountBind, Context: context,
+	})
 	require.NoError(t, err)
 	binding := "peer-main-bind-value-with-at-least-thirty-two-characters"
 	payloadBytes, err := common.Marshal(oauthFlowPayload{
@@ -1233,6 +1253,13 @@ func testHandleOAuthBindDefersAPeerMainMutationBackToTheOriginSession(t *testing
 		BrowserBindingHash:     domainOAuthBindingHash(binding),
 		ExpectedAuthVersion:    user.AuthVersion,
 		ExpectedSessionVersion: 1,
+		Authorization: &model.AuthFlowAuthorization{
+			AuthSessionIdentity: identity,
+			ProofID:             1,
+			Scope:               verificationBinding.Scope,
+			ContextHash:         verificationBinding.ContextHash,
+			Method:              service.VerificationMethodPassword,
+		},
 	})
 	require.NoError(t, err)
 	state, _, err := model.CreateAuthFlow(model.AuthFlowCreate{
@@ -1426,7 +1453,7 @@ func testDisabledDomainLoginHandoffExchangesTheBoundTicketForAMainFallback(t *te
 	previousSuffix := common.CustomDomainSuffix
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.AuthFlow{}, &model.CustomDomain{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.AuthFlow{}, &model.CustomDomain{}, &model.Log{}, &model.AuditLog{}))
 	model.DB = db
 	model.LOG_DB = db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -1573,13 +1600,13 @@ func testDisabledDomainLoginHandoffExchangesTheBoundTicketForAMainFallback(t *te
 	assert.Contains(t, response.Header().Get("Set-Cookie"), service.RefreshCookieName+"=")
 	require.NoError(t, db.Model(&model.UserSession{}).Count(&sessionCount).Error)
 	assert.EqualValues(t, 1, sessionCount)
-	var loginLog model.Log
-	require.NoError(t, db.Where("user_id = ? AND type = ?", user.Id, model.LogTypeLogin).First(&loginLog).Error)
+	var loginLog model.AuditLog
+	require.NoError(t, db.Where("user_id = ? AND category = ?", user.Id, model.AuditCategoryLogin).First(&loginLog).Error)
 	assert.Equal(t, user.Username, loginLog.Username)
-	assert.Contains(t, loginLog.Other, `"login_method":"oauth:github"`)
+	assert.Equal(t, "oauth:github", loginLog.Other.LoginMethod)
 	response = requestFallback(callbackBinding)
 	assert.Equal(t, http.StatusForbidden, response.Code)
 	var loginLogCount int64
-	require.NoError(t, db.Model(&model.Log{}).Where("user_id = ? AND type = ?", user.Id, model.LogTypeLogin).Count(&loginLogCount).Error)
+	require.NoError(t, db.Model(&model.AuditLog{}).Where("user_id = ? AND category = ?", user.Id, model.AuditCategoryLogin).Count(&loginLogCount).Error)
 	assert.EqualValues(t, 1, loginLogCount)
 }

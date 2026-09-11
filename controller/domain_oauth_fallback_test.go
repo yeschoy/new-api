@@ -69,7 +69,7 @@ func TestDomainLoginFallbackRejectsUnboundOrDifferentBrowserTickets(t *testing.T
 			var count int64
 			require.NoError(t, db.Model(&model.UserSession{}).Count(&count).Error)
 			assert.Zero(t, count)
-			require.NoError(t, db.Model(&model.Log{}).Where("type = ?", model.LogTypeLogin).Count(&count).Error)
+			require.NoError(t, model.LOG_DB.Model(&model.AuditLog{}).Where("category = ?", model.AuditCategoryLogin).Count(&count).Error)
 			assert.Zero(t, count)
 		})
 	}

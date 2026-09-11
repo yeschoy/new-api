@@ -80,9 +80,11 @@ function renderFlow() {
 
 function chooseModel(model: string) {
   const input = screen.getByRole('combobox')
-  fireEvent.pointerDown(input)
   act(() => input.focus())
-  fireEvent.mouseDown(screen.getByRole('option', { name: model }))
+  if (!screen.queryByRole('option', { name: model })) {
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+  }
+  fireEvent.click(screen.getByRole('option', { name: model }))
 }
 
 function createdKey(): ApiKey {
@@ -353,7 +355,11 @@ describe('easy connect flow', () => {
       await queryClient.invalidateQueries({ queryKey: ['user-group-models'] })
     })
 
-    expect(screen.queryByRole('button', { name: 'Copy everything' })).toBeNull()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Copy everything' })
+      ).toBeNull()
+    )
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
     expect(
       screen.getByRole('button', { name: 'Generate connection details' })

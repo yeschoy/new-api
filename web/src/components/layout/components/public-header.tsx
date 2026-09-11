@@ -227,13 +227,14 @@ export function PublicHeader(props: PublicHeaderProps) {
                     <a
                       key={linkKey}
                       href={link.href}
+                      title={t(link.title)}
                       target='_blank'
                       rel='noopener noreferrer'
                       aria-disabled={link.disabled}
                       tabIndex={link.disabled ? -1 : undefined}
                       onClick={(event) => handleNavLinkClick(event, link)}
                       className={cn(
-                        'text-muted-foreground hover:text-foreground rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
+                        'text-muted-foreground hover:text-foreground min-w-0 truncate rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
                         link.disabled && 'pointer-events-none opacity-50'
                       )}
                     >
@@ -245,6 +246,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                   <Link
                     key={linkKey}
                     to={link.href}
+                    title={t(link.title)}
                     disabled={link.disabled}
                     onClick={(event) => handleNavLinkClick(event, link)}
                     className={cn(
@@ -290,7 +292,7 @@ export function PublicHeader(props: PublicHeaderProps) {
             </div>
 
             {/* Mobile: compact actions + hamburger */}
-            <div className='flex items-center gap-2 sm:hidden'>
+            <div className='flex shrink-0 items-center gap-2 lg:hidden'>
               {showThemeSwitch && <ThemeSwitch />}
               {showAuthButtons && !loading && isAuthenticated && (
                 <ProfileDropdown />
@@ -332,7 +334,7 @@ export function PublicHeader(props: PublicHeaderProps) {
       {/* Mobile full-screen overlay */}
       <div
         className={cn(
-          'bg-background/98 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] sm:pointer-events-none sm:hidden',
+          'bg-background/98 fixed inset-0 z-40 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] lg:pointer-events-none lg:hidden',
           mobileOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0'

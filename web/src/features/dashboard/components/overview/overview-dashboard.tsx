@@ -38,6 +38,7 @@ import type { ApiKey } from '@/features/keys/types'
 import { getUserModels } from '@/lib/api'
 import { formatQuota } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
+import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
@@ -81,7 +82,7 @@ function DeveloperOverviewDashboard() {
   const apiKeysQuery = useQuery({
     queryKey: ['dashboard', 'overview', 'api-keys', user?.id],
     queryFn: async () => {
-      const result = await getApiKeys({ p: 1, size: 10 })
+      const result = requireServerSuccess(await getApiKeys({ p: 1, size: 10 }))
       return result.success ? (result.data?.items ?? []) : []
     },
     staleTime: 60 * 1000,
@@ -90,7 +91,7 @@ function DeveloperOverviewDashboard() {
   const modelsQuery = useQuery({
     queryKey: ['dashboard', 'overview', 'user-models', user?.id],
     queryFn: async () => {
-      const result = await getUserModels()
+      const result = requireServerSuccess(await getUserModels())
       return result.success ? (result.data ?? []) : []
     },
     staleTime: 5 * 60 * 1000,

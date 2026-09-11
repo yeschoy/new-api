@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { AuthBundle } from '@/stores/auth-store'
+import {
+  useAuthStore,
+  type AuthBundle,
+  type AuthUser,
+} from '@/stores/auth-store'
 
 export function createTestAuthBundle(): AuthBundle {
   const expiresAt = Math.floor(Date.now() / 1000) + 3600
@@ -36,4 +40,22 @@ export function createTestAuthBundle(): AuthBundle {
       expires_at: expiresAt,
     },
   }
+}
+
+/** Establish a complete authenticated fixture without weakening setUser guards. */
+export function setTestAuthUser(user: AuthUser | null): void {
+  if (!user) {
+    useAuthStore.getState().auth.reset()
+    return
+  }
+
+  const bundle = createTestAuthBundle()
+  useAuthStore.getState().auth.setBundle({
+    ...bundle,
+    user,
+    session: {
+      ...bundle.session,
+      sid: `fixture-session-${user.id}`,
+    },
+  })
 }

@@ -94,20 +94,33 @@ func TestRegisterCreatesUsableLoginSession(t *testing.T) {
 			assert.Positive(t, stored.LastLoginAt)
 			var token model.Token
 			require.NoError(t, db.Where("user_id = ?", stored.Id).First(&token).Error)
-			var audit model.Log
-			require.NoError(t, db.Where("user_id = ? AND type = ?", stored.Id, model.LogTypeLogin).First(&audit).Error)
-			var auditOther map[string]interface{}
-			require.NoError(t, common.UnmarshalJsonStr(audit.Other, &auditOther))
-			assert.Equal(t, "password", auditOther["login_method"])
+			var audit model.AuditLog
+			require.NoError(t, model.LOG_DB.Where("user_id = ? AND category = ?", stored.Id, model.AuditCategoryLogin).First(&audit).Error)
+			assert.Equal(t, "password", audit.Other.LoginMethod)
 
 			cookies := response.Result().Cookies()
-			require.Len(t, cookies, 1)
-			cookie := cookies[0]
+			require.Len(t, cookies, 2)
+			var cookie *http.Cookie
+			var sessionHint *http.Cookie
+			for _, candidate := range cookies {
+				switch candidate.Name {
+				case service.RefreshCookieName:
+					cookie = candidate
+				case service.SessionHintCookieName:
+					sessionHint = candidate
+				}
+			}
+			require.NotNil(t, cookie)
+			require.NotNil(t, sessionHint)
 			assert.Equal(t, service.RefreshCookieName, cookie.Name)
 			assert.Empty(t, cookie.Domain)
 			assert.True(t, cookie.HttpOnly)
 			assert.True(t, cookie.Secure)
 			assert.Equal(t, http.SameSiteStrictMode, cookie.SameSite)
+			assert.Equal(t, service.SessionHintCookieValue, sessionHint.Value)
+			assert.Equal(t, "/", sessionHint.Path)
+			assert.False(t, sessionHint.HttpOnly)
+			assert.True(t, sessionHint.Secure)
 			assert.Equal(t, "no-store", response.Header().Get("Cache-Control"))
 
 			selfRequest := httptest.NewRequest(http.MethodGet, "https://main.example/api/user/self", nil)
@@ -172,7 +185,7 @@ func TestRegisterWithoutAutomaticLoginKeepsCreatedAccount(t *testing.T) {
 			var count int64
 			require.NoError(t, db.Model(&model.UserSession{}).Count(&count).Error)
 			assert.Zero(t, count)
-			require.NoError(t, db.Model(&model.Log{}).Where("type = ?", model.LogTypeLogin).Count(&count).Error)
+			require.NoError(t, model.LOG_DB.Model(&model.AuditLog{}).Where("category = ?", model.AuditCategoryLogin).Count(&count).Error)
 			assert.Zero(t, count)
 		})
 	}

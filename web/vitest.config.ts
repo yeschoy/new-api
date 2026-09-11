@@ -30,12 +30,10 @@ export default defineConfig({
     },
   },
   test: {
-    server: {
-      deps: {
-        inline: ['@lobehub/icons', '@lobehub/ui', '@lobehub/fluent-emoji'],
-      },
-    },
     environment: 'jsdom',
+    server: {
+      deps: { inline: [/@lobehub\//, /antd-style/] },
+    },
     setupFiles: ['./src/test-setup.ts'],
     clearMocks: true,
     restoreMocks: true,
