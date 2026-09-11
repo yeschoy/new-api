@@ -43,9 +43,12 @@ let requestedWindow = 0
 let requestedStart = 0
 let summaryRequests = 0
 let listWindow = 0
+let requestedLogTypes: number[] = []
+let includeStandaloneError = false
 let requestOther: Record<string, unknown> = {}
 let requestType = 2
 let streamFails = true
+const requestCreatedAt = Date.UTC(2026, 8, 8, 12, 34) / 1000
 const summary = {
   requests: 103,
   succeeded: 101,
@@ -83,6 +86,8 @@ beforeEach(() => {
   requestedWindow = 0
   summaryRequests = 0
   listWindow = 0
+  requestedLogTypes = []
+  includeStandaloneError = false
   requestOther = { group_ratio: 0.5 }
   requestType = 2
   streamFails = true
@@ -127,36 +132,58 @@ beforeEach(() => {
         Number(url.searchParams.get('start_timestamp')) +
         1
       const page = Number(url.searchParams.get('p') ?? 1)
+      const pageSize = Number(url.searchParams.get('page_size') ?? 50)
+      const typeParam = url.searchParams.get('type')
+      const requestedType = Number(typeParam ?? 0)
+      if (typeParam !== null) requestedLogTypes.push(requestedType)
+      const requestLogs = Array.from({ length: 51 }, (_, index) => {
+        let modelName = `request-${index + 1}`
+        if (index === 0) modelName = 'partial-stream'
+        else if (index === 50) modelName = 'older-request'
+        return {
+          id: index + 1,
+          user_id: 1,
+          created_at: requestCreatedAt,
+          type: requestType,
+          content: '',
+          token_name: 'work-key',
+          request_id: index === 0 ? 'request-001' : `request-${index + 1}`,
+          model_name: modelName,
+          quota: 100000,
+          prompt_tokens: 4,
+          completion_tokens: 1,
+          use_time: 4,
+          is_stream: true,
+          other: JSON.stringify({
+            stream_status: {
+              status: streamFails ? 'error' : 'ok',
+              end_error: streamFails ? 'upstream timeout' : undefined,
+            },
+            ...requestOther,
+          }),
+        }
+      })
+      if (requestedType === 5 && includeStandaloneError) {
+        requestLogs.push({
+          ...requestLogs[0],
+          id: 1,
+          created_at: requestCreatedAt + 1,
+          type: 5,
+          request_id: 'standalone-error',
+          model_name: 'standalone-error',
+        })
+      }
+      const matchingLogs =
+        typeParam === null
+          ? [requestLogs[page === 1 ? 0 : 50]]
+          : requestLogs.filter((log) => log.type === requestedType)
       data = {
         success: true,
         data: {
           page,
-          page_size: 50,
-          total: 103,
-          items: [
-            {
-              id: page,
-              user_id: 1,
-              created_at: Math.floor(Date.now() / 1000),
-              type: requestType,
-              content: '',
-              token_name: 'work-key',
-              request_id: 'request-001',
-              model_name: page === 1 ? 'partial-stream' : 'older-request',
-              quota: 100000,
-              prompt_tokens: 4,
-              completion_tokens: 1,
-              use_time: 4,
-              is_stream: true,
-              other: JSON.stringify({
-                stream_status: {
-                  status: streamFails ? 'error' : 'ok',
-                  end_error: streamFails ? 'upstream timeout' : undefined,
-                },
-                ...requestOther,
-              }),
-            },
-          ],
+          page_size: pageSize,
+          total: typeParam === null ? 103 : matchingLogs.length,
+          items: matchingLogs.slice((page - 1) * pageSize, page * pageSize),
         },
       }
     } else throw new Error(`Unexpected request ${url.pathname}`)
@@ -193,6 +220,7 @@ describe('terminal usage views', () => {
     ).toHaveTextContent('¥7')
     expect(requestedWindow).toBe(86400)
     expect(listWindow).toBe(86400)
+    expect(requestedLogTypes.sort()).toEqual([2, 5])
     expect(screen.queryByText('Successful + failed requests')).toBeNull()
     expect(
       screen.queryByText(
@@ -219,6 +247,14 @@ describe('terminal usage views', () => {
     )
     const row = (await screen.findByText('partial-stream')).closest('article')
     if (!row) throw new Error('Missing request row')
+    expect(row).toHaveTextContent(
+      new Intl.DateTimeFormat('en', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(requestCreatedAt * 1000))
+    )
     expect(within(row).getByText('Failed')).toBeVisible()
     expect(
       within(row)
@@ -245,6 +281,19 @@ describe('terminal usage views', () => {
     ).toBeVisible()
     await user.click(within(details).getByText('Original error'))
     expect(within(details).getByText('upstream timeout')).toBeVisible()
+  })
+
+  it('merges standalone errors with consume logs before displaying the page', async () => {
+    includeStandaloneError = true
+
+    render(
+      <QueryClientProvider client={client}>
+        <TerminalRequests />
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByText('standalone-error')).toBeVisible()
+    expect(screen.getByText('partial-stream')).toBeVisible()
   })
 
   it.each([

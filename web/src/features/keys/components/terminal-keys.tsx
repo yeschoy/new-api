@@ -24,6 +24,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { TerminalPage } from '@/components/layout/components/terminal-page'
 import { buildModelCatalog } from '@/features/home/lib/catalog'
 import { formatPerMillionTokens } from '@/features/home/lib/pricing-savings'
@@ -66,12 +67,13 @@ export function TerminalKeys() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const clipboard = useCopyToClipboard({ notify: true })
-  const [name, setName] = useState('日常用')
+  const [name, setName] = useState('')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
   const [modelName, setModelName] = useState('')
   const [groupName, setGroupName] = useState('')
   const [page, setPage] = useState(1)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [revokeTarget, setRevokeTarget] = useState<number | 'all' | null>(null)
   const { models, priceRate } = usePricingData()
   const catalog = useMemo(
     () => buildModelCatalog(models || [], priceRate),
@@ -181,7 +183,11 @@ export function TerminalKeys() {
         throw new Error(result.message || t('Failed to delete API key'))
       }
     },
-    onError: (error: Error) => setActionError(t(error.message)),
+    onSuccess: () => setRevokeTarget(null),
+    onError: (error: Error) => {
+      setActionError(t(error.message))
+      setRevokeTarget(null)
+    },
     onSettled: async () => {
       setPage(1)
       setCreatedKey(null)
@@ -195,11 +201,15 @@ export function TerminalKeys() {
       await revokeAllApiKeys()
     },
     onSuccess: () => {
+      setRevokeTarget(null)
       setCreatedKey(null)
       setPage(1)
       toast.success(t('All keys revoked'))
     },
-    onError: (error: Error) => setActionError(t(error.message)),
+    onError: (error: Error) => {
+      setActionError(t(error.message))
+      setRevokeTarget(null)
+    },
     onSettled: async () => {
       setPage(1)
       setCreatedKey(null)
@@ -209,6 +219,13 @@ export function TerminalKeys() {
 
   const keys = keysQuery.data?.items ?? []
   const pageCount = Math.max(1, Math.ceil((keysQuery.data?.total ?? 0) / 100))
+  let revokeCount = 0
+  if (revokeTarget === 'all') {
+    revokeCount = keysQuery.data?.total ?? 0
+  } else if (revokeTarget !== null) {
+    revokeCount = 1
+  }
+  const revoking = revokeOne.isPending || revokeAll.isPending
 
   return (
     <TerminalPage
@@ -221,8 +238,8 @@ export function TerminalKeys() {
           <button
             type='button'
             className='ci-button ci-button--danger-quiet ci-button--size-xs'
-            onClick={() => revokeAll.mutate()}
-            disabled={revokeAll.isPending}
+            onClick={() => setRevokeTarget('all')}
+            disabled={revoking}
           >
             {t('Revoke all active keys')}
           </button>
@@ -440,7 +457,8 @@ export function TerminalKeys() {
                     <button
                       type='button'
                       className='ci-button ci-button--ghost ci-button--size-xs'
-                      onClick={() => revokeOne.mutate(key.id)}
+                      disabled={revoking}
+                      onClick={() => setRevokeTarget(key.id)}
                     >
                       {t('Revoke')}
                     </button>
@@ -474,6 +492,32 @@ export function TerminalKeys() {
           </button>
         </div>
       ) : null}
+      <ConfirmDialog
+        destructive
+        open={revokeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !revoking) setRevokeTarget(null)
+        }}
+        title={t('Delete {{count}} API key(s)?', { count: revokeCount })}
+        desc={
+          <>
+            {t('You are about to delete {{count}} API key(s).', {
+              count: revokeCount,
+            })}{' '}
+            <br />
+            {t('This action cannot be undone.')}
+          </>
+        }
+        confirmText={t('Delete')}
+        isLoading={revoking}
+        handleConfirm={() => {
+          if (revokeTarget === 'all') {
+            revokeAll.mutate()
+          } else if (revokeTarget !== null) {
+            revokeOne.mutate(revokeTarget)
+          }
+        }}
+      />
     </TerminalPage>
   )
 }

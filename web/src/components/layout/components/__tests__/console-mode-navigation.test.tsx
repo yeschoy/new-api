@@ -20,6 +20,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
   createRootRoute,
+  createRootRouteWithContext,
   createRoute,
   createRouter,
   Outlet,
@@ -29,6 +30,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route as DashboardSectionRoute } from '@/routes/_authenticated/dashboard/$section'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
 
 import { ConsoleModeControl } from '../console-mode-switcher'
@@ -87,6 +89,28 @@ async function renderModes(path: string) {
   return router
 }
 
+async function loadDashboardSection(path: string) {
+  const root = createRootRouteWithContext<{ queryClient: QueryClient }>()()
+  const authenticated = createRoute({
+    getParentRoute: () => root,
+    id: '_authenticated',
+  })
+  const dashboard = createRoute({
+    getParentRoute: () => authenticated,
+    path: '/dashboard/$section',
+    beforeLoad: (context) =>
+      DashboardSectionRoute.options.beforeLoad?.({ ...context }),
+    component: () => <p>Dashboard section</p>,
+  })
+  const router = createRouter({
+    routeTree: root.addChildren([authenticated.addChildren([dashboard])]),
+    context: { queryClient: client },
+    history: createMemoryHistory({ initialEntries: [path] }),
+  })
+  await router.load()
+  return router
+}
+
 describe('console mode navigation', () => {
   it.each(['/dashboard/models', '/dashboard/flow', '/channels'])(
     'opens the easy overview when switching from %s',
@@ -109,6 +133,14 @@ describe('console mode navigation', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Developer mode' })
     )
+    expect(router.state.location.pathname).toBe('/dashboard/models')
+  })
+
+  it('redirects a developer who opens the reports URL directly to analytics', async () => {
+    useConsoleModeStore.getState().setMode('developer')
+
+    const router = await loadDashboardSection('/dashboard/reports')
+
     expect(router.state.location.pathname).toBe('/dashboard/models')
   })
 

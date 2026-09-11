@@ -149,6 +149,13 @@ beforeEach(() => {
         }
         data = { success: true, data: ids.length }
       }
+    } else if (
+      config.method === 'delete' &&
+      /^\/api\/token\/\d+\/?$/.test(url.pathname)
+    ) {
+      const id = Number(url.pathname.match(/\/(\d+)\/?$/)?.[1])
+      keys = keys.filter((item) => item.id !== id)
+      data = { success: true }
     } else {
       throw new Error(`Unexpected request: ${config.method} ${url.pathname}`)
     }
@@ -192,7 +199,7 @@ describe('terminal key management', () => {
       'standard-model'
     )
     await user.click(screen.getByRole('button', { name: 'Create key' }))
-    const row = await screen.findByRole('row', { name: /日常用/ })
+    const row = await screen.findByRole('row', { name: /Daily key/ })
     expect(creates).toBe(1)
     failReveal = false
     await user.click(within(row).getByRole('button', { name: /Copy/ }))
@@ -210,6 +217,10 @@ describe('terminal key management', () => {
     await user.click(
       screen.getByRole('button', { name: 'Revoke all active keys' })
     )
+    expect(keys).toHaveLength(101)
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
+    )
     await waitFor(() => expect(keys).toHaveLength(0))
     expect(new Set(deleted).size).toBe(101)
   })
@@ -221,6 +232,9 @@ describe('terminal key management', () => {
     await screen.findByText('existing')
     await user.click(
       screen.getByRole('button', { name: 'Revoke all active keys' })
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
     )
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Delete unavailable'
@@ -235,6 +249,9 @@ describe('terminal key management', () => {
     await screen.findByText('existing')
     await user.click(
       screen.getByRole('button', { name: 'Revoke all active keys' })
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
     )
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Failed to delete API keys'
@@ -262,5 +279,22 @@ describe('terminal key management', () => {
       'aria-pressed',
       'true'
     )
+  })
+
+  it('waits for confirmation before revoking one key', async () => {
+    const user = userEvent.setup()
+    renderKeys()
+    const row = await screen.findByRole('row', { name: /existing/ })
+
+    await user.click(within(row).getByRole('button', { name: 'Revoke' }))
+
+    expect(keys).toHaveLength(1)
+    expect(
+      screen.getByRole('alertdialog', { name: 'Delete 1 API key(s)?' })
+    ).toBeVisible()
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
+    )
+    await waitFor(() => expect(keys).toHaveLength(0))
   })
 })

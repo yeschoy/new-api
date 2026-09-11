@@ -19,18 +19,19 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { ChevronRight, Inbox } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { TerminalPage } from '@/components/layout/components/terminal-page'
 import { Sheet, SheetTrigger } from '@/components/ui/sheet'
+import { toIntlLocale } from '@/i18n/languages'
 import { formatConsoleMoney } from '@/lib/console-money'
 import { formatQuotaWithCurrency } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { getUserLogs } from '../api'
+import { getUserRequestLogs } from '../api'
 import { LOG_TYPE_ENUM } from '../constants'
 import { usageLogSchema, type UsageLog } from '../data/schema'
 import { useUsageSummary } from '../hooks/use-usage-summary'
@@ -52,7 +53,7 @@ function isVisibleLog(log: UsageLog): boolean {
 }
 
 export function TerminalRequests() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [filter, setFilter] = useState<RequestFilter>('all')
   const [selectedLog, setSelectedLog] = useState<UsageLog | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -60,14 +61,23 @@ export function TerminalRequests() {
   const userId = useAuthStore((state) => state.auth.user?.id)
   const summary = useUsageSummary(1)
   const { start, end } = summary
+  const requestTimeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(toIntlLocale(i18n.language), {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    [i18n.language]
+  )
 
   const logsQuery = useQuery({
     queryKey: ['terminal', 'requests', userId, start.unix(), end.unix(), page],
     queryFn: async () => {
-      const result = await getUserLogs({
+      const result = await getUserRequestLogs({
         p: page,
         page_size: 50,
-        type: 0,
         start_timestamp: start.unix(),
         end_timestamp: end.unix(),
       })
@@ -225,7 +235,7 @@ export function TerminalRequests() {
                 const cacheRead = other?.cache_tokens || 0
                 return (
                   <article
-                    key={log.id}
+                    key={`${log.type}-${log.id}`}
                     className={cn('ci-requestRow', failed && 'is-failed')}
                   >
                     <SheetTrigger
@@ -238,7 +248,9 @@ export function TerminalRequests() {
                             {log.model_name || t('Unknown model')}
                           </strong>
                           <span>
-                            {dayjs.unix(log.created_at).format('M月D日 HH:mm')}
+                            {requestTimeFormatter.format(
+                              dayjs.unix(log.created_at).toDate()
+                            )}
                             {log.token_name ? ` · ${log.token_name}` : ''}
                           </span>
                         </div>

@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getUserLogs } from '@/features/usage-logs/api'
+import { getUserRequestLogs } from '@/features/usage-logs/api'
 import { TerminalRequestDetails } from '@/features/usage-logs/components/terminal-request-details'
 import { LOG_TYPE_ENUM } from '@/features/usage-logs/constants'
 import {
@@ -79,10 +79,9 @@ export function DeveloperRequestWorkbench() {
       requestId,
     ],
     queryFn: async () => {
-      const result = await getUserLogs({
+      const result = await getUserRequestLogs({
         p: page,
         page_size: PAGE_SIZE,
-        type: 0,
         start_timestamp: start.unix(),
         end_timestamp: end.unix(),
         request_id: requestId || undefined,
@@ -316,7 +315,7 @@ export function DeveloperRequestWorkbench() {
                           )
                   }
                   return (
-                    <TableRow key={log.id}>
+                    <TableRow key={`${log.type}-${log.id}`}>
                       <TableCell className='max-w-72'>
                         <SheetTrigger
                           onClick={() => setSelectedLog(log)}

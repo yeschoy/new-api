@@ -103,9 +103,7 @@ describe('terminal sidebar transitions', () => {
         <RouterProvider router={router} />
       </QueryClientProvider>
     )
-    await user.click(
-      await screen.findByRole('link', { name: '野菜' })
-    )
+    await user.click(await screen.findByRole('link', { name: '野菜' }))
     expect(
       await screen.findByRole('heading', { name: 'Public home' })
     ).toBeVisible()
@@ -137,6 +135,37 @@ describe('terminal sidebar transitions', () => {
     expect(screen.getByRole('textbox', { name: 'Search' })).toBe(search)
     expect(search).toHaveValue('keys')
     expect(search).toBeEnabled()
+  })
+
+  it('hides destinations disabled by site and user navigation settings', async () => {
+    useAuthStore.getState().auth.setBundle({
+      ...createTestAuthBundle(),
+      user: {
+        ...createTestAuthBundle().user,
+        sidebar_modules: JSON.stringify({
+          console: { enabled: true, token: false, log: false },
+        }),
+      },
+    })
+    client.setQueryData(
+      ['status'],
+      {
+        HeaderNavModules: JSON.stringify({ pricing: false }),
+        SidebarModulesAdmin: JSON.stringify({
+          personal: { enabled: true, topup: false },
+        }),
+      },
+      { updatedAt: Date.now() + 60000 }
+    )
+
+    await renderLayout()
+
+    expect(screen.queryByRole('link', { name: 'API keys' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Models' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Wallet' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Requests' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Reports' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Playground' })).toBeVisible()
   })
 
   it('honors the last toggle during repeated clicks and keeps focus on the trigger', async () => {
