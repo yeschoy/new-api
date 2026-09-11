@@ -43,7 +43,7 @@ let requestedWindow = 0
 let requestedStart = 0
 let summaryRequests = 0
 let listWindow = 0
-let requestedLogTypes: number[] = []
+let requestedLogTypeSets: string[] = []
 let includeStandaloneError = false
 let requestOther: Record<string, unknown> = {}
 let requestType = 2
@@ -86,7 +86,7 @@ beforeEach(() => {
   requestedWindow = 0
   summaryRequests = 0
   listWindow = 0
-  requestedLogTypes = []
+  requestedLogTypeSets = []
   includeStandaloneError = false
   requestOther = { group_ratio: 0.5 }
   requestType = 2
@@ -134,8 +134,9 @@ beforeEach(() => {
       const page = Number(url.searchParams.get('p') ?? 1)
       const pageSize = Number(url.searchParams.get('page_size') ?? 50)
       const typeParam = url.searchParams.get('type')
+      const typesParam = url.searchParams.get('types')
       const requestedType = Number(typeParam ?? 0)
-      if (typeParam !== null) requestedLogTypes.push(requestedType)
+      if (typesParam !== null) requestedLogTypeSets.push(typesParam)
       const requestLogs = Array.from({ length: 51 }, (_, index) => {
         let modelName = `request-${index + 1}`
         if (index === 0) modelName = 'partial-stream'
@@ -163,8 +164,11 @@ beforeEach(() => {
           }),
         }
       })
-      if (requestedType === 5 && includeStandaloneError) {
-        requestLogs.push({
+      if (
+        includeStandaloneError &&
+        (requestedType === 5 || typesParam?.split(',').includes('5'))
+      ) {
+        requestLogs.unshift({
           ...requestLogs[0],
           id: 1,
           created_at: requestCreatedAt + 1,
@@ -173,16 +177,21 @@ beforeEach(() => {
           model_name: 'standalone-error',
         })
       }
-      const matchingLogs =
-        typeParam === null
-          ? [requestLogs[page === 1 ? 0 : 50]]
-          : requestLogs.filter((log) => log.type === requestedType)
+      const requestedTypes = new Set(
+        typesParam?.split(',').map((value) => Number(value)) ?? []
+      )
+      let matchingLogs = requestLogs
+      if (typesParam) {
+        matchingLogs = requestLogs.filter((log) => requestedTypes.has(log.type))
+      } else if (typeParam !== null) {
+        matchingLogs = requestLogs.filter((log) => log.type === requestedType)
+      }
       data = {
         success: true,
         data: {
           page,
           page_size: pageSize,
-          total: typeParam === null ? 103 : matchingLogs.length,
+          total: typesParam || typeParam === null ? 103 : matchingLogs.length,
           items: matchingLogs.slice((page - 1) * pageSize, page * pageSize),
         },
       }
@@ -220,7 +229,7 @@ describe('terminal usage views', () => {
     ).toHaveTextContent('¥7')
     expect(requestedWindow).toBe(86400)
     expect(listWindow).toBe(86400)
-    expect(requestedLogTypes.sort()).toEqual([2, 5])
+    expect(requestedLogTypeSets).toEqual(['2,5'])
     expect(screen.queryByText('Successful + failed requests')).toBeNull()
     expect(
       screen.queryByText(

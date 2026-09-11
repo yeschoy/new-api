@@ -45,7 +45,6 @@ import {
   type CatalogEntry,
 } from '../lib/catalog'
 import { formatPerMillionTokens } from '../lib/pricing-savings'
-import { vendorAvatar, vendorAvatarIsMono } from '../lib/vendor-avatar'
 import { CatalogPrice } from './catalog-price'
 import { CatalogVendorIcon } from './catalog-vendor-icon'
 import { CiMark } from './ci-mark'
@@ -179,14 +178,10 @@ export function CiLandingPage(props: LandingPageProps) {
                           {t('on AI models')}
                           {featured ? (
                             <span
-                              className={cn(
-                                'ci-heroModelLogo ci-heroModelLogoVisible',
-                                vendorAvatarIsMono(featured) &&
-                                  'ci-heroModelLogoMono'
-                              )}
+                              className='ci-heroModelLogo ci-heroModelLogoVisible'
                               aria-hidden='true'
                             >
-                              <img src={vendorAvatar(featured)} alt='' />
+                              <CatalogVendorIcon model={featured} />
                             </span>
                           ) : null}
                         </i>

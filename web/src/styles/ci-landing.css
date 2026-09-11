@@ -1944,12 +1944,6 @@ html:not([data-theme='light']) .ci-publicHeaderScope .ci-header {
 }
 
 :is(html[data-theme='dark'], html.dark, .ci-landing[data-theme='dark'])
-  .ci-heroModelLogoMono
-  img {
-  filter: invert(1);
-}
-
-:is(html[data-theme='dark'], html.dark, .ci-landing[data-theme='dark'])
   .ci-animatedNumber
   > span {
   --highlighter-color: color-mix(

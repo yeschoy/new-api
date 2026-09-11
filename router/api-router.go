@@ -430,9 +430,9 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.PUT("/:id", controller.UpdateDeployment)
 			deploymentsRoute.PUT("/:id/name", controller.UpdateDeploymentName)
 			deploymentsRoute.POST("/:id/extend", controller.ExtendDeployment)
-			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
-		}
-	}
+deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
+}
+}
 }
 
 func registerDesktopRoutes(apiRouter *gin.RouterGroup) {

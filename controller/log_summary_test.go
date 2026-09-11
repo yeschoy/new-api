@@ -114,3 +114,36 @@ func TestGetUserLogSummaryAcceptsTenDayWindow(t *testing.T) {
 		})
 	}
 }
+
+func TestGetUserLogsFiltersMultipleRequestTypes(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	require.NoError(t, db.Create(&[]model.Log{
+		{UserId: 42, Type: model.LogTypeConsume, CreatedAt: 1000, ModelName: "consume"},
+		{UserId: 42, Type: model.LogTypeError, CreatedAt: 1001, ModelName: "error"},
+		{UserId: 42, Type: model.LogTypeManage, CreatedAt: 1002, ModelName: "manage"},
+		{UserId: 99, Type: model.LogTypeConsume, CreatedAt: 1003, ModelName: "other-user"},
+	}).Error)
+	for page, expectedType := range []int{model.LogTypeError, model.LogTypeConsume} {
+		t.Run(fmt.Sprintf("page-%d", page+1), func(t *testing.T) {
+			ctx, recorder := newAuthenticatedContext(t, http.MethodGet,
+				fmt.Sprintf("/api/log/self?types=2,5&p=%d&page_size=1", page+1), nil, 42)
+
+			GetUserLogs(ctx)
+
+			require.Equal(t, http.StatusOK, recorder.Code)
+			var result struct {
+				Success bool `json:"success"`
+				Data    struct {
+					Items []model.Log `json:"items"`
+					Total int         `json:"total"`
+				} `json:"data"`
+			}
+			require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &result))
+			require.True(t, result.Success)
+			assert.Equal(t, 2, result.Data.Total)
+			require.Len(t, result.Data.Items, 1)
+			assert.Equal(t, expectedType, result.Data.Items[0].Type)
+		})
+	}
+}
