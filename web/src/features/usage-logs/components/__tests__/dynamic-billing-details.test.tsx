@@ -86,6 +86,28 @@ function makeLog(includeSettlementTrace = true): UsageLog {
   }
 }
 
+function makeInputPricedCacheLog(): UsageLog {
+  const log = makeLog()
+  const other = JSON.parse(log.other) as Record<string, unknown>
+  other.expr_b64 = Buffer.from('tier("base", p * 2 + c * 10)', 'utf8').toString(
+    'base64'
+  )
+  other.billing_usage = {
+    p: 232,
+    c: 16,
+    len: 232,
+    cr: 200,
+    cc: 0,
+    cc1h: 0,
+    img: 0,
+    img_o: 0,
+    ai: 0,
+    ao: 0,
+  }
+  other.billing_cost_before_group = 0.000624
+  return { ...log, quota: 312, other: JSON.stringify(other) }
+}
+
 async function renderDetails(log = makeLog()) {
   const client = new QueryClient()
   await renderApp(
@@ -135,7 +157,12 @@ describe('dynamic request detail billing', () => {
     const prices = within(details).getByRole('region', {
       name: 'Matched unit prices',
     })
+    const billingLayout = prices.parentElement
+    if (!billingLayout) throw new Error('Missing billing layout')
 
+    expect(getComputedStyle(billingLayout).gridTemplateColumns).toBe(
+      'minmax(0, 1fr)'
+    )
     expect(within(prices).getByText('Input').closest('div')).toHaveTextContent(
       '¥2 /M'
     )
@@ -198,6 +225,22 @@ describe('dynamic request detail billing', () => {
     client.clear()
   })
 
+  it('opens the verified bill on press and closes it with Escape', async () => {
+    const user = userEvent.setup()
+    const client = await renderDetails()
+    const trigger = screen.getByRole('button', { name: 'Billing Details' })
+
+    await user.click(trigger)
+    expect(
+      await screen.findByRole('tooltip', { name: 'Billing Details' })
+    ).toBeVisible()
+    await user.keyboard('{Escape}')
+    await waitFor(() =>
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    )
+    client.clear()
+  })
+
   it('keeps legacy unit prices but omits an unverifiable bill trigger', async () => {
     const client = await renderDetails(makeLog(false))
     const details = await screen.findByRole('dialog', {
@@ -210,6 +253,22 @@ describe('dynamic request detail billing', () => {
     expect(
       within(details).queryByRole('button', { name: 'Billing Details' })
     ).not.toBeInTheDocument()
+    client.clear()
+  })
+
+  it('explains cache usage that the expression intentionally bills at the input price', async () => {
+    const client = await renderDetails(makeInputPricedCacheLog())
+    const details = await screen.findByRole('dialog', {
+      name: 'Request details',
+    })
+    const prices = within(details).getByRole('region', {
+      name: 'Matched unit prices',
+    })
+
+    expect(
+      within(prices).getByText('Cache usage is included in the input price.')
+    ).toBeVisible()
+    expect(within(prices).queryByText('Cache Read')).not.toBeInTheDocument()
     client.clear()
   })
 })

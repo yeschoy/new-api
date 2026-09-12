@@ -7044,8 +7044,8 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   min-height: 20px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--ci-color-accent) 10%, transparent);
-  color: var(--ci-color-accent);
+  background: var(--ci-color-accent-surface-subtle);
+  color: var(--ci-color-heading);
   font-size: 10px;
   font-weight: 650;
 }

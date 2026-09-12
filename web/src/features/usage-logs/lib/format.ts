@@ -370,7 +370,10 @@ export function getTieredBillingSummary(
       priceEntries.push({
         key: v.key,
         field: v.field,
-        shortLabel: v.shortLabel,
+        shortLabel:
+          v.key === 'cc' && other.claude === true
+            ? 'Cache Write (5m)'
+            : v.shortLabel,
         price,
       })
     }

@@ -284,7 +284,7 @@ function parseTierBody(bodyStr: string): Record<string, unknown> {
   const declaredPriceFields: string[] = []
   const tier: Record<string, unknown> = { declaredPriceFields }
   for (const [varName, field] of Object.entries(BILLING_VAR_KEY_TO_FIELD)) {
-    const declared = Object.prototype.hasOwnProperty.call(coeffs, varName)
+    const declared = Object.hasOwn(coeffs, varName)
     tier[field] = declared ? coeffs[varName] : 0
     if (declared) declaredPriceFields.push(field)
   }

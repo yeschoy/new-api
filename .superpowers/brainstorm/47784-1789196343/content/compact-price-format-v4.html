@@ -1,0 +1,52 @@
+<style>
+  .preview { max-width:900px; margin:24px auto 0; border:1px solid var(--border); border-radius:20px; background:linear-gradient(180deg,#fbfdff,#fff); color:#0f172a; overflow:hidden; box-shadow:0 18px 48px rgba(15,23,42,.08); }
+  .head { padding:20px 22px; border-bottom:1px solid #e2e8f0; }
+  .title { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:15px; font-weight:760; }
+  .pill { padding:4px 8px; border-radius:999px; background:#eff6ff; color:#2563eb; font-size:10px; font-weight:760; }
+  .tier { color:#64748b; font-size:11px; font-weight:650; }
+  .costs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin-top:18px; }
+  .fact span { display:block; color:#64748b; font-size:11px; }
+  .fact strong { display:block; margin-top:5px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:16px; }
+  .body { padding:20px 22px 24px; }
+  .subhead { display:flex; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .subhead strong { font-size:13px; }
+  .subhead span { color:#64748b; font-size:11px; }
+  .rates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .rate { display:flex; justify-content:space-between; align-items:center; gap:14px; min-height:48px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:12px; background:white; }
+  .name { display:flex; flex-direction:column; gap:2px; }
+  .name b { font-size:12px; }
+  .name small { color:#64748b; font-size:10px; }
+  .value { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; font-weight:760; }
+  .unit { color:#64748b; font-family:inherit; font-size:9px; font-weight:500; }
+  .rule { margin-top:18px; padding:11px 12px; border-radius:12px; background:#f8fafc; color:#64748b; font-size:11px; line-height:1.6; }
+  .rule b { color:#0f172a; }
+  .examples { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .examples code { padding:3px 7px; border-radius:7px; background:white; border:1px solid #e2e8f0; color:#2563eb; }
+  @media (max-width:720px) { .rates { grid-template-columns:1fr; } .costs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+</style>
+
+<h2>单价改为紧凑小数</h2>
+<p class="subtitle">去掉尾随零，不牺牲小额价格的有效精度。</p>
+
+<div class="preview">
+  <div class="head">
+    <div class="title">本次费用 <span class="pill">↯ 动态计费</span><span class="tier">命中：基础档</span></div>
+    <div class="costs">
+      <div class="fact"><span>折扣前估算</span><strong>¥0.000238</strong></div>
+      <div class="fact"><span>实扣</span><strong>¥0.000238</strong></div>
+      <div class="fact"><span>折扣</span><strong>0%</strong></div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="subhead"><strong>本次命中单价</strong><span>按实际涉及的计价维度展示</span></div>
+    <div class="rates">
+      <div class="rate"><span class="name"><b>输入 Token</b><small>5 tokens</small></span><span class="value">¥2 <span class="unit">/M</span></span></div>
+      <div class="rate"><span class="name"><b>输出 Token</b><small>16 tokens</small></span><span class="value">¥14.25 <span class="unit">/M</span></span></div>
+      <div class="rate"><span class="name"><b>缓存读取</b><small>820 tokens</small></span><span class="value">¥0.2 <span class="unit">/M</span></span></div>
+      <div class="rate"><span class="name"><b>缓存写入 · 5 分钟</b><small>120 tokens</small></span><span class="value">¥2.5 <span class="unit">/M</span></span></div>
+    </div>
+    <div class="rule"><b>格式规则</b>：最多保留 6 位小数，删除末尾的零；明确免费显示为 <code>¥0/M</code>，极小非零值不会被吞掉。
+      <div class="examples"><code>¥2</code><code>¥14.25</code><code>¥0.2</code><code>¥0.000025</code><code>¥0/M</code></div>
+    </div>
+  </div>
+</div>
