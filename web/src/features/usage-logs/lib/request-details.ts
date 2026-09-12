@@ -19,7 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 import { LOG_TYPE_ENUM } from '../constants'
 import type { UsageLog } from '../data/schema'
 import type { LogOtherData } from '../types'
-import { parseLogOther, isViolationFeeLog } from './format'
+import {
+  getTieredBillingSummary,
+  parseLogOther,
+  isViolationFeeLog,
+  type TieredBillingSummary,
+} from './format'
 import { isPerCallBilling } from './utils'
 
 export function isFailedRequest(log: UsageLog): boolean {
@@ -92,5 +97,92 @@ export function getRecordedUnitPrices(other: LogOtherData | null) {
     cacheWrite5m: recordedTokenPrice(input, other?.cache_creation_ratio_5m),
     cacheWrite1h: recordedTokenPrice(input, other?.cache_creation_ratio_1h),
     perRequest: null,
+  }
+}
+
+export type DynamicBillingLineItem = {
+  key: string
+  labelKey: string
+  quantity: number
+  unitPrice: number
+  costBeforeGroup: number
+}
+
+export type DynamicBillingDetails = {
+  tierLabel: string
+  priceEntries: TieredBillingSummary['priceEntries']
+  lineItems: DynamicBillingLineItem[]
+  requestMultiplier: number
+  costBeforeGroup: number
+}
+
+export function getDynamicBillingDetails(
+  other: LogOtherData | null
+): DynamicBillingDetails | null {
+  const summary = getTieredBillingSummary(other, {
+    includeUnusedCache: true,
+  })
+  const usage = other?.billing_usage
+  const recordedCost = other?.billing_cost_before_group
+  if (
+    !summary ||
+    !usage ||
+    typeof recordedCost !== 'number' ||
+    !Number.isFinite(recordedCost) ||
+    recordedCost < 0
+  ) {
+    return null
+  }
+
+  let requestMultiplier = 1
+  for (const rule of other.request_rules ?? []) {
+    if (!rule.matched) continue
+    if (
+      typeof rule.multiplier !== 'number' ||
+      !Number.isFinite(rule.multiplier) ||
+      rule.multiplier < 0
+    ) {
+      return null
+    }
+    requestMultiplier *= rule.multiplier
+    if (!Number.isFinite(requestMultiplier)) return null
+  }
+
+  const lineItems: DynamicBillingLineItem[] = []
+  let calculatedCost = 0
+  for (const entry of summary.priceEntries) {
+    const quantity = usage[entry.key as keyof typeof usage]
+    if (
+      typeof quantity !== 'number' ||
+      !Number.isFinite(quantity) ||
+      quantity < 0
+    ) {
+      return null
+    }
+    if (quantity === 0) continue
+
+    const costBeforeGroup =
+      (quantity * entry.price * requestMultiplier) / 1_000_000
+    if (!Number.isFinite(costBeforeGroup) || costBeforeGroup < 0) return null
+    calculatedCost += costBeforeGroup
+    lineItems.push({
+      key: entry.key,
+      labelKey: entry.shortLabel,
+      quantity,
+      unitPrice: entry.price,
+      costBeforeGroup,
+    })
+  }
+
+  if (lineItems.length === 0 || !Number.isFinite(calculatedCost)) return null
+  const tolerance = Math.max(1e-12, Math.abs(recordedCost) * 1e-9)
+  if (Math.abs(calculatedCost - recordedCost) > tolerance) return null
+
+  return {
+    tierLabel: summary.tier.label,
+    priceEntries: summary.priceEntries,
+    lineItems,
+    requestMultiplier,
+    costBeforeGroup: recordedCost,
   }
 }
