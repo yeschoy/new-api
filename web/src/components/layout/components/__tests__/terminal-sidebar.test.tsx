@@ -110,10 +110,12 @@ describe('terminal sidebar transitions', () => {
     expect(router.state.location.pathname).toBe('/')
   })
 
-  it('keeps private developer documentation out of the easy sidebar', async () => {
+  it('keeps the beginner guide available in the easy sidebar', async () => {
     await renderLayout()
 
-    expect(screen.queryByRole('link', { name: 'Docs' })).toBeNull()
+    expect(
+      screen.getByRole('link', { name: 'Beginner guide' })
+    ).toHaveAttribute('href', '/guide')
     expect(screen.getByRole('link', { name: 'API keys' })).toBeVisible()
   })
 
@@ -208,5 +210,20 @@ describe('terminal sidebar transitions', () => {
     fireEvent.click(trigger)
     expect(sidebar).toHaveAttribute('inert')
     expect(window.localStorage.getItem('ci_sidebar_collapsed')).toBeNull()
+  })
+
+  it('shows the beginner guide after opening the compact sidebar', async () => {
+    const original = window.matchMedia
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      ...original(query),
+      matches: query === '(max-width: 900px)',
+    }))
+    await renderLayout()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+
+    expect(
+      screen.getByRole('link', { name: 'Beginner guide' })
+    ).toHaveAttribute('href', '/guide')
   })
 })

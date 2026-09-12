@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
+  BookOpen,
   Boxes,
   ChevronDown,
   FileText,
@@ -72,6 +73,7 @@ const NAV_ICONS = {
   playground: MessageSquare,
   keys: KeyRound,
   billing: Wallet,
+  docs: BookOpen,
 } as const
 
 const SIDEBAR_STORAGE_KEY = 'ci_sidebar_collapsed'

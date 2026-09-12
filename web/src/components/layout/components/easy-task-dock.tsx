@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
 import {
+  BookOpen,
   KeyRound,
   LayoutDashboard,
   Menu,
@@ -49,6 +50,12 @@ const EASY_TASKS = [
     to: '/pricing',
     icon: Sparkles,
     tone: 'money',
+  },
+  {
+    titleKey: 'Beginner guide',
+    to: '/guide',
+    icon: BookOpen,
+    tone: 'signal',
   },
   {
     titleKey: 'Spending details',
