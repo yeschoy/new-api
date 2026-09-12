@@ -344,6 +344,8 @@ func InjectTieredBillingInfo(other *model.LogOther, relayInfo *relaycommon.Relay
 		if result.FixedPrice != nil {
 			other.SetPublic("fixed_price", *result.FixedPrice)
 		}
+		other.SetPublic("billing_usage", result.ActualUsage)
+		other.SetPublic("billing_cost_before_group", result.ActualCostBeforeGroup)
 		if len(result.RequestRules) > 0 {
 			other.SetPublic("request_rules", result.RequestRules)
 		}

@@ -210,6 +210,20 @@ export interface LogOtherData {
   matched_tier?: string
   request_rules?: RequestRuleTrace[]
   usage_facts?: Record<string, string | number>
+  billing_usage?: {
+    p: number
+    c: number
+    len: number
+    cr: number
+    cc: number
+    cc1h: number
+    img: number
+    img_cr?: number
+    img_o: number
+    ai: number
+    ao: number
+  }
+  billing_cost_before_group?: number
   reasoning_effort?: string
   image?: boolean
   image_ratio?: number

@@ -6978,6 +6978,14 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   padding-top: 24px;
   border-top: 1px solid var(--ci-color-border-subtle);
 }
+.ci-requestBilling--dynamic {
+  gap: 0;
+}
+.ci-requestBilling--dynamic
+  .ci-requestDetailsSection
+  + .ci-requestDetailsSection {
+  padding-top: 22px;
+}
 @media (min-width: 640px) {
   .ci-requestBilling {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6991,12 +6999,98 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   .ci-requestBilling .ci-requestFacts {
     grid-template-columns: minmax(0, 1fr);
   }
+  .ci-requestBilling--dynamic {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ci-requestBilling--dynamic
+    .ci-requestDetailsSection
+    + .ci-requestDetailsSection {
+    padding-top: 22px;
+    padding-inline-start: 0;
+    border-top: 1px solid var(--ci-color-border-subtle);
+    border-inline-start: 0;
+  }
+  .ci-requestBilling--dynamic .ci-requestFacts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 .ci-requestDetailsSection h3,
 .ci-requestFailure h3 {
   margin: 0 0 14px;
   font-size: 13px;
   font-weight: 650;
+}
+.ci-requestSectionHeading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.ci-requestSectionHeading h3 {
+  margin: 0;
+}
+.ci-requestBillingHelp {
+  width: 20px;
+  height: 20px;
+  border-color: var(--ci-color-border-subtle);
+  border-radius: 999px;
+  color: var(--ci-color-text-muted);
+}
+.ci-requestBillingBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ci-color-accent-surface-subtle);
+  color: var(--ci-color-heading);
+  font-size: 10px;
+  font-weight: 650;
+}
+.ci-requestBillingTier {
+  min-width: 0;
+  color: var(--ci-color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ci-requestPriceFacts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+}
+.ci-requestPriceFacts > div {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--ci-color-border-subtle);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ci-color-surface) 74%, transparent);
+}
+.ci-requestPriceFacts dt {
+  min-width: 0;
+  color: var(--ci-color-heading);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ci-requestPriceFacts dd {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+@media (min-width: 640px) {
+  .ci-requestPriceFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .ci-requestFacts {
   display: grid;
@@ -7022,6 +7116,95 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   color: var(--ci-color-text-muted);
   font-size: 12px;
   line-height: 1.7;
+}
+.isolate:has(> .ci-requestBillingPopover) {
+  z-index: 80;
+}
+.ci-requestBillingPopover {
+  gap: 0;
+  padding: 14px;
+}
+.ci-requestBillingPopoverHeader {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ci-requestBillingPopoverHeader strong {
+  font-size: 12px;
+}
+.ci-requestBillingPopoverHeader span {
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.ci-requestBillingLines {
+  margin: 4px 0 0;
+}
+.ci-requestBillingLines > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 0;
+}
+.ci-requestBillingLines > div + div {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.ci-requestBillingLines dt {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.ci-requestBillingLines dt strong {
+  font-size: 11px;
+}
+.ci-requestBillingLines dt span {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.ci-requestBillingLines dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 650;
+}
+.ci-requestBillingMultiplier,
+.ci-requestBillingTotals > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ci-requestBillingMultiplier {
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.ci-requestBillingMultiplier strong {
+  color: var(--foreground);
+  font-family: var(--font-mono);
+}
+.ci-requestBillingTotals {
+  display: grid;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+.ci-requestBillingTotals span {
+  color: var(--muted-foreground);
+}
+.ci-requestBillingTotals strong {
+  font-family: var(--font-mono);
 }
 .ci-requestFailure {
   padding: 14px;

@@ -37,6 +37,7 @@ import {
   formatQuotaWithCurrency,
 } from '@/lib/currency'
 import dayjs from '@/lib/dayjs'
+import { cn } from '@/lib/utils'
 
 import { LOG_TYPE_ENUM } from '../constants'
 import type { UsageLog } from '../data/schema'
@@ -45,12 +46,14 @@ import {
   getLogQuotaComparison,
   getLogChargedQuota,
 } from '../lib/cost-comparison'
-import { parseLogOther } from '../lib/format'
+import { getTieredBillingSummary, parseLogOther } from '../lib/format'
 import {
+  getDynamicBillingDetails,
   getRecordedUnitPrices,
   getRequestErrorText,
   isFailedRequest,
 } from '../lib/request-details'
+import { DynamicBillingPopover } from './dynamic-billing-popover'
 
 const moneyOptions = { digitsLarge: 6, digitsSmall: 6, abbreviate: false }
 
@@ -66,11 +69,28 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
   const comparison = billed ? getLogQuotaComparison(log.quota, other) : null
   const ratio = getLogGroupRatio(other)
   const prices = getRecordedUnitPrices(other)
+  const dynamicSummary =
+    prices.mode === 'dynamic'
+      ? getTieredBillingSummary(other, { includeUnusedCache: true })
+      : null
+  const dynamicDetails =
+    prices.mode === 'dynamic' ? getDynamicBillingDetails(other) : null
   const cacheRead = other?.cache_tokens ?? 0
   const cacheWrite = other?.cache_creation_tokens ?? 0
   const cacheWrite5m = other?.cache_creation_tokens_5m ?? 0
   const cacheWrite1h = other?.cache_creation_tokens_1h ?? 0
   const firstResponseMs = other?.frt
+  const hasCacheUsage =
+    cacheRead > 0 || cacheWrite > 0 || cacheWrite5m > 0 || cacheWrite1h > 0
+  const hasDynamicCachePrice =
+    dynamicSummary?.priceEntries.some((entry) =>
+      ['cr', 'cc', 'cc1h', 'img_cr'].includes(entry.key)
+    ) ?? false
+  const cacheIncludedInInput =
+    prices.mode === 'dynamic' &&
+    dynamicSummary?.tier.billingUnit !== 'request' &&
+    hasCacheUsage &&
+    !hasDynamicCachePrice
   let charged = t('No charge')
   if (billed) {
     charged = subscription
@@ -225,12 +245,35 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
             ))}
           </dl>
         </section>
-        <div className='ci-requestBilling'>
+        <div
+          className={cn(
+            'ci-requestBilling',
+            prices.mode === 'dynamic' && 'ci-requestBilling--dynamic'
+          )}
+        >
           <section
             className='ci-requestDetailsSection'
             aria-label={t('Request cost')}
           >
-            <h3>{t('Request cost')}</h3>
+            <div className='ci-requestSectionHeading'>
+              <h3>{t('Request cost')}</h3>
+              {dynamicDetails ? (
+                <DynamicBillingPopover
+                  details={dynamicDetails}
+                  charged={charged}
+                />
+              ) : null}
+              {prices.mode === 'dynamic' ? (
+                <span className='ci-requestBillingBadge'>
+                  {t('Dynamic Pricing')}
+                </span>
+              ) : null}
+              {dynamicSummary?.tier.label ? (
+                <span className='ci-requestBillingTier'>
+                  {t('Matched Tier')}: {dynamicSummary.tier.label}
+                </span>
+              ) : null}
+            </div>
             <dl className='ci-requestFacts'>
               {prices.mode !== 'request' && (
                 <div>
@@ -288,53 +331,78 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
             {prices.mode === 'fee' && (
               <p className='ci-requestDetailsNote'>{t('Violation Fee')}</p>
             )}
-          </section>
-          {prices.mode !== 'fee' && prices.mode !== 'request' && (
-            <section
-              className='ci-requestDetailsSection'
-              aria-label={t('Base unit prices')}
-            >
-              <h3>{t('Base unit prices')}</h3>
-              {prices.mode === 'tokens' && (
-                <>
-                  <dl className='ci-requestFacts'>
-                    {unitPriceFacts.map((fact) => (
-                      <div key={fact.label}>
-                        <dt>{fact.label}</dt>
-                        <dd>
-                          {fact.value === null ? (
-                            '—'
-                          ) : (
-                            <>
-                              {formatBillingCurrencyFromUSD(
-                                fact.value,
-                                moneyOptions
-                              )}{' '}
-                              <span className='text-muted-foreground font-normal'>
-                                /M
-                              </span>
-                            </>
-                          )}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <p className='ci-requestDetailsNote'>
-                    {t(
-                      'Unit prices are per million tokens, before the request discount, using the rates recorded at the time.'
-                    )}
-                  </p>
-                </>
-              )}
-              {prices.mode === 'dynamic' && (
+            {prices.mode === 'dynamic' &&
+              (!dynamicSummary || dynamicSummary.priceEntries.length === 0) && (
                 <p className='ci-requestDetailsNote'>
                   {t(
                     'This request used dynamic pricing. The recorded charge includes its usage-based calculation.'
                   )}
                 </p>
               )}
+          </section>
+          {prices.mode === 'tokens' && (
+            <section
+              className='ci-requestDetailsSection'
+              aria-label={t('Base unit prices')}
+            >
+              <h3>{t('Base unit prices')}</h3>
+              <dl className='ci-requestFacts'>
+                {unitPriceFacts.map((fact) => (
+                  <div key={fact.label}>
+                    <dt>{fact.label}</dt>
+                    <dd>
+                      {fact.value === null ? (
+                        '—'
+                      ) : (
+                        <>
+                          {formatBillingCurrencyFromUSD(
+                            fact.value,
+                            moneyOptions
+                          )}{' '}
+                          <span className='text-muted-foreground font-normal'>
+                            /M
+                          </span>
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className='ci-requestDetailsNote'>
+                {t(
+                  'Unit prices are per million tokens, before the request discount, using the rates recorded at the time.'
+                )}
+              </p>
             </section>
           )}
+          {prices.mode === 'dynamic' &&
+          dynamicSummary &&
+          dynamicSummary.priceEntries.length > 0 ? (
+            <section
+              className='ci-requestDetailsSection'
+              aria-label={t('Matched unit prices')}
+            >
+              <h3>{t('Matched unit prices')}</h3>
+              <dl className='ci-requestPriceFacts'>
+                {dynamicSummary.priceEntries.map((entry) => (
+                  <div key={entry.key}>
+                    <dt>{t(entry.shortLabel)}</dt>
+                    <dd>
+                      {formatBillingCurrencyFromUSD(entry.price, moneyOptions)}{' '}
+                      <span className='text-muted-foreground font-normal'>
+                        /{entry.unit ? t(entry.unit) : 'M'}
+                      </span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {cacheIncludedInInput ? (
+                <p className='ci-requestDetailsNote'>
+                  {t('Cache usage is included in the input price.')}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
         </div>
         <section className='ci-requestDetailsSection'>
           <h3>{t('Token Breakdown')}</h3>

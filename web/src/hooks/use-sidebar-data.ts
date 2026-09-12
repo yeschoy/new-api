@@ -77,6 +77,11 @@ export function useSidebarData(): SidebarData {
               icon: CreditCard,
             },
             {
+              title: t('Beginner guide'),
+              url: '/guide',
+              icon: BookOpen,
+            },
+            {
               title: t('Spending details'),
               url: '/usage-logs/common',
               icon: FileText,

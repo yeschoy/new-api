@@ -264,6 +264,7 @@ export type ParsedTier = {
   conditionText?: string
   label: string
   conditions: TierCondition[]
+  declaredPriceFields: string[]
   [field: string]: unknown
 }
 
@@ -286,10 +287,14 @@ export type ParsedTaskTier = {
 function mapTokenTier(
   tier: TokenTier & { conditionText?: string }
 ): ParsedTier {
+  const declaredPriceFields = Object.keys(tier.prices).map(
+    (key) => BILLING_VAR_KEY_TO_FIELD[key]
+  )
   return {
     label: tier.label,
     ...(tier.imageCount ? { imageCount: true } : {}),
     conditions: tier.conditions,
+    declaredPriceFields,
     ...(tier.billingUnit === 'request'
       ? { billingUnit: tier.billingUnit, fixedPrice: tier.fixedPrice }
       : {}),

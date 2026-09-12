@@ -1648,6 +1648,12 @@ For commercial licensing, please contact support@quantumnous.com
   padding-inline: 0;
 }
 
+.dopa-developer-header .dopa-system-brand {
+  min-inline-size: 1.25rem;
+  max-inline-size: 100%;
+  overflow: hidden;
+}
+
 .dopa-header-actions > * {
   flex-shrink: 0;
 }

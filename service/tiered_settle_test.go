@@ -56,6 +56,47 @@ func makeRelayInfo(expr string, groupRatio float64, estPrompt, estCompletion int
 	}
 }
 
+func TestTieredSettlementTraceIsSerializedForLog(t *testing.T) {
+	expression := `tier("base", p * 2 + c * 10 + cr * 0.2 + cc * 4) * 2`
+	params := billingexpr.TokenParams{P: 5, C: 16, CR: 200, CC: 7}
+	snapshot := &billingexpr.BillingSnapshot{
+		ExprString:   expression,
+		ExprHash:     billingexpr.ExprHashString(expression),
+		GroupRatio:   0.5,
+		QuotaPerUnit: 500_000,
+		ExprVersion:  1,
+	}
+
+	result, err := billingexpr.ComputeTieredQuota(snapshot, params)
+	require.NoError(t, err)
+	assert.Equal(t, params, result.ActualUsage)
+	assert.InDelta(t, 0.000476, result.ActualCostBeforeGroup, 1e-12)
+	assert.InDelta(t, 238, result.ActualQuotaBeforeGroup, 1e-9)
+	assert.Equal(t, 119, result.ActualQuotaAfterGroup)
+
+	other := model.NewLogOther()
+	relayInfo := &relaycommon.RelayInfo{TieredBillingSnapshot: snapshot}
+	InjectTieredBillingInfo(other, relayInfo, &result)
+
+	values := other.Snapshot()
+	assert.Equal(t, params, values["billing_usage"])
+	assert.Equal(t, 0.000476, values["billing_cost_before_group"])
+	assert.Equal(t, "base", values["matched_tier"])
+	assert.NotEmpty(t, values["expr_b64"])
+
+	encoded, err := common.Marshal(other)
+	require.NoError(t, err)
+	var decoded map[string]any
+	require.NoError(t, common.Unmarshal(encoded, &decoded))
+	usage, ok := decoded["billing_usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, 5.0, usage["p"])
+	assert.Equal(t, 16.0, usage["c"])
+	assert.Equal(t, 0.0, usage["img_cr"])
+	assert.NotContains(t, usage, "P")
+	assert.Equal(t, 0.000476, decoded["billing_cost_before_group"])
+}
+
 // ---------------------------------------------------------------------------
 // Existing tests (preserved)
 // ---------------------------------------------------------------------------

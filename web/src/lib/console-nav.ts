@@ -63,6 +63,12 @@ export const CONSOLE_NAV: ConsoleNavItem[] = [
   },
   { id: 'keys', title: 'API keys', href: '/keys', group: 'build' },
   { id: 'billing', title: 'Wallet', href: '/wallet', group: 'account' },
+  {
+    id: 'docs',
+    title: 'Beginner guide',
+    href: '/guide',
+    group: 'resources',
+  },
 ]
 
 export function consoleNavPath(href: string): string {

@@ -292,16 +292,31 @@ export function decodeBillingExprB64(exprB64: string | undefined): string {
  */
 export function resolveMatchedTier(
   tiers: ParsedTier[],
-  matchedLabel: string | undefined
+  matchedLabel: string | undefined,
+  billingUnit?: 'token' | 'request',
+  fixedPrice?: number
 ): ParsedTier | null {
   if (tiers.length === 0) return null
   if (!matchedLabel) return null
-  const found = tiers.find((tier) => {
+  let candidates = tiers.filter((tier) => {
     const l1 = normalizeTierLabel(tier.label)
     const l2 = normalizeTierLabel(matchedLabel)
     return l1 === l2 && l1 !== ''
   })
-  return found || null
+  if (billingUnit) {
+    candidates = candidates.filter(
+      (tier) => (tier.billingUnit ?? 'token') === billingUnit
+    )
+  }
+  if (
+    billingUnit === 'request' &&
+    fixedPrice !== undefined &&
+    Number.isFinite(fixedPrice) &&
+    fixedPrice >= 0
+  ) {
+    candidates = candidates.filter((tier) => tier.fixedPrice === fixedPrice)
+  }
+  return candidates.length === 1 ? candidates[0] : null
 }
 
 /**
@@ -313,11 +328,16 @@ export interface TieredBillingSummary {
   tiers: ParsedTier[]
   tier: ParsedTier
   priceEntries: Array<{
+    key: string
     field: string
     shortLabel: string
     price: number
     unit?: 'request' | 'image'
   }>
+}
+
+type TieredBillingSummaryOptions = {
+  includeUnusedCache?: boolean
 }
 
 /**
@@ -339,7 +359,8 @@ export function hasAnyCacheTokens(
 }
 
 export function getTieredBillingSummary(
-  other: LogOtherData | null
+  other: LogOtherData | null,
+  options: TieredBillingSummaryOptions = {}
 ): TieredBillingSummary | null {
   if (!other || other.billing_mode !== 'tiered_expr') return null
   const exprStr = decodeBillingExprB64(other.expr_b64)
@@ -347,7 +368,12 @@ export function getTieredBillingSummary(
   const tiers = parseTiersFromExpr(
     splitBillingExprAndRequestRules(exprStr).billingExpr
   )
-  const tier = resolveMatchedTier(tiers, other.matched_tier)
+  const tier = resolveMatchedTier(
+    tiers,
+    other.matched_tier,
+    other.billing_unit,
+    other.fixed_price
+  )
   if (
     other.billing_unit === 'request' &&
     typeof other.fixed_price === 'number' &&
@@ -355,15 +381,10 @@ export function getTieredBillingSummary(
     other.fixed_price >= 0
   ) {
     const fixedPrice = other.fixed_price
-    const actualTier = tiers.find(
-      (entry) =>
-        normalizeTierLabel(entry.label) ===
-          normalizeTierLabel(other.matched_tier) &&
-        entry.billingUnit === 'request' &&
-        entry.fixedPrice === fixedPrice
-    ) ?? {
+    const actualTier = tier ?? {
       label: other.matched_tier || '',
       conditions: [],
+      declaredPriceFields: [],
       billingUnit: 'request' as const,
       fixedPrice,
     }
@@ -372,6 +393,7 @@ export function getTieredBillingSummary(
       tier: actualTier,
       priceEntries: [
         {
+          key: 'fixed',
           field: 'fixedPrice',
           shortLabel:
             other.image_count !== undefined ? 'Per image' : 'Per-call',
@@ -388,6 +410,7 @@ export function getTieredBillingSummary(
       tier,
       priceEntries: [
         {
+          key: 'fixed',
           field: 'fixedPrice',
           shortLabel: tier.imageCount ? 'Per image' : 'Per-call',
           price: tier.fixedPrice,
@@ -397,18 +420,30 @@ export function getTieredBillingSummary(
     }
   }
 
+  const declaredPriceFields = new Set(tier.declaredPriceFields)
   const cacheTokensPresent = hasAnyCacheTokens(other)
 
   const priceEntries: TieredBillingSummary['priceEntries'] = []
   for (const v of BILLING_PRICING_VARS) {
     if (!v.field) continue
-    if (v.group === 'cache' && !cacheTokensPresent) continue
+    if (!declaredPriceFields.has(v.field)) continue
+    if (
+      v.group === 'cache' &&
+      !options.includeUnusedCache &&
+      !cacheTokensPresent
+    ) {
+      continue
+    }
     const raw = tier[v.field as keyof ParsedTier]
     const price = Number(raw)
     if (Number.isFinite(price) && price >= 0) {
       priceEntries.push({
+        key: v.key,
         field: v.field,
-        shortLabel: v.shortLabel,
+        shortLabel:
+          v.key === 'cc' && other.claude === true
+            ? 'Cache Write (5m)'
+            : v.shortLabel,
         price,
       })
     }

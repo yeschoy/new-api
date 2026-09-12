@@ -122,8 +122,11 @@ look valid but use an incompatible model/endpoint pair.
 
 ### 3. Contracts
 
-- Public navigation and easy-mode navigation do not link to the internal guide.
-  Contextual help inside an authenticated setup flow may link to `/guide`.
+- Public navigation does not link to the internal guide. Authenticated
+  easy-mode navigation exposes a translated `Beginner guide` entry to
+  `/guide`; the operator-route override renders the existing developer
+  documentation shell without changing the saved easy-mode preference.
+  Contextual help inside an authenticated setup flow may also link to `/guide`.
 - Protocol-specific articles intersect account model IDs with pricing
   `supported_endpoint_types`: `openai-response` for Codex, `anthropic` for
   Claude Code, and `openai` for Chat Completions clients.
@@ -171,8 +174,9 @@ look valid but use an incompatible model/endpoint pair.
 - Component tests: platform tabs, visible resolved config, safe copy text,
   translated search, mobile titled Sheet, and desktop table-of-contents
   breakpoint.
-- Navigation tests: no public/easy guide destination, developer sidebar entry,
-  developer-header `/guide` fallback, and operator-route recognition.
+- Navigation tests: no public guide destination; desktop and compact easy-mode
+  navigation expose `Beginner guide` at `/guide`; developer sidebar entry,
+  developer-header `/guide` fallback, and operator-route recognition remain.
 - Localization tests: every catalog/component key exists in all seven locales
   and preserves the English placeholder multiset.
 
