@@ -207,7 +207,7 @@ export function TerminalHome() {
             </div>
           </label>
           <Link
-            to='/guide'
+            to='/beginner-guide'
             className='ci-button ci-button--outline ci-button--size-xs'
             style={{ marginTop: 12 }}
           >

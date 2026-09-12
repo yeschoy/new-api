@@ -77,7 +77,7 @@ describe('compact console navigation', () => {
       ).toHaveAttribute('href', '/pricing')
       expect(
         screen.getByRole('menuitem', { name: 'Beginner guide' })
-      ).toHaveAttribute('href', '/guide')
+      ).toHaveAttribute('href', '/beginner-guide')
       expect(
         screen.getByRole('menuitem', { name: 'Spending details' })
       ).toHaveAttribute('href', '/usage-logs')
@@ -103,7 +103,7 @@ describe('compact console navigation', () => {
     expect(screen.getByRole('link', { name: 'My key' })).toBeVisible()
     expect(
       screen.getByRole('link', { name: 'Beginner guide' })
-    ).toHaveAttribute('href', '/guide')
+    ).toHaveAttribute('href', '/beginner-guide')
   })
 
   it('uses one full-size mobile mode button while keeping both mode choices available', async () => {

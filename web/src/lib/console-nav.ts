@@ -66,7 +66,7 @@ export const CONSOLE_NAV: ConsoleNavItem[] = [
   {
     id: 'docs',
     title: 'Beginner guide',
-    href: '/guide',
+    href: '/beginner-guide',
     group: 'resources',
   },
 ]

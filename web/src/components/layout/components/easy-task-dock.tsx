@@ -53,7 +53,7 @@ const EASY_TASKS = [
   },
   {
     titleKey: 'Beginner guide',
-    to: '/guide',
+    to: '/beginner-guide',
     icon: BookOpen,
     tone: 'signal',
   },

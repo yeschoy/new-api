@@ -330,7 +330,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
                   return (
                     <Link
                       key={item.id}
-                      to='/guide'
+                      to='/beginner-guide'
                       className={className}
                       title={t(item.title)}
                       aria-label={t(item.title)}

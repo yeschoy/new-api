@@ -29,6 +29,7 @@ describe('isOperatorRoute', () => {
     expect(isOperatorRoute('/dashboard/reports')).toBe(false)
     expect(isOperatorRoute('/pricing')).toBe(false)
     expect(isOperatorRoute('/playground')).toBe(false)
+    expect(isOperatorRoute('/beginner-guide')).toBe(false)
   })
 
   it('recognizes operator workspaces', () => {

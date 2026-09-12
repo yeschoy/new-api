@@ -564,6 +564,14 @@ describe('terminal usage views', () => {
     expect(screen.queryByText('Not held separately on this gateway')).toBeNull()
   })
 
+  it('opens the historical beginner guide from the easy terminal overview', async () => {
+    await renderApp(<TerminalHome />, client)
+
+    expect(
+      await screen.findByRole('link', { name: 'Read the docs' })
+    ).toHaveAttribute('href', '/beginner-guide')
+  })
+
   it('shows distinct balance, daily usage and savings while reusing the daily summary on requests', async () => {
     const home = await renderApp(<TerminalHome />, client)
     expect(await screen.findByText('Usage today')).toBeVisible()
