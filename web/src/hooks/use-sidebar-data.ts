@@ -76,7 +76,7 @@ export function useSidebarData(): SidebarData {
             },
             {
               title: t('Beginner guide'),
-              url: '/guide',
+              url: '/beginner-guide',
               icon: BookOpen,
             },
             {

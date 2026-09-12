@@ -115,7 +115,7 @@ describe('terminal sidebar transitions', () => {
 
     expect(
       screen.getByRole('link', { name: 'Beginner guide' })
-    ).toHaveAttribute('href', '/guide')
+    ).toHaveAttribute('href', '/beginner-guide')
     expect(screen.getByRole('link', { name: 'API keys' })).toBeVisible()
   })
 
@@ -224,6 +224,6 @@ describe('terminal sidebar transitions', () => {
 
     expect(
       screen.getByRole('link', { name: 'Beginner guide' })
-    ).toHaveAttribute('href', '/guide')
+    ).toHaveAttribute('href', '/beginner-guide')
   })
 })

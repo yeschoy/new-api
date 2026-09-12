@@ -100,7 +100,7 @@ consume billing expressions, while sidebar sizing composes with Base UI state.
 - Wrong: apply expanded `sidebar-gap` sizing regardless of `data-state`.
 - Correct: scope expanded geometry to `data-state="expanded"`.
 
-## Authenticated account-aware developer documentation
+## Authenticated developer and beginner documentation
 
 ### 1. Scope / Trigger
 
@@ -114,6 +114,8 @@ look valid but use an incompatible model/endpoint pair.
 - Routes: `/guide` and `/guide/$slug` live under `routes/_authenticated/guide/`.
 - `isOperatorRoute('/guide' | '/guide/...')` returns `true` so the developer
   shell wins over a saved easy-mode preference.
+- Route `/beginner-guide` lives directly under `routes/_authenticated/` and is
+  not an operator route, so it keeps the user's saved console shell.
 - `useGuideEnvironment(audience, requested, onSelectionChange)` composes
   `getUserModels()`, `getUserGroups()`, `getUserGroupModels(group)`,
   `getPricing()`, and `useGuideAddress()`.
@@ -124,9 +126,10 @@ look valid but use an incompatible model/endpoint pair.
 
 - Public navigation does not link to the internal guide. Authenticated
   easy-mode navigation exposes a translated `Beginner guide` entry to
-  `/guide`; the operator-route override renders the existing developer
-  documentation shell without changing the saved easy-mode preference.
-  Contextual help inside an authenticated setup flow may also link to `/guide`.
+  `/beginner-guide`; contextual help inside the easy setup flow uses the same
+  route. Developer navigation exposes `Docs` at `/guide`. Never point both
+  labels at one route: the beginner guide is the historical tool-card workflow,
+  while `/guide` is the account-aware developer documentation center.
 - Protocol-specific articles intersect account model IDs with pricing
   `supported_endpoint_types`: `openai-response` for Codex, `anthropic` for
   Claude Code, and `openai` for Chat Completions clients.
@@ -138,6 +141,9 @@ look valid but use an incompatible model/endpoint pair.
   contract that explicitly supports one.
 - Guide code never calls key-list or key-reveal APIs. Every API-key slot resolves
   to the literal masked placeholder `sk-••••••`.
+- Beginner-guide examples use masked keys such as `sk-****************` and
+  runtime deployment addresses; they never reveal a stored key or hardcode the
+  deployed host.
 - Dynamic guide prose uses English i18n keys and must be enumerated by the guide
   localization test because a static `t('...')` extractor cannot see catalog
   data.
@@ -147,6 +153,8 @@ look valid but use an incompatible model/endpoint pair.
 | Condition | Required behavior |
 | --- | --- |
 | Anonymous request to `/guide...` | Existing authenticated-route redirect to sign-in |
+| Anonymous request to `/beginner-guide` | Existing authenticated-route redirect to sign-in |
+| Unknown beginner-guide `tool` query | Keep the catalog visible without opening a dialog |
 | Invalid route slug | Not-found experience; never a silent article fallback |
 | Requested model/group is unavailable | Replace with a verified deterministic default |
 | No model supports the article protocol | Honest empty state with a Models action |
@@ -158,8 +166,12 @@ look valid but use an incompatible model/endpoint pair.
 
 - Good: an account has a Responses model in `default`; the Codex article shows
   that pair and regenerates its visible/copyable TOML together.
+- Good: easy navigation opens `/beginner-guide`; developer navigation opens
+  `/guide`, and changing routes does not rewrite the saved console mode.
 - Base: a protocol-neutral troubleshooting article may list all account models,
   but it does not claim that one model supports every client.
+- Bad: reuse `/guide` for the easy-mode `Beginner guide` entry; this silently
+  replaces the historical beginner workflow with the developer shell.
 - Bad: choose the first account model for a Chat Completions curl example
   without checking `supported_endpoint_types`.
 - Bad: retrieve a full key so a documentation snippet can be copied in one click.
@@ -175,8 +187,12 @@ look valid but use an incompatible model/endpoint pair.
   translated search, mobile titled Sheet, and desktop table-of-contents
   breakpoint.
 - Navigation tests: no public guide destination; desktop and compact easy-mode
-  navigation expose `Beginner guide` at `/guide`; developer sidebar entry,
-  developer-header `/guide` fallback, and operator-route recognition remain.
+  navigation expose `Beginner guide` at `/beginner-guide`; developer sidebar
+  entry and developer-header fallback remain `/guide`; operator-route tests
+  assert `/guide` is developer-only and `/beginner-guide` is not.
+- Beginner-guide tests: 31 historical tools, category/search behavior, direct
+  tool dialog, runtime address substitution, masked keys, and unknown-tool
+  fallback.
 - Localization tests: every catalog/component key exists in all seven locales
   and preserves the English placeholder multiset.
 

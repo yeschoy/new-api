@@ -65,7 +65,7 @@ describe('console mode sidebar', () => {
       '/dashboard/overview',
       '/keys',
       '/pricing',
-      '/guide',
+      '/beginner-guide',
       '/usage-logs/common',
       '/wallet',
     ])

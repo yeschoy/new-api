@@ -74,8 +74,24 @@ async function renderModes(path: string) {
       </TerminalLayout>
     ),
   })
+  const beginnerGuide = createRoute({
+    getParentRoute: () => root,
+    path: '/beginner-guide',
+    component: () => <ConsoleModeControl compact />,
+  })
+  const guide = createRoute({
+    getParentRoute: () => root,
+    path: '/guide',
+    component: () => <ConsoleModeControl compact />,
+  })
   const router = createRouter({
-    routeTree: root.addChildren([dashboard, channels, keys]),
+    routeTree: root.addChildren([
+      dashboard,
+      channels,
+      keys,
+      beginnerGuide,
+      guide,
+    ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   })
   await act(async () => {
@@ -144,12 +160,25 @@ describe('console mode navigation', () => {
     expect(router.state.location.pathname).toBe('/dashboard/models')
   })
 
-  it('shows developer mode on an operator route even with an easy preference', async () => {
+  it.each(['/dashboard/models', '/guide'])(
+    'shows developer mode on operator route %s even with an easy preference',
+    async (path) => {
+      useConsoleModeStore.getState().setMode('easy')
+      await renderModes(path)
+      expect(
+        await screen.findByRole('button', { name: 'Developer mode' })
+      ).toHaveAttribute('aria-pressed', 'true')
+    }
+  )
+
+  it('keeps the easy shell on the authenticated beginner guide', async () => {
     useConsoleModeStore.getState().setMode('easy')
-    await renderModes('/dashboard/models')
+    await renderModes('/beginner-guide')
+
     expect(
-      await screen.findByRole('button', { name: 'Developer mode' })
+      await screen.findByRole('button', { name: 'Easy mode' })
     ).toHaveAttribute('aria-pressed', 'true')
+    expect(useConsoleModeStore.getState().mode).toBe('easy')
   })
 
   it('keeps both mode choices in the easy header without losing the current request page', async () => {
