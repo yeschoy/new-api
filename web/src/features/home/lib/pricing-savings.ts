@@ -16,12 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import i18next from 'i18next'
+
 import {
   isDynamicPricingModel,
   hasTaskUsageSchema,
 } from '@/features/pricing/lib/dynamic-price'
 import { getDisplayGroupRatio } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatLocalCurrencyAmount } from '@/lib/currency'
 
 export type ModelFamily =
   | 'openai'
@@ -37,6 +41,8 @@ export type SavingsUseCase = 'coding' | 'agents' | 'support' | 'research'
 export type SavingsModel = {
   modelName: string
   vendorName: string
+  vendorIcon?: string
+  endpointTypes?: string[]
   family: ModelFamily
   baseInputPrice: number
   baseOutputPrice: number
@@ -362,6 +368,8 @@ function toSavingsModel(
   return {
     modelName: model.model_name,
     vendorName: model.vendor_name?.trim() || getFallbackVendorName(family),
+    vendorIcon: model.vendor_icon || model.icon,
+    endpointTypes: model.supported_endpoint_types ?? [],
     family,
     baseInputPrice,
     baseOutputPrice,
@@ -445,6 +453,25 @@ export function buildSavingsCatalog(
   })
 }
 
+export function formatUsdPerMillion(amount: number): string {
+  if (!Number.isFinite(amount)) return '—'
+  if (amount <= 0) return '$0/M'
+  if (amount < 0.01) {
+    return `$${amount.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}/M`
+  }
+  if (amount < 10) return `$${amount.toFixed(2)}/M`
+  return `$${amount.toFixed(2)}/M`
+}
+
+export function formatPerMillionTokens(amount: number): string {
+  if (!Number.isFinite(amount) || amount < 0) return '—'
+  return `${formatLocalCurrencyAmount(amount, {
+    digitsLarge: 4,
+    digitsSmall: 4,
+    locale: toIntlLocale(i18next.resolvedLanguage || i18next.language),
+  })}/M`
+}
+
 export function formatCnyAmount(
   amount: number,
   options: { compact?: boolean; maximumFractionDigits?: number } = {}
@@ -481,7 +508,9 @@ export function formatTokenMillions(
   }).format(tokens)
 }
 
-export function getMaximumSavingsPercent(models: SavingsModel[]): number {
+export function getMaximumSavingsPercent(
+  models: Array<{ savingsPercent: number }>
+): number {
   return models.reduce(
     (maximum, model) => Math.max(maximum, model.savingsPercent),
     0

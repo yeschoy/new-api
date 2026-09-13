@@ -18,10 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api, type ApiRequestConfig } from '@/lib/api'
 
+import { LOG_TYPE_ENUM } from './constants'
 import { buildQueryParams } from './lib/query-params'
 import { parseTaskArtifactsResponse } from './lib/task-artifacts'
 import type {
   GetLogsParams,
+  UserLogSummary,
+  UserLogSummaryParams,
   GetLogsResponse,
   GetLogStatsParams,
   GetLogStatsResponse,
@@ -79,6 +82,23 @@ export const getUserLogs = (
   params: Omit<GetLogsParams, 'username' | 'channel'> = {}
 ) => fetchLogs('/api/log', params, false)
 
+type UserRequestLogsParams = Omit<
+  GetLogsParams,
+  'username' | 'channel' | 'type'
+>
+
+const REQUEST_LOG_TYPES = [LOG_TYPE_ENUM.CONSUME, LOG_TYPE_ENUM.ERROR] as const
+
+export async function getUserRequestLogs(
+  params: UserRequestLogsParams = {}
+): Promise<GetLogsResponse> {
+  return fetchLogs(
+    '/api/log',
+    { ...params, types: [...REQUEST_LOG_TYPES] },
+    false
+  )
+}
+
 export const getLogStats = (params: GetLogStatsParams = {}) =>
   fetchLogStats('/api/log', params, true)
 
@@ -124,4 +144,18 @@ export async function getTaskArtifacts(taskId: string) {
     taskArtifactRequestConfig
   )
   return parseTaskArtifactsResponse(response.data)
+}
+
+export async function getUserLogSummary(
+  params: UserLogSummaryParams
+): Promise<UserLogSummary> {
+  const response = await api.get<{
+    success: boolean
+    message?: string
+    data?: UserLogSummary
+  }>('/api/log/self/summary', { params })
+  if (!response.data.success || !response.data.data) {
+    throw new Error(response.data.message || 'Failed to load usage report')
+  }
+  return response.data.data
 }

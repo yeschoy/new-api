@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -39,7 +40,27 @@ func GetAllLogs(c *gin.Context) {
 func GetUserLogs(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	userId := c.GetInt("id")
-	logType, _ := strconv.Atoi(c.Query("type"))
+	var logTypes []int
+	if rawTypes := c.Query("types"); rawTypes != "" {
+		seen := make(map[int]struct{})
+		for _, rawType := range strings.Split(rawTypes, ",") {
+			logType, err := strconv.Atoi(strings.TrimSpace(rawType))
+			if err != nil || logType <= model.LogTypeUnknown || logType > model.LogTypeLogin {
+				c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "无效的日志类型"})
+				return
+			}
+			if _, exists := seen[logType]; exists {
+				continue
+			}
+			seen[logType] = struct{}{}
+			logTypes = append(logTypes, logType)
+		}
+	} else {
+		logType, _ := strconv.Atoi(c.Query("type"))
+		if logType != model.LogTypeUnknown {
+			logTypes = []int{logType}
+		}
+	}
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	tokenName := c.Query("token_name")
@@ -47,7 +68,7 @@ func GetUserLogs(c *gin.Context) {
 	group := c.Query("group")
 	requestId := c.Query("request_id")
 	upstreamRequestId := c.Query("upstream_request_id")
-	logs, total, err := model.GetUserLogs(userId, logType, startTimestamp, endTimestamp, modelName, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), group, requestId, upstreamRequestId)
+	logs, total, err := model.GetUserLogs(userId, logTypes, startTimestamp, endTimestamp, modelName, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), group, requestId, upstreamRequestId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
