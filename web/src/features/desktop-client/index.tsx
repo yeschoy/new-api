@@ -24,6 +24,7 @@ import { MarketingHeader } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
 import { useTheme } from '@/context/theme-provider'
 import { CiMark } from '@/features/home/components/ci-mark'
+import { GlassCursor } from '@/features/home/components/glass-cursor'
 import { PRODUCT_NAME } from '@/lib/product-brand'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -122,6 +123,7 @@ export function DesktopClientPage(props: DesktopClientPageProps = {}) {
       className='ci-landing ci-theme client-landing'
       data-theme={isDark ? 'dark' : 'light'}
     >
+      <GlassCursor scopeSelector='.client-landing' />
       <div className='ci-handoffRoot'>
         <MarketingHeader
           isAuthenticated={isAuthenticated}

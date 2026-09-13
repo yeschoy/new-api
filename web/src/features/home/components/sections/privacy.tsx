@@ -26,7 +26,7 @@ export function Privacy() {
     kicker: string
     title: string
     body: string
-    href: '/privacy-policy' | '/guide' | '/pricing'
+    href: '/privacy-policy' | '/pricing'
     action: string
   }> = [
     {
@@ -44,8 +44,8 @@ export function Privacy() {
       body: t(
         'Cache controls pass through when the selected model supports them.'
       ),
-      href: '/guide',
-      action: t('Read the docs'),
+      href: '/privacy-policy',
+      action: t('Read the privacy policy'),
     },
     {
       kicker: t('Upstream providers'),

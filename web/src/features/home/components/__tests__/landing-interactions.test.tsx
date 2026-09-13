@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -18,12 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { readFileSync } from 'node:fs'
+
 import { QueryClient } from '@tanstack/react-query'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { useAuthStore } from '@/stores/auth-store'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 import { renderApp } from '@/test-utils/render-app'
 
@@ -32,17 +33,19 @@ import { CiLandingPage } from '../ci-landing-page'
 
 let client: QueryClient
 let style: HTMLStyleElement
+const originalConfig = useSystemConfigStore.getState()
 const originalAuth = useAuthStore.getState()
 beforeEach(() => {
   useAuthStore.getState().auth.reset()
   client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   })
   client.setQueryData(['status'], {}, { updatedAt: Date.now() + 60000 })
   style = document.createElement('style')
   document.head.append(style)
 })
 afterEach(() => {
+  useSystemConfigStore.setState(originalConfig)
   useAuthStore.setState(originalAuth)
   client.clear()
   style.remove()
@@ -121,6 +124,44 @@ describe('landing interactions and price layout', () => {
     )
     expect(screen.getAllByText('Save 50%').length).toBeGreaterThan(0)
   })
+  it.each([
+    ['qwen-max', 'Qwen', 'Qwen.Color', null],
+    ['kimi-k2', 'Moonshot', 'Moonshot', null],
+    ['private-model', 'Acme', undefined, 'A'],
+  ])(
+    'uses the matching or neutral hero icon for %s',
+    async (modelName, vendorName, vendorIcon, fallbackText) => {
+      const catalog = buildModelCatalog(
+        [
+          {
+            ...models[0].pricingModel,
+            model_name: modelName,
+            vendor_name: vendorName,
+            vendor_icon: vendorIcon,
+            group_ratio: { default: 0.5 },
+          },
+        ],
+        1
+      )
+      const { container } = await renderApp(
+        <CiLandingPage
+          isAuthenticated={false}
+          models={catalog}
+          maxSavingsPercent={50}
+        />,
+        client
+      )
+      const logo = container.querySelector('.ci-heroModelLogo')
+
+      expect(logo).not.toBeNull()
+      expect(logo?.querySelector('img')).toBeNull()
+      if (fallbackText) {
+        expect(logo).toHaveTextContent(fallbackText)
+      } else {
+        expect(logo?.querySelector('svg')).not.toBeNull()
+      }
+    }
+  )
   it('closes mobile navigation when an in-page destination is selected', async () => {
     const user = userEvent.setup()
     await renderApp(
@@ -150,8 +191,8 @@ describe('landing interactions and price layout', () => {
       within(navigation).queryByRole('link', { name: 'Model Price' })
     ).not.toBeInTheDocument()
     expect(
-      within(navigation).getByRole('link', { name: 'Docs' })
-    ).toHaveAttribute('href', '/guide')
+      within(navigation).queryByRole('link', { name: 'Docs' })
+    ).not.toBeInTheDocument()
     expect(
       within(navigation).getByRole('link', { name: 'Client' })
     ).toHaveAttribute('href', '/client')
@@ -177,4 +218,53 @@ describe('landing interactions and price layout', () => {
     if (!comparison) throw new Error('Missing live comparison')
     expect(getComputedStyle(comparison).opacity).toBe('1')
   })
+})
+
+describe('configured landing footer', () => {
+  it.each([true, false])(
+    'renders custom notices and respects enabled legal links=%s',
+    async (enabled) => {
+      useSystemConfigStore.getState().setConfig({
+        footerHtml:
+          '<strong>Operator registration notice</strong><script>window.footerInjected = true</script>',
+      })
+      client.setQueryData(
+        ['status'],
+        {
+          user_agreement_enabled: enabled,
+          privacy_policy_enabled: enabled,
+        },
+        { updatedAt: Date.now() + 60000 }
+      )
+      await renderApp(
+        <CiLandingPage
+          isAuthenticated={false}
+          models={models}
+          maxSavingsPercent={0}
+        />,
+        client
+      )
+      const footer = screen.getByRole('contentinfo')
+      expect(
+        within(footer).getByText('Operator registration notice')
+      ).toBeVisible()
+      expect(footer.querySelector('script')).toBeNull()
+      for (const [name, href] of [
+        ['User Agreement', '/user-agreement'],
+        ['Privacy Policy', '/privacy-policy'],
+      ]) {
+        if (enabled) {
+          expect(within(footer).getByRole('link', { name })).toHaveAttribute(
+            'href',
+            href
+          )
+        } else {
+          expect(within(footer).queryByRole('link', { name })).toBeNull()
+        }
+      }
+      expect(
+        within(footer).getByRole('link', { name: 'New API' })
+      ).toHaveAttribute('href', 'https://github.com/QuantumNous/new-api')
+    }
+  )
 })

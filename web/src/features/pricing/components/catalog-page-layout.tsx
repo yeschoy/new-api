@@ -34,7 +34,9 @@ export function CatalogPageLayout(props: CatalogPageLayoutProps) {
   if (user) {
     return (
       <>
-        <GlassCursor scopeSelector='.ci-app, .dopa-console, .ci-landing' />
+        {mode === 'developer' ? (
+          <GlassCursor scopeSelector='.ci-app, .dopa-console, .ci-landing' />
+        ) : null}
         <AuthenticatedLayout>
           <div
             className={cn(

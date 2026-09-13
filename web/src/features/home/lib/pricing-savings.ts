@@ -16,12 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import i18next from 'i18next'
+
 import {
   isDynamicPricingModel,
   hasTaskUsageSchema,
 } from '@/features/pricing/lib/dynamic-price'
 import { getDisplayGroupRatio } from '@/features/pricing/lib/model-helpers'
 import type { PricingModel } from '@/features/pricing/types'
+import { toIntlLocale } from '@/i18n/languages'
 import { formatLocalCurrencyAmount } from '@/lib/currency'
 
 export type ModelFamily =
@@ -465,8 +468,8 @@ export function formatPerMillionTokens(amount: number): string {
   return `${formatLocalCurrencyAmount(amount, {
     digitsLarge: 4,
     digitsSmall: 4,
-    locale: 'zh-CN',
-  })}/百万`
+    locale: toIntlLocale(i18next.resolvedLanguage || i18next.language),
+  })}/M`
 }
 
 export function formatCnyAmount(

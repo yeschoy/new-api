@@ -52,7 +52,7 @@ describe('recharge price display', () => {
       ],
       7
     )
-    expect(formatPerMillionTokens(model.siteInputPrice)).toBe('¥7/百万')
+    expect(formatPerMillionTokens(model.siteInputPrice)).toBe('¥7/M')
   })
   it('shows an explicit zero price instead of a missing price', () => {
     useSystemConfigStore.setState({
@@ -61,7 +61,7 @@ describe('recharge price display', () => {
         currency: { ...original.currency, quotaDisplayType: 'CNY' },
       },
     })
-    expect(formatPerMillionTokens(0)).toBe('¥0/百万')
+    expect(formatPerMillionTokens(0)).toBe('¥0/M')
     expect(formatPerMillionTokens(Number.NaN)).toBe('—')
   })
 })

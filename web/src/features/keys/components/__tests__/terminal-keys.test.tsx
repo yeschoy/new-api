@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { AxiosError } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -100,7 +101,21 @@ beforeEach(() => {
   api.defaults.adapter = async (config) => {
     const url = new URL(config.url ?? '', 'http://localhost')
     let data: unknown
-    if (url.pathname === '/api/user/self/groups') {
+    if (url.pathname === '/api/pricing') {
+      throw new AxiosError(
+        'Pricing disabled',
+        'ERR_BAD_REQUEST',
+        config,
+        undefined,
+        {
+          data: { success: false, message: 'Pricing disabled' },
+          status: 403,
+          statusText: 'Forbidden',
+          headers: {},
+          config,
+        }
+      )
+    } else if (url.pathname === '/api/user/self/groups') {
       data = {
         success: true,
         data: {
@@ -149,6 +164,13 @@ beforeEach(() => {
         }
         data = { success: true, data: ids.length }
       }
+    } else if (
+      config.method === 'delete' &&
+      /^\/api\/token\/\d+\/?$/.test(url.pathname)
+    ) {
+      const id = Number(url.pathname.match(/\/(\d+)\/?$/)?.[1])
+      keys = keys.filter((item) => item.id !== id)
+      data = { success: true }
     } else {
       throw new Error(`Unexpected request: ${config.method} ${url.pathname}`)
     }
@@ -192,7 +214,7 @@ describe('terminal key management', () => {
       'standard-model'
     )
     await user.click(screen.getByRole('button', { name: 'Create key' }))
-    const row = await screen.findByRole('row', { name: /日常用/ })
+    const row = await screen.findByRole('row', { name: /Daily key/ })
     expect(creates).toBe(1)
     failReveal = false
     await user.click(within(row).getByRole('button', { name: /Copy/ }))
@@ -210,6 +232,10 @@ describe('terminal key management', () => {
     await user.click(
       screen.getByRole('button', { name: 'Revoke all active keys' })
     )
+    expect(keys).toHaveLength(101)
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
+    )
     await waitFor(() => expect(keys).toHaveLength(0))
     expect(new Set(deleted).size).toBe(101)
   })
@@ -221,6 +247,9 @@ describe('terminal key management', () => {
     await screen.findByText('existing')
     await user.click(
       screen.getByRole('button', { name: 'Revoke all active keys' })
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
     )
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Delete unavailable'
@@ -235,6 +264,9 @@ describe('terminal key management', () => {
     await screen.findByText('existing')
     await user.click(
       screen.getByRole('button', { name: 'Revoke all active keys' })
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
     )
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Failed to delete API keys'
@@ -263,4 +295,36 @@ describe('terminal key management', () => {
       'true'
     )
   })
+
+  it('waits for confirmation before revoking one key', async () => {
+    const user = userEvent.setup()
+    renderKeys()
+    const row = await screen.findByRole('row', { name: /existing/ })
+
+    await user.click(within(row).getByRole('button', { name: 'Revoke' }))
+
+    expect(keys).toHaveLength(1)
+    expect(
+      screen.getByRole('alertdialog', { name: 'Delete 1 API key(s)?' })
+    ).toBeVisible()
+    await user.click(
+      screen.getByRole('button', { name: 'Delete', hidden: true })
+    )
+    await waitFor(() => expect(keys).toHaveLength(0))
+  })
+})
+
+it('creates a key in an authorized group when the pricing endpoint returns 403', async () => {
+  client.removeQueries({ queryKey: ['pricing'] })
+  const user = userEvent.setup()
+  renderKeys()
+  await screen.findByText('existing')
+  await waitFor(() =>
+    expect(client.getQueryState(['pricing'])?.status).toBe('error')
+  )
+  const create = screen.getByRole('button', { name: 'Create key' })
+  expect(create).toBeEnabled()
+  await user.click(create)
+  await waitFor(() => expect(creates).toBe(1))
+  expect(keys[0].group).toBe('cheap')
 })

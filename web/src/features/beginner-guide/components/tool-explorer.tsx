@@ -29,10 +29,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import type { GuideAddress } from '@/features/guide/use-guide-address'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 
 import { guideTools, type GuideTool, type ToolCategory } from '../data'
-import type { GuideAddress } from '../use-guide-address'
 
 const CATEGORIES: { value: ToolCategory | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },

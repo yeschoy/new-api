@@ -130,6 +130,19 @@ describe('application header console mode', () => {
     ).toHaveAttribute('href', 'https://docs.example.com')
   })
 
+  it('uses the private developer guide when no external docs link is configured', async () => {
+    useConsoleModeStore.getState().setMode('developer')
+    client.setQueryData(['status'], {})
+    await renderApp(<AppHeader />, client)
+
+    const navigation = screen.getByRole('navigation', {
+      name: 'Main navigation',
+    })
+    expect(
+      within(navigation).getByRole('link', { name: 'Docs' })
+    ).toHaveAttribute('href', '/guide')
+  })
+
   it('honors disabled backend modules in developer navigation', async () => {
     useConsoleModeStore.getState().setMode('developer')
     client.setQueryData(['status'], {

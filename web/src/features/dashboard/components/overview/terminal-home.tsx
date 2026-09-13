@@ -150,12 +150,16 @@ export function TerminalHome() {
           </small>
         </article>
         <article>
-          <span>{t('Usage today')}</span>
+          <span>{t('Wallet spending today')}</span>
           <strong>
             {summary.data ? formatConsoleMoney(summary.data.quota) : '—'}
           </strong>
           <small>
-            {t('Billed usage today, including subscription usage.')}
+            {summary.data
+              ? t('Subscription usage: {{quota}} quota units', {
+                  quota: summary.data.subscription_quota ?? 0,
+                })
+              : '—'}
           </small>
         </article>
         <article>
@@ -207,7 +211,7 @@ export function TerminalHome() {
             </div>
           </label>
           <Link
-            to='/guide'
+            to='/beginner-guide'
             className='ci-button ci-button--outline ci-button--size-xs'
             style={{ marginTop: 12 }}
           >

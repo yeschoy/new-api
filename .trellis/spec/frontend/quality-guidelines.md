@@ -100,6 +100,128 @@ consume billing expressions, while sidebar sizing composes with Base UI state.
 - Wrong: apply expanded `sidebar-gap` sizing regardless of `data-state`.
 - Correct: scope expanded geometry to `data-state="expanded"`.
 
+## Authenticated developer and beginner documentation
+
+### 1. Scope / Trigger
+
+Use this contract when adding or changing internal setup documentation that
+combines deployment URLs, account models, billing groups, and client protocol
+examples. It prevents public exposure, leaked credentials, and examples that
+look valid but use an incompatible model/endpoint pair.
+
+### 2. Signatures
+
+- Routes: `/guide` and `/guide/$slug` live under `routes/_authenticated/guide/`.
+- `isOperatorRoute('/guide' | '/guide/...')` returns `true` so the developer
+  shell wins over a saved easy-mode preference.
+- Route `/beginner-guide` lives directly under `routes/_authenticated/` and is
+  not an operator route, so it keeps the user's saved console shell.
+- `useGuideEnvironment(audience, requested, onSelectionChange)` composes
+  `getUserModels()`, `getUserGroups()`, `getUserGroupModels(group)`,
+  `getPricing()`, and `useGuideAddress()`.
+- `fillGuideTemplate(template, runtime)` resolves only approved deployment,
+  model, group, and masked-key placeholders.
+
+### 3. Contracts
+
+- Public navigation does not link to the internal guide. Authenticated
+  easy-mode navigation exposes a translated `Beginner guide` entry to
+  `/beginner-guide`; contextual help inside the easy setup flow uses the same
+  route. Developer navigation exposes `Docs` at `/guide`. Never point both
+  labels at one route: the beginner guide is the historical tool-card workflow,
+  while `/guide` is the account-aware developer documentation center.
+- Protocol-specific articles intersect account model IDs with pricing
+  `supported_endpoint_types`: `openai-response` for Codex, `anthropic` for
+  Claude Code, and `openai` for Chat Completions clients.
+- A selected group is shown only after `/api/user/models?group=<group>` confirms
+  it contains the selected model.
+- The billing/routing group belongs to the API key. Select the model/group
+  before key creation and create or edit the key in that group; do not describe
+  the group as a client request field or custom header without a separate API
+  contract that explicitly supports one.
+- Guide code never calls key-list or key-reveal APIs. Every API-key slot resolves
+  to the literal masked placeholder `sk-••••••`.
+- Beginner-guide examples use masked keys such as `sk-****************` and
+  runtime deployment addresses; they never reveal a stored key or hardcode the
+  deployed host.
+- Dynamic guide prose uses English i18n keys and must be enumerated by the guide
+  localization test because a static `t('...')` extractor cannot see catalog
+  data.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Anonymous request to `/guide...` | Existing authenticated-route redirect to sign-in |
+| Anonymous request to `/beginner-guide` | Existing authenticated-route redirect to sign-in |
+| Unknown beginner-guide `tool` query | Keep the catalog visible without opening a dialog |
+| Invalid route slug | Not-found experience; never a silent article fallback |
+| Requested model/group is unavailable | Replace with a verified deterministic default |
+| No model supports the article protocol | Honest empty state with a Models action |
+| Pricing or group verification fails | Retryable error state; do not emit an unverified config |
+| Pricing success response omits `data` | Retryable error state; no render exception |
+| Selected model declares context below 1M | Do not claim or generate a 1M configuration |
+
+### 5. Good / Base / Bad Cases
+
+- Good: an account has a Responses model in `default`; the Codex article shows
+  that pair and regenerates its visible/copyable TOML together.
+- Good: easy navigation opens `/beginner-guide`; developer navigation opens
+  `/guide`, and changing routes does not rewrite the saved console mode.
+- Base: a protocol-neutral troubleshooting article may list all account models,
+  but it does not claim that one model supports every client.
+- Bad: reuse `/guide` for the easy-mode `Beginner guide` entry; this silently
+  replaces the historical beginner workflow with the developer shell.
+- Bad: choose the first account model for a Chat Completions curl example
+  without checking `supported_endpoint_types`.
+- Bad: retrieve a full key so a documentation snippet can be copied in one click.
+
+### 6. Tests Required
+
+- Catalog/runtime unit tests: seven stable articles, neighboring articles,
+  placeholder resolution, protocol filtering, and immutable inputs.
+- Hook tests: verified model/group combinations, invalid requested values,
+  model changes that invalidate a group, empty protocols, rejected queries, and
+  unsuccessful responses without payloads.
+- Component tests: platform tabs, visible resolved config, safe copy text,
+  translated search, mobile titled Sheet, and desktop table-of-contents
+  breakpoint.
+- Navigation tests: no public guide destination; desktop and compact easy-mode
+  navigation expose `Beginner guide` at `/beginner-guide`; developer sidebar
+  entry and developer-header fallback remain `/guide`; operator-route tests
+  assert `/guide` is developer-only and `/beginner-guide` is not.
+- Beginner-guide tests: 31 historical tools, category/search behavior, direct
+  tool dialog, runtime address substitution, masked keys, and unknown-tool
+  fallback.
+- Localization tests: every catalog/component key exists in all seven locales
+  and preserves the English placeholder multiset.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+const model = userModels[0]
+const apiKey = await getFullApiKey(keyId)
+return template.replace('{{MODEL}}', model).replace('{{KEY}}', apiKey)
+```
+
+#### Correct
+
+```ts
+const models = filterModelsForAudience(userModels, pricing, audience)
+const groups = verifiedGroupsFor(models[0])
+return fillGuideTemplate(template, {
+  ...runtimeAddress,
+  model: models[0],
+  group: groups[0],
+  platform,
+})
+```
+
+The correct path derives only display-safe values, and the template resolver
+owns the constant masked API-key placeholder.
+
 
 ## Easy-console pricing, keys and reports
 
@@ -121,6 +243,8 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Developer price comparisons use the "Official price" label with a tooltip explaining that values are recorded-base estimates, not independently verified provider prices. Recognized overseas model families display the native official USD amount; domestic and unknown families display CNY. Keep the actual site charge in CNY and compute discounts after converting the overseas reference at `OFFICIAL_PRICE_USD_TO_CNY = 6.75`. Use the unrounded amount for this conversion and do not apply the recharge price to the native USD number. Currency recognition follows the same model-family resolver as the model badge; no official-price feed is implied.
 - Per-request billing (`isPerCallBilling(other.model_price)`) does not show original-price or savings comparisons in developer cost cells, easy request rows, or request details. Preserve the actual charge and any subscription/tool-surcharge indicators.
 - Configured cache-write ratios, including zero, are displayed even when no cache was written. Claude's recorded 5-minute and 1-hour rates remain separate. Missing historical rates are not filled from current catalog settings.
+- Catalog vendor names and icons come from `/api/pricing` metadata. Preserve an explicit vendor icon identifier or image URL. When the icon is absent, resolve known normalized vendor names to their matching icon; an unknown vendor uses its neutral name/initial fallback and must never inherit another provider's branded icon.
+- Public visual surfaces and the easy-mode authenticated shell mount at most one shared `GlassCursor`, scoped to their root. `TerminalLayout` owns the `.ci-app` cursor in easy mode, so an authenticated `CatalogPageLayout` defers to that instance in easy mode and keeps its page-owned instance only in developer mode; the anonymous catalog keeps its public-root instance. Home, authentication, catalog and desktop-client pages use the same implementation so fine-pointer tracking, interactive-control scaling, input avoidance, reduced-motion handling and listener cleanup remain consistent.
 - Do not display an unconnected reserved-balance metric as a hardcoded zero.
 
 ### Validation & Error Matrix
@@ -139,7 +263,7 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - Bad: reuse the on/off translation for a percentage discount, or apply flex display to td elements.
 
 ### Tests Required
-Cover 101-key revoke and incomplete deletion, reveal retry without duplicate creation, group changes/free pricing, all pricing modes, complete reports vs a paginated list, stream failures and currency export. Browser/DOM tests cover mobile anchor-close behavior, table-cell layout, visible rate comparisons and absence of retired supplier entry points.
+Cover 101-key revoke and incomplete deletion, reveal retry without duplicate creation, group changes/free pricing, all pricing modes, complete reports vs a paginated list, stream failures and currency export. Browser/DOM tests cover mobile anchor-close behavior, table-cell layout, visible rate comparisons, absence of retired supplier entry points, a generic easy-mode shell cursor, and exactly one cursor on authenticated catalog pages in either console mode.
 
 ### Wrong vs Correct
 - Wrong: use catalog discount percentages to estimate savings for historical logs.

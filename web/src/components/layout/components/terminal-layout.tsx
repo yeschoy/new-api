@@ -43,7 +43,9 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { SignOutDialog } from '@/components/sign-out-dialog'
 import { useTheme } from '@/context/theme-provider'
 import { CiMark } from '@/features/home/components/ci-mark'
+import { GlassCursor } from '@/features/home/components/glass-cursor'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 import { useUserDisplay } from '@/hooks/use-user-display'
 import { formatConsoleMoney } from '@/lib/console-money'
 import {
@@ -59,9 +61,9 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
+import type { NavGroup } from '../types'
 import { CommunityHelp } from './community-help'
 import { ConsoleModeControl } from './console-mode-switcher'
-import { DocsSearch } from './docs-search'
 
 const NAV_ICONS = {
   overview: LayoutGrid,
@@ -75,6 +77,19 @@ const NAV_ICONS = {
 } as const
 
 const SIDEBAR_STORAGE_KEY = 'ci_sidebar_collapsed'
+
+const TERMINAL_NAV_CONFIG: NavGroup[] = [
+  {
+    id: 'terminal',
+    title: '',
+    items: CONSOLE_NAV.map((item) => ({
+      title: item.title,
+      url: consoleNavPath(item.href),
+      configUrls:
+        item.id === 'reports' ? ['/usage-logs/common' as const] : undefined,
+    })),
+  },
+]
 
 type TerminalLayoutProps = {
   children: React.ReactNode
@@ -120,17 +135,34 @@ export function TerminalLayout(props: TerminalLayoutProps) {
   const showBalanceCard = remainQuota <= 0 || remainYuan < 20
   const isPlayground = pathname.startsWith('/playground')
   const handleLabel = secondaryText || displayName
+  const configuredNavGroups = useSidebarConfig(TERMINAL_NAV_CONFIG)
+  const configuredPaths = useMemo(
+    () =>
+      new Set(
+        (configuredNavGroups[0]?.items ?? []).flatMap((item) =>
+          item.url ? [item.url] : []
+        )
+      ),
+    [configuredNavGroups]
+  )
+  const configuredNav = useMemo(
+    () =>
+      CONSOLE_NAV.filter((item) =>
+        configuredPaths.has(consoleNavPath(item.href))
+      ),
+    [configuredPaths]
+  )
 
   const visibleNav = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    if (!needle) return CONSOLE_NAV
-    return CONSOLE_NAV.filter((item) => {
+    if (!needle) return configuredNav
+    return configuredNav.filter((item) => {
       const translated = t(item.title).toLowerCase()
       return (
         item.title.toLowerCase().includes(needle) || translated.includes(needle)
       )
     })
-  }, [query, t])
+  }, [configuredNav, query, t])
 
   useEffect(() => {
     if (isCompactViewport()) setCollapsed(true)
@@ -159,6 +191,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
       )}
       data-theme={isDark ? 'dark' : 'light'}
     >
+      <GlassCursor scopeSelector='.ci-app' />
       <aside
         id={sidebarId}
         className='ci-appSidebar'
@@ -297,7 +330,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
                   return (
                     <Link
                       key={item.id}
-                      to='/guide'
+                      to='/beginner-guide'
                       className={className}
                       title={t(item.title)}
                       aria-label={t(item.title)}
@@ -415,7 +448,6 @@ export function TerminalLayout(props: TerminalLayoutProps) {
           >
             <PanelLeft size={16} />
           </button>
-          <DocsSearch />
           <div className='ci-appTopbarRight'>
             <ConsoleModeControl compact />
             <span className='ci-appUsd'>¥</span>

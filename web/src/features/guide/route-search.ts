@@ -16,22 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { Guide } from '@/features/guide'
-
-const guideSearchSchema = z.object({
-  q: z.string().optional(),
-  tool: z.string().optional(),
+export const guideSearchSchema = z.object({
+  q: z.string().max(200).optional(),
+  platform: z
+    .enum(['windows', 'macos', 'linux', 'vscode', 'jetbrains'])
+    .optional(),
+  model: z.string().max(255).optional(),
+  group: z.string().max(64).optional(),
 })
-
-export const Route = createFileRoute('/guide')({
-  validateSearch: guideSearchSchema,
-  component: GuideRoute,
-})
-
-function GuideRoute() {
-  const search = Route.useSearch()
-  return <Guide query={search.q} toolId={search.tool} />
-}

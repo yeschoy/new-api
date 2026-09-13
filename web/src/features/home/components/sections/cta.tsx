@@ -55,14 +55,16 @@ export function CTA(props: CTAProps) {
             {primaryLabel}
             <ArrowRight className='size-4' />
           </Button>
-          <Button
-            variant='outline'
-            size='lg'
-            className='h-10 rounded-md px-4 text-sm'
-            render={<Link to='/guide' />}
-          >
-            {t('Read the docs')}
-          </Button>
+          {props.isAuthenticated ? (
+            <Button
+              variant='outline'
+              size='lg'
+              className='h-10 rounded-md px-4 text-sm'
+              render={<Link to='/guide' />}
+            >
+              {t('Read the docs')}
+            </Button>
+          ) : null}
         </div>
       </div>
     </section>

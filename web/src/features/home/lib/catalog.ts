@@ -164,12 +164,32 @@ export function catalogVendorAvatar(model: CatalogIdentity): string | null {
     case 'deepseek':
       return '/ci/lobe/deepseek-avatar.svg'
     default:
-      return '/ci/lobe/zai-avatar.svg'
+      return null
   }
 }
 
+const VENDOR_ICON_NAMES = new Map<string, string>([
+  ['xiaomi', 'XiaomiMiMo'],
+  ['小米', 'XiaomiMiMo'],
+  ['tencent', 'Hunyuan.Color'],
+  ['腾讯', 'Hunyuan.Color'],
+  ['moonshot', 'Kimi.Color'],
+  ['moonshot ai', 'Kimi.Color'],
+  ['月之暗面', 'Kimi.Color'],
+  ['讯飞', 'Spark.Color'],
+  ['iflytek', 'Spark.Color'],
+  ['智谱', 'Zhipu.Color'],
+  ['zhipu', 'Zhipu.Color'],
+  ['阿里巴巴', 'Qwen.Color'],
+  ['alibaba', 'Qwen.Color'],
+])
+
 export function familyIconName(model: CatalogIdentity): string {
   if (model.vendorIcon) return model.vendorIcon
+  const configuredVendorIcon = VENDOR_ICON_NAMES.get(
+    model.vendorName.trim().toLowerCase()
+  )
+  if (configuredVendorIcon) return configuredVendorIcon
   switch (model.family) {
     case 'openai':
       return 'OpenAI'

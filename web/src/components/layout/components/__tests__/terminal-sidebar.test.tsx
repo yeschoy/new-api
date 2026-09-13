@@ -103,14 +103,22 @@ describe('terminal sidebar transitions', () => {
         <RouterProvider router={router} />
       </QueryClientProvider>
     )
-    await user.click(
-      await screen.findByRole('link', { name: '野菜' })
-    )
+    await user.click(await screen.findByRole('link', { name: '野菜' }))
     expect(
       await screen.findByRole('heading', { name: 'Public home' })
     ).toBeVisible()
     expect(router.state.location.pathname).toBe('/')
   })
+
+  it('keeps the beginner guide available in the easy sidebar', async () => {
+    await renderLayout()
+
+    expect(
+      screen.getByRole('link', { name: 'Beginner guide' })
+    ).toHaveAttribute('href', '/beginner-guide')
+    expect(screen.getByRole('link', { name: 'API keys' })).toBeVisible()
+  })
+
   it('keeps search input and page state while collapsing and reopening', async () => {
     const user = userEvent.setup()
     await renderLayout()
@@ -137,6 +145,37 @@ describe('terminal sidebar transitions', () => {
     expect(screen.getByRole('textbox', { name: 'Search' })).toBe(search)
     expect(search).toHaveValue('keys')
     expect(search).toBeEnabled()
+  })
+
+  it('hides destinations disabled by site and user navigation settings', async () => {
+    useAuthStore.getState().auth.setBundle({
+      ...createTestAuthBundle(),
+      user: {
+        ...createTestAuthBundle().user,
+        sidebar_modules: JSON.stringify({
+          console: { enabled: true, token: false, log: false },
+        }),
+      },
+    })
+    client.setQueryData(
+      ['status'],
+      {
+        HeaderNavModules: JSON.stringify({ pricing: false }),
+        SidebarModulesAdmin: JSON.stringify({
+          personal: { enabled: true, topup: false },
+        }),
+      },
+      { updatedAt: Date.now() + 60000 }
+    )
+
+    await renderLayout()
+
+    expect(screen.queryByRole('link', { name: 'API keys' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Models' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Wallet' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Requests' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Reports' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'Playground' })).toBeVisible()
   })
 
   it('honors the last toggle during repeated clicks and keeps focus on the trigger', async () => {
@@ -171,5 +210,20 @@ describe('terminal sidebar transitions', () => {
     fireEvent.click(trigger)
     expect(sidebar).toHaveAttribute('inert')
     expect(window.localStorage.getItem('ci_sidebar_collapsed')).toBeNull()
+  })
+
+  it('shows the beginner guide after opening the compact sidebar', async () => {
+    const original = window.matchMedia
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      ...original(query),
+      matches: query === '(max-width: 900px)',
+    }))
+    await renderLayout()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+
+    expect(
+      screen.getByRole('link', { name: 'Beginner guide' })
+    ).toHaveAttribute('href', '/beginner-guide')
   })
 })

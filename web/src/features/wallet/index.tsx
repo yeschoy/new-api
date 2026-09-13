@@ -400,36 +400,6 @@ export function Wallet(props: WalletProps) {
                 />
               </div>
             </section>
-            <section id='redeem' className='ci-panel'>
-              <header className='ci-panelHeader'>
-                <h2>{t('Redeem a code')}</h2>
-                <p>{t('Have a code? Paste it here to add credit.')}</p>
-              </header>
-              <div className='ci-panelBody'>
-                <label className='ci-field'>
-                  <span>{t('Redemption code')}</span>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <input
-                      className='ci-input ci-input--sm'
-                      value={redemptionCode}
-                      onChange={(event) =>
-                        setRedemptionCode(event.target.value)
-                      }
-                    />
-                    <button
-                      type='button'
-                      className='ci-button ci-button--size-xs'
-                      onClick={() => {
-                        void handleRedeem()
-                      }}
-                      disabled={redeeming}
-                    >
-                      {t('Redeem')}
-                    </button>
-                  </div>
-                </label>
-              </div>
-            </section>
           </TerminalBilling>
         </TerminalPage>
       ) : (

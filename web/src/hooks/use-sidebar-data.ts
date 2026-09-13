@@ -76,7 +76,7 @@ export function useSidebarData(): SidebarData {
             },
             {
               title: t('Beginner guide'),
-              url: '/guide',
+              url: '/beginner-guide',
               icon: BookOpen,
             },
             {
@@ -126,6 +126,11 @@ export function useSidebarData(): SidebarData {
             title: t('Playground'),
             url: '/playground',
             icon: FlaskConical,
+          },
+          {
+            title: t('Docs'),
+            url: '/guide',
+            icon: BookOpen,
           },
           {
             title: t('Usage Logs'),

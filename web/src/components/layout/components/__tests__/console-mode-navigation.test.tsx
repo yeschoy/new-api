@@ -20,6 +20,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
   createRootRoute,
+  createRootRouteWithContext,
   createRoute,
   createRouter,
   Outlet,
@@ -29,6 +30,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Route as DashboardSectionRoute } from '@/routes/_authenticated/dashboard/$section'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
 
 import { ConsoleModeControl } from '../console-mode-switcher'
@@ -72,8 +74,24 @@ async function renderModes(path: string) {
       </TerminalLayout>
     ),
   })
+  const beginnerGuide = createRoute({
+    getParentRoute: () => root,
+    path: '/beginner-guide',
+    component: () => <ConsoleModeControl compact />,
+  })
+  const guide = createRoute({
+    getParentRoute: () => root,
+    path: '/guide',
+    component: () => <ConsoleModeControl compact />,
+  })
   const router = createRouter({
-    routeTree: root.addChildren([dashboard, channels, keys]),
+    routeTree: root.addChildren([
+      dashboard,
+      channels,
+      keys,
+      beginnerGuide,
+      guide,
+    ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   })
   await act(async () => {
@@ -84,6 +102,28 @@ async function renderModes(path: string) {
       <RouterProvider router={router} />
     </QueryClientProvider>
   )
+  return router
+}
+
+async function loadDashboardSection(path: string) {
+  const root = createRootRouteWithContext<{ queryClient: QueryClient }>()()
+  const authenticated = createRoute({
+    getParentRoute: () => root,
+    id: '_authenticated',
+  })
+  const dashboard = createRoute({
+    getParentRoute: () => authenticated,
+    path: '/dashboard/$section',
+    beforeLoad: (context) =>
+      DashboardSectionRoute.options.beforeLoad?.({ ...context }),
+    component: () => <p>Dashboard section</p>,
+  })
+  const router = createRouter({
+    routeTree: root.addChildren([authenticated.addChildren([dashboard])]),
+    context: { queryClient: client },
+    history: createMemoryHistory({ initialEntries: [path] }),
+  })
+  await router.load()
   return router
 }
 
@@ -112,12 +152,33 @@ describe('console mode navigation', () => {
     expect(router.state.location.pathname).toBe('/dashboard/models')
   })
 
-  it('shows developer mode on an operator route even with an easy preference', async () => {
+  it('redirects a developer who opens the reports URL directly to analytics', async () => {
+    useConsoleModeStore.getState().setMode('developer')
+
+    const router = await loadDashboardSection('/dashboard/reports')
+
+    expect(router.state.location.pathname).toBe('/dashboard/models')
+  })
+
+  it.each(['/dashboard/models', '/guide'])(
+    'shows developer mode on operator route %s even with an easy preference',
+    async (path) => {
+      useConsoleModeStore.getState().setMode('easy')
+      await renderModes(path)
+      expect(
+        await screen.findByRole('button', { name: 'Developer mode' })
+      ).toHaveAttribute('aria-pressed', 'true')
+    }
+  )
+
+  it('keeps the easy shell on the authenticated beginner guide', async () => {
     useConsoleModeStore.getState().setMode('easy')
-    await renderModes('/dashboard/models')
+    await renderModes('/beginner-guide')
+
     expect(
-      await screen.findByRole('button', { name: 'Developer mode' })
+      await screen.findByRole('button', { name: 'Easy mode' })
     ).toHaveAttribute('aria-pressed', 'true')
+    expect(useConsoleModeStore.getState().mode).toBe('easy')
   })
 
   it('keeps both mode choices in the easy header without losing the current request page', async () => {

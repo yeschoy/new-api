@@ -21,11 +21,13 @@ import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { createPortal } from 'react-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { AuthenticatedLayout } from '@/components/layout/components/authenticated-layout'
 import { DirectionProvider } from '@/context/direction-provider'
 import { FontProvider } from '@/context/font-provider'
 import { ThemeCustomizationProvider } from '@/context/theme-customization-provider'
 import { ThemeProvider } from '@/context/theme-provider'
 import { AccessAuthLayout } from '@/features/auth/access-auth-layout'
+import { DesktopClientPage } from '@/features/desktop-client'
 import { CatalogPageLayout } from '@/features/pricing/components/catalog-page-layout'
 import { useAuthStore } from '@/stores/auth-store'
 import { useConsoleModeStore } from '@/stores/console-mode-store'
@@ -190,6 +192,42 @@ describe('home glass cursor', () => {
 })
 
 describe('glass cursor on related public surfaces', () => {
+  it('follows interactive controls on the desktop client page', async () => {
+    const rendered = await renderApp(
+      <ThemeProvider>
+        <FontProvider>
+          <DirectionProvider>
+            <ThemeCustomizationProvider>
+              <DesktopClientPage
+                runtime={{
+                  hostname: 'example.com',
+                  environment: {
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                    platform: 'Win32',
+                    maxTouchPoints: 0,
+                  },
+                }}
+              />
+            </ThemeCustomizationProvider>
+          </DirectionProvider>
+        </FontProvider>
+      </ThemeProvider>,
+      client
+    )
+
+    const download = screen.getByRole('link', { name: 'Download for Windows' })
+    moveMouse(download)
+    drawFrame()
+    const cursor = screen.getByTestId('glass-cursor')
+    expect(cursor).toBeVisible()
+    expect(cursor).toHaveAttribute('data-interactive', 'true')
+
+    moveMouse(document.body)
+    expect(cursor).not.toBeVisible()
+    rendered.unmount()
+    expect(screen.queryByTestId('glass-cursor')).not.toBeInTheDocument()
+  })
+
   it('follows explicitly enabled modal surfaces portalled outside the page', async () => {
     await renderApp(
       <AccessAuthLayout title='Sign in'>
@@ -245,7 +283,9 @@ describe('glass cursor on related public surfaces', () => {
         </ThemeProvider>,
         client
       )
-      const cursor = screen.getByTestId('glass-cursor')
+      const cursors = screen.getAllByTestId('glass-cursor')
+      expect(cursors).toHaveLength(1)
+      const cursor = cursors[0]
       moveMouse(screen.getByRole('button', { name: 'Explore models' }))
       drawFrame()
       expect(cursor).toBeVisible()
@@ -259,4 +299,60 @@ describe('glass cursor on related public surfaces', () => {
       expect(mediaListeners.size).toBe(0)
     }
   )
+})
+
+describe('glass cursor in the authenticated console', () => {
+  it('stays active as one shared instance throughout the easy-mode shell', async () => {
+    useAuthStore.getState().auth.setBundle(createTestAuthBundle())
+    useConsoleModeStore.getState().setMode('easy')
+
+    await renderApp(
+      <ThemeProvider>
+        <FontProvider>
+          <DirectionProvider>
+            <ThemeCustomizationProvider>
+              <AuthenticatedLayout>
+                <button type='button'>Open report</button>
+              </AuthenticatedLayout>
+            </ThemeCustomizationProvider>
+          </DirectionProvider>
+        </FontProvider>
+      </ThemeProvider>,
+      client
+    )
+
+    const button = screen.getByRole('button', { name: 'Open report' })
+    moveMouse(button)
+    drawFrame()
+
+    const cursors = screen.getAllByTestId('glass-cursor')
+    expect(cursors).toHaveLength(1)
+    expect(cursors[0]).toBeVisible()
+    expect(cursors[0]).toHaveAttribute('data-interactive', 'true')
+  })
+
+  it('does not expand the effect to the generic developer shell', async () => {
+    useAuthStore.getState().auth.setBundle(createTestAuthBundle())
+    useConsoleModeStore.getState().setMode('developer')
+
+    await renderApp(
+      <ThemeProvider>
+        <FontProvider>
+          <DirectionProvider>
+            <ThemeCustomizationProvider>
+              <AuthenticatedLayout>
+                <button type='button'>Open report</button>
+              </AuthenticatedLayout>
+            </ThemeCustomizationProvider>
+          </DirectionProvider>
+        </FontProvider>
+      </ThemeProvider>,
+      client
+    )
+
+    moveMouse(screen.getByRole('button', { name: 'Open report' }))
+    drawFrame()
+
+    expect(screen.queryByTestId('glass-cursor')).not.toBeInTheDocument()
+  })
 })
