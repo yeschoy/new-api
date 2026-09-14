@@ -242,7 +242,7 @@ Landing/auth/catalog pricing, key quote/revoke flows, and easy-console reporting
 - `getFullApiKey(id)` reveals only through the dedicated endpoint, rejects masked results and normalizes the sk- prefix. Successful creation must refresh keys even when reveal fails.
 - `revokeAllApiKeys()` collects all IDs before deleting bounded batches and verifies the final list is empty. Partial/error outcomes refresh the list and never show an all-revoked success.
 - Easy key quote cards and key rows show the group name on the first line with a
-  `GroupRatioPill` multiplier beside it and the group description underneath.
+  `GroupMultiplierBadge` multiplier beside it and the group description underneath.
   `auto` (whose API ratio is the literal `自动`) stays out of the quote cards,
   and key rows omit the pill when no finite ratio is known, so the UI never
   prints an invented `1x` for an unknown multiplier.

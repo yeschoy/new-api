@@ -65,16 +65,6 @@ type GroupBadgeProps = Omit<
   containerClassName?: string
 }
 
-function getGroupRatioClassName(ratio: number): string {
-  if (ratio > 1) {
-    return 'bg-warning/10 text-warning'
-  }
-  if (ratio < 1) {
-    return 'bg-info/10 text-info'
-  }
-  return 'bg-muted text-muted-foreground'
-}
-
 function getGroupLabel(params: {
   labelOverride?: string
   groupName?: string
@@ -138,27 +128,6 @@ export function GroupBadge(props: GroupBadgeProps) {
     >
       <span className='max-w-full min-w-0 overflow-hidden'>{badge}</span>
       <GroupMultiplierBadge ratio={ratio} label={ratioLabel} />
-    </span>
-  )
-}
-
-/** Billing multiplier for a group, tinted by discount / list price / markup. */
-export function GroupRatioPill({
-  ratio,
-  className,
-}: {
-  ratio: number
-  className?: string
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex h-5 shrink-0 items-center rounded-full px-1.5 font-mono text-xs leading-none font-medium tabular-nums',
-        getGroupRatioClassName(ratio),
-        className
-      )}
-    >
-      {ratio}x
     </span>
   )
 }

@@ -25,7 +25,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import { GroupRatioPill } from '@/components/group-badge'
+import { GroupMultiplierBadge } from '@/components/group-badge'
 import { TerminalPage } from '@/components/layout/components/terminal-page'
 import { buildModelCatalog } from '@/features/home/lib/catalog'
 import { formatPerMillionTokens } from '@/features/home/lib/pricing-savings'
@@ -338,7 +338,7 @@ export function TerminalKeys() {
                   >
                     <span className='ci-quoteHead'>
                       <span className='ci-quoteName'>{group.label}</span>
-                      <GroupRatioPill ratio={group.ratio} />
+                      <GroupMultiplierBadge ratio={group.ratio} />
                     </span>
                     <span className='ci-quoteLane'>
                       {group.desc || discountLabel(t, discount)}
@@ -469,7 +469,7 @@ export function TerminalKeys() {
                           {key.group || t('Default')}
                         </span>
                         {meta?.ratio === undefined ? null : (
-                          <GroupRatioPill ratio={meta.ratio} />
+                          <GroupMultiplierBadge ratio={meta.ratio} />
                         )}
                       </span>
                       {meta?.desc ? (
