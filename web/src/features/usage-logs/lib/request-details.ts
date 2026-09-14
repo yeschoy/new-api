@@ -28,11 +28,40 @@ import {
 import { isPerCallBilling } from './utils'
 
 export function isFailedRequest(log: UsageLog): boolean {
+  const other = parseLogOther(log.other)
   return (
     log.type === LOG_TYPE_ENUM.ERROR ||
-    (log.is_stream &&
-      parseLogOther(log.other)?.stream_status?.status === 'error')
+    isViolationFeeLog(other) ||
+    (log.is_stream && other?.stream_status?.status === 'error')
   )
+}
+
+/**
+ * Collapse the log rows of one client request into its settled outcome, the
+ * same way the request summary counts them: an internally retried channel
+ * error and the consume row it finally settles with share a request_id, and
+ * when several consume rows are recorded only the latest one is the outcome.
+ * Rows are expected newest first, so the first consume row of a request wins.
+ */
+export function collapseRequestOutcomes(logs: UsageLog[]): UsageLog[] {
+  const settledIds = new Set<string>()
+  for (const log of logs) {
+    if (log.type === LOG_TYPE_ENUM.CONSUME && log.request_id) {
+      settledIds.add(log.request_id)
+    }
+  }
+
+  const keptConsumeIds = new Set<string>()
+  return logs.filter((log) => {
+    if (!log.request_id) return true
+    if (log.type === LOG_TYPE_ENUM.ERROR) {
+      return !settledIds.has(log.request_id)
+    }
+    if (log.type !== LOG_TYPE_ENUM.CONSUME) return true
+    if (keptConsumeIds.has(log.request_id)) return false
+    keptConsumeIds.add(log.request_id)
+    return true
+  })
 }
 
 export function getRequestErrorText(log: UsageLog): string {

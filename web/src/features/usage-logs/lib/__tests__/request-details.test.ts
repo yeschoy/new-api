@@ -18,7 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { describe, expect, it } from 'vitest'
 
-import { getRecordedUnitPrices } from '../request-details'
+import { LOG_TYPE_ENUM } from '../../constants'
+import { usageLogSchema } from '../../data/schema'
+import {
+  collapseRequestOutcomes,
+  isFailedRequest,
+  getRecordedUnitPrices,
+} from '../request-details'
 
 describe('recorded request unit prices', () => {
   it('derives cache-read and cache-write unit prices only from recorded ratios', () => {
@@ -103,5 +109,97 @@ describe('recorded request unit prices', () => {
     expect(
       getRecordedUnitPrices({ violation_fee: true, model_ratio: 2 })
     ).toMatchObject({ mode: 'fee', input: null, output: null })
+  })
+})
+
+describe('request outcomes', () => {
+  it.each([
+    [{ violation_fee: true, status_code: 400 }, true],
+    [{ violation_fee_code: 'penalty' }, true],
+    [{ violation_fee_marker: 'penalty' }, true],
+    [{}, false],
+  ])(
+    'classifies consume metadata %j with failed=%s while preserving charges',
+    (other, failed) => {
+      const log = usageLogSchema.parse({
+        id: 1,
+        user_id: 42,
+        created_at: 1000,
+        content: '',
+        type: LOG_TYPE_ENUM.CONSUME,
+        quota: 20,
+        other: JSON.stringify(other),
+      })
+      expect(isFailedRequest(log)).toBe(failed)
+      expect(log.quota).toBe(20)
+    }
+  )
+})
+
+describe('retried request outcomes', () => {
+  const log = (overrides: Record<string, unknown>) =>
+    usageLogSchema.parse({
+      id: 1,
+      user_id: 42,
+      created_at: 1000,
+      content: '',
+      ...overrides,
+    })
+
+  it('drops the retry error row once the request settled with a charge', () => {
+    const logs = [
+      log({
+        id: 3,
+        type: LOG_TYPE_ENUM.CONSUME,
+        request_id: 'retry',
+        quota: 30,
+      }),
+      log({ id: 2, type: LOG_TYPE_ENUM.ERROR, request_id: 'retry' }),
+      log({ id: 1, type: LOG_TYPE_ENUM.ERROR, request_id: 'solo' }),
+    ]
+
+    expect(collapseRequestOutcomes(logs).map((item) => item.id)).toEqual([3, 1])
+  })
+
+  it('keeps the settled charge when the retry error was persisted later', () => {
+    const logs = [
+      log({ id: 3, type: LOG_TYPE_ENUM.ERROR, request_id: 'retry' }),
+      log({
+        id: 2,
+        type: LOG_TYPE_ENUM.CONSUME,
+        request_id: 'retry',
+        quota: 30,
+      }),
+    ]
+
+    expect(collapseRequestOutcomes(logs).map((item) => item.id)).toEqual([2])
+  })
+
+  it('keeps only the latest consume row of a repeated settlement', () => {
+    const logs = [
+      log({
+        id: 2,
+        type: LOG_TYPE_ENUM.CONSUME,
+        request_id: 'retry',
+        quota: 30,
+      }),
+      log({
+        id: 1,
+        type: LOG_TYPE_ENUM.CONSUME,
+        request_id: 'retry',
+        quota: 10,
+      }),
+    ]
+
+    expect(collapseRequestOutcomes(logs).map((item) => item.id)).toEqual([2])
+  })
+
+  it('keeps standalone failures and rows recorded without a request id', () => {
+    const logs = [
+      log({ id: 3, type: LOG_TYPE_ENUM.ERROR, request_id: '' }),
+      log({ id: 2, type: LOG_TYPE_ENUM.ERROR, request_id: 'solo' }),
+    ]
+
+    expect(collapseRequestOutcomes(logs).map((item) => item.id)).toEqual([3, 2])
   })
 })

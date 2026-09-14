@@ -504,6 +504,8 @@ export interface UserInfo {
 }
 
 export type UserLogSummaryTotals = {
+  /** Subscription allowance consumption, excluded from wallet quota. */
+  subscription_quota?: number
   requests: number
   succeeded: number
   failed: number

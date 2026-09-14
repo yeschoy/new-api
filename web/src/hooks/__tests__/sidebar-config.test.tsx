@@ -22,6 +22,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { checkIsActive } from '@/components/layout/lib/url-utils'
+import type { NavGroup } from '@/components/layout/types'
 import {
   parseSidebarModulesAdmin,
   serializeSidebarModulesAdmin,
@@ -37,16 +38,11 @@ vi.mock('@/hooks/use-console-mode', () => ({
 }))
 
 beforeEach(() => {
-  vi.stubGlobal('localStorage', {
-    getItem: () => null,
-    setItem: () => undefined,
-    removeItem: () => undefined,
-  })
+  window.localStorage.clear()
 })
 
 afterEach(() => {
   cleanup()
-  vi.unstubAllGlobals()
   useAuthStore.getState().auth.reset()
 })
 
@@ -76,6 +72,37 @@ function sidebarFor(admin?: object, user?: object, canConfigure = true) {
     { wrapper: Wrapper }
   )
   return result
+}
+
+const navGroups: NavGroup[] = [
+  {
+    id: 'analytics',
+    title: 'Analytics',
+    items: [
+      { title: 'Usage & costs', url: '/dashboard/models' },
+      { title: 'Flow', url: '/dashboard/flow' },
+      { title: 'Overview', url: '/dashboard/overview' },
+    ],
+  },
+]
+
+function renderSidebarConfig(dataExportEnabled: boolean) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  })
+  client.setQueryData(['status'], {
+    enable_data_export: dataExportEnabled,
+  })
+
+  function Wrapper(props: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={client}>
+        {props.children}
+      </QueryClientProvider>
+    )
+  }
+
+  return renderHook(() => useSidebarConfig(navGroups), { wrapper: Wrapper })
 }
 
 describe('security sidebar visibility', () => {
@@ -182,5 +209,25 @@ describe('audit log sidebar entry', () => {
       .map((item) => item.title)
     expect(titles).not.toContain('Usage Logs')
     expect(titles).toContain('Audit Logs')
+  })
+})
+
+describe('data dashboard sidebar visibility', () => {
+  it('hides data dashboard destinations when data export is disabled', () => {
+    const { result } = renderSidebarConfig(false)
+
+    expect(result.current[0]?.items.map((item) => item.title)).toEqual([
+      'Overview',
+    ])
+  })
+
+  it('shows data dashboard destinations when data export is enabled', () => {
+    const { result } = renderSidebarConfig(true)
+
+    expect(result.current[0]?.items.map((item) => item.title)).toEqual([
+      'Usage & costs',
+      'Flow',
+      'Overview',
+    ])
   })
 })
