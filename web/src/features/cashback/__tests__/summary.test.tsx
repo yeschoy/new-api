@@ -17,9 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CashbackSummary } from '../components/cashback-summary'
+
+const summaryMocks = vi.hoisted(() => ({ rewardCount: 6 }))
 
 vi.mock('../hooks/use-cashback', () => ({
   useCashbackSummary: () => ({
@@ -41,7 +43,7 @@ vi.mock('../hooks/use-cashback', () => ({
         {
           inviter_id: 42,
           distinct_invitees: 3,
-          reward_count: 6,
+          reward_count: summaryMocks.rewardCount,
           reward_quota: 900,
         },
       ],
@@ -53,6 +55,10 @@ vi.mock('../hooks/use-cashback', () => ({
 }))
 
 describe('cashback summary', () => {
+  beforeEach(() => {
+    summaryMocks.rewardCount = 6
+  })
+
   it('shows the identities behind inviter and device risk clusters', () => {
     render(<CashbackSummary />)
 
@@ -61,4 +67,17 @@ describe('cashback summary', () => {
     expect(screen.getByText('Inviter clusters')).toBeVisible()
     expect(screen.getByText('Shared device clusters')).toBeVisible()
   })
+
+  it.each([
+    { count: 1, label: '1 reward' },
+    { count: 6, label: '6 rewards' },
+  ])(
+    'shows $label when an inviter cluster has $count rewards',
+    ({ count, label }) => {
+      summaryMocks.rewardCount = count
+      render(<CashbackSummary />)
+
+      expect(screen.getByText(label, { exact: false })).toBeVisible()
+    }
+  )
 })

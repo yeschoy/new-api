@@ -179,7 +179,9 @@ export function CashbackTable(props: CashbackTableProps) {
       </Table>
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <span className='text-muted-foreground text-sm'>
-          {t('{{count}} rewards', { count: total.toLocaleString() })}
+          {t(total === 1 ? '{{count}} reward' : '{{count}} rewards', {
+            count: total.toLocaleString(),
+          })}
         </span>
         <div className='flex items-center gap-2'>
           <Button

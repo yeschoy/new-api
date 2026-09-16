@@ -84,6 +84,23 @@ describe('cashback table', () => {
     expect(onSelect).toHaveBeenCalledWith(7)
   })
 
+  it.each([
+    { total: 1, label: '1 reward' },
+    { total: 2, label: '2 rewards' },
+  ])('shows $label when the result count is $total', ({ total, label }) => {
+    render(
+      <CashbackTable
+        page={{ ...page, total }}
+        isLoading={false}
+        isError={false}
+        onSelect={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText(label)).toBeVisible()
+  })
+
   it('renders an explicit empty state', () => {
     render(
       <CashbackTable

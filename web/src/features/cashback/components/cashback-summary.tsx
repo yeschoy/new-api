@@ -140,9 +140,14 @@ export function CashbackSummary() {
                       <span className='text-muted-foreground'>
                         {cluster.distinct_invitees.toLocaleString()}{' '}
                         {t('Invited user')} ·{' '}
-                        {t('{{count}} rewards', {
-                          count: cluster.reward_count.toLocaleString(),
-                        })}{' '}
+                        {t(
+                          cluster.reward_count === 1
+                            ? '{{count}} reward'
+                            : '{{count}} rewards',
+                          {
+                            count: cluster.reward_count.toLocaleString(),
+                          }
+                        )}{' '}
                         · {t('Payable reward')}:{' '}
                         {cluster.reward_quota.toLocaleString()}
                       </span>

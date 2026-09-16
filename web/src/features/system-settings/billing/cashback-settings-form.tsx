@@ -225,14 +225,14 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       toast.success(t('Cashback settings saved'))
     } catch (error: unknown) {
       const axiosError = axios.isAxiosError(error) ? error : undefined
-      const field = axiosError?.response?.data?.field as
-        | keyof typeof fieldMap
-        | undefined
-      if (field && fieldMap[field]) {
-        form.setError(fieldMap[field], {
-          message:
-            axiosError?.response?.data?.message ||
-            t('Invalid cashback setting'),
+      const field = axiosError?.response?.data?.field as string | undefined
+      const serverMessage =
+        axiosError?.response?.data?.message || t('Invalid cashback setting')
+      if (field === 'config') {
+        form.setError('root.server', { message: serverMessage })
+      } else if (field && field in fieldMap) {
+        form.setError(fieldMap[field as keyof typeof fieldMap], {
+          message: serverMessage,
         })
       }
       let message: string | undefined
@@ -273,6 +273,12 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
             isSaveDisabled={!form.formState.isDirty}
             saveLabel='Save cashback settings'
           />
+
+          {form.formState.errors.root?.server?.message && (
+            <p role='alert' className='text-destructive text-sm'>
+              {form.formState.errors.root.server.message}
+            </p>
+          )}
 
           {!props.config.compliance_confirmed && (
             <Alert variant='destructive'>

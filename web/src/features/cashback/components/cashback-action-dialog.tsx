@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import axios from 'axios'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -65,6 +65,12 @@ type CashbackActionDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
+const MAX_CASHBACK_REASON_CHARACTERS = 1000
+
+function unicodeLength(value: string): number {
+  return [...value].length
+}
+
 export function CashbackActionDialog(props: CashbackActionDialogProps) {
   const { t } = useTranslation()
   const [reason, setReason] = useState('')
@@ -74,11 +80,14 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
     props.detail.order.cumulative_refund_rate_bps / 100
   )
   const [evidenceRef, setEvidenceRef] = useState('')
+  const [submissionStarted, setSubmissionStarted] = useState(false)
+  const submissionStartedRef = useRef(false)
   const reviewMutation = useReviewCashbackReward()
   const incidentMutation = useRecordCashbackIncident()
   const rewardDebtMutation = useResolveCashbackRewardDebt()
   const principalDebtMutation = useResolveCashbackPrincipalDebt()
   const isPending =
+    submissionStarted ||
     reviewMutation.isPending ||
     incidentMutation.isPending ||
     rewardDebtMutation.isPending ||
@@ -115,13 +124,18 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
     refundPercent >= minimumPercent &&
     refundPercent <= 100 &&
     (incidentKind !== 'refund' || refundPercent > 0)
+  const reasonTooLong = unicodeLength(reason) > MAX_CASHBACK_REASON_CHARACTERS
+  const evidenceTooLong =
+    unicodeLength(evidenceRef) > MAX_CASHBACK_REASON_CHARACTERS
   const canSubmit =
     (!reasonRequired || reason.trim().length > 0) &&
-    reason.length <= 1000 &&
-    (props.action !== 'incident' ||
-      (incidentRateValid && evidenceRef.length <= 1000))
+    !reasonTooLong &&
+    (props.action !== 'incident' || (incidentRateValid && !evidenceTooLong))
 
   async function handleSubmit() {
+    if (submissionStartedRef.current) return
+    submissionStartedRef.current = true
+    setSubmissionStarted(true)
     try {
       let response: { success: boolean; message: string }
       let issueError = ''
@@ -195,6 +209,14 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
           message = t('Refund percentage is invalid.')
         } else if (payload?.code === 'CASHBACK_STATE_CONFLICT') {
           message = t('Cashback state changed. Refresh and try again.')
+        } else if (payload?.code === 'CASHBACK_QUOTA_MUTATION_PENDING') {
+          message = t(
+            'Wallet quota is still updating. Wait a moment and try again.'
+          )
+        } else if (payload?.code === 'CASHBACK_QUOTA_FENCE_LOST') {
+          message = t(
+            'Wallet quota protection was interrupted. Try again in a moment.'
+          )
         } else {
           message = payload?.message
         }
@@ -202,6 +224,9 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
         message = error.message
       }
       toast.error(message || t('Cashback operation failed'))
+    } finally {
+      submissionStartedRef.current = false
+      setSubmissionStarted(false)
     }
   }
 
@@ -286,10 +311,23 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
               </Label>
               <Input
                 id='cashback-evidence-reference'
-                maxLength={1000}
                 value={evidenceRef}
+                aria-invalid={evidenceTooLong}
+                aria-describedby={
+                  evidenceTooLong
+                    ? 'cashback-evidence-reference-error'
+                    : undefined
+                }
                 onChange={(event) => setEvidenceRef(event.target.value)}
               />
+              {evidenceTooLong && (
+                <p
+                  id='cashback-evidence-reference-error'
+                  className='text-destructive text-xs'
+                >
+                  {t('Use no more than 1000 characters.')}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -301,23 +339,27 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
           <Textarea
             id='cashback-action-reason'
             value={reason}
-            maxLength={1000}
             aria-required={reasonRequired}
-            aria-invalid={reasonRequired && reason.trim().length === 0}
+            aria-invalid={
+              reasonTooLong || (reasonRequired && reason.trim().length === 0)
+            }
             aria-describedby={
-              reasonRequired && reason.trim().length === 0
+              reasonTooLong || (reasonRequired && reason.trim().length === 0)
                 ? 'cashback-action-reason-error'
                 : undefined
             }
             onChange={(event) => setReason(event.target.value)}
             placeholder={t('Record the evidence and decision rationale')}
           />
-          {reasonRequired && reason.trim().length === 0 && (
+          {(reasonTooLong ||
+            (reasonRequired && reason.trim().length === 0)) && (
             <p
               id='cashback-action-reason-error'
               className='text-destructive text-xs'
             >
-              {t('A reason is required for this cashback action.')}
+              {reasonTooLong
+                ? t('Use no more than 1000 characters.')
+                : t('A reason is required for this cashback action.')}
             </p>
           )}
         </div>
@@ -326,7 +368,6 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
           <Button
             type='button'
             variant='outline'
-            disabled={isPending}
             onClick={() => props.onOpenChange(false)}
           >
             {t('Cancel')}

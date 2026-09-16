@@ -111,6 +111,8 @@ export const STATIC_I18N_KEYS = [
   'Resolved cashback principal debt for top-up {{top_up_id}}',
   'Attempted to resolve cashback principal debt',
   'Viewed sensitive cashback details for reward {{reward_id}}',
+  '{{count}} reward',
+  '{{count}} rewards',
   '{{high}} high-risk, {{severe}} severe-risk, {{incidents}} incidents, {{failures}} settlement failures, {{issues}} reconciliation issues.',
 
   // System info

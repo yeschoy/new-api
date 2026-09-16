@@ -18,11 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SettingsPageProvider } from '../../components/settings-page-context'
 import type { CashbackConfig } from '../../types'
 import { CashbackSettingsForm } from '../cashback-settings-form'
+
+const updateCashbackConfig = vi.hoisted(() => vi.fn())
+
+vi.mock('../../api', () => ({ updateCashbackConfig }))
 
 const config: CashbackConfig = {
   inviter_enabled: false,
@@ -42,6 +46,10 @@ const config: CashbackConfig = {
 
 let actionsContainer: HTMLDivElement | null = null
 let queryClient: QueryClient | null = null
+
+beforeEach(() => {
+  updateCashbackConfig.mockReset()
+})
 
 afterEach(() => {
   queryClient?.clear()
@@ -87,6 +95,28 @@ describe('cashback settings validation', () => {
         'Enabled inviter cashback requires a positive rate'
       )
     ).toBeInTheDocument()
+  })
+
+  it('presents malformed configuration errors as an accessible form error', async () => {
+    updateCashbackConfig.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        data: { field: 'config', message: 'Malformed cashback configuration' },
+      },
+    })
+    renderForm()
+
+    fireEvent.change(
+      screen.getByRole('spinbutton', { name: 'Settlement delay (days)' }),
+      { target: { value: '8' } }
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Malformed cashback configuration'
+    )
   })
 
   it('rejects a combined rate above one hundred percent', async () => {
