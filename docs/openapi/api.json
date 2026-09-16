@@ -5552,6 +5552,17 @@
             "description": "参数校验失败",
             "headers": {}
           },
+          "404": {
+            "description": "返现记录不存在",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "状态冲突或硬阻断",
             "headers": {}
@@ -5597,9 +5608,38 @@
             "description": "参数校验失败",
             "headers": {}
           },
+          "404": {
+            "description": "返现记录不存在",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
-            "description": "状态冲突或硬阻断",
-            "headers": {}
+            "description": "状态冲突、硬阻断，或钱包额度变更仍在处理中（CASHBACK_QUOTA_MUTATION_PENDING）",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "钱包额度保护所有权丢失，数据库操作已回滚，可稍后安全重试（CASHBACK_QUOTA_FENCE_LOST）",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5668,9 +5708,38 @@
             "description": "参数校验失败",
             "headers": {}
           },
+          "404": {
+            "description": "充值订单或返现上下文不存在",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
-            "description": "状态冲突或硬阻断",
-            "headers": {}
+            "description": "状态冲突、硬阻断，或钱包额度变更仍在处理中（CASHBACK_QUOTA_MUTATION_PENDING）",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "钱包额度保护所有权丢失，数据库操作已回滚，可稍后安全重试（CASHBACK_QUOTA_FENCE_LOST）",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5752,6 +5821,17 @@
             "description": "参数校验失败",
             "headers": {}
           },
+          "404": {
+            "description": "返现记录不存在",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "状态冲突或硬阻断",
             "headers": {}
@@ -5817,6 +5897,17 @@
             "description": "参数校验失败",
             "headers": {}
           },
+          "404": {
+            "description": "充值订单返现上下文不存在",
+            "headers": {},
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashbackErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "状态冲突或硬阻断",
             "headers": {}
@@ -5865,6 +5956,44 @@
             "type": "string"
           },
           "data": {}
+        }
+      },
+      "CashbackErrorResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "code"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "面向客户端的安全消息；额度并发错误不会包含底层 Redis 或 fence 诊断。"
+          },
+          "code": {
+            "type": "string",
+            "description": "稳定错误码；额度并发冲突使用 CASHBACK_QUOTA_MUTATION_PENDING 或 CASHBACK_QUOTA_FENCE_LOST。",
+            "enum": [
+              "CASHBACK_ERROR",
+              "CASHBACK_HARD_BLOCKED",
+              "CASHBACK_INVALID_INPUT",
+              "CASHBACK_REASON_REQUIRED",
+              "CASHBACK_REFUND_RATE_INVALID",
+              "CASHBACK_STATE_CONFLICT",
+              "CASHBACK_NOT_FOUND",
+              "CASHBACK_QUOTA_MUTATION_PENDING",
+              "CASHBACK_QUOTA_FENCE_LOST"
+            ]
+          },
+          "blocking_reason": {
+            "type": "string"
+          }
         }
       },
       "AuthSessionIssuanceError": {

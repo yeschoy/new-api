@@ -96,21 +96,31 @@ snapshot and overrun the cap.
 
 The normal response envelope is `{ success, message, data? }`. Cashback errors
 also expose a stable `code`; a hard block may include `blocking_reason`.
-Frontend contracts live in `web/src/features/cashback/types.ts` and must match
-the controller DTO rather than GORM models.
+`ErrUserQuotaMutationPending` maps to HTTP `409` with
+`CASHBACK_QUOTA_MUTATION_PENDING`; lost fence ownership maps to HTTP `503` with
+`CASHBACK_QUOTA_FENCE_LOST`. Both responses use fixed safe messages rather than
+Redis/fence diagnostics. Frontend contracts live in
+`web/src/features/cashback/types.ts` and must match the controller DTO rather
+than GORM models.
 
 ### Database signatures
 
 Only these cashback tables are registered in normal and fast migration lists:
 
 - `CashbackOrderContext`: unique `top_up_id`; normalized `base_quota`, actual
-  `credited_quota`, request risk evidence, completion source/provider, incident,
-  cumulative principal reversal, and principal debt.
+  `credited_quota`, order-local activation eligibility, request risk evidence,
+  completion source/provider, incident, cumulative principal reversal, and
+  principal debt.
 - `CashbackReward`: unique `(top_up_id, direction)`; relationship, calculation,
   immutable config/risk snapshots, review/settlement state, retry evidence,
   recovery, and reward debt.
 - `CashbackDeviceLink`: unique `(user_id, device_fingerprint_hash)` and reverse
   `(device_fingerprint_hash, user_id)` lookup for correlation.
+- `CashbackQuotaMutation`: unique `event_key`; main-database transactional
+  evidence for issue, reward recovery, and principal recovery. Composite
+  `(reward_id, kind)` and `(top_up_id, kind)` indexes support bounded
+  reconciliation batches. `LOG_DB` remains human-facing best-effort audit
+  evidence and is never the money ledger.
 
 The settlement scan index is ordered by
 `(review_status, settlement_status, available_at)`. Rolling exposure uses
@@ -145,12 +155,17 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 - `base_quota` is the face value selected/input by the user, normalized at order
   creation. It is not provider money, discounted payment, or credited quota.
-- After the feature has first been enabled, every newly created online order
-  gets a `CashbackOrderContext`, even while both current direction switches are
-  off. Orders created before `first_enabled_at` are never backfilled.
-- `InsertOnlineTopUp` creates `TopUp` and its required context atomically.
-- A post-enable online order cannot settle without that context. A missing
-  context is a transaction error, not a silent cashback skip.
+- Every newly created online order gets a `CashbackOrderContext`, including
+  before first enable. `eligible_after_first_enable` persists the activation
+  decision visible in the order-creation transaction; payment completion must
+  not reconstruct ordering from second-resolution timestamps.
+- `InsertOnlineTopUp` creates `TopUp` and its context atomically. Pre-enable
+  contexts settle normally but never create rewards. Orders created before the
+  code owned order-local snapshots are not backfilled.
+- A clearly post-enable online order cannot settle without its context. For
+  legacy context-less orders, `first_enabled_at` remains a compatibility
+  fallback, with timestamp equality treated as pre-activation because new
+  same-second orders carry an explicit context.
 - Verified provider settlement marks the order successful, calls
   `CompleteTopUpCashbackTx`, and credits top-up quota in the same database
   transaction. Any cashback invariant failure rolls back the complete payment
@@ -186,11 +201,22 @@ wallet quota; floating-point money arithmetic is forbidden.
   reward quota, a successful matching online order, unchanged valid referral,
   enabled accounts, eligible completion source/channel, no incident, and no
   open beneficiary reward or principal debt.
-- Row locks and state predicates, not the scheduler lease, guarantee at-most-once
-  issuance. `cashback_settlement` runs every minute in batches of 100 and first
-  refuses to settle when reconciliation detects inconsistent rows.
-- A blocked or failed frozen reward records the reason/error and a retry time;
-  it is not silently issued or canceled.
+- Row locks, the unique mutation event, and state predicates—not the scheduler
+  lease—guarantee at-most-once issuance. `cashback_settlement` runs every minute
+  in batches of 100. Before issuing, it advances a bounded, primary-key ordered
+  reconciliation page across rewards, order contexts, and mutation evidence; a
+  mismatched page remains pinned and stops settlement until repaired. Process
+  restart safely begins the bounded scan from the start instead of running an
+  unbounded full-history count.
+- `reconciliation_issues` is the issue count from the current bounded page, not
+  a full-history total. Repeated clean calls advance the in-process cursor and
+  eventually cycle through all rows.
+- A blocked or failed frozen reward records the reason/error and a retry time.
+  For review requests, only fence acquisition/verification and an actual
+  issuance attempt are settlement failures; invalid review transitions do not
+  delay settlement. A fence acquisition failure is recorded only when the
+  persisted reward was already approved, frozen, and mature. Ineligible,
+  pending, or immature records do not fabricate failures.
 
 ### Incidents, recovery, and debt
 
@@ -205,9 +231,27 @@ wallet quota; floating-point money arithmetic is forbidden.
   `floor(credited_quota * cumulative_rate / 10000)`.
 - Insufficient available quota creates reward/principal debt. Any open debt for
   the beneficiary blocks later cashback creation, approval, and issuance.
-- Redis-enabled recovery reserves the authoritative cache before the matching
-  locked database debit. Transaction error or panic must compensate every cache
-  reservation. Do not debit only one side of the cache/database boundary.
+- Redis-enabled issue/recovery acquires sorted per-user quota mutation fences
+  before the database transaction. The fence rejects concurrent cache writes
+  and spending, keeps an owned cache generation stable through the DB decision,
+  and verifies ownership before commit. Success, error, and panic invalidate the
+  cached balance and retain a short cooldown fence so pending batch deltas can
+  reach the database before authoritative rehydration. A lost owner still
+  deletes the balance hash but never deletes or weakens a replacement owner's
+  fence, so a rolled-back cache debit cannot become readable.
+- Recovery holds the user-quota batch accumulator boundary while checking and
+  reserving Redis. Any queued or already-swapped/in-flight user-quota delta
+  makes the locked DB row non-authoritative and aborts accounting as retryable,
+  including when the user cache hash is absent. Retry only after the batch delta
+  has flushed.
+- During an active quota fence, authentication and profile reads may return a
+  direct DB snapshot without publishing it into Redis. Quota-authoritative reads
+  (`GetUserQuota`, billing trust checks), reservations, and cache publication
+  preserve `ErrUserQuotaMutationPending`, so a direct identity snapshot can
+  never become spend authority. Committed authentication-version floors and
+  required session revocation run independently of deferred quota-cache refresh;
+  post-commit cache publication errors are logged rather than reported as a
+  rollback. Cache mutation errors otherwise fail closed.
 - Debt resolution is an explicit audited administrative disposition: it clears
   the selected debt record but does not restore a canceled reward. Blocked
   rewards are released for retry only after all reward and principal debt for
@@ -221,9 +265,13 @@ wallet quota; floating-point money arithmetic is forbidden.
   full IP/device view is audited; clear its query cache on close.
 - Mutations disable repeat submission and invalidate list, summary, the changed
   reward, and any other reward details affected by an order-level incident or
-  debt transition.
+  debt transition. Pending dialogs keep Confirm disabled but remain dismissible
+  through Escape, Close, and Cancel; mutation-owned invalidation must still run
+  after the dialog unmounts.
 - All visible strings use the seven project locales. Dialog reason fields need
   labels, validation/error association, keyboard handling, and focus recovery.
+  Count copy must choose singular/plural from the raw numeric count before
+  applying locale-specific number formatting.
 
 ## 4. Validation & Error Matrix
 
@@ -242,12 +290,18 @@ wallet quota; floating-point money arithmetic is forbidden.
 | Repeated verified payment callback | Return the provider path's idempotent success; do not credit top-up or create rewards twice |
 | Post-enable online order lacks its context | Roll back provider completion; callback path must return retryable failure |
 | Manual top-up completion | Credit only the top-up; persist ineligible source when context exists; create no reward |
-| Order predates first enable | Create no context/reward, even if payment succeeds later |
+| New order predates first enable | Persist an ineligible context; payment succeeds normally and creates no reward |
 | Device signal absent, malformed, too long, or Web Crypto unavailable | Continue auth/payment; snapshot `missing`/`invalid` risk evidence |
 | Approval occurs before `available_at` | Store approval but remain frozen |
 | Scheduler sees a blocked reward | Keep frozen, store blocker/retry time, and do not credit quota |
-| Reconciliation finds inconsistent issued/recovery rows | Fail the settlement run before issuing another reward |
-| Incident transaction fails after Redis reservation | Roll back DB and compensate reserved cache quota, including panic paths |
+| Bounded reconciliation page finds inconsistent state/evidence | Pin the page and fail the settlement run before issuing another reward |
+| Queued/in-flight user-quota batch delta exists, with or without a cache hash | Abort incident accounting as retryable before state/debt/ledger mutation; flush the delta before retry |
+| Cashback action encounters `ErrUserQuotaMutationPending` | `409`, `CASHBACK_QUOTA_MUTATION_PENDING`, fixed safe retry message; no mutation |
+| Cashback action loses quota fence ownership | `503`, `CASHBACK_QUOTA_FENCE_LOST`, fixed safe retry message; roll back database mutation |
+| Cashback money transaction encounters Redis failure or loses its fence | Roll back DB, invalidate the affected balance hash without altering a replacement fence, record settlement error/retry evidence for an eligible matured reward, and keep cache spending unavailable until safe rehydration |
+| Identity/profile read occurs during quota cooldown | Return a direct DB snapshot without publishing cache; quota-authoritative reads and billing trust checks retain the pending error |
+| Security mutation commits while quota cache refresh is deferred | Publish/retain the auth-version fence, complete required session revocation, log cache refresh failure, and do not report a false database rollback |
+| Invalid review transition on an approved mature reward | Return the transition error without writing settlement failure metadata or delaying the scheduler |
 | One of several user debts is resolved | Keep the user blocked until every open reward/principal debt is closed |
 
 ## 5. Good / Base / Bad Cases
@@ -282,8 +336,9 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 - Configuration: defaults; individual/combined rates; compliance; positive
   caps; immutable first-enable timestamp; atomic version update.
-- Migration: exactly the three side tables; no cashback columns on existing
-  business tables; unique order context and `(top_up_id, direction)`.
+- Migration: exactly the four side tables; no cashback columns on existing
+  business tables; unique order context, `(top_up_id, direction)`, and mutation
+  event keys.
 - Provider matrix: Epay, Stripe, Creem, Waffo, and Waffo Pancake create the same
   normalized cashback semantics; forged callbacks are rejected; verified
   retries are idempotent; manual completion is ineligible.
@@ -293,17 +348,26 @@ wallet quota; floating-point money arithmetic is forbidden.
 - Review/settlement: reason rules, maturity, hard blockers, task retries,
   reconciliation stop, wallet maximum, and at-most-once quota credit.
 - Incident/debt: cumulative partial-to-full refund, decreasing/duplicate rates,
-  reward-before-principal recovery, insufficient balances, cache compensation
-  on error and panic, and all-debts-closed unblocking.
+  reward-before-principal recovery, insufficient balances, queued and in-flight
+  batch deltas with warm/cold caches, fence-protected cache expiry/rehydration,
+  ownership loss on commit/rollback/panic, durable mutation evidence, and
+  all-debts-closed unblocking.
+- Shared auth/billing blast radius: identity reads remain available during a
+  quota fence, quota getters above the trust threshold remain fail-closed,
+  committed auth changes publish/retain their floor and revoke sessions even
+  when quota-cache refresh or Redis is unavailable, and invalid review actions
+  never write settlement retry metadata.
 - Risk: missing/invalid device, shared IP/device, login mismatch, account age,
   velocity, repeated/small-then-large amounts, inviter concentration, and the
   rule that one correlation signal does not auto-reject.
 
 Primary regression files are `model/cashback_test.go`,
-`controller/cashback_config_test.go`,
+`model/cashback_integration_test.go`, `controller/cashback_config_test.go`,
 `controller/cashback_webhook_security_test.go`, and the affected provider
 controller/model tests. Exercise MySQL/PostgreSQL row-lock and isolation paths
-in integration tests before changing transaction ordering.
+through the isolated `TEST_MYSQL_DSN` / `TEST_POSTGRES_DSN` integration test
+before changing transaction ordering. Missing DSNs must produce an explicit
+skip and must never be represented as production-database verification.
 
 ### Frontend assertions
 
