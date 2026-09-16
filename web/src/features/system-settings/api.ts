@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import type {
+  CashbackConfigResponse,
+  CashbackConfigUpdate,
   ConfirmPaymentComplianceResponse,
   FetchUpstreamRatiosRequest,
   LogCleanupTask,
@@ -45,6 +47,22 @@ export async function confirmPaymentCompliance() {
   const res = await api.post<ConfirmPaymentComplianceResponse>(
     '/api/option/payment_compliance',
     { confirmed: true }
+  )
+  return res.data
+}
+
+export async function getCashbackConfig(): Promise<CashbackConfigResponse> {
+  const res = await api.get<CashbackConfigResponse>('/api/cashback/config')
+  return res.data
+}
+
+export async function updateCashbackConfig(
+  request: CashbackConfigUpdate
+): Promise<CashbackConfigResponse> {
+  const res = await api.put<CashbackConfigResponse>(
+    '/api/cashback/config',
+    request,
+    { skipErrorHandler: true }
   )
   return res.data
 }

@@ -26,6 +26,11 @@ import {
   clearAuthentication,
   refreshAuthentication,
 } from '@/lib/auth-session'
+import {
+  DEVICE_SIGNAL_HEADER,
+  getDeviceSignal,
+  shouldAttachDeviceSignal,
+} from '@/lib/device-signal'
 import { getServerErrorMessageKey } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -142,10 +147,14 @@ api.interceptors.response.use(
   }
 )
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
   const accessToken = useAuthStore.getState().auth.accessToken
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
+  }
+  if (shouldAttachDeviceSignal(config.method, config.url)) {
+    const signal = await getDeviceSignal()
+    if (signal) config.headers[DEVICE_SIGNAL_HEADER] = signal
   }
   return config
 })
