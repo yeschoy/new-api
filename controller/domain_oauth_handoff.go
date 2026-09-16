@@ -341,6 +341,7 @@ func ConsumeDomainLoginHandoff(c *gin.Context) {
 		writeAuthSessionError(c, err)
 		return
 	}
+	captureCashbackDeviceLink(c, flow.UserId, model.CashbackDeviceSourceLogin)
 	model.UpdateUserLastLoginAt(flow.UserId)
 	service.WriteRefreshCookie(c, bundle.RefreshToken)
 	recordLoginAuditByUserID(flow.UserId, payload.LoginMethod, c)
@@ -468,6 +469,7 @@ func ConsumeDomainLoginFallback(c *gin.Context) {
 		writeAuthSessionError(c, err)
 		return
 	}
+	captureCashbackDeviceLink(c, flow.UserId, model.CashbackDeviceSourceLogin)
 	model.UpdateUserLastLoginAt(flow.UserId)
 	service.WriteRefreshCookie(c, bundle.RefreshToken)
 	recordLoginAuditByUserID(flow.UserId, payload.LoginMethod, c)

@@ -74,6 +74,28 @@ func TestTopUpQuotaValidation(t *testing.T) {
 	}
 }
 
+func TestCashbackBaseQuotaUsesFaceValueAcrossOnlineProviders(t *testing.T) {
+	oldQuotaPerUnit := common.QuotaPerUnit
+	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType
+	common.QuotaPerUnit = 500000
+	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeUSD
+	t.Cleanup(func() {
+		common.QuotaPerUnit = oldQuotaPerUnit
+		operation_setting.GetGeneralSetting().QuotaDisplayType = oldDisplayType
+	})
+
+	for _, provider := range []string{"epay", "stripe", "waffo", "waffo_pancake"} {
+		t.Run(provider, func(t *testing.T) {
+			quota, err := cashbackBaseQuotaFromTopUpAmount(100)
+			require.NoError(t, err)
+			assert.Equal(t, 50_000_000, quota)
+		})
+	}
+	creemQuota, err := cashbackBaseQuotaFromWalletQuota(100)
+	require.NoError(t, err)
+	assert.Equal(t, 100, creemQuota)
+}
+
 func TestValidateTopUpQuotaReturnsMaximumAmount(t *testing.T) {
 	oldQuotaPerUnit := common.QuotaPerUnit
 	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType

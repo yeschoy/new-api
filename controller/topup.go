@@ -327,6 +327,11 @@ func RequestEpay(c *gin.Context) {
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		amount = dAmount.Div(dQuotaPerUnit).IntPart()
 	}
+	baseQuota, err := cashbackBaseQuotaFromTopUpAmount(req.Amount)
+	if err != nil || baseQuota <= 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "充值数量无效"})
+		return
+	}
 	topUp := &model.TopUp{
 		UserId:          id,
 		Amount:          amount,
@@ -338,7 +343,7 @@ func RequestEpay(c *gin.Context) {
 		CreateTime:      time.Now().Unix(),
 		Status:          common.TopUpStatusPending,
 	}
-	err = topUp.Insert()
+	err = insertOnlineTopUpWithCashbackContext(c, topUp, baseQuota)
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("易支付 创建充值订单失败 user_id=%d trade_no=%s payment_method=%s amount=%d error=%q", id, tradeNo, req.PaymentMethod, req.Amount, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})

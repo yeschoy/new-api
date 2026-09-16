@@ -262,23 +262,27 @@ func UpdateOptionsBulk(values map[string]string) error {
 		}
 	}
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		for k, v := range values {
-			option := Option{Key: k}
-			if err := tx.FirstOrCreate(&option, Option{Key: k}).Error; err != nil {
-				return err
-			}
-			option.Value = v
-			if err := tx.Save(&option).Error; err != nil {
-				return err
-			}
-		}
-		return nil
+		return updateOptionsBulkTx(tx, values)
 	})
 	if err != nil {
 		return err
 	}
 	for k, v := range values {
 		if err := updateOptionMap(k, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func updateOptionsBulkTx(tx *gorm.DB, values map[string]string) error {
+	for key, value := range values {
+		option := Option{Key: key}
+		if err := tx.FirstOrCreate(&option, Option{Key: key}).Error; err != nil {
+			return err
+		}
+		option.Value = value
+		if err := tx.Save(&option).Error; err != nil {
 			return err
 		}
 	}

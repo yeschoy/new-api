@@ -145,6 +145,10 @@ func UpdateOption(c *gin.Context) {
 	default:
 		option.Value = fmt.Sprintf("%v", option.Value)
 	}
+	if strings.HasPrefix(option.Key, operation_setting.CashbackSettingName+".") {
+		common.ApiErrorMsg(c, "返现配置必须通过专用接口完整更新")
+		return
+	}
 	switch option.Key {
 	case "QuotaForInviter", "QuotaForInvitee":
 		if isPositiveOptionValue(option.Value.(string)) && !operation_setting.IsPaymentComplianceConfirmed() {

@@ -56,6 +56,9 @@
     },
     {
       "name": "系统设置"
+    },
+    {
+      "name": "邀请返现"
     }
   ],
   "paths": {
@@ -5228,6 +5231,625 @@
             "Combination1243": []
           }
         ]
+      }
+    },
+    "/api/cashback/config": {
+      "get": {
+        "summary": "获取邀请充值返现配置",
+        "deprecated": false,
+        "description": "👑 需要超级管理员权限（Root）。返回独立方向开关、整数基点比例、T+N、风控阈值、首次启用时间与配置版本。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "完整更新邀请充值返现配置",
+        "deprecated": false,
+        "description": "👑 需要超级管理员权限（Root）。完整对象原子校验与保存；启用方向比例必须大于 0，比例合计不超过 100%，首次启用时间由服务端只写一次。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "inviter_enabled",
+                  "invitee_enabled",
+                  "inviter_rate_bps",
+                  "invitee_rate_bps",
+                  "settlement_days",
+                  "max_reward_quota",
+                  "daily_reward_quota",
+                  "ip_account_threshold",
+                  "device_account_threshold",
+                  "daily_topup_count_threshold"
+                ],
+                "properties": {
+                  "inviter_enabled": {
+                    "type": "boolean"
+                  },
+                  "invitee_enabled": {
+                    "type": "boolean"
+                  },
+                  "inviter_rate_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "invitee_rate_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "settlement_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 90
+                  },
+                  "max_reward_quota": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 0
+                  },
+                  "daily_reward_quota": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 0
+                  },
+                  "ip_account_threshold": {
+                    "type": "integer",
+                    "minimum": 2
+                  },
+                  "device_account_threshold": {
+                    "type": "integer",
+                    "minimum": 2
+                  },
+                  "daily_topup_count_threshold": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashback/rewards": {
+      "get": {
+        "summary": "分页查询邀请充值返现",
+        "deprecated": false,
+        "description": "👨‍💼 需要管理员权限（Admin）。支持订单号、用户、方向、审核状态、结算状态和风险等级筛选；不返回完整设备/IP 快照。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [
+          {
+            "name": "p",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "trade_no",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "inviter",
+                "invitee"
+              ]
+            }
+          },
+          {
+            "name": "review_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "approved",
+                "rejected"
+              ]
+            }
+          },
+          {
+            "name": "settlement_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "frozen",
+                "issued",
+                "canceled",
+                "reclaimed",
+                "debt"
+              ]
+            }
+          },
+          {
+            "name": "risk_level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "severe"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ]
+      }
+    },
+    "/api/cashback/summary": {
+      "get": {
+        "summary": "获取返现风险与资金对账摘要",
+        "deprecated": false,
+        "description": "👨‍💼 需要管理员权限（Admin）。返回待审核、待到期、已发放、已追回、欠额、风险聚集、结算失败与对账异常摘要。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ]
+      }
+    },
+    "/api/cashback/rewards/{id}": {
+      "get": {
+        "summary": "获取返现敏感详情",
+        "deprecated": false,
+        "description": "👨‍💼 需要管理员权限（Admin）。返回完整下单 IP、散列设备信号、配置及风险快照；每次读取都会记录审计日志。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "返现记录 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ]
+      }
+    },
+    "/api/cashback/rewards/{id}/review": {
+      "post": {
+        "summary": "逐笔审核返现",
+        "deprecated": false,
+        "description": "👨‍💼 需要管理员权限（Admin）。不提供批量审核；高风险通过及所有驳回必须填写理由，硬阻断不能被理由覆盖。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "返现记录 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashback/topups/{id}/incident": {
+      "post": {
+        "summary": "手工标记退款、拒付或争议",
+        "deprecated": false,
+        "description": "👨‍💼 需要管理员权限（Admin）。首期唯一异常入口，不接支付渠道自动退款/拒付/争议回调。先取消或追回两个方向全部返现，再按只能单调增加的累计退款比例冲正实际到账本金。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "在线充值 TopUp ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "cumulative_refund_rate_bps",
+                  "reason"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "refund",
+                      "chargeback",
+                      "dispute"
+                    ]
+                  },
+                  "cumulative_refund_rate_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "evidence_ref": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashback/rewards/{id}/debt/resolve": {
+      "post": {
+        "summary": "处置返现奖励欠额",
+        "deprecated": false,
+        "description": "👨‍💼 需要管理员权限（Admin）。仅解除后续返现阻断，不恢复已取消奖励。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "返现记录 ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cashback/orders/{id}/principal-debt/resolve": {
+      "post": {
+        "summary": "处置充值本金欠额",
+        "deprecated": false,
+        "description": "👨‍💼 需要管理员权限（Admin）。仅解除后续返现阻断，保留原异常及冲正记录。",
+        "tags": [
+          "邀请返现"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "在线充值 TopUp ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "参数校验失败",
+            "headers": {}
+          },
+          "409": {
+            "description": "状态冲突或硬阻断",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "Combination343": []
+          },
+          {
+            "Combination1243": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   },

@@ -38,6 +38,18 @@ func (cm *ConfigManager) Get(name string) interface{} {
 	return cm.configs[name]
 }
 
+// UpdateFromMap applies a complete field map to one registered config while
+// holding the manager lock, matching LoadFromDB's update boundary.
+func (cm *ConfigManager) UpdateFromMap(name string, values map[string]string) error {
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
+	cfg := cm.configs[name]
+	if cfg == nil {
+		return nil
+	}
+	return updateConfigFromMap(cfg, values)
+}
+
 // LoadFromDB 从数据库加载配置
 func (cm *ConfigManager) LoadFromDB(options map[string]string) error {
 	cm.mutex.Lock()

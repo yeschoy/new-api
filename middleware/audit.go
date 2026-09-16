@@ -50,6 +50,7 @@ var auditRouteActions = map[string]string{
 	"POST /api/option/payment_compliance":       "option.payment_compliance",
 	"POST /api/option/rest_model_ratio":         "option.reset_ratio",
 	"DELETE /api/option/channel_affinity_cache": "option.clear_affinity_cache",
+	"PUT /api/cashback/config":                  "cashback.config_update_attempt",
 
 	// 自定义 OAuth（root）
 	"POST /api/custom-oauth-provider/":      "custom_oauth.create",
@@ -92,8 +93,12 @@ var auditRouteActions = map[string]string{
 	"PUT /api/subscription/admin/plans/:id": "subscription.plan_update",
 	"POST /api/subscription/admin/bind":     "subscription.bind",
 
-	// 日志
-	"POST /api/system-task/log-cleanup": "log.cleanup_start",
+	// 返现与日志
+	"POST /api/cashback/rewards/:id/review":                "cashback.review_attempt",
+	"POST /api/cashback/topups/:id/incident":               "cashback.incident_attempt",
+	"POST /api/cashback/rewards/:id/debt/resolve":          "cashback.reward_debt_resolve_attempt",
+	"POST /api/cashback/orders/:id/principal-debt/resolve": "cashback.principal_debt_resolve_attempt",
+	"POST /api/system-task/log-cleanup":                    "log.cleanup_start",
 }
 
 // beginAdminAudit 在管理/root 写操作进入 handler 前包装 ResponseWriter，

@@ -176,6 +176,14 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 // alreadyDone=true 表示订单此前已完成，本次为幂等重复回调。
 // 进程内的 LockOrder 只是优化，正确性由本函数的数据库行锁保证。
 func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
+	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, callerIp, CashbackCompletionProviderCallback)
+}
+
+func RechargeEpayVerifiedReturn(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
+	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, callerIp, CashbackCompletionVerifiedReturn)
+}
+
+func rechargeEpayWithSource(tradeNo string, actualPaymentMethod string, callerIp string, completionSource CashbackCompletionSource) (alreadyDone bool, err error) {
 	if tradeNo == "" {
 		return false, errors.New("未提供支付单号")
 	}
@@ -187,7 +195,7 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 
 	var quotaToAdd int
 	topUp := &TopUp{}
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return ErrTopUpNotFound
 		}
@@ -216,6 +224,9 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		if err := tx.Save(topUp).Error; err != nil {
 			return err
 		}
+		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, completionSource); err != nil {
+			return err
+		}
 		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
 	})
 	if err != nil {
@@ -240,6 +251,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 	}
 
 	var quota int
+	alreadyDone := false
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -247,7 +259,7 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		refCol = `"trade_no"`
 	}
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", referenceId).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
@@ -257,6 +269,10 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 			return ErrPaymentMethodMismatch
 		}
 
+		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
+			return nil
+		}
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
 		}
@@ -274,6 +290,9 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
 		}
+		if err := CompleteTopUpCashbackTx(tx, topUp, quota, CashbackCompletionProviderCallback); err != nil {
+			return err
+		}
 		return creditTopUpQuota(tx, topUp.UserId, quota, map[string]interface{}{
 			"stripe_customer": customerId,
 		})
@@ -282,6 +301,9 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 	if err != nil {
 		common.SysError("topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
+	}
+	if alreadyDone {
+		return nil
 	}
 	syncCreditUserQuotaCache(topUp.UserId, quota, "stripe topup")
 
@@ -462,8 +484,9 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	var quotaToAdd int
 	var payMoney float64
 	var paymentMethod string
+	alreadyDone := false
 
-	err := DB.Transaction(func(tx *gorm.DB) error {
+	err := cashbackTransaction(func(tx *gorm.DB) error {
 		topUp := &TopUp{}
 		// 行级锁，避免并发补单
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
@@ -472,6 +495,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 
 		// 幂等处理：已成功直接返回
 		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
 			return nil
 		}
 
@@ -503,6 +527,10 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			return err
 		}
 
+		if err := MarkManualTopUpCashbackCompletionTx(tx, topUp, quotaToAdd); err != nil {
+			return err
+		}
+
 		// 增加用户额度（立即写库，保持一致性）
 		if err := creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil); err != nil {
 			return err
@@ -517,6 +545,9 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	if err != nil {
 		return err
 	}
+	if alreadyDone {
+		return nil
+	}
 
 	// 事务外记录日志，避免阻塞
 	syncCreditUserQuotaCache(userId, quotaToAdd, "manual topup")
@@ -529,6 +560,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 	}
 
 	var quota int
+	alreadyDone := false
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
@@ -536,7 +568,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		refCol = `"trade_no"`
 	}
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", referenceId).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
@@ -546,6 +578,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			return ErrPaymentMethodMismatch
 		}
 
+		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
+			return nil
+		}
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
 		}
@@ -561,6 +597,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		quota, err = common.WalletQuotaFromDecimalStrict(decimal.NewFromInt(topUp.Amount))
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
+		}
+
+		if err := CompleteTopUpCashbackTx(tx, topUp, quota, CashbackCompletionProviderCallback); err != nil {
+			return err
 		}
 
 		// 构建更新字段，优先使用邮箱，如果邮箱为空则使用用户名
@@ -588,6 +628,9 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		common.SysError("creem topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}
+	if alreadyDone {
+		return nil
+	}
 	syncCreditUserQuotaCache(topUp.UserId, quota, "creem topup")
 
 	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用Creem充值成功，充值额度: %v，支付金额：%.2f", quota, topUp.Money), callerIp, topUp.PaymentMethod, PaymentMethodCreem)
@@ -608,7 +651,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		refCol = `"trade_no"`
 	}
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
@@ -636,6 +679,9 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		topUp.CompleteTime = common.GetTimestamp()
 		topUp.Status = common.TopUpStatusSuccess
 		if err := tx.Save(topUp).Error; err != nil {
+			return err
+		}
+		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, CashbackCompletionProviderCallback); err != nil {
 			return err
 		}
 
@@ -668,7 +714,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		refCol = `"trade_no"`
 	}
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
@@ -696,6 +742,9 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		topUp.CompleteTime = common.GetTimestamp()
 		topUp.Status = common.TopUpStatusSuccess
 		if err := tx.Save(topUp).Error; err != nil {
+			return err
+		}
+		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, CashbackCompletionProviderCallback); err != nil {
 			return err
 		}
 
