@@ -19,6 +19,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
 | [Quality Guidelines](./quality-guidelines.md) | Embedded SPA/static-file boundary and code standards | Partially implemented |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
+| [Referral recharge cashback](./referral-recharge-cashback.md) | Transactional rewards, review, settlement, incidents, and API contracts | Implemented |
 
 ---
 
