@@ -49,7 +49,11 @@ func GetCashbackConfig(c *gin.Context) {
 func UpdateCashbackConfig(c *gin.Context) {
 	var request cashbackConfigUpdateRequest
 	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid cashback configuration"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid cashback configuration",
+			"field":   "config",
+		})
 		return
 	}
 

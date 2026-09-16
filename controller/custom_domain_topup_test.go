@@ -296,7 +296,7 @@ func TestEpayBrowserReturnVerifiesSettlesOnceAndReturnsToTheStoredDomain(t *test
 	previousEpayKey := operation_setting.EpayKey
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.CustomDomain{}, &model.TopUp{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.CustomDomain{}, &model.TopUp{}, &model.CashbackOrderContext{}, &model.Log{}))
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	common.RedisEnabled = false

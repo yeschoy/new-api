@@ -59,18 +59,24 @@ func resetBatchUpdateTestState(t *testing.T) {
 	t.Helper()
 	oldBatchEnabled := common.BatchUpdateEnabled
 	common.BatchUpdateEnabled = false
+	batchUpdateRunLock.Lock()
 	for i := 0; i < BatchUpdateTypeCount; i++ {
 		batchUpdateLocks[i].Lock()
 		batchUpdateStores[i] = make(map[int]int)
+		batchUpdateInFlightStores[i] = make(map[int]int)
 		batchUpdateLocks[i].Unlock()
 	}
+	batchUpdateRunLock.Unlock()
 	t.Cleanup(func() {
 		common.BatchUpdateEnabled = oldBatchEnabled
+		batchUpdateRunLock.Lock()
 		for i := 0; i < BatchUpdateTypeCount; i++ {
 			batchUpdateLocks[i].Lock()
 			batchUpdateStores[i] = make(map[int]int)
+			batchUpdateInFlightStores[i] = make(map[int]int)
 			batchUpdateLocks[i].Unlock()
 		}
+		batchUpdateRunLock.Unlock()
 	})
 }
 
@@ -151,6 +157,45 @@ func TestBatchUpdateAccumulatesTwoMaximumRequestCharges(t *testing.T) {
 	assert.Equal(t, 100, getUserQuotaFromDB(t, user.Id))
 }
 
+func TestQuotaFenceRejectsColdCacheWithQueuedOrInFlightBatchDelta(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		setDelta func(userID int)
+	}{
+		{
+			name: "queued",
+			setDelta: func(userID int) {
+				addNewRecord(BatchUpdateTypeUserQuota, userID, 5_000)
+			},
+		},
+		{
+			name: "in_flight",
+			setDelta: func(userID int) {
+				batchUpdateLocks[BatchUpdateTypeUserQuota].Lock()
+				batchUpdateInFlightStores[BatchUpdateTypeUserQuota][userID] = 5_000
+				batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
+			},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			truncateTables(t)
+			resetBatchUpdateTestState(t)
+			useUserCacheMiniRedis(t)
+			common.BatchUpdateEnabled = true
+
+			user := createReserveTestUser(t, 0)
+			fences, err := acquireUserQuotaMutationFences(user.Id)
+			require.NoError(t, err)
+			defer fences.finalize()
+			testCase.setDelta(user.Id)
+
+			_, err = fences.takeAvailable(user, 5_000)
+			assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+			assert.Equal(t, 0, getUserQuotaFromDB(t, user.Id))
+		})
+	}
+}
+
 func TestBatchUpdateAccumulatorSaturatesOverflow(t *testing.T) {
 	resetBatchUpdateTestState(t)
 
@@ -170,7 +215,7 @@ func TestBatchUpdateAccumulatorSaturatesOverflow(t *testing.T) {
 	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
 }
 
-func TestReserveFallsBackToDatabaseWhenRedisIsUnavailable(t *testing.T) {
+func TestReserveFailsClosedWhenRedisIsUnavailable(t *testing.T) {
 	truncateTables(t)
 	resetBatchUpdateTestState(t)
 	server := useUserCacheMiniRedis(t)
@@ -179,16 +224,60 @@ func TestReserveFallsBackToDatabaseWhenRedisIsUnavailable(t *testing.T) {
 	require.NoError(t, populateUserCache(user))
 	server.Close()
 
-	// Redis 故障时降级为数据库条件更新：服务保持可用且不会超扣。
+	// Redis may contain authoritative unflushed quota. An outage cannot safely
+	// distinguish that state from a cache miss, so spending fails closed.
 	reserved, err := TryReserveUserQuota(user.Id, 5)
-	require.NoError(t, err)
-	assert.True(t, reserved)
-	assert.Equal(t, 15, getUserQuotaFromDB(t, user.Id))
-
-	reserved, err = TryReserveUserQuota(user.Id, 16)
-	require.NoError(t, err)
+	assert.Error(t, err)
 	assert.False(t, reserved)
-	assert.Equal(t, 15, getUserQuotaFromDB(t, user.Id))
+	assert.Equal(t, 20, getUserQuotaFromDB(t, user.Id))
+}
+
+func TestUserQuotaMutationFenceBlocksRehydrationAndSpending(t *testing.T) {
+	truncateTables(t)
+	resetBatchUpdateTestState(t)
+	server := useUserCacheMiniRedis(t)
+
+	initialQuota := common.GetTrustQuota() + 1
+	user := createReserveTestUser(t, initialQuota)
+	require.NoError(t, populateUserCache(user))
+	fences, err := acquireUserQuotaMutationFences(user.Id)
+	require.NoError(t, err)
+
+	// Simulate TTL expiry while a money transaction is open. Neither a stale
+	// snapshot nor a normal spend may cross the active fence.
+	require.NoError(t, common.RDB.Del(t.Context(), getUserCacheKey(user.Id)).Err())
+	err = writeUserCache(user.ToBaseUser(), true)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	reserved, err := TryReserveUserQuota(user.Id, 1)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	assert.False(t, reserved)
+	assert.Equal(t, initialQuota, getUserQuotaFromDB(t, user.Id))
+
+	require.NoError(t, fences.verify())
+	fences.finalize()
+	assert.False(t, server.Exists(getUserCacheKey(user.Id)))
+
+	// Identity/profile reads use a direct DB snapshot during cooldown without
+	// publishing it as spend authority. Even a balance above TrustQuota cannot
+	// enter the billing trust bypass because the quota-specific getter fails.
+	direct, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	assert.Equal(t, initialQuota, direct.Quota)
+	assert.False(t, server.Exists(getUserCacheKey(user.Id)))
+	_, err = GetUserQuota(user.Id, false)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending, "quota-authoritative reads must not enter the billing trust path")
+	reserved, err = TryReserveUserQuota(user.Id, 1)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	assert.False(t, reserved)
+	err = writeUserCache(user.ToBaseUser(), true)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	assert.False(t, server.Exists(getUserCacheKey(user.Id)))
+
+	server.FastForward(time.Duration(userQuotaMutationCooldownSeconds()+1) * time.Second)
+	fresh, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	assert.Equal(t, initialQuota, fresh.Quota)
+	assert.True(t, server.Exists(getUserCacheKey(user.Id)))
 }
 
 func TestSynchronousReserveCompensatesCacheWhenPersistenceFails(t *testing.T) {

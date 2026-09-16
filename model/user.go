@@ -773,14 +773,10 @@ func (user *User) Update(updatePassword bool) error {
 	}); err != nil {
 		return err
 	}
-	if err := updateUserCache(*user); err != nil {
-		return err
-	}
 	if user.AuthVersion > previousAuthVersion {
-		_, err := RevokeAllUserSessions(user.Id, "user_security_changed")
-		return err
+		return finalizeCommittedUserAuthMutation(user.Id, "user_security_changed")
 	}
-	return nil
+	return updateUserCache(*user)
 }
 
 func (user *User) UpdateWithTx(tx *gorm.DB, updatePassword bool) error {
@@ -834,14 +830,10 @@ func (user *User) Edit(updatePassword bool) error {
 	}); err != nil {
 		return err
 	}
-	if err := updateUserCache(*user); err != nil {
-		return err
-	}
 	if user.AuthVersion > previousAuthVersion {
-		_, err := RevokeAllUserSessions(user.Id, "user_security_changed")
-		return err
+		return finalizeCommittedUserAuthMutation(user.Id, "user_security_changed")
 	}
-	return nil
+	return updateUserCache(*user)
 }
 
 func (user *User) EditWithTx(tx *gorm.DB, updatePassword bool) error {
@@ -1159,11 +1151,7 @@ func ResetUserPasswordByEmail(email string, password string) error {
 	}); err != nil {
 		return err
 	}
-	if err := PublishUserAuthCache(user.Id); err != nil {
-		return err
-	}
-	_, err = RevokeAllUserSessions(user.Id, "password_reset")
-	return err
+	return finalizeCommittedUserAuthMutation(user.Id, "password_reset")
 }
 
 func IsAdmin(userId int) bool {

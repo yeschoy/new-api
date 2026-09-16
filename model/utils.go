@@ -23,11 +23,14 @@ const (
 )
 
 var batchUpdateStores []map[int]int
+var batchUpdateInFlightStores []map[int]int
 var batchUpdateLocks []sync.Mutex
+var batchUpdateRunLock sync.Mutex
 
 func init() {
 	for i := 0; i < BatchUpdateTypeCount; i++ {
 		batchUpdateStores = append(batchUpdateStores, make(map[int]int))
+		batchUpdateInFlightStores = append(batchUpdateInFlightStores, make(map[int]int))
 		batchUpdateLocks = append(batchUpdateLocks, sync.Mutex{})
 	}
 }
@@ -63,6 +66,9 @@ func addNewRecord(type_ int, id int, value int) {
 }
 
 func batchUpdate() {
+	batchUpdateRunLock.Lock()
+	defer batchUpdateRunLock.Unlock()
+
 	// check if there's any data to update
 	hasData := false
 	for i := 0; i < BatchUpdateTypeCount; i++ {
@@ -85,8 +91,16 @@ func batchUpdate() {
 		batchUpdateLocks[i].Lock()
 		stores[i] = batchUpdateStores[i]
 		batchUpdateStores[i] = make(map[int]int)
+		batchUpdateInFlightStores[i] = stores[i]
 		batchUpdateLocks[i].Unlock()
 	}
+	defer func() {
+		for i := 0; i < BatchUpdateTypeCount; i++ {
+			batchUpdateLocks[i].Lock()
+			batchUpdateInFlightStores[i] = make(map[int]int)
+			batchUpdateLocks[i].Unlock()
+		}
+	}()
 
 	for i, store := range stores {
 		if i == BatchUpdateTypeUserQuota || i == BatchUpdateTypeUsedQuota || i == BatchUpdateTypeRequestCount {

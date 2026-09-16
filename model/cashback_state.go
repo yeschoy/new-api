@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -15,6 +16,11 @@ import (
 type CashbackReviewAction string
 
 const cashbackSettlementRetryDelaySeconds int64 = 5 * 60
+const maxCashbackReasonCharacters = 1_000
+
+func cashbackTextWithinLimit(value string) bool {
+	return utf8.RuneCountInString(value) <= maxCashbackReasonCharacters
+}
 
 const (
 	CashbackReviewActionApprove CashbackReviewAction = "approve"
@@ -69,7 +75,7 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 		return CashbackReviewResult{}, fmt.Errorf("%w: unsupported review action", ErrCashbackInvalidInput)
 	}
 	reason = strings.TrimSpace(reason)
-	if len(reason) > 1_000 {
+	if !cashbackTextWithinLimit(reason) {
 		return CashbackReviewResult{}, fmt.Errorf("%w: cashback review reason is too long", ErrCashbackInvalidInput)
 	}
 	if now <= 0 {
@@ -84,10 +90,43 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 		return CashbackReviewResult{}, err
 	}
 
+	settlementEligibleAtStart := initial.ReviewStatus == CashbackReviewApproved && initial.SettlementStatus == CashbackSettlementFrozen && now >= initial.AvailableAt
+	manualSettlementCandidate := action == CashbackReviewActionApprove &&
+		(initial.ReviewStatus == CashbackReviewPending || initial.ReviewStatus == CashbackReviewApproved) &&
+		initial.SettlementStatus == CashbackSettlementFrozen && now >= initial.AvailableAt &&
+		((initial.RiskLevel != CashbackRiskHigh && initial.RiskLevel != CashbackRiskSevere) || reason != "")
+	if manualSettlementCandidate {
+		if err := requireCashbackReconciliationHealthy(); err != nil {
+			return CashbackReviewResult{}, err
+		}
+	}
+
+	fences := &userQuotaMutationFences{tokens: map[int]string{}}
+	if manualSettlementCandidate {
+		var err error
+		fences, err = acquireUserQuotaMutationFences(initial.BeneficiaryID)
+		if err != nil {
+			if settlementEligibleAtStart {
+				recordCashbackSettlementFailure(rewardID, err, now)
+			}
+			return CashbackReviewResult{}, err
+		}
+		defer fences.finalize()
+	}
+
 	result := CashbackReviewResult{}
 	var creditedUserID, creditedQuota int
 	var finalErr error
-	err := DB.Transaction(func(tx *gorm.DB) error {
+	var settlementErr error
+	err := DB.Transaction(func(tx *gorm.DB) (txErr error) {
+		defer func() {
+			if txErr == nil {
+				if verifyErr := fences.verify(); verifyErr != nil {
+					settlementErr = verifyErr
+					txErr = verifyErr
+				}
+			}
+		}()
 		topUp, orderContext, reward, err := lockCashbackCoreTx(tx, initial.TopUpID, rewardID)
 		if err != nil {
 			return err
@@ -166,12 +205,8 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 			if now >= reward.AvailableAt {
 				issued, issueErr := issueLockedCashbackRewardTx(tx, reward, users[reward.BeneficiaryID], now)
 				if issueErr != nil {
-					reward.LastSettlementError = issueErr.Error()
-					reward.NextSettlementAttemptAt = now + cashbackSettlementRetryDelaySeconds
-					if saveErr := tx.Save(reward).Error; saveErr != nil {
-						return saveErr
-					}
-					result.IssueError = issueErr.Error()
+					settlementErr = issueErr
+					return issueErr
 				} else if issued {
 					result.Issued = true
 					creditedUserID = reward.BeneficiaryID
@@ -184,10 +219,12 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 		return ErrCashbackInvalidState
 	})
 	if err != nil {
+		if settlementErr != nil {
+			recordCashbackSettlementFailure(rewardID, settlementErr, now)
+		}
 		return CashbackReviewResult{}, err
 	}
 	if creditedQuota > 0 {
-		syncCreditUserQuotaCache(creditedUserID, creditedQuota, "cashback settlement")
 		recordCashbackCreditLog(creditedUserID, rewardID, creditedQuota)
 	}
 	if finalErr != nil {
@@ -211,9 +248,27 @@ func IssueCashbackReward(rewardID int64, now int64) (CashbackSettlementOutcome, 
 		return CashbackSettlementOutcome{}, err
 	}
 
+	if initial.SettlementStatus == CashbackSettlementIssued {
+		return CashbackSettlementOutcome{RewardID: rewardID, Skipped: true}, nil
+	}
+	if initial.ReviewStatus != CashbackReviewApproved || initial.SettlementStatus != CashbackSettlementFrozen || now < initial.AvailableAt {
+		return CashbackSettlementOutcome{RewardID: rewardID, Skipped: true}, nil
+	}
+	fences, err := acquireUserQuotaMutationFences(initial.BeneficiaryID)
+	if err != nil {
+		recordCashbackSettlementFailure(rewardID, err, now)
+		return CashbackSettlementOutcome{}, err
+	}
+	defer fences.finalize()
+
 	outcome := CashbackSettlementOutcome{RewardID: rewardID}
 	var creditedUserID, creditedQuota int
-	err := DB.Transaction(func(tx *gorm.DB) error {
+	err = DB.Transaction(func(tx *gorm.DB) (txErr error) {
+		defer func() {
+			if txErr == nil {
+				txErr = fences.verify()
+			}
+		}()
 		topUp, orderContext, reward, err := lockCashbackCoreTx(tx, initial.TopUpID, rewardID)
 		if err != nil {
 			return err
@@ -245,13 +300,7 @@ func IssueCashbackReward(rewardID int64, now int64) (CashbackSettlementOutcome, 
 		}
 		issued, issueErr := issueLockedCashbackRewardTx(tx, reward, users[reward.BeneficiaryID], now)
 		if issueErr != nil {
-			reward.LastSettlementError = issueErr.Error()
-			reward.NextSettlementAttemptAt = now + cashbackSettlementRetryDelaySeconds
-			if err := tx.Save(reward).Error; err != nil {
-				return err
-			}
-			outcome.ErrorMessage = issueErr.Error()
-			return nil
+			return issueErr
 		}
 		if issued {
 			outcome.Issued = true
@@ -261,10 +310,10 @@ func IssueCashbackReward(rewardID int64, now int64) (CashbackSettlementOutcome, 
 		return nil
 	})
 	if err != nil {
+		recordCashbackSettlementFailure(rewardID, err, now)
 		return CashbackSettlementOutcome{}, err
 	}
 	if creditedQuota > 0 {
-		syncCreditUserQuotaCache(creditedUserID, creditedQuota, "cashback settlement")
 		recordCashbackCreditLog(creditedUserID, rewardID, creditedQuota)
 	}
 	return outcome, nil
@@ -293,12 +342,8 @@ func SettleMaturedCashbackRewards(now int64, batchSize int) (CashbackSettlementR
 	if batchSize <= 0 || batchSize > 500 {
 		batchSize = 100
 	}
-	inconsistencies, err := CashbackReconciliationInconsistencyCount()
-	if err != nil {
+	if err := requireCashbackReconciliationHealthy(); err != nil {
 		return CashbackSettlementRunResult{}, err
-	}
-	if inconsistencies > 0 {
-		return CashbackSettlementRunResult{}, fmt.Errorf("cashback reconciliation found %d inconsistent records", inconsistencies)
 	}
 	var ids []int64
 	if err := DB.Model(&CashbackReward{}).
@@ -412,6 +457,9 @@ func issueLockedCashbackRewardTx(tx *gorm.DB, reward *CashbackReward, beneficiar
 	if err := creditTopUpQuota(tx, reward.BeneficiaryID, reward.RewardQuota, nil); err != nil {
 		return false, err
 	}
+	if err := recordCashbackQuotaMutationTx(tx, cashbackIssueMutation(reward)); err != nil {
+		return false, err
+	}
 	reward.SettlementStatus = CashbackSettlementIssued
 	reward.IssuedAt = now
 	reward.LastSettlementError = ""
@@ -429,7 +477,7 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 	}
 	input.Reason = strings.TrimSpace(input.Reason)
 	input.EvidenceRef = strings.TrimSpace(input.EvidenceRef)
-	if input.Reason == "" || len(input.Reason) > 1_000 || len(input.EvidenceRef) > 1_000 {
+	if input.Reason == "" || !cashbackTextWithinLimit(input.Reason) || !cashbackTextWithinLimit(input.EvidenceRef) {
 		return CashbackIncidentResult{}, fmt.Errorf("%w: a valid incident reason is required", ErrCashbackInvalidInput)
 	}
 	if input.CumulativeRefundRateBPS < 0 || input.CumulativeRefundRateBPS > 10_000 {
@@ -445,15 +493,34 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 		input.Now = time.Now().Unix()
 	}
 
-	result := CashbackIncidentResult{}
-	cacheReservations := map[int]int{}
-	transactionCommitted := false
-	defer func() {
-		if !transactionCommitted {
-			compensateCashbackCacheReservations(cacheReservations)
+	var fenceContext CashbackOrderContext
+	if err := DB.Select("user_id").Where("top_up_id = ?", topUpID).First(&fenceContext).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return CashbackIncidentResult{}, ErrCashbackNotFound
 		}
-	}()
-	err := DB.Transaction(func(tx *gorm.DB) error {
+		return CashbackIncidentResult{}, err
+	}
+	var fenceRewards []CashbackReward
+	if err := DB.Select("beneficiary_id").Where("top_up_id = ?", topUpID).Find(&fenceRewards).Error; err != nil {
+		return CashbackIncidentResult{}, err
+	}
+	fenceUserIDs := []int{fenceContext.UserID}
+	for _, reward := range fenceRewards {
+		fenceUserIDs = append(fenceUserIDs, reward.BeneficiaryID)
+	}
+	fences, err := acquireUserQuotaMutationFences(fenceUserIDs...)
+	if err != nil {
+		return CashbackIncidentResult{}, err
+	}
+	defer fences.finalize()
+
+	result := CashbackIncidentResult{}
+	err = DB.Transaction(func(tx *gorm.DB) (txErr error) {
+		defer func() {
+			if txErr == nil {
+				txErr = fences.verify()
+			}
+		}()
 		var topUp TopUp
 		if err := lockForUpdate(tx).Where("id = ?", topUpID).First(&topUp).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -516,7 +583,7 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 					return errors.New("cashback reward recovery exceeds issued quota")
 				}
 				user := users[reward.BeneficiaryID]
-				recovered, cacheReserved, err := reserveCashbackRecoveryQuota(user, remaining)
+				recovered, err := reserveCashbackRecoveryQuota(user, remaining, fences)
 				if err != nil {
 					return err
 				}
@@ -524,11 +591,11 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 					if err := debitLockedCashbackUserTx(tx, reward.BeneficiaryID, recovered); err != nil {
 						return err
 					}
+					if err := recordCashbackQuotaMutationTx(tx, cashbackRewardRecoveryMutation(reward, recovered)); err != nil {
+						return err
+					}
 					user.Quota -= recovered
 					users[reward.BeneficiaryID] = user
-					if cacheReserved {
-						cacheReservations[reward.BeneficiaryID] += recovered
-					}
 				}
 				reward.RecoveredQuota += recovered
 				reward.OutstandingDebtQuota = reward.RewardQuota - reward.RecoveredQuota
@@ -558,7 +625,7 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 		}
 		if deltaTarget > 0 {
 			user := users[orderContext.UserID]
-			recovered, cacheReserved, err := reserveCashbackRecoveryQuota(user, deltaTarget)
+			recovered, err := reserveCashbackRecoveryQuota(user, deltaTarget, fences)
 			if err != nil {
 				return err
 			}
@@ -566,11 +633,11 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 				if err := debitLockedCashbackUserTx(tx, orderContext.UserID, recovered); err != nil {
 					return err
 				}
+				if err := recordCashbackQuotaMutationTx(tx, cashbackPrincipalRecoveryMutation(&orderContext, recovered)); err != nil {
+					return err
+				}
 				user.Quota -= recovered
 				users[orderContext.UserID] = user
-				if cacheReserved {
-					cacheReservations[orderContext.UserID] += recovered
-				}
 			}
 			orderContext.PrincipalRecoveredQuota += recovered
 			newDebt := deltaTarget - recovered
@@ -599,13 +666,12 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 	if err != nil {
 		return CashbackIncidentResult{}, err
 	}
-	transactionCommitted = true
 	return result, nil
 }
 
 func ResolveCashbackRewardDebt(rewardID int64, operatorID int, reason string, now int64) (*CashbackReward, error) {
 	reason = strings.TrimSpace(reason)
-	if rewardID <= 0 || operatorID <= 0 || reason == "" || len(reason) > 1_000 {
+	if rewardID <= 0 || operatorID <= 0 || reason == "" || !cashbackTextWithinLimit(reason) {
 		return nil, fmt.Errorf("%w: a valid debt resolution reason is required", ErrCashbackInvalidInput)
 	}
 	if now <= 0 {
@@ -654,7 +720,7 @@ func ResolveCashbackRewardDebt(rewardID int64, operatorID int, reason string, no
 
 func ResolveCashbackPrincipalDebt(topUpID int, operatorID int, reason string, now int64) (*CashbackOrderContext, error) {
 	reason = strings.TrimSpace(reason)
-	if topUpID <= 0 || operatorID <= 0 || reason == "" || len(reason) > 1_000 {
+	if topUpID <= 0 || operatorID <= 0 || reason == "" || !cashbackTextWithinLimit(reason) {
 		return nil, fmt.Errorf("%w: a valid debt resolution reason is required", ErrCashbackInvalidInput)
 	}
 	if now <= 0 {
@@ -724,66 +790,30 @@ func minPositiveQuota(current, requested int) int {
 	return requested
 }
 
-func reserveCashbackRecoveryQuota(user User, requested int) (int, bool, error) {
-	amount := minPositiveQuota(user.Quota, requested)
-	if amount == 0 || user.Id <= 0 {
-		return 0, false, nil
+func reserveCashbackRecoveryQuota(user User, requested int, fences *userQuotaMutationFences) (int, error) {
+	if requested <= 0 || user.Id <= 0 || user.DeletedAt.Valid {
+		return 0, nil
 	}
-	if !common.RedisEnabled || user.DeletedAt.Valid {
-		return amount, false, nil
-	}
-
-	for attempt := 0; attempt < 2; attempt++ {
-		cached, err := cacheGetUserBase(user.Id)
-		if err != nil {
-			if attempt > 0 {
-				return 0, false, err
-			}
-			if err := populateUserCache(user); err != nil {
-				return 0, false, err
-			}
-			continue
-		}
-		amount = minPositiveQuota(cached.Quota, minPositiveQuota(user.Quota, requested))
-		if amount == 0 {
-			return 0, false, nil
-		}
-		result, err := cacheTryReserveUserQuota(user.Id, int64(amount))
-		if err != nil {
-			return 0, false, err
-		}
-		switch result {
-		case cacheQuotaOK:
-			return amount, true, nil
-		case cacheQuotaMiss:
-			if err := populateUserCache(user); err != nil {
-				return 0, false, err
-			}
-		case cacheQuotaInsufficient:
-			continue
-		}
-	}
-	return 0, false, nil
+	return fences.takeAvailable(user, requested)
 }
 
-func compensateCashbackCacheReservations(reservations map[int]int) {
-	for userID, quota := range reservations {
-		if quota <= 0 {
-			continue
-		}
-		result, err := cacheApplyUserQuotaDelta(userID, int64(quota))
-		if err != nil {
-			common.SysError(fmt.Sprintf("failed to compensate cashback cache reservation for user %d: %v", userID, err))
-			continue
-		}
-		if result != cacheQuotaOK && result != cacheQuotaMiss {
-			common.SysError(fmt.Sprintf("failed to compensate cashback cache reservation for user %d: result=%d", userID, result))
-		}
+func recordCashbackSettlementFailure(rewardID int64, settlementErr error, now int64) {
+	if rewardID <= 0 || settlementErr == nil {
+		return
+	}
+	result := DB.Session(&gorm.Session{SkipHooks: true}).Model(&CashbackReward{}).
+		Where("id = ? AND review_status = ? AND settlement_status = ? AND available_at <= ?", rewardID, CashbackReviewApproved, CashbackSettlementFrozen, now).
+		Updates(map[string]interface{}{
+			"last_settlement_error":      settlementErr.Error(),
+			"next_settlement_attempt_at": now + cashbackSettlementRetryDelaySeconds,
+		})
+	if result.Error != nil {
+		common.SysError(fmt.Sprintf("failed to record cashback settlement error for reward %d: %v", rewardID, result.Error))
 	}
 }
 
 func recordCashbackCreditLog(userID int, rewardID int64, quota int) {
-	username, _ := GetUsernameById(userID, false)
+	username, _ := GetUsernameById(userID, true)
 	params := map[string]interface{}{
 		"reward_id": rewardID,
 		"quota":     logger.LogQuota(quota),
@@ -799,20 +829,4 @@ func recordCashbackCreditLog(userID int, rewardID int64, quota int) {
 	if err := createLog(log); err != nil {
 		common.SysLog("failed to record cashback credit log: " + err.Error())
 	}
-}
-
-func CashbackReconciliationInconsistencyCount() (int64, error) {
-	var count int64
-	if err := DB.Model(&CashbackReward{}).
-		Where("(settlement_status = ? AND (review_status <> ? OR issued_at <= 0 OR reward_quota <= 0)) OR recovered_quota < 0 OR outstanding_debt_quota < 0 OR recovered_quota + outstanding_debt_quota > reward_quota", CashbackSettlementIssued, CashbackReviewApproved).
-		Count(&count).Error; err != nil {
-		return 0, err
-	}
-	var principalCount int64
-	if err := DB.Model(&CashbackOrderContext{}).
-		Where("principal_reversal_target_quota < 0 OR principal_recovered_quota < 0 OR principal_outstanding_debt_quota < 0 OR principal_recovered_quota > principal_reversal_target_quota").
-		Count(&principalCount).Error; err != nil {
-		return 0, err
-	}
-	return count + principalCount, nil
 }

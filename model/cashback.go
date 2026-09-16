@@ -410,10 +410,11 @@ func InsertOnlineTopUp(topUp *TopUp, baseQuota int, metadata CashbackRequestMeta
 		if err != nil {
 			return err
 		}
-		if firstEnabledAt <= 0 || topUp.CreateTime < firstEnabledAt {
-			return nil
-		}
 
+		// Persist the activation decision with every new online order. Payment
+		// completion must not try to reconstruct transaction ordering from two
+		// second-resolution timestamps.
+		eligibleAfterFirstEnable := firstEnabledAt > 0 && topUp.CreateTime >= firstEnabledAt
 		deviceHash, deviceStatus := ParseCashbackDeviceSignal(metadata.DeviceSignal)
 		requestIP := normalizeCashbackIP(metadata.RequestIP)
 		userAgentHash := HashCashbackUserAgent(metadata.UserAgent)
@@ -427,7 +428,7 @@ func InsertOnlineTopUp(topUp *TopUp, baseQuota int, metadata CashbackRequestMeta
 			RequestUserAgentHash:     userAgentHash,
 			DeviceFingerprintHash:    deviceHash,
 			DeviceSignalStatus:       deviceStatus,
-			EligibleAfterFirstEnable: true,
+			EligibleAfterFirstEnable: eligibleAfterFirstEnable,
 		}
 		if err := tx.Create(&context).Error; err != nil {
 			return err
@@ -475,7 +476,10 @@ func cashbackOrderContextRequiredTx(tx *gorm.DB, topUp *TopUp) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return firstEnabledAt > 0 && topUp.CreateTime >= firstEnabledAt, nil
+	// Context-less equality is reserved for legacy/in-flight orders created
+	// before the activation commit. New code always persists an order context,
+	// including while cashback is disabled.
+	return firstEnabledAt > 0 && topUp.CreateTime > firstEnabledAt, nil
 }
 
 func lockCashbackUsersTx(tx *gorm.DB, userIDs ...int) (map[int]User, error) {

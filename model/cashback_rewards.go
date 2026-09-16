@@ -28,18 +28,19 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 	if !validCashbackCompletionSource(source) || source == "" {
 		return errors.New("invalid cashback completion source")
 	}
-	contextRequired, err := cashbackOrderContextRequiredTx(tx, topUp)
-	if err != nil {
-		return err
-	}
-	if !contextRequired {
-		return nil
-	}
-
 	var orderContext CashbackOrderContext
-	err = lockForUpdate(tx).Where("top_up_id = ?", topUp.Id).First(&orderContext).Error
+	err := lockForUpdate(tx).Where("top_up_id = ?", topUp.Id).First(&orderContext).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return ErrCashbackOrderContextMissing
+		contextRequired, boundaryErr := cashbackOrderContextRequiredTx(tx, topUp)
+		if boundaryErr != nil {
+			return boundaryErr
+		}
+		if contextRequired {
+			return ErrCashbackOrderContextMissing
+		}
+		// Historical orders predate order-local eligibility snapshots. They
+		// settle normally and are never backfilled.
+		return nil
 	}
 	if err != nil {
 		return err
@@ -59,7 +60,7 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 	if err := tx.Save(&orderContext).Error; err != nil {
 		return err
 	}
-	if !eligibleCashbackCompletionSource(source) {
+	if !eligibleCashbackCompletionSource(source) || !orderContext.EligibleAfterFirstEnable {
 		return nil
 	}
 
@@ -76,7 +77,7 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 	if !setting.AnyDirectionEnabled() || !operation_setting.IsPaymentComplianceConfirmed() {
 		return nil
 	}
-	if !orderContext.EligibleAfterFirstEnable || setting.FirstEnabledAt <= 0 || topUp.CreateTime < setting.FirstEnabledAt {
+	if setting.FirstEnabledAt <= 0 || topUp.CreateTime < setting.FirstEnabledAt {
 		return ErrCashbackInvalidState
 	}
 	if topUp.Status != common.TopUpStatusSuccess || topUp.CompleteTime <= 0 {

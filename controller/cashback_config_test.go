@@ -97,6 +97,16 @@ func TestUpdateCashbackConfigPreservesFirstEnableBoundary(t *testing.T) {
 	assert.EqualValues(t, 2, stored.Version)
 }
 
+func TestUpdateCashbackConfigMalformedJSONReturnsStableConfigField(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+
+	response := runCashbackConfigUpdate(t, `{"inviter_enabled":`)
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.JSONEq(t, `{"success":false,"message":"invalid cashback configuration","field":"config"}`, response.Body.String())
+}
+
 func TestUpdateCashbackConfigRejectsCombinedRateAboveOneHundredPercent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setupCashbackConfigControllerTest(t)

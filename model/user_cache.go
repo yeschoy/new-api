@@ -86,15 +86,17 @@ func updateUserCache(user User) error {
 
 // GetUserCache gets complete user cache from hash
 func GetUserCache(userId int) (*UserBase, error) {
-	// Try getting from Redis first
-	userCache, err := cacheGetUserBase(userId)
-	if err == nil {
+	// Try getting from Redis first.
+	userCache, cacheErr := cacheGetUserBase(userId)
+	if cacheErr == nil {
 		return userCache, nil
 	}
+	quotaMutationPending := errors.Is(cacheErr, ErrUserQuotaMutationPending)
 
-	// Redis misses and read failures both fall back to the shared database. A
-	// version fence newer than the database is the one exception: allowing that
-	// snapshot would re-authorize a user while a restrictive update is pending.
+	// Redis misses and read failures fall back to the shared database. During a
+	// quota mutation fence this snapshot is identity/display data only: it is
+	// returned without publishing a cache hash, while TryReserveUserQuota stays
+	// fail-closed on the fence. The authentication version floor still applies.
 	user, err := GetUserById(userId, false)
 	if err != nil {
 		return nil, err
@@ -103,6 +105,9 @@ func GetUserCache(userId int) (*UserBase, error) {
 		floor, floorErr := getUserAuthVersionFloor(userId)
 		if floorErr == nil && floor > user.AuthVersion {
 			return nil, ErrUserAuthCachePending
+		}
+		if quotaMutationPending {
+			return user.ToBaseUser(), nil
 		}
 		if err := populateUserCache(*user); err != nil {
 			if errors.Is(err, ErrUserAuthCachePending) {
@@ -118,11 +123,26 @@ func cacheGetUserBase(userId int) (*UserBase, error) {
 	if !common.RedisEnabled {
 		return nil, fmt.Errorf("redis is not enabled")
 	}
-	var userCache UserBase
-	// Try getting from Redis first
-	err := common.RedisHGetObj(getUserCacheKey(userId), &userCache)
+	pending, err := userQuotaMutationFenceExists(userId)
 	if err != nil {
 		return nil, err
+	}
+	if pending {
+		return nil, ErrUserQuotaMutationPending
+	}
+	var userCache UserBase
+	// Try getting from Redis first.
+	if err := common.RedisHGetObj(getUserCacheKey(userId), &userCache); err != nil {
+		return nil, err
+	}
+	// Recheck after HGETALL so a fence raised concurrently cannot expose the
+	// pre-transaction snapshot to a caller.
+	pending, err = userQuotaMutationFenceExists(userId)
+	if err != nil {
+		return nil, err
+	}
+	if pending {
+		return nil, ErrUserQuotaMutationPending
 	}
 	if userCache.Id != userId || userCache.CacheSchema != userCacheSchemaVersion || userCache.AuthVersion <= 0 {
 		return nil, fmt.Errorf("user cache schema is stale")
@@ -144,8 +164,14 @@ func cacheIncrUserQuota(userId int, delta int64) error {
 	if !common.RedisEnabled {
 		return nil
 	}
-	_, err := cacheApplyUserQuotaDelta(userId, delta)
-	return err
+	result, err := cacheApplyUserQuotaDelta(userId, delta)
+	if err != nil {
+		return err
+	}
+	if result == cacheQuotaPending {
+		return ErrUserQuotaMutationPending
+	}
+	return nil
 }
 
 func cacheDecrUserQuota(userId int, delta int64) error {
@@ -174,7 +200,18 @@ func getUserGroupCache(userId int) (string, error) {
 }
 
 func getUserQuotaCache(userId int) (int, error) {
-	cache, err := GetUserCache(userId)
+	// Quota-authoritative callers must not consume the direct database snapshot
+	// that GetUserCache intentionally exposes for identity/profile reads during
+	// a quota fence. Preserve the pending error so billing cannot enter the
+	// trust-quota bypass while money state is changing.
+	cache, err := cacheGetUserBase(userId)
+	if err == nil {
+		return cache.Quota, nil
+	}
+	if errors.Is(err, ErrUserQuotaMutationPending) {
+		return 0, err
+	}
+	cache, err = GetUserCache(userId)
 	if err != nil {
 		return 0, err
 	}

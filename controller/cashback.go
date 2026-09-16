@@ -108,6 +108,9 @@ type cashbackDebtResolutionRequest struct {
 	Reason string `json:"reason"`
 }
 
+const cashbackQuotaMutationPendingMessage = "Wallet quota is still updating. Wait a moment and try again."
+const cashbackQuotaFenceLostMessage = "Wallet quota protection was interrupted. Try again in a moment."
+
 func ListCashbackRewards(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	userID, err := parseOptionalPositiveInt(c.Query("user_id"))
@@ -385,6 +388,10 @@ func cashbackErrorStatus(err error) int {
 	switch {
 	case errors.Is(err, model.ErrCashbackNotFound), errors.Is(err, model.ErrTopUpNotFound):
 		return http.StatusNotFound
+	case errors.Is(err, model.ErrUserQuotaMutationPending):
+		return http.StatusConflict
+	case errors.Is(err, model.ErrUserQuotaMutationFenceLost):
+		return http.StatusServiceUnavailable
 	case errors.Is(err, model.ErrCashbackInvalidState), errors.Is(err, model.ErrCashbackHardBlocked), errors.Is(err, model.ErrCashbackDebtNotFound), errors.Is(err, model.ErrTopUpStatusInvalid):
 		return http.StatusConflict
 	case errors.Is(err, model.ErrCashbackInvalidInput), errors.Is(err, model.ErrCashbackReviewReason), errors.Is(err, model.ErrCashbackRefundRate):
@@ -401,6 +408,12 @@ func cashbackAPIError(c *gin.Context, status int, err error) {
 		"message": err.Error(),
 	}
 	switch {
+	case errors.Is(err, model.ErrUserQuotaMutationPending):
+		code = "CASHBACK_QUOTA_MUTATION_PENDING"
+		response["message"] = cashbackQuotaMutationPendingMessage
+	case errors.Is(err, model.ErrUserQuotaMutationFenceLost):
+		code = "CASHBACK_QUOTA_FENCE_LOST"
+		response["message"] = cashbackQuotaFenceLostMessage
 	case errors.Is(err, model.ErrCashbackHardBlocked):
 		code = "CASHBACK_HARD_BLOCKED"
 		if _, reason, found := strings.Cut(err.Error(), ": "); found {

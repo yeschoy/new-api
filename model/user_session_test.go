@@ -653,3 +653,141 @@ func TestPasswordResetBumpsAuthVersionAndRevokesSessions(t *testing.T) {
 	assert.Equal(t, UserSessionStatusRevoked, storedSession.Status)
 	assert.Equal(t, "password_reset", storedSession.RevokedReason)
 }
+
+func TestPasswordResetPublishesAuthVersionAndRevokesSessionsDuringQuotaFence(t *testing.T) {
+	setupUserSessionTest(t)
+	server := useUserCacheMiniRedis(t)
+	now := time.Now().Unix()
+	user := &User{
+		Username: "password-reset-fenced-user",
+		Password: "old-hash",
+		Email:    "password-reset-fenced@example.com",
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(user).Error)
+	t.Cleanup(func() { _ = DB.Unscoped().Delete(&User{}, user.Id).Error })
+	require.NoError(t, populateUserCache(*user))
+	session := newTestUserSession("password-reset-fenced-session", user.Id, now)
+	require.NoError(t, CreateUserSession(session))
+
+	fences, err := acquireUserQuotaMutationFences(user.Id)
+	require.NoError(t, err)
+	defer fences.finalize()
+
+	require.NoError(t, ResetUserPasswordByEmail(user.Email, "new-password"))
+	var stored User
+	require.NoError(t, DB.First(&stored, user.Id).Error)
+	assert.Equal(t, int64(2), stored.AuthVersion)
+	assert.True(t, common.ValidatePasswordAndHash("new-password", stored.Password))
+
+	committed, err := common.RDB.Get(t.Context(), getUserAuthVersionKey(user.Id)).Result()
+	require.NoError(t, err)
+	assert.Equal(t, "2", committed)
+	assert.False(t, server.Exists(getUserAuthFenceKey(user.Id)))
+
+	identity, err := GetUserCache(user.Id)
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, identity.AuthVersion)
+	storedSession, err := GetUserSessionBySID(session.SID)
+	require.NoError(t, err)
+	assert.Equal(t, UserSessionStatusRevoked, storedSession.Status)
+	assert.Equal(t, "password_reset", storedSession.RevokedReason)
+}
+
+func TestUserUpdateAndEditFinalizeAuthDuringQuotaFence(t *testing.T) {
+	for _, testCase := range []struct {
+		name   string
+		mutate func(*User)
+		apply  func(*User) error
+	}{
+		{
+			name: "update_role",
+			mutate: func(user *User) {
+				user.Role = common.RoleAdminUser
+			},
+			apply: func(user *User) error { return user.Update(false) },
+		},
+		{
+			name: "edit_group",
+			mutate: func(user *User) {
+				user.Group = "vip"
+			},
+			apply: func(user *User) error { return user.Edit(false) },
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			setupUserSessionTest(t)
+			useUserCacheMiniRedis(t)
+			now := time.Now().Unix()
+			user := &User{
+				Username: "auth-finalize-" + testCase.name,
+				Password: "old-hash",
+				Email:    testCase.name + "@example.com",
+				AffCode:  "auth-" + common.GetRandomString(8),
+				Role:     common.RoleCommonUser,
+				Status:   common.UserStatusEnabled,
+				Group:    "default",
+			}
+			require.NoError(t, DB.Create(user).Error)
+			t.Cleanup(func() { _ = DB.Unscoped().Delete(&User{}, user.Id).Error })
+			require.NoError(t, populateUserCache(*user))
+			session := newTestUserSession("auth-finalize-"+testCase.name, user.Id, now)
+			require.NoError(t, CreateUserSession(session))
+
+			fences, err := acquireUserQuotaMutationFences(user.Id)
+			require.NoError(t, err)
+			defer fences.finalize()
+
+			testCase.mutate(user)
+			require.NoError(t, testCase.apply(user))
+
+			var stored User
+			require.NoError(t, DB.First(&stored, user.Id).Error)
+			assert.EqualValues(t, 2, stored.AuthVersion)
+			committed, err := common.RDB.Get(t.Context(), getUserAuthVersionKey(user.Id)).Result()
+			require.NoError(t, err)
+			assert.Equal(t, "2", committed)
+			storedSession, err := GetUserSessionBySID(session.SID)
+			require.NoError(t, err)
+			assert.Equal(t, UserSessionStatusRevoked, storedSession.Status)
+			assert.Equal(t, "user_security_changed", storedSession.RevokedReason)
+		})
+	}
+}
+
+func TestCommittedAuthFinalizationRevokesSessionsWhenRedisBecomesUnavailable(t *testing.T) {
+	setupUserSessionTest(t)
+	server := useUserCacheMiniRedis(t)
+	now := time.Now().Unix()
+	user := &User{
+		Username: "auth-finalize-redis-outage",
+		Password: "old-hash",
+		Email:    "auth-finalize-redis-outage@example.com",
+		AffCode:  "auth-" + common.GetRandomString(8),
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, DB.Create(user).Error)
+	t.Cleanup(func() { _ = DB.Unscoped().Delete(&User{}, user.Id).Error })
+	require.NoError(t, populateUserCache(*user))
+	session := newTestUserSession("auth-finalize-redis-outage", user.Id, now)
+	require.NoError(t, CreateUserSession(session))
+
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		_, err := IncrementUserAuthVersionWithTx(tx, user.Id)
+		return err
+	}))
+	server.Close()
+
+	require.NoError(t, finalizeCommittedUserAuthMutation(user.Id, "user_security_changed"))
+	var stored User
+	require.NoError(t, DB.First(&stored, user.Id).Error)
+	assert.EqualValues(t, 2, stored.AuthVersion)
+	storedSession, err := GetUserSessionBySID(session.SID)
+	require.NoError(t, err)
+	assert.Equal(t, UserSessionStatusRevoked, storedSession.Status)
+	assert.Equal(t, "user_security_changed", storedSession.RevokedReason)
+}

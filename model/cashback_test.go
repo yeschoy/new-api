@@ -32,9 +32,10 @@ func setupCashbackTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(
-		&User{}, &UserSession{}, &TopUp{}, &Option{}, &CashbackOrderContext{}, &CashbackReward{}, &CashbackDeviceLink{}, &Log{},
+		&User{}, &UserSession{}, &TopUp{}, &Option{}, &CashbackOrderContext{}, &CashbackReward{}, &CashbackDeviceLink{}, &CashbackQuotaMutation{}, &Log{},
 	))
 	DB, LOG_DB = db, db
+	resetCashbackReconciliationProgress()
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	common.RedisEnabled = false
 	payment := operation_setting.GetPaymentSetting()
@@ -42,6 +43,7 @@ func setupCashbackTestDB(t *testing.T) *gorm.DB {
 	payment.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
 
 	t.Cleanup(func() {
+		resetCashbackReconciliationProgress()
 		DB, LOG_DB = oldDB, oldLogDB
 		common.SetMainDatabaseType(oldType)
 		common.RedisEnabled = oldRedis
@@ -116,6 +118,9 @@ func TestCashbackMigrationCreatesOnlySideTablesAndUniqueDirection(t *testing.T) 
 	assert.True(t, db.Migrator().HasTable(&CashbackOrderContext{}))
 	assert.True(t, db.Migrator().HasTable(&CashbackReward{}))
 	assert.True(t, db.Migrator().HasTable(&CashbackDeviceLink{}))
+	assert.True(t, db.Migrator().HasTable(&CashbackQuotaMutation{}))
+	assert.True(t, db.Migrator().HasIndex(&CashbackQuotaMutation{}, "idx_cashback_mutation_reward_kind"))
+	assert.True(t, db.Migrator().HasIndex(&CashbackQuotaMutation{}, "idx_cashback_mutation_topup_kind"))
 
 	columns, err := db.Migrator().ColumnTypes(&TopUp{})
 	require.NoError(t, err)
@@ -142,9 +147,9 @@ func TestInsertOnlineTopUpHonorsImmutableFirstEnableBoundaryAndHashesDevice(t *t
 
 	oldOrder := TopUp{UserId: invitee.Id, TradeNo: "before-first-enable", PaymentProvider: PaymentProviderEpay, CreateTime: now - 1, Status: common.TopUpStatusPending}
 	require.NoError(t, InsertOnlineTopUp(&oldOrder, 100, CashbackRequestMetadata{}))
-	var count int64
-	require.NoError(t, DB.Model(&CashbackOrderContext{}).Where("top_up_id = ?", oldOrder.Id).Count(&count).Error)
-	assert.Zero(t, count)
+	var oldContext CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", oldOrder.Id).First(&oldContext).Error)
+	assert.False(t, oldContext.EligibleAfterFirstEnable)
 
 	newOrder := TopUp{UserId: invitee.Id, TradeNo: "after-first-enable", PaymentProvider: PaymentProviderEpay, CreateTime: now, Status: common.TopUpStatusPending}
 	require.NoError(t, InsertOnlineTopUp(&newOrder, 100, CashbackRequestMetadata{
@@ -157,8 +162,48 @@ func TestInsertOnlineTopUpHonorsImmutableFirstEnableBoundaryAndHashesDevice(t *t
 	assert.Len(t, orderContext.DeviceFingerprintHash, 64)
 	assert.NotContains(t, orderContext.DeviceFingerprintHash, "bbbb")
 	var link CashbackDeviceLink
-	require.NoError(t, DB.Where("user_id = ?", invitee.Id).First(&link).Error)
+	require.NoError(t, DB.Where("user_id = ? AND device_fingerprint_hash = ?", invitee.Id, orderContext.DeviceFingerprintHash).First(&link).Error)
 	assert.Equal(t, orderContext.DeviceFingerprintHash, link.DeviceFingerprintHash)
+}
+
+func TestSameSecondFirstEnableUsesOrderLocalEligibilitySnapshot(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	_, invitee := createCashbackUsers(t, now-10_000)
+
+	baseQuota, err := common.WalletQuotaFromDecimalStrict(decimal.NewFromFloat(common.QuotaPerUnit))
+	require.NoError(t, err)
+	preEnable := TopUp{
+		UserId: invitee.Id, Amount: 1, Money: 1, TradeNo: "same-second-before-enable",
+		PaymentMethod: "alipay", PaymentProvider: PaymentProviderEpay,
+		CreateTime: now, Status: common.TopUpStatusPending,
+	}
+	require.NoError(t, InsertOnlineTopUp(&preEnable, baseQuota, CashbackRequestMetadata{}))
+	var preEnableContext CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", preEnable.Id).First(&preEnableContext).Error)
+	assert.False(t, preEnableContext.EligibleAfterFirstEnable)
+
+	saveCashbackTestSetting(t, now)
+	alreadyDone, err := RechargeEpay(preEnable.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+	assert.False(t, alreadyDone)
+	var rewardCount int64
+	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", preEnable.Id).Count(&rewardCount).Error)
+	assert.Zero(t, rewardCount)
+
+	var creditedUser User
+	require.NoError(t, DB.First(&creditedUser, invitee.Id).Error)
+	assert.Equal(t, baseQuota, creditedUser.Quota)
+
+	postEnable := TopUp{
+		UserId: invitee.Id, Amount: 1, Money: 1, TradeNo: "same-second-after-enable",
+		PaymentMethod: "alipay", PaymentProvider: PaymentProviderEpay,
+		CreateTime: now, Status: common.TopUpStatusPending,
+	}
+	require.NoError(t, InsertOnlineTopUp(&postEnable, baseQuota, CashbackRequestMetadata{}))
+	var postEnableContext CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", postEnable.Id).First(&postEnableContext).Error)
+	assert.True(t, postEnableContext.EligibleAfterFirstEnable)
 }
 
 func TestCompleteTopUpCreatesIndependentSnapshotRewardsAndSettlesOnce(t *testing.T) {
@@ -204,12 +249,323 @@ func TestCompleteTopUpCreatesIndependentSnapshotRewardsAndSettlesOnce(t *testing
 		Where("other LIKE ?", `%"action":"cashback.reward_credited"%`).
 		Count(&creditLogCount).Error)
 	assert.EqualValues(t, 2, creditLogCount)
+	var issueMutationCount int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("kind = ?", CashbackQuotaMutationIssue).Count(&issueMutationCount).Error)
+	assert.EqualValues(t, 2, issueMutationCount)
 	summary, err := GetCashbackAdminSummary()
 	require.NoError(t, err)
 	assert.EqualValues(t, 15_000, summary.IssuedQuota)
 	assert.Zero(t, summary.ReconciliationIssues)
 	assert.NotNil(t, summary.InviterClusters)
 	assert.NotNil(t, summary.DeviceClusters)
+}
+
+func TestCashbackIssuanceInvalidatesCacheUntilCommittedBalanceCanRehydrate(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	inviter, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+
+	redisServer := useUserCacheMiniRedis(t)
+	var inviterRow User
+	require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
+	require.NoError(t, writeUserCache(inviterRow.ToBaseUser(), true))
+	outcome, err := IssueCashbackReward(reward.ID, reward.AvailableAt)
+	require.NoError(t, err)
+	assert.True(t, outcome.Issued)
+	require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
+	assert.Equal(t, reward.RewardQuota, inviterRow.Quota)
+	_, err = cacheGetUserBase(inviter.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	assert.False(t, redisServer.Exists(getUserCacheKey(inviter.Id)))
+
+	duplicate, err := IssueCashbackReward(reward.ID, reward.AvailableAt+1)
+	require.NoError(t, err)
+	assert.True(t, duplicate.Skipped)
+	redisServer.FastForward(time.Duration(userQuotaMutationCooldownSeconds()+1) * time.Second)
+	cached, err := GetUserCache(inviter.Id)
+	require.NoError(t, err)
+	assert.Equal(t, inviterRow.Quota, cached.Quota)
+}
+
+func TestCashbackIssuanceFailsClosedWhenRedisIsUnavailable(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	inviter, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+
+	redisServer := useUserCacheMiniRedis(t)
+	redisServer.Close()
+	_, err = IssueCashbackReward(reward.ID, reward.AvailableAt)
+	assert.Error(t, err)
+	var storedReward CashbackReward
+	require.NoError(t, DB.First(&storedReward, reward.ID).Error)
+	assert.Equal(t, CashbackSettlementFrozen, storedReward.SettlementStatus)
+	assert.NotEmpty(t, storedReward.LastSettlementError)
+	assert.Equal(t, reward.AvailableAt+cashbackSettlementRetryDelaySeconds, storedReward.NextSettlementAttemptAt)
+	var storedInviter User
+	require.NoError(t, DB.First(&storedInviter, inviter.Id).Error)
+	assert.Zero(t, storedInviter.Quota)
+}
+
+func TestCashbackIssuanceRecordsLostFenceAndRollsBackMoney(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	inviter, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+
+	useUserCacheMiniRedis(t)
+	callbackName := "test:cashback-fence-lost"
+	require.NoError(t, DB.Callback().Update().After("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+		if tx.Statement.Table == "cashback_rewards" {
+			_ = common.RDB.Del(t.Context(), getUserQuotaMutationFenceKey(inviter.Id)).Err()
+		}
+	}))
+	callbackRegistered := true
+	t.Cleanup(func() {
+		if callbackRegistered {
+			_ = DB.Callback().Update().Remove(callbackName)
+		}
+	})
+
+	_, err = IssueCashbackReward(reward.ID, reward.AvailableAt)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationFenceLost)
+	require.NoError(t, DB.Callback().Update().Remove(callbackName))
+	callbackRegistered = false
+
+	var storedReward CashbackReward
+	require.NoError(t, DB.First(&storedReward, reward.ID).Error)
+	assert.Equal(t, CashbackSettlementFrozen, storedReward.SettlementStatus)
+	assert.Contains(t, storedReward.LastSettlementError, ErrUserQuotaMutationFenceLost.Error())
+	assert.Equal(t, reward.AvailableAt+cashbackSettlementRetryDelaySeconds, storedReward.NextSettlementAttemptAt)
+	var storedInviter User
+	require.NoError(t, DB.First(&storedInviter, inviter.Id).Error)
+	assert.Zero(t, storedInviter.Quota)
+	var mutationCount int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("reward_id = ?", reward.ID).Count(&mutationCount).Error)
+	assert.Zero(t, mutationCount)
+}
+
+func TestCashbackIssuanceSkipsIneligibleWithoutSettlementError(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+
+	redisServer := useUserCacheMiniRedis(t)
+	redisServer.Close()
+	outcome, err := IssueCashbackReward(reward.ID, reward.AvailableAt)
+	require.NoError(t, err)
+	assert.True(t, outcome.Skipped)
+	var stored CashbackReward
+	require.NoError(t, DB.First(&stored, reward.ID).Error)
+	assert.Empty(t, stored.LastSettlementError)
+	assert.Zero(t, stored.NextSettlementAttemptAt)
+
+	_, err = ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+	outcome, err = IssueCashbackReward(reward.ID, now)
+	require.NoError(t, err)
+	assert.True(t, outcome.Skipped)
+	require.NoError(t, DB.First(&stored, reward.ID).Error)
+	assert.Empty(t, stored.LastSettlementError)
+	assert.Zero(t, stored.NextSettlementAttemptAt)
+}
+
+func TestCashbackReviewRecordsFenceFailureForApprovedMatureReward(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+
+	redisServer := useUserCacheMiniRedis(t)
+	redisServer.Close()
+	_, err = ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "retry mature approval", 999, reward.AvailableAt)
+	assert.Error(t, err)
+
+	var stored CashbackReward
+	require.NoError(t, DB.First(&stored, reward.ID).Error)
+	assert.Equal(t, CashbackReviewApproved, stored.ReviewStatus)
+	assert.Equal(t, CashbackSettlementFrozen, stored.SettlementStatus)
+	assert.NotEmpty(t, stored.LastSettlementError)
+	assert.Equal(t, reward.AvailableAt+cashbackSettlementRetryDelaySeconds, stored.NextSettlementAttemptAt)
+}
+
+func TestCashbackInvalidReviewDoesNotFabricateSettlementFailure(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+
+	_, err = ReviewCashbackReward(reward.ID, CashbackReviewActionReject, "invalid rejection", 999, reward.AvailableAt)
+	assert.ErrorIs(t, err, ErrCashbackInvalidState)
+
+	var stored CashbackReward
+	require.NoError(t, DB.First(&stored, reward.ID).Error)
+	assert.Equal(t, CashbackReviewApproved, stored.ReviewStatus)
+	assert.Equal(t, CashbackSettlementFrozen, stored.SettlementStatus)
+	assert.Empty(t, stored.LastSettlementError)
+	assert.Zero(t, stored.NextSettlementAttemptAt)
+}
+
+func TestCashbackIssuanceRollsBackWhenMutationEvidenceFails(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	inviter, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+
+	forcedErr := errors.New("forced cashback ledger failure")
+	callbackName := "test:cashback-ledger-rollback"
+	require.NoError(t, DB.Callback().Create().Before("gorm:create").Register(callbackName, func(tx *gorm.DB) {
+		if tx.Statement.Table == "cashback_quota_mutations" {
+			tx.AddError(forcedErr)
+		}
+	}))
+	callbackRegistered := true
+	t.Cleanup(func() {
+		if callbackRegistered {
+			_ = DB.Callback().Create().Remove(callbackName)
+		}
+	})
+
+	_, err = IssueCashbackReward(reward.ID, reward.AvailableAt)
+	assert.ErrorIs(t, err, forcedErr)
+	require.NoError(t, DB.Callback().Create().Remove(callbackName))
+	callbackRegistered = false
+
+	var storedReward CashbackReward
+	require.NoError(t, DB.First(&storedReward, reward.ID).Error)
+	assert.Equal(t, CashbackSettlementFrozen, storedReward.SettlementStatus)
+	assert.Contains(t, storedReward.LastSettlementError, forcedErr.Error())
+	var storedInviter User
+	require.NoError(t, DB.First(&storedInviter, inviter.Id).Error)
+	assert.Zero(t, storedInviter.Quota)
+	var mutationCount int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("reward_id = ?", reward.ID).Count(&mutationCount).Error)
+	assert.Zero(t, mutationCount)
+}
+
+func TestCashbackReconciliationStopsSettlementOnLedgerMismatch(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, reward.AvailableAt)
+	require.NoError(t, err)
+
+	var mutation CashbackQuotaMutation
+	require.NoError(t, DB.Where("reward_id = ? AND kind = ?", reward.ID, CashbackQuotaMutationIssue).First(&mutation).Error)
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&CashbackQuotaMutation{}).Where("id = ?", mutation.ID).Update("quota", mutation.Quota+1).Error)
+	inconsistencies, err := CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.Positive(t, inconsistencies)
+	_, err = SettleMaturedCashbackRewards(reward.AvailableAt+1, 100)
+	assert.ErrorContains(t, err, "cashback reconciliation found")
+}
+
+func TestMatureCashbackApprovalStopsOnReconciliationMismatch(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	inviter, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+
+	inconsistent := CashbackReward{
+		TopUpID: order.Id + 10_000, TradeNo: "reconciliation-blocks-manual-approval", Direction: CashbackDirectionInvitee,
+		InviteeID: invitee.Id, InviterID: inviter.Id, BeneficiaryID: invitee.Id, BaseQuota: 100, RateBPS: 100,
+		CalculatedQuota: 1, RewardQuota: 1, SettlementDays: 7, PaidAt: now,
+		AvailableAt: now, ReviewStatus: CashbackReviewPending, SettlementStatus: CashbackSettlementFrozen,
+		RiskLevel: CashbackRiskLow, RiskSnapshot: `{}`, ConfigSnapshot: `{}`, RecoveredQuota: 2,
+	}
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Create(&inconsistent).Error)
+
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, reward.AvailableAt)
+	require.ErrorContains(t, err, "cashback reconciliation found")
+	assert.Zero(t, cashbackReconciliationProgress.RewardID, "the inconsistent page must remain pinned")
+
+	var storedReward CashbackReward
+	require.NoError(t, DB.First(&storedReward, reward.ID).Error)
+	assert.Equal(t, CashbackReviewPending, storedReward.ReviewStatus)
+	assert.Equal(t, CashbackSettlementFrozen, storedReward.SettlementStatus)
+	var storedInviter User
+	require.NoError(t, DB.First(&storedInviter, inviter.Id).Error)
+	assert.Zero(t, storedInviter.Quota)
+	var mutationCount int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("reward_id = ?", reward.ID).Count(&mutationCount).Error)
+	assert.Zero(t, mutationCount)
+}
+
+func TestCashbackReconciliationAdvancesInBoundedBatchesAndPinsMismatch(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	rewards := make([]CashbackReward, 0, cashbackReconciliationBatchSize+1)
+	for i := 0; i < cashbackReconciliationBatchSize+1; i++ {
+		reward := CashbackReward{
+			TopUpID: i + 1, TradeNo: fmt.Sprintf("reconcile-%d", i+1), Direction: CashbackDirectionInvitee,
+			InviteeID: 2, InviterID: 1, BeneficiaryID: 2, BaseQuota: 100, RateBPS: 100,
+			CalculatedQuota: 1, RewardQuota: 1, SettlementDays: 7, PaidAt: now,
+			AvailableAt: now + 7*24*60*60, ReviewStatus: CashbackReviewPending,
+			SettlementStatus: CashbackSettlementFrozen, RiskLevel: CashbackRiskLow,
+			RiskSnapshot: `{}`, ConfigSnapshot: `{}`,
+		}
+		if i == cashbackReconciliationBatchSize {
+			reward.RecoveredQuota = 2
+		}
+		rewards = append(rewards, reward)
+	}
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Create(&rewards).Error)
+
+	issues, err := CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.Zero(t, issues)
+	assert.Equal(t, rewards[cashbackReconciliationBatchSize-1].ID, cashbackReconciliationProgress.RewardID)
+
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, issues)
+	assert.Equal(t, rewards[cashbackReconciliationBatchSize-1].ID, cashbackReconciliationProgress.RewardID, "a mismatched page must remain pinned until repaired")
+
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, issues)
 }
 
 func TestConcurrentCashbackSettlementCreditsAtMostOnce(t *testing.T) {
@@ -255,7 +611,16 @@ func TestConcurrentCashbackSettlementCreditsAtMostOnce(t *testing.T) {
 			successfulCalls++
 		}
 	}
-	assert.GreaterOrEqual(t, successfulCalls, 1)
+	// SQLite can abort both competing writers with SQLITE_LOCKED. The durable
+	// frozen state must remain retryable and still issue exactly once.
+	if successfulCalls == 0 {
+		outcome, retryErr := IssueCashbackReward(reward.ID, reward.AvailableAt)
+		require.NoError(t, retryErr)
+		if outcome.Issued {
+			issuedCount++
+		}
+	}
+	assert.Equal(t, 1, issuedCount)
 	var updatedInviter User
 	require.NoError(t, DB.First(&updatedInviter, inviter.Id).Error)
 	assert.Equal(t, reward.RewardQuota, updatedInviter.Quota)
@@ -336,6 +701,11 @@ func TestCashbackIncidentIsMonotonicIdempotentAndCreatesDebt(t *testing.T) {
 	assert.Equal(t, 15_000, first.RewardRecoveredQuota)
 	assert.Equal(t, 50_000, first.PrincipalRecoveredNow)
 	assert.Zero(t, first.RewardDebtQuota)
+	var recoveredLedgerQuota int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).
+		Where("kind IN ?", []CashbackQuotaMutationKind{CashbackQuotaMutationRewardRecovery, CashbackQuotaMutationPrincipalRecovery}).
+		Select("COALESCE(SUM(quota), 0)").Scan(&recoveredLedgerQuota).Error)
+	assert.EqualValues(t, 65_000, recoveredLedgerQuota)
 	assert.Zero(t, first.PrincipalDebtQuota)
 
 	var afterFirst User
@@ -413,7 +783,7 @@ func TestCashbackIncidentUsesAuthoritativeCachedQuotaAndTracksDebt(t *testing.T)
 		require.NoError(t, err)
 	}
 
-	useUserCacheMiniRedis(t)
+	redisServer := useUserCacheMiniRedis(t)
 	var inviterRow, inviteeRow User
 	require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
 	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
@@ -436,12 +806,171 @@ func TestCashbackIncidentUsesAuthoritativeCachedQuotaAndTracksDebt(t *testing.T)
 	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
 	assert.Equal(t, 5_000, inviterRow.Quota)
 	assert.Equal(t, 85_000, inviteeRow.Quota)
-	inviterCache, err := cacheGetUserBase(inviter.Id)
+	_, err = cacheGetUserBase(inviter.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	_, err = cacheGetUserBase(invitee.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	assert.False(t, redisServer.Exists(getUserCacheKey(inviter.Id)))
+	assert.False(t, redisServer.Exists(getUserCacheKey(invitee.Id)))
+	redisServer.FastForward(time.Duration(userQuotaMutationCooldownSeconds()+1) * time.Second)
+	inviterCache, err := GetUserCache(inviter.Id)
 	require.NoError(t, err)
-	inviteeCache, err := cacheGetUserBase(invitee.Id)
+	inviteeCache, err := GetUserCache(invitee.Id)
 	require.NoError(t, err)
-	assert.Zero(t, inviterCache.Quota)
-	assert.Zero(t, inviteeCache.Quota)
+	assert.Equal(t, 5_000, inviterCache.Quota)
+	assert.Equal(t, 85_000, inviteeCache.Quota)
+}
+
+func TestCashbackIncidentWaitsForPendingPositiveBatchQuota(t *testing.T) {
+	for _, testCase := range []struct {
+		name                string
+		populateInviteeHash bool
+	}{
+		{name: "cached", populateInviteeHash: true},
+		{name: "cold_cache", populateInviteeHash: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			setupCashbackTestDB(t)
+			resetBatchUpdateTestState(t)
+			now := time.Now().Unix()
+			saveCashbackTestSetting(t, now-100)
+			inviter, invitee := createCashbackUsers(t, now-30*24*60*60)
+			topUp := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+			var rewards []CashbackReward
+			require.NoError(t, DB.Where("top_up_id = ?", topUp.Id).Order("id asc").Find(&rewards).Error)
+			for _, reward := range rewards {
+				_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "approved", 999, reward.AvailableAt)
+				require.NoError(t, err)
+			}
+
+			redisServer := useUserCacheMiniRedis(t)
+			var inviterRow, inviteeRow User
+			require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
+			require.NoError(t, DB.Model(&User{}).Where("id = ?", invitee.Id).Update("quota", 0).Error)
+			require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
+			require.NoError(t, writeUserCache(inviterRow.ToBaseUser(), true))
+			if testCase.populateInviteeHash {
+				pendingInvitee := inviteeRow
+				pendingInvitee.Quota = 5_000
+				require.NoError(t, writeUserCache(pendingInvitee.ToBaseUser(), true))
+			}
+			common.BatchUpdateEnabled = true
+			addNewRecord(BatchUpdateTypeUserQuota, invitee.Id, 5_000)
+
+			_, err := HandleCashbackIncident(topUp.Id, CashbackIncidentInput{
+				Kind: CashbackIncidentRefund, CumulativeRefundRateBPS: 10_000,
+				Reason: "wait for positive batch quota", OperatorID: 999, Now: now + 1,
+			})
+			assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+
+			var orderContext CashbackOrderContext
+			require.NoError(t, DB.Where("top_up_id = ?", topUp.Id).First(&orderContext).Error)
+			assert.Empty(t, orderContext.IncidentKind)
+			assert.Zero(t, orderContext.PrincipalRecoveredQuota)
+			assert.Zero(t, orderContext.PrincipalOutstandingDebtQuota)
+			var recoveryMutationCount int64
+			require.NoError(t, DB.Model(&CashbackQuotaMutation{}).
+				Where("kind IN ?", []CashbackQuotaMutationKind{CashbackQuotaMutationRewardRecovery, CashbackQuotaMutationPrincipalRecovery}).
+				Count(&recoveryMutationCount).Error)
+			assert.Zero(t, recoveryMutationCount)
+			for _, reward := range rewards {
+				var stored CashbackReward
+				require.NoError(t, DB.First(&stored, reward.ID).Error)
+				assert.Equal(t, CashbackSettlementIssued, stored.SettlementStatus)
+				assert.Zero(t, stored.RecoveredQuota)
+				assert.Zero(t, stored.OutstandingDebtQuota)
+			}
+
+			batchUpdate()
+			assert.Equal(t, 5_000, getUserQuotaFromDB(t, invitee.Id))
+			redisServer.FastForward(time.Duration(userQuotaMutationCooldownSeconds()+1) * time.Second)
+
+			result, err := HandleCashbackIncident(topUp.Id, CashbackIncidentInput{
+				Kind: CashbackIncidentRefund, CumulativeRefundRateBPS: 10_000,
+				Reason: "retry after positive batch quota flush", OperatorID: 999, Now: now + 2,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, 15_000, result.RewardRecoveredQuota)
+			assert.Zero(t, result.RewardDebtQuota)
+			assert.Zero(t, result.PrincipalRecoveredNow)
+			assert.Equal(t, 100_000, result.PrincipalDebtQuota)
+			assert.Zero(t, getUserQuotaFromDB(t, inviter.Id))
+			assert.Zero(t, getUserQuotaFromDB(t, invitee.Id))
+		})
+	}
+}
+
+func TestCashbackIncidentLostFenceInvalidatesRolledBackCacheDebit(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	inviter, invitee := createCashbackUsers(t, now-30*24*60*60)
+	topUp := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var rewards []CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", topUp.Id).Order("id asc").Find(&rewards).Error)
+	for _, reward := range rewards {
+		_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "approved", 999, reward.AvailableAt)
+		require.NoError(t, err)
+	}
+
+	redisServer := useUserCacheMiniRedis(t)
+	var inviterRow, inviteeRow User
+	require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
+	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
+	require.NoError(t, writeUserCache(inviterRow.ToBaseUser(), true))
+	require.NoError(t, writeUserCache(inviteeRow.ToBaseUser(), true))
+	inviterQuotaBefore, inviteeQuotaBefore := inviterRow.Quota, inviteeRow.Quota
+
+	const replacementOwner = "replacement-owner"
+	callbackName := "test:cashback-incident-fence-lost"
+	replaced := false
+	require.NoError(t, DB.Callback().Update().After("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+		if !replaced && tx.Statement.Table == "cashback_rewards" {
+			replaced = true
+			_ = common.RDB.Set(t.Context(), getUserQuotaMutationFenceKey(inviter.Id), replacementOwner, time.Minute).Err()
+		}
+	}))
+	callbackRegistered := true
+	t.Cleanup(func() {
+		if callbackRegistered {
+			_ = DB.Callback().Update().Remove(callbackName)
+		}
+	})
+
+	_, err := HandleCashbackIncident(topUp.Id, CashbackIncidentInput{
+		Kind: CashbackIncidentRefund, CumulativeRefundRateBPS: 10_000,
+		Reason: "lose incident fence ownership", OperatorID: 999, Now: now + 1,
+	})
+	assert.ErrorIs(t, err, ErrUserQuotaMutationFenceLost)
+	require.NoError(t, DB.Callback().Update().Remove(callbackName))
+	callbackRegistered = false
+
+	require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
+	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
+	assert.Equal(t, inviterQuotaBefore, inviterRow.Quota)
+	assert.Equal(t, inviteeQuotaBefore, inviteeRow.Quota)
+	assert.False(t, redisServer.Exists(getUserCacheKey(inviter.Id)), "rolled-back cache debit must never remain readable")
+	owner, ownerErr := common.RDB.Get(t.Context(), getUserQuotaMutationFenceKey(inviter.Id)).Result()
+	require.NoError(t, ownerErr)
+	assert.Equal(t, replacementOwner, owner, "finalization must not delete a replacement owner's fence")
+	_, err = cacheGetUserBase(inviter.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+
+	var orderContext CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", topUp.Id).First(&orderContext).Error)
+	assert.Empty(t, orderContext.IncidentKind)
+	for _, reward := range rewards {
+		var stored CashbackReward
+		require.NoError(t, DB.First(&stored, reward.ID).Error)
+		assert.Equal(t, CashbackSettlementIssued, stored.SettlementStatus)
+		assert.Zero(t, stored.RecoveredQuota)
+		assert.Zero(t, stored.OutstandingDebtQuota)
+	}
+	var recoveryMutationCount int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).
+		Where("kind IN ?", []CashbackQuotaMutationKind{CashbackQuotaMutationRewardRecovery, CashbackQuotaMutationPrincipalRecovery}).
+		Count(&recoveryMutationCount).Error)
+	assert.Zero(t, recoveryMutationCount)
 }
 
 func TestCashbackIncidentRestoresCacheReservationWhenTransactionRollsBack(t *testing.T) {
@@ -457,7 +986,7 @@ func TestCashbackIncidentRestoresCacheReservationWhenTransactionRollsBack(t *tes
 		require.NoError(t, err)
 	}
 
-	useUserCacheMiniRedis(t)
+	redisServer := useUserCacheMiniRedis(t)
 	var inviterRow, inviteeRow User
 	require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
 	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
@@ -491,9 +1020,14 @@ func TestCashbackIncidentRestoresCacheReservationWhenTransactionRollsBack(t *tes
 	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
 	assert.Equal(t, inviterQuotaBefore, inviterRow.Quota)
 	assert.Equal(t, inviteeQuotaBefore, inviteeRow.Quota)
-	inviterCache, err := cacheGetUserBase(inviter.Id)
+	_, err = cacheGetUserBase(inviter.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	_, err = cacheGetUserBase(invitee.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	redisServer.FastForward(time.Duration(userQuotaMutationCooldownSeconds()+1) * time.Second)
+	inviterCache, err := GetUserCache(inviter.Id)
 	require.NoError(t, err)
-	inviteeCache, err := cacheGetUserBase(invitee.Id)
+	inviteeCache, err := GetUserCache(invitee.Id)
 	require.NoError(t, err)
 	assert.Equal(t, inviterQuotaBefore, inviterCache.Quota)
 	assert.Equal(t, inviteeQuotaBefore, inviteeCache.Quota)
@@ -551,7 +1085,7 @@ func TestCashbackIncidentRestoresCacheReservationWhenTransactionPanics(t *testin
 		require.NoError(t, err)
 	}
 
-	useUserCacheMiniRedis(t)
+	redisServer := useUserCacheMiniRedis(t)
 	var inviterRow, inviteeRow User
 	require.NoError(t, DB.First(&inviterRow, inviter.Id).Error)
 	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
@@ -585,9 +1119,14 @@ func TestCashbackIncidentRestoresCacheReservationWhenTransactionPanics(t *testin
 	require.NoError(t, DB.First(&inviteeRow, invitee.Id).Error)
 	assert.Equal(t, inviterQuotaBefore, inviterRow.Quota)
 	assert.Equal(t, inviteeQuotaBefore, inviteeRow.Quota)
-	inviterCache, err := cacheGetUserBase(inviter.Id)
+	_, err := cacheGetUserBase(inviter.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	_, err = cacheGetUserBase(invitee.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	redisServer.FastForward(time.Duration(userQuotaMutationCooldownSeconds()+1) * time.Second)
+	inviterCache, err := GetUserCache(inviter.Id)
 	require.NoError(t, err)
-	inviteeCache, err := cacheGetUserBase(invitee.Id)
+	inviteeCache, err := GetUserCache(invitee.Id)
 	require.NoError(t, err)
 	assert.Equal(t, inviterQuotaBefore, inviterCache.Quota)
 	assert.Equal(t, inviteeQuotaBefore, inviteeCache.Quota)
@@ -934,6 +1473,27 @@ func TestAllOnlineTopUpProvidersCreateCashbackInSettlement(t *testing.T) {
 	}
 }
 
+func TestCashbackReasonLimitCountsUnicodeCodePoints(t *testing.T) {
+	setupCashbackTestDB(t)
+	valid := strings.Repeat("理", maxCashbackReasonCharacters)
+	tooLong := valid + "理"
+	assert.True(t, cashbackTextWithinLimit(valid))
+	assert.False(t, cashbackTextWithinLimit(tooLong))
+
+	_, err := ReviewCashbackReward(999, CashbackReviewActionApprove, valid, 1, 1)
+	assert.ErrorIs(t, err, ErrCashbackNotFound)
+	_, err = ReviewCashbackReward(999, CashbackReviewActionApprove, tooLong, 1, 1)
+	assert.ErrorIs(t, err, ErrCashbackInvalidInput)
+	_, err = HandleCashbackIncident(999, CashbackIncidentInput{
+		Kind: CashbackIncidentDispute, Reason: tooLong, OperatorID: 1, Now: 1,
+	})
+	assert.ErrorIs(t, err, ErrCashbackInvalidInput)
+	_, err = ResolveCashbackRewardDebt(999, 1, tooLong, 1)
+	assert.ErrorIs(t, err, ErrCashbackInvalidInput)
+	_, err = ResolveCashbackPrincipalDebt(999, 1, tooLong, 1)
+	assert.ErrorIs(t, err, ErrCashbackInvalidInput)
+}
+
 func TestParseCashbackDeviceSignalRejectsUntrustedValuesWithoutBlockingMissing(t *testing.T) {
 	hash, status := ParseCashbackDeviceSignal("")
 	assert.Empty(t, hash)
@@ -997,9 +1557,52 @@ func TestPostEnableTopUpCannotCompleteWithoutRequiredCashbackContext(t *testing.
 		}
 		return CompleteTopUpCashbackTx(tx, &locked, 1_000, CashbackCompletionProviderCallback)
 	})
-	require.ErrorIs(t, err, ErrCashbackInvalidState)
+	require.NoError(t, err)
 	require.NoError(t, DB.First(&stored, topUp.Id).Error)
-	assert.Equal(t, common.TopUpStatusPending, stored.Status)
+	assert.Equal(t, common.TopUpStatusSuccess, stored.Status)
+	require.NoError(t, DB.First(&invalidContext, invalidContext.ID).Error)
+	assert.Equal(t, CashbackCompletionProviderCallback, invalidContext.CompletionSource)
+	assert.Equal(t, 1_000, invalidContext.CreditedQuota)
+	var rewardCount int64
+	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", topUp.Id).Count(&rewardCount).Error)
+	assert.Zero(t, rewardCount)
+}
+
+func TestContextlessPreEnableTopUpKeepsLegacyCompatibility(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	firstEnabledAt := now - 100
+	saveCashbackTestSetting(t, firstEnabledAt)
+	_, invitee := createCashbackUsers(t, now-30*24*60*60)
+	topUp := TopUp{
+		UserId: invitee.Id, Amount: 1, Money: 1, TradeNo: "legacy-pre-enable-contextless",
+		PaymentMethod: PaymentMethodStripe, PaymentProvider: PaymentProviderStripe,
+		CreateTime: firstEnabledAt - 1, Status: common.TopUpStatusPending,
+	}
+	require.NoError(t, DB.Create(&topUp).Error)
+
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var locked TopUp
+		if err := lockForUpdate(tx).First(&locked, topUp.Id).Error; err != nil {
+			return err
+		}
+		locked.Status = common.TopUpStatusSuccess
+		locked.CompleteTime = now
+		if err := tx.Save(&locked).Error; err != nil {
+			return err
+		}
+		return CompleteTopUpCashbackTx(tx, &locked, 1_000, CashbackCompletionProviderCallback)
+	})
+	require.NoError(t, err)
+
+	var stored TopUp
+	require.NoError(t, DB.First(&stored, topUp.Id).Error)
+	assert.Equal(t, common.TopUpStatusSuccess, stored.Status)
+	var contextCount, rewardCount int64
+	require.NoError(t, DB.Model(&CashbackOrderContext{}).Where("top_up_id = ?", topUp.Id).Count(&contextCount).Error)
+	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", topUp.Id).Count(&rewardCount).Error)
+	assert.Zero(t, contextCount)
+	assert.Zero(t, rewardCount)
 }
 
 func TestStripeRechargeDuplicateCallbackIsIdempotentWithCashback(t *testing.T) {

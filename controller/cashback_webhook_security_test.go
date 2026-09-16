@@ -42,7 +42,7 @@ func generateWaffoTestKeys(t *testing.T) (string, string) {
 	return base64.StdEncoding.EncodeToString(privateDER), base64.StdEncoding.EncodeToString(publicDER)
 }
 
-func TestStripeWebhookRetriesWhenCashbackTransactionRollsBack(t *testing.T) {
+func TestStripeWebhookRetriesWhenCashbackContextTableIsMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	oldDB, oldLogDB := model.DB, model.LOG_DB
 	oldDatabaseType := common.MainDatabaseType()
@@ -61,8 +61,8 @@ func TestStripeWebhookRetriesWhenCashbackTransactionRollsBack(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(
-		&model.User{}, &model.TopUp{}, &model.Option{}, &model.CashbackOrderContext{},
-		&model.CashbackReward{}, &model.CashbackDeviceLink{}, &model.SubscriptionOrder{}, &model.Log{},
+		&model.User{}, &model.TopUp{}, &model.Option{},
+		&model.CashbackReward{}, &model.CashbackDeviceLink{}, &model.CashbackQuotaMutation{}, &model.SubscriptionOrder{}, &model.Log{},
 	))
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
@@ -108,9 +108,10 @@ func TestStripeWebhookRetriesWhenCashbackTransactionRollsBack(t *testing.T) {
 		PaymentMethod: model.PaymentMethodStripe, PaymentProvider: model.PaymentProviderStripe,
 		CreateTime: now, Status: common.TopUpStatusPending,
 	}
-	// Deliberately bypass InsertOnlineTopUp to simulate a broken post-enable
-	// order that lacks its required cashback side-table context.
+	// Deliberately bypass InsertOnlineTopUp to create the provider order while
+	// the required cashback context table is unavailable.
 	require.NoError(t, db.Create(&topUp).Error)
+	assert.False(t, db.Migrator().HasTable(&model.CashbackOrderContext{}))
 
 	payload := []byte(`{"id":"evt_cashback_retry","type":"checkout.session.completed","data":{"object":{"object":"checkout.session","client_reference_id":"stripe-cashback-retry","status":"complete","payment_status":"paid","customer":"cus_cashback","amount_total":100,"currency":"usd"}}}`)
 	signed := stripewebhook.GenerateTestSignedPayload(&stripewebhook.UnsignedPayload{

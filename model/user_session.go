@@ -702,14 +702,22 @@ func AdvanceUserSessionAuthVersion(userID int, sid string, expectedSessionVersio
 }
 
 func RevokeOtherUserSessions(userID int, currentSID, reason string) (int64, error) {
-	return revokeUserSessions(userID, currentSID, reason)
+	return revokeUserSessions(userID, currentSID, reason, false)
 }
 
 func RevokeAllUserSessions(userID int, reason string) (int64, error) {
-	return revokeUserSessions(userID, "", reason)
+	return revokeUserSessions(userID, "", reason, false)
 }
 
-func revokeUserSessions(userID int, excludedSID, reason string) (int64, error) {
+// revokeAllUserSessionsAfterAuthVersionChange is used only after the user's
+// auth version has committed and its pre-commit Redis fence was published.
+// That fence already rejects stale session/user snapshots, so a Redis outage
+// must not prevent the durable session rows from being revoked.
+func revokeAllUserSessionsAfterAuthVersionChange(userID int, reason string) (int64, error) {
+	return revokeUserSessions(userID, "", reason, true)
+}
+
+func revokeUserSessions(userID int, excludedSID, reason string, tolerateCacheFenceFailure bool) (int64, error) {
 	if userID <= 0 {
 		return 0, ErrUserSessionInvalid
 	}
@@ -729,7 +737,10 @@ func revokeUserSessions(userID int, excludedSID, reason string) (int64, error) {
 		}
 		for i := range candidates {
 			if err := writeUserSessionDenyFence(&candidates[i], UserSessionStatusRevoking, now, reason); err != nil {
-				return totalAffected, err
+				if !tolerateCacheFenceFailure {
+					return totalAffected, err
+				}
+				common.SysError(fmt.Sprintf("failed to publish session deny fence after committed auth-version change for user %d: %v", userID, err))
 			}
 		}
 
