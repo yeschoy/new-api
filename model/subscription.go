@@ -758,11 +758,18 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		return errors.New("invalid userId or planId")
 	}
 
+	quotaFences, err := acquireUserQuotaMutationFences(userId)
+	if err != nil {
+		return err
+	}
+	quotaCommitted := false
+	defer func() { finalizeUserQuotaMutationFences(quotaFences, quotaCommitted) }()
+
 	var logPlanTitle string
 	var logMoney float64
 	var chargedQuota int
 	var upgradeGroup string
-	err := DB.Transaction(func(tx *gorm.DB) error {
+	err = DB.Transaction(func(tx *gorm.DB) error {
 		plan, err := getSubscriptionPlanByIdTx(tx, planId)
 		if err != nil {
 			return err
@@ -825,6 +832,9 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		if subscription.PrevUserGroup != "" {
 			upgradeGroup = strings.TrimSpace(subscription.UpgradeGroup)
 		}
+		if requiredQuota > 0 {
+			return quotaFences.verify()
+		}
 		return nil
 	})
 	if err != nil {
@@ -832,9 +842,8 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 	}
 
 	if chargedQuota > 0 {
-		if err := cacheDecrUserQuota(userId, int64(chargedQuota)); err != nil {
-			common.SysLog("failed to decrease user quota cache after subscription balance purchase: " + err.Error())
-		}
+		quotaCommitted = true
+		syncUserQuotaDeltaCache(quotaFences, userId, -chargedQuota, "subscription balance purchase")
 	}
 	if upgradeGroup != "" {
 		refreshSubscriptionUserGroupCache(userId, "subscription balance purchase")

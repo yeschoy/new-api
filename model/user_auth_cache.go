@@ -59,7 +59,10 @@ func writeUserCache(user *UserBase, includeQuota bool) error {
 	}
 	ttl := userCacheTTLSeconds()
 	const script = `
-if redis.call('EXISTS', KEYS[4]) == 1 then
+local clock = redis.call('TIME')
+local now = tonumber(clock[1]) * 1000 + math.floor(tonumber(clock[2]) / 1000)
+redis.call('ZREMRANGEBYSCORE', KEYS[5], '-inf', now)
+if redis.call('EXISTS', KEYS[4]) == 1 or redis.call('ZCARD', KEYS[5]) > 0 then
   return -1
 end
 local incoming = tonumber(ARGV[1])
@@ -93,6 +96,7 @@ return 1`
 			getUserAuthFenceKey(user.Id),
 			getUserAuthVersionKey(user.Id),
 			getUserQuotaMutationFenceKey(user.Id),
+			getUserQuotaBatchPendingKey(user.Id),
 		},
 		user.AuthVersion, user.Id, user.Group, user.Email, user.Status, user.Role,
 		user.Username, user.Setting, user.CacheSchema, includeQuotaArg, user.Quota, ttl,

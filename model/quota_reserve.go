@@ -32,18 +32,35 @@ if quota == nil or quota < tonumber(ARGV[1]) then
   return 0
 end
 redis.call('HINCRBY', KEYS[1], 'Quota', -tonumber(ARGV[1]))
+if ARGV[4] ~= '' then
+  local clock = redis.call('TIME')
+  local now = tonumber(clock[1]) * 1000 + math.floor(tonumber(clock[2]) / 1000)
+  redis.call('ZADD', KEYS[3], now + tonumber(ARGV[5]), ARGV[4])
+  redis.call('EXPIRE', KEYS[3], ARGV[6])
+  redis.call('EXPIRE', KEYS[1], ARGV[7])
+end
 return 1`
 
 const userQuotaDeltaScript = `
 if redis.call('EXISTS', KEYS[2]) == 1 then
   return -2
 end
-if tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') ~= tonumber(ARGV[2])
-  or tonumber(redis.call('HGET', KEYS[1], 'CacheSchema') or '0') ~= tonumber(ARGV[3])
-  or redis.call('HEXISTS', KEYS[1], 'Quota') == 0 then
+local cache_valid = tonumber(redis.call('HGET', KEYS[1], 'Id') or '0') == tonumber(ARGV[2])
+  and tonumber(redis.call('HGET', KEYS[1], 'CacheSchema') or '0') == tonumber(ARGV[3])
+  and redis.call('HEXISTS', KEYS[1], 'Quota') == 1
+if ARGV[4] ~= '' then
+  local clock = redis.call('TIME')
+  local now = tonumber(clock[1]) * 1000 + math.floor(tonumber(clock[2]) / 1000)
+  redis.call('ZADD', KEYS[3], now + tonumber(ARGV[5]), ARGV[4])
+  redis.call('EXPIRE', KEYS[3], ARGV[6])
+end
+if not cache_valid then
   return -1
 end
 redis.call('HINCRBY', KEYS[1], 'Quota', tonumber(ARGV[1]))
+if ARGV[4] ~= '' then
+  redis.call('EXPIRE', KEYS[1], ARGV[7])
+end
 return 1`
 
 const tokenQuotaReserveScript = `
@@ -88,20 +105,48 @@ func quotaResultFromLua(result int, err error) (cacheQuotaResult, error) {
 	}
 }
 
-func cacheTryReserveUserQuota(userID int, amount int64) (cacheQuotaResult, error) {
+func cacheTryReserveUserQuotaWithBatchOwner(userID int, amount int64, owner string) (cacheQuotaResult, error) {
 	result, err := common.RDB.Eval(context.Background(), userQuotaReserveScript,
-		[]string{getUserCacheKey(userID), getUserQuotaMutationFenceKey(userID)},
-		amount, userID, userCacheSchemaVersion,
+		[]string{
+			getUserCacheKey(userID),
+			getUserQuotaMutationFenceKey(userID),
+			getUserQuotaBatchPendingKey(userID),
+		},
+		amount,
+		userID,
+		userCacheSchemaVersion,
+		owner,
+		userQuotaBatchPendingLeaseMillis(),
+		userQuotaBatchPendingKeyTTLSeconds(),
+		userQuotaMutationHashTTLSeconds(),
+	).Int()
+	return quotaResultFromLua(result, err)
+}
+
+func cacheTryReserveUserQuota(userID int, amount int64) (cacheQuotaResult, error) {
+	return cacheTryReserveUserQuotaWithBatchOwner(userID, amount, "")
+}
+
+func cacheApplyUserQuotaDeltaWithBatchOwner(userID int, delta int64, owner string) (cacheQuotaResult, error) {
+	result, err := common.RDB.Eval(context.Background(), userQuotaDeltaScript,
+		[]string{
+			getUserCacheKey(userID),
+			getUserQuotaMutationFenceKey(userID),
+			getUserQuotaBatchPendingKey(userID),
+		},
+		delta,
+		userID,
+		userCacheSchemaVersion,
+		owner,
+		userQuotaBatchPendingLeaseMillis(),
+		userQuotaBatchPendingKeyTTLSeconds(),
+		userQuotaMutationHashTTLSeconds(),
 	).Int()
 	return quotaResultFromLua(result, err)
 }
 
 func cacheApplyUserQuotaDelta(userID int, delta int64) (cacheQuotaResult, error) {
-	result, err := common.RDB.Eval(context.Background(), userQuotaDeltaScript,
-		[]string{getUserCacheKey(userID), getUserQuotaMutationFenceKey(userID)},
-		delta, userID, userCacheSchemaVersion,
-	).Int()
-	return quotaResultFromLua(result, err)
+	return cacheApplyUserQuotaDeltaWithBatchOwner(userID, delta, "")
 }
 
 func cacheTryReserveTokenQuota(id int, key string, amount int64) (cacheQuotaResult, error) {
@@ -116,13 +161,9 @@ func cacheApplyTokenQuotaDelta(id int, key string, delta int64) (cacheQuotaResul
 	return quotaResultFromLua(result, err)
 }
 
-// persistUserQuotaDelta 把已在缓存侧预扣成功的增量落库；批量模式下入队，
-// 直写模式下要求行存在（用户已删除时报错，交由调用方补偿缓存）。
+// persistUserQuotaDelta writes a synchronously reserved delta to the database.
+// Batch mode queues through cacheTryReserveAndQueueUserQuota instead.
 func persistUserQuotaDelta(id int, delta int) error {
-	if common.BatchUpdateEnabled {
-		addNewRecord(BatchUpdateTypeUserQuota, id, delta)
-		return nil
-	}
 	result := DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", delta))
 	if result.Error != nil {
 		return result.Error
@@ -187,7 +228,13 @@ func TryReserveUserQuota(id int, quota int) (bool, error) {
 		return reserveUserQuotaDB(id, quota)
 	}
 
-	result, err := cacheTryReserveUserQuota(id, int64(quota))
+	var result cacheQuotaResult
+	var err error
+	if common.BatchUpdateEnabled {
+		result, err = cacheTryReserveAndQueueUserQuota(id, quota)
+	} else {
+		result, err = cacheTryReserveUserQuota(id, int64(quota))
+	}
 	if err != nil {
 		return false, err
 	}
@@ -198,7 +245,11 @@ func TryReserveUserQuota(id int, quota int) (bool, error) {
 		if _, hydrateErr := GetUserCache(id); hydrateErr != nil {
 			return false, hydrateErr
 		}
-		result, err = cacheTryReserveUserQuota(id, int64(quota))
+		if common.BatchUpdateEnabled {
+			result, err = cacheTryReserveAndQueueUserQuota(id, quota)
+		} else {
+			result, err = cacheTryReserveUserQuota(id, int64(quota))
+		}
 		if err != nil {
 			return false, err
 		}
@@ -211,6 +262,9 @@ func TryReserveUserQuota(id int, quota int) (bool, error) {
 	}
 	if result == cacheQuotaInsufficient {
 		return false, nil
+	}
+	if common.BatchUpdateEnabled {
+		return true, nil
 	}
 	if err = persistUserQuotaDelta(id, -quota); err != nil {
 		compensated, compensateErr := cacheApplyUserQuotaDelta(id, int64(quota))

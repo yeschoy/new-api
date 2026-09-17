@@ -148,6 +148,14 @@ func Redeem(key string, userId int) (quota int, err error) {
 		keyCol = `"key"`
 	}
 	common.RandomSleep()
+	creditFences, err := acquireUserQuotaMutationFences(userId)
+	if err != nil {
+		common.SysError("redemption quota fence acquisition failed: " + err.Error())
+		return 0, ErrRedeemFailed
+	}
+	creditCommitted := false
+	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
+
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
 		if err != nil {
@@ -175,13 +183,14 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if result.RowsAffected == 0 {
 			return errors.New("该兑换码已被使用")
 		}
-		return creditTopUpQuota(tx, userId, redemption.Quota, nil)
+		return creditTopUpQuotaProtected(tx, userId, redemption.Quota, nil, creditFences)
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
 	}
-	syncCreditUserQuotaCache(userId, redemption.Quota, "redemption")
+	creditCommitted = true
+	syncCreditUserQuotaCache(creditFences, userId, redemption.Quota, "redemption")
 	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
 	return redemption.Quota, nil
 }
