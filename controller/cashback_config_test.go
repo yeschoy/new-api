@@ -52,6 +52,13 @@ func setupCashbackConfigControllerTest(t *testing.T) {
 	})
 }
 
+const validCashbackConfigJSON = `{
+	"inviter_enabled":false,"invitee_enabled":false,
+	"inviter_rate_bps":0,"invitee_rate_bps":0,
+	"settlement_days":7,"max_reward_quota":1000,"daily_reward_quota":5000,
+	"ip_account_threshold":3,"device_account_threshold":2,"daily_topup_count_threshold":5
+}`
+
 func runCashbackConfigUpdate(t *testing.T, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodPut, "/api/cashback/config", bytes.NewBufferString(body))
@@ -105,6 +112,65 @@ func TestUpdateCashbackConfigMalformedJSONReturnsStableConfigField(t *testing.T)
 
 	assert.Equal(t, http.StatusBadRequest, response.Code)
 	assert.JSONEq(t, `{"success":false,"message":"invalid cashback configuration","field":"config"}`, response.Body.String())
+}
+
+func TestUpdateCashbackConfigRejectsIncompleteReplacementWithoutMutation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, testCase := range []struct {
+		name         string
+		body         string
+		missingField string
+	}{
+		{
+			name: "boolean",
+			body: `{
+				"invitee_enabled":false,
+				"inviter_rate_bps":0,"invitee_rate_bps":0,
+				"settlement_days":7,"max_reward_quota":1000,"daily_reward_quota":5000,
+				"ip_account_threshold":3,"device_account_threshold":2,"daily_topup_count_threshold":5
+			}`,
+			missingField: "inviter_enabled",
+		},
+		{
+			name: "numeric",
+			body: `{
+				"inviter_enabled":false,"invitee_enabled":false,
+				"inviter_rate_bps":0,"invitee_rate_bps":0,
+				"settlement_days":7,"max_reward_quota":1000,"daily_reward_quota":5000,
+				"ip_account_threshold":3,"device_account_threshold":2
+			}`,
+			missingField: "daily_topup_count_threshold",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			setupCashbackConfigControllerTest(t)
+			before, err := model.GetCashbackSettingFromDB()
+			require.NoError(t, err)
+
+			response := runCashbackConfigUpdate(t, testCase.body)
+
+			assert.Equal(t, http.StatusBadRequest, response.Code)
+			assert.Contains(t, response.Body.String(), `"field":"`+testCase.missingField+`"`)
+			after, err := model.GetCashbackSettingFromDB()
+			require.NoError(t, err)
+			assert.Equal(t, before, after)
+		})
+	}
+}
+
+func TestUpdateCashbackConfigRejectsTrailingJSONWithoutMutation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	before, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+
+	response := runCashbackConfigUpdate(t, validCashbackConfigJSON+` {"extra":true}`)
+
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Contains(t, response.Body.String(), `"field":"config"`)
+	after, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
 }
 
 func TestUpdateCashbackConfigRejectsCombinedRateAboveOneHundredPercent(t *testing.T) {

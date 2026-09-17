@@ -425,7 +425,7 @@ func cashbackAPIError(c *gin.Context, status int, err error) {
 		code = "CASHBACK_REASON_REQUIRED"
 	case errors.Is(err, model.ErrCashbackRefundRate):
 		code = "CASHBACK_REFUND_RATE_INVALID"
-	case errors.Is(err, model.ErrCashbackInvalidState):
+	case errors.Is(err, model.ErrCashbackInvalidState), errors.Is(err, model.ErrCashbackDebtNotFound), errors.Is(err, model.ErrTopUpStatusInvalid):
 		code = "CASHBACK_STATE_CONFLICT"
 	case errors.Is(err, model.ErrCashbackNotFound):
 		code = "CASHBACK_NOT_FOUND"

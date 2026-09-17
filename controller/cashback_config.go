@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -15,16 +17,72 @@ import (
 )
 
 type cashbackConfigUpdateRequest struct {
-	InviterEnabled           bool `json:"inviter_enabled"`
-	InviteeEnabled           bool `json:"invitee_enabled"`
-	InviterRateBPS           int  `json:"inviter_rate_bps"`
-	InviteeRateBPS           int  `json:"invitee_rate_bps"`
-	SettlementDays           int  `json:"settlement_days"`
-	MaxRewardQuota           int  `json:"max_reward_quota"`
-	DailyRewardQuota         int  `json:"daily_reward_quota"`
-	IPAccountThreshold       int  `json:"ip_account_threshold"`
-	DeviceAccountThreshold   int  `json:"device_account_threshold"`
-	DailyTopUpCountThreshold int  `json:"daily_topup_count_threshold"`
+	InviterEnabled           *bool `json:"inviter_enabled"`
+	InviteeEnabled           *bool `json:"invitee_enabled"`
+	InviterRateBPS           *int  `json:"inviter_rate_bps"`
+	InviteeRateBPS           *int  `json:"invitee_rate_bps"`
+	SettlementDays           *int  `json:"settlement_days"`
+	MaxRewardQuota           *int  `json:"max_reward_quota"`
+	DailyRewardQuota         *int  `json:"daily_reward_quota"`
+	IPAccountThreshold       *int  `json:"ip_account_threshold"`
+	DeviceAccountThreshold   *int  `json:"device_account_threshold"`
+	DailyTopUpCountThreshold *int  `json:"daily_topup_count_threshold"`
+}
+
+func decodeCashbackConfigUpdate(reader io.Reader) (cashbackConfigUpdateRequest, error) {
+	var request cashbackConfigUpdateRequest
+	decoder := json.NewDecoder(reader)
+	if err := decoder.Decode(&request); err != nil {
+		return request, err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return request, errors.New("multiple cashback configuration documents")
+		}
+		return request, err
+	}
+	return request, nil
+}
+
+func (request cashbackConfigUpdateRequest) candidate() (operation_setting.CashbackSetting, string) {
+	missing := ""
+	switch {
+	case request.InviterEnabled == nil:
+		missing = "inviter_enabled"
+	case request.InviteeEnabled == nil:
+		missing = "invitee_enabled"
+	case request.InviterRateBPS == nil:
+		missing = "inviter_rate_bps"
+	case request.InviteeRateBPS == nil:
+		missing = "invitee_rate_bps"
+	case request.SettlementDays == nil:
+		missing = "settlement_days"
+	case request.MaxRewardQuota == nil:
+		missing = "max_reward_quota"
+	case request.DailyRewardQuota == nil:
+		missing = "daily_reward_quota"
+	case request.IPAccountThreshold == nil:
+		missing = "ip_account_threshold"
+	case request.DeviceAccountThreshold == nil:
+		missing = "device_account_threshold"
+	case request.DailyTopUpCountThreshold == nil:
+		missing = "daily_topup_count_threshold"
+	}
+	if missing != "" {
+		return operation_setting.CashbackSetting{}, missing
+	}
+	return operation_setting.CashbackSetting{
+		InviterEnabled:           *request.InviterEnabled,
+		InviteeEnabled:           *request.InviteeEnabled,
+		InviterRateBPS:           *request.InviterRateBPS,
+		InviteeRateBPS:           *request.InviteeRateBPS,
+		SettlementDays:           *request.SettlementDays,
+		MaxRewardQuota:           *request.MaxRewardQuota,
+		DailyRewardQuota:         *request.DailyRewardQuota,
+		IPAccountThreshold:       *request.IPAccountThreshold,
+		DeviceAccountThreshold:   *request.DeviceAccountThreshold,
+		DailyTopUpCountThreshold: *request.DailyTopUpCountThreshold,
+	}, ""
 }
 
 type cashbackConfigResponse struct {
@@ -47,8 +105,8 @@ func GetCashbackConfig(c *gin.Context) {
 }
 
 func UpdateCashbackConfig(c *gin.Context) {
-	var request cashbackConfigUpdateRequest
-	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
+	request, err := decodeCashbackConfigUpdate(c.Request.Body)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid cashback configuration",
@@ -56,22 +114,19 @@ func UpdateCashbackConfig(c *gin.Context) {
 		})
 		return
 	}
+	candidate, missingField := request.candidate()
+	if missingField != "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "missing cashback configuration field",
+			"field":   missingField,
+		})
+		return
+	}
 
 	cashbackConfigUpdateMu.Lock()
 	defer cashbackConfigUpdateMu.Unlock()
 
-	candidate := operation_setting.CashbackSetting{
-		InviterEnabled:           request.InviterEnabled,
-		InviteeEnabled:           request.InviteeEnabled,
-		InviterRateBPS:           request.InviterRateBPS,
-		InviteeRateBPS:           request.InviteeRateBPS,
-		SettlementDays:           request.SettlementDays,
-		MaxRewardQuota:           request.MaxRewardQuota,
-		DailyRewardQuota:         request.DailyRewardQuota,
-		IPAccountThreshold:       request.IPAccountThreshold,
-		DeviceAccountThreshold:   request.DeviceAccountThreshold,
-		DailyTopUpCountThreshold: request.DailyTopUpCountThreshold,
-	}
 	current, next, err := model.UpdateCashbackSettingAtomic(
 		candidate,
 		operation_setting.IsPaymentComplianceConfirmed(),

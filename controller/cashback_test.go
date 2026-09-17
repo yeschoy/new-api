@@ -62,3 +62,29 @@ func TestCashbackQuotaMutationErrorsUseStableSafeContract(t *testing.T) {
 		})
 	}
 }
+
+func TestCashbackStateErrorsUseConflictCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, testCase := range []struct {
+		name string
+		err  error
+	}{
+		{name: "missing debt", err: model.ErrCashbackDebtNotFound},
+		{name: "invalid top-up state", err: model.ErrTopUpStatusInvalid},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+
+			status := cashbackErrorStatus(testCase.err)
+			cashbackAPIError(context, status, testCase.err)
+
+			assert.Equal(t, http.StatusConflict, recorder.Code)
+			var response struct {
+				Code string `json:"code"`
+			}
+			require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+			assert.Equal(t, "CASHBACK_STATE_CONFLICT", response.Code)
+		})
+	}
+}
