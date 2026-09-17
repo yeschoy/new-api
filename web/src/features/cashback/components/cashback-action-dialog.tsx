@@ -120,10 +120,14 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
     props.detail.reward.risk_level === 'high' ||
     props.detail.reward.risk_level === 'severe'
   const minimumPercent = props.detail.order.cumulative_refund_rate_bps / 100
-  const incidentRateValid =
+  const refundRateBPS = Math.round(refundPercent * 100)
+  const incidentRatePrecisionValid =
+    Number.isFinite(refundPercent) && refundRateBPS / 100 === refundPercent
+  const incidentRateRangeValid =
     refundPercent >= minimumPercent &&
     refundPercent <= 100 &&
     (incidentKind !== 'refund' || refundPercent > 0)
+  const incidentRateValid = incidentRateRangeValid && incidentRatePrecisionValid
   const reasonTooLong = unicodeLength(reason) > MAX_CASHBACK_REASON_CHARACTERS
   const evidenceTooLong =
     unicodeLength(evidenceRef) > MAX_CASHBACK_REASON_CHARACTERS
@@ -133,7 +137,7 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
     (props.action !== 'incident' || (incidentRateValid && !evidenceTooLong))
 
   async function handleSubmit() {
-    if (submissionStartedRef.current) return
+    if (!canSubmit || submissionStartedRef.current) return
     submissionStartedRef.current = true
     setSubmissionStarted(true)
     try {
@@ -157,9 +161,7 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
             topUpId: props.detail.reward.top_up_id,
             kind: incidentKind,
             cumulativeRefundRateBPS:
-              incidentKind === 'chargeback'
-                ? 10000
-                : Math.round(refundPercent * 100),
+              incidentKind === 'chargeback' ? 10000 : refundRateBPS,
             reason: reason.trim(),
             evidenceRef: evidenceRef.trim(),
           })
@@ -301,7 +303,9 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
                   id='cashback-refund-percent-error'
                   className='text-destructive text-xs'
                 >
-                  {t('Refund percentage cannot decrease or exceed 100%.')}
+                  {incidentRateRangeValid
+                    ? t('Use no more than two decimal places')
+                    : t('Refund percentage cannot decrease or exceed 100%.')}
                 </p>
               )}
             </div>

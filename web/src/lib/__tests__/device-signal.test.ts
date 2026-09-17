@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { getDeviceSignal, shouldAttachDeviceSignal } from '../device-signal'
 
@@ -32,7 +32,15 @@ beforeAll(() => {
         return bytes
       },
       subtle: {
-        digest: async () => new Uint8Array(32).fill(2).buffer,
+        digest: async (_algorithm: string, data: BufferSource) => {
+          const input = new Uint8Array(data as ArrayBuffer)
+          const output = new Uint8Array(32)
+          input.forEach((byte, index) => {
+            output[index % output.length] =
+              (output[index % output.length] + byte + index) % 256
+          })
+          return output.buffer
+        },
       },
     },
   })
@@ -50,8 +58,37 @@ describe('device signal', () => {
   it('creates a versioned hashed signal without exposing the local seed', async () => {
     const signal = await getDeviceSignal()
 
-    expect(signal).toBe(`v1:${'02'.repeat(32)}`)
+    expect(signal).toMatch(/^v1:[0-9a-f]{64}$/)
     expect(signal).not.toContain('01'.repeat(32))
+  })
+
+  it('stays stable when mutable browser properties change', async () => {
+    const originalUserAgent = window.navigator.userAgent
+    const originalLanguage = window.navigator.language
+    try {
+      Object.defineProperties(window.navigator, {
+        userAgent: { configurable: true, value: 'browser-version-a' },
+        language: { configurable: true, value: 'en-US' },
+      })
+      vi.resetModules()
+      const firstModule = await import('../device-signal')
+      const first = await firstModule.getDeviceSignal()
+
+      Object.defineProperties(window.navigator, {
+        userAgent: { configurable: true, value: 'browser-version-b' },
+        language: { configurable: true, value: 'fr-FR' },
+      })
+      vi.resetModules()
+      const secondModule = await import('../device-signal')
+      const second = await secondModule.getDeviceSignal()
+
+      expect(second).toBe(first)
+    } finally {
+      Object.defineProperties(window.navigator, {
+        userAgent: { configurable: true, value: originalUserAgent },
+        language: { configurable: true, value: originalLanguage },
+      })
+    }
   })
 
   it('attaches only to authentication and online top-up POST requests', () => {

@@ -319,6 +319,87 @@ describe('cashback action dialog', () => {
     queryClient.clear()
   })
 
+  it.each(['0.005', '0.01000000001'])(
+    'rejects refund percentage %s when it is not exact basis points',
+    (value) => {
+      const queryClient = new QueryClient({
+        defaultOptions: { mutations: { retry: false } },
+      })
+      render(
+        <QueryClientProvider client={queryClient}>
+          <CashbackActionDialog
+            action='incident'
+            detail={detail}
+            open
+            onOpenChange={() => undefined}
+          />
+        </QueryClientProvider>
+      )
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Reason' }), {
+        target: { value: 'Provider reported a partial refund' },
+      })
+      const refund = screen.getByRole('spinbutton', {
+        name: 'Cumulative refund percentage',
+      })
+      fireEvent.change(refund, { target: { value } })
+
+      expect(
+        screen.getByRole('button', { name: 'Confirm action' })
+      ).toBeDisabled()
+      expect(refund).toHaveAccessibleDescription(
+        'Use no more than two decimal places'
+      )
+      expect(apiMocks.recordCashbackIncident).not.toHaveBeenCalled()
+      queryClient.clear()
+    }
+  )
+
+  it.each([
+    { value: '0.01', expectedBPS: 1 },
+    { value: '0.29', expectedBPS: 29 },
+  ])(
+    'serializes exact refund percentage $value without rounding',
+    async ({ value, expectedBPS }) => {
+      apiMocks.recordCashbackIncident.mockResolvedValueOnce({
+        success: true,
+        message: '',
+      })
+      const queryClient = new QueryClient({
+        defaultOptions: { mutations: { retry: false } },
+      })
+      render(
+        <QueryClientProvider client={queryClient}>
+          <CashbackActionDialog
+            action='incident'
+            detail={detail}
+            open
+            onOpenChange={() => undefined}
+          />
+        </QueryClientProvider>
+      )
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Reason' }), {
+        target: { value: 'Provider reported a partial refund' },
+      })
+      fireEvent.change(
+        screen.getByRole('spinbutton', {
+          name: 'Cumulative refund percentage',
+        }),
+        { target: { value } }
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm action' }))
+
+      await waitFor(() =>
+        expect(apiMocks.recordCashbackIncident).toHaveBeenCalledWith(
+          detail.reward.top_up_id,
+          expect.objectContaining({ cumulative_refund_rate_bps: expectedBPS })
+        )
+      )
+      queryClient.clear()
+    }
+  )
+
   it.each([
     {
       code: 'CASHBACK_QUOTA_MUTATION_PENDING',

@@ -57,36 +57,15 @@ function getOrCreateDeviceSeed(): string | undefined {
 }
 
 async function createDeviceSignal(): Promise<string | undefined> {
-  if (
-    typeof window === 'undefined' ||
-    typeof navigator === 'undefined' ||
-    !window.crypto?.subtle
-  ) {
+  if (typeof window === 'undefined' || !window.crypto?.subtle) {
     return undefined
   }
   const seed = getOrCreateDeviceSeed()
   if (!seed) return undefined
 
-  let timeZone = ''
-  try {
-    timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? ''
-  } catch {
-    // Time-zone support is optional; the random seed remains the stable anchor.
-  }
-  const screenDescriptor = window.screen
-    ? `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`
-    : ''
-  const material = [
-    seed,
-    navigator.userAgent,
-    navigator.language,
-    navigator.platform,
-    timeZone,
-    screenDescriptor,
-  ].join('\u001f')
   const digest = await window.crypto.subtle.digest(
     'SHA-256',
-    new TextEncoder().encode(material)
+    new TextEncoder().encode(seed)
   )
   return `v1:${bytesToHex(new Uint8Array(digest))}`
 }
