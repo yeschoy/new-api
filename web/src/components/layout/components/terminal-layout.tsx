@@ -449,7 +449,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
             <PanelLeft size={16} />
           </button>
           <div className='ci-appTopbarRight'>
-            <CommunityHelp />
+            <CommunityHelp variant='header' />
             <ConsoleModeControl compact />
             <span className='ci-appUsd'>¥</span>
             <LanguageSwitcher />

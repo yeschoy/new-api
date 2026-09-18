@@ -43,7 +43,7 @@ const VARIANT_CLASSNAMES = {
   },
   header: {
     trigger:
-      'bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary px-3 text-sm font-semibold shadow-sm transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+      'ci-communityTrigger bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary px-3 text-sm font-semibold shadow-sm transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
     panel:
       'border-border bg-background text-foreground absolute top-[calc(100%+10px)] right-0 z-30 grid w-60 justify-items-center gap-2.5 rounded-2xl border p-4 text-center shadow-xl',
     label: 'hidden whitespace-nowrap sm:inline',
