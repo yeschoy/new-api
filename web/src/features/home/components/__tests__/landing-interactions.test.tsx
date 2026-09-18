@@ -98,11 +98,14 @@ describe('landing interactions and price layout', () => {
     landing.setAttribute('data-theme', 'dark')
     expect(getComputedStyle(badge).color).toBe('rgb(225, 234, 216)')
 
-    expect(
-      within(screen.getByRole('banner')).getByRole('button', {
-        name: 'Community',
-      })
-    ).toBeVisible()
+    const community = within(screen.getByRole('banner')).getByRole('button', {
+      name: 'Community',
+    })
+    expect(community).toBeVisible()
+    expect(community).toHaveClass('ci-communityTrigger')
+    expect(readFileSync('src/styles/ci-landing.css', 'utf8')).toMatch(
+      /\.ci-handoffRoot button\.ci-communityTrigger\s*{[^}]*color:\s*var\(--primary-foreground\)/
+    )
   })
 
   it('shows the signed-in account menu and overview entry instead of sign-in links', async () => {

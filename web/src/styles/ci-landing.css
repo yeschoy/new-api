@@ -1537,6 +1537,12 @@ html:not([data-theme='light']) .ci-publicHeaderScope .ci-header {
   letter-spacing: 0;
 }
 
+/* Keep the solid community action legible over the broad button reset above. */
+.ci-handoffRoot button.ci-communityTrigger {
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+
 .ci-handoffRoot a:not(.ci-button) {
   color: inherit;
   text-decoration: none;
