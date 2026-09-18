@@ -142,10 +142,10 @@ export function AppHeader({
           )}
         >
           {showNotifications && !isEasyMode && <AppHeaderNotifications />}
+          <CommunityHelp variant='header' />
           <ConsoleModeControl compact />
           <LanguageSwitcher />
           {showConfigDrawer && <ConfigDrawer />}
-          <CommunityHelp variant='header' />
           {showProfileDropdown && <ProfileDropdown />}
         </div>
       )}

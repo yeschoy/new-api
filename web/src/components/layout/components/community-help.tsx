@@ -26,8 +26,8 @@ type CommunityHelpVariant = 'console' | 'header'
 
 type CommunityHelpProps = {
   /**
-   * `console` keeps the lime console button, `header` fits site top bars where
-   * the label collapses to an icon on small screens.
+   * `console` keeps the lime console button, `header` uses a prominent site
+   * header action whose label only collapses on phone-sized screens.
    */
   variant?: CommunityHelpVariant
 }
@@ -43,10 +43,10 @@ const VARIANT_CLASSNAMES = {
   },
   header: {
     trigger:
-      'text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200',
+      'bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary px-3 text-sm font-semibold shadow-sm transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
     panel:
       'border-border bg-background text-foreground absolute top-[calc(100%+10px)] right-0 z-30 grid w-60 justify-items-center gap-2.5 rounded-2xl border p-4 text-center shadow-xl',
-    label: 'hidden lg:inline',
+    label: 'hidden whitespace-nowrap sm:inline',
     qr: 'size-[180px] shrink-0 rounded-lg bg-white object-contain',
     title: 'text-[13px]',
     hint: 'text-muted-foreground text-xs leading-snug',

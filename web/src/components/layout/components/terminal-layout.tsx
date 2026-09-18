@@ -449,6 +449,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
             <PanelLeft size={16} />
           </button>
           <div className='ci-appTopbarRight'>
+            <CommunityHelp />
             <ConsoleModeControl compact />
             <span className='ci-appUsd'>¥</span>
             <LanguageSwitcher />
@@ -462,7 +463,6 @@ export function TerminalLayout(props: TerminalLayoutProps) {
             >
               {isDark ? <Moon size={16} /> : <Sun size={16} />}
             </button>
-            <CommunityHelp />
           </div>
         </header>
         <div className={cn('ci-appMain', isPlayground && 'ci-appMain--flush')}>
