@@ -137,12 +137,18 @@ describe('terminal sidebar transitions', () => {
     await renderLayout()
 
     const topbar = screen.getByRole('banner')
-    expect(
-      within(topbar).getByRole('button', { name: 'Community' })
-    ).toBeVisible()
+    const community = within(topbar).getByRole('button', {
+      name: 'Community',
+    })
+    expect(community).toBeVisible()
     expect(
       within(topbar).getAllByRole('button', { name: 'Community' })
     ).toHaveLength(1)
+    expect(
+      community.compareDocumentPosition(
+        within(topbar).getByRole('button', { name: 'Easy mode' })
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 
   it('keeps search input and page state while collapsing and reopening', async () => {
