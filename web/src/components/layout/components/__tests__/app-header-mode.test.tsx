@@ -67,6 +67,17 @@ vi.mock('../system-brand', () => ({
 let client: QueryClient
 const previousMode = useConsoleModeStore.getState().mode
 
+function expectCommunityBeforeModeControl() {
+  const community = screen.getByRole('button', { name: 'Community' })
+  for (const mode of ['Easy mode', 'Developer mode']) {
+    expect(
+      community.compareDocumentPosition(
+        screen.getByRole('button', { name: mode })
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  }
+}
+
 afterEach(() => {
   cleanup()
   client.clear()
@@ -94,6 +105,9 @@ describe('application header console mode', () => {
     expect(screen.queryByRole('link', { name: 'Model Square' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Language' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Theme settings' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Community' })).toBeVisible()
+    expect(screen.getAllByRole('button', { name: 'Community' })).toHaveLength(1)
+    expectCommunityBeforeModeControl()
     expect(screen.getByRole('button', { name: 'Profile' })).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Language' }).parentElement
@@ -109,6 +123,9 @@ describe('application header console mode', () => {
       screen.queryByRole('button', { name: 'Search' })
     ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Community' })).toBeVisible()
+    expect(screen.getAllByRole('button', { name: 'Community' })).toHaveLength(1)
+    expectCommunityBeforeModeControl()
     const navigation = screen.getByRole('navigation', {
       name: 'Main navigation',
     })
