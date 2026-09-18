@@ -145,6 +145,10 @@ func GetAndValidateResponsesRequest(c *gin.Context) (*dto.OpenAIResponsesRequest
 	if exceedsMaxTokensLimit(request.MaxOutputTokens) {
 		return nil, errors.New("max_output_tokens is invalid")
 	}
+	if request.MaxOutputTokens != nil && *request.MaxOutputTokens > 0 && *request.MaxOutputTokens < minToolCompletionTokens && jsonHasItems(request.Tools) {
+		raised := minToolCompletionTokens
+		request.MaxOutputTokens = &raised
+	}
 	return request, nil
 }
 
@@ -364,7 +368,47 @@ func GetAndValidateTextRequest(c *gin.Context, relayMode int) (*dto.GeneralOpenA
 			return nil, errors.New("field instruction is required")
 		}
 	}
+	if relayMode == relayconstant.RelayModeChatCompletions {
+		raiseTinyToolCompletionBudget(textRequest)
+	}
 	return textRequest, nil
+}
+
+// Agent clients (Codex, Claude Code) sometimes send a leftover completion
+// budget of a few tokens after a tool round. That cannot emit another tool
+// call or a usable answer, so raise it to a floor instead of forwarding it.
+const minToolCompletionTokens uint = 1024
+
+func raiseTinyToolCompletionBudget(req *dto.GeneralOpenAIRequest) {
+	if req == nil || !chatRequestUsesTools(req) {
+		return
+	}
+	if req.MaxCompletionTokens != nil && *req.MaxCompletionTokens > 0 && *req.MaxCompletionTokens < minToolCompletionTokens {
+		raised := minToolCompletionTokens
+		req.MaxCompletionTokens = &raised
+		return
+	}
+	if req.MaxTokens != nil && *req.MaxTokens > 0 && *req.MaxTokens < minToolCompletionTokens {
+		raised := minToolCompletionTokens
+		req.MaxTokens = &raised
+	}
+}
+
+func chatRequestUsesTools(req *dto.GeneralOpenAIRequest) bool {
+	if len(req.Tools) > 0 || jsonHasItems(req.Functions) {
+		return true
+	}
+	for _, message := range req.Messages {
+		if len(message.ParseToolCalls()) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func jsonHasItems(raw []byte) bool {
+	s := strings.TrimSpace(string(raw))
+	return s != "" && s != "null" && s != "[]" && s != "{}"
 }
 
 func GetAndValidateGeminiRequest(c *gin.Context) (*dto.GeminiChatRequest, error) {

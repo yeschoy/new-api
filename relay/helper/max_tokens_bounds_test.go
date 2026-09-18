@@ -49,6 +49,47 @@ func TestMaxTokensBounds(t *testing.T) {
 		require.Contains(t, err.Error(), "max_tokens is invalid")
 	})
 
+	t.Run("tiny tool max_tokens is raised for chat completions", func(t *testing.T) {
+		c := newJSONContext(t, `{
+			"model":"deepseek-v4.1-flash",
+			"messages":[
+				{"role":"user","content":"a"},
+				{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"bash","arguments":"{}"}}]},
+				{"role":"tool","content":"(no output)","tool_call_id":"call_1"},
+				{"role":"user","content":"?"}
+			],
+			"max_tokens":8,
+			"stream":false
+		}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.NotNil(t, req.MaxTokens)
+		require.EqualValues(t, 1024, *req.MaxTokens)
+	})
+
+	t.Run("tiny max_tokens without tools is left unchanged", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"a"}],"max_tokens":8}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.NotNil(t, req.MaxTokens)
+		require.EqualValues(t, 8, *req.MaxTokens)
+	})
+
+	t.Run("omitted max_tokens is not invented for tool requests", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"a"}],"tools":[{"type":"function","function":{"name":"bash","parameters":{}}}]}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.Nil(t, req.MaxTokens)
+	})
+
+	t.Run("tiny responses max_output_tokens is raised when tools are present", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"gpt-5","input":"hi","max_output_tokens":8,"tools":[{"type":"function","name":"bash"}]}`)
+		req, err := GetAndValidateResponsesRequest(c)
+		require.NoError(t, err)
+		require.NotNil(t, req.MaxOutputTokens)
+		require.EqualValues(t, 1024, *req.MaxOutputTokens)
+	})
+
 	t.Run("claude normal max_tokens accepted", func(t *testing.T) {
 		c := newJSONContext(t, `{"model":"claude-sonnet-4","messages":[{"role":"user","content":"hi"}],"max_tokens":8192}`)
 		req, err := GetAndValidateClaudeRequest(c)
