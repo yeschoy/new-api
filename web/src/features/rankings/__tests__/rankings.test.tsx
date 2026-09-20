@@ -143,7 +143,7 @@ it.each(['anonymous', 'developer', 'easy'] as const)(
       ])
       expect(
         within(navigation).getByRole('link', { name: 'Docs' })
-      ).toHaveAttribute('href', 'https://docs.example.com')
+      ).toHaveAttribute('href', '/guide')
       expect(
         within(navigation).getByRole('link', { name: 'Rankings' })
       ).toHaveAttribute('href', '/rankings')

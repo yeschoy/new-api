@@ -46,7 +46,7 @@ export function PulseSection(props: PulseSectionProps) {
       <PulseCard
         title={t('Trending up')}
         description={t('Models climbing the leaderboard')}
-        icon={<TrendingUp className='size-4 text-emerald-500' />}
+        icon={<TrendingUp className='text-success size-4' />}
       >
         {props.movers.length === 0 ? (
           <PulseEmpty label={t('No notable climbers right now')} />
@@ -62,7 +62,7 @@ export function PulseSection(props: PulseSectionProps) {
       <PulseCard
         title={t('Trending down')}
         description={t('Models losing positions')}
-        icon={<TrendingDown className='size-4 text-rose-500' />}
+        icon={<TrendingDown className='text-destructive size-4' />}
       >
         {props.droppers.length === 0 ? (
           <PulseEmpty label={t('No notable drops right now')} />
@@ -85,15 +85,17 @@ function PulseCard(props: {
   children: React.ReactNode
 }) {
   return (
-    <div className='bg-card overflow-hidden rounded-lg border'>
-      <header className='border-b px-4 py-3'>
-        <h3 className='text-foreground inline-flex items-center gap-2 text-sm font-semibold'>
-          {props.icon}
-          {props.title}
-        </h3>
-        <p className='text-muted-foreground/80 mt-0.5 text-xs'>
+    <div className='ed-panel overflow-hidden'>
+      <header className='ed-panelHead'>
+        <div>
+          <h3 className='inline-flex items-center gap-2'>
+            {props.icon}
+            {props.title}
+          </h3>
+          <p>
           {props.description}
-        </p>
+          </p>
+        </div>
       </header>
       <div className='py-1'>{props.children}</div>
     </div>

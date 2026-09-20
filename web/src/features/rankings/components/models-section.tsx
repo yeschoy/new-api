@@ -164,23 +164,18 @@ export function ModelsSection(props: ModelsSectionProps) {
   }, [chartGridColor, chartTextColor, orderedPoints, t])
 
   return (
-    <section className='bg-card overflow-hidden rounded-lg border'>
-      {/* Chart block ----------------------------------------------------- */}
-      <header className='flex items-start justify-between gap-4 px-5 py-4'>
-        <div className='min-w-0 flex-1'>
-          <h2 className='text-foreground inline-flex items-center gap-2 text-base font-semibold'>
-            <BarChart3 className='text-primary size-4' />
+    <section className='ed-panel overflow-hidden'>
+      <header className='ed-panelHead'>
+        <div>
+          <h2>
+            <BarChart3 className='text-primary mr-2 inline size-4 align-[-2px]' aria-hidden='true' />
             {t('Top Models')}
           </h2>
-          <p className='text-muted-foreground mt-1 text-sm'>
-            {t(PERIOD_DESCRIPTIONS[props.period])}
-          </p>
+          <p>{t(PERIOD_DESCRIPTIONS[props.period])}</p>
         </div>
         <div className='shrink-0 text-right'>
-          <div className='text-foreground font-mono text-2xl font-semibold tabular-nums'>
-            {formatTokens(totalTokens)}
-          </div>
-          <div className='text-muted-foreground/80 text-[10px] font-medium tracking-widest uppercase'>
+          <div className='ed-num text-3xl'>{formatTokens(totalTokens)}</div>
+          <div className='text-muted-foreground text-[0.68rem] font-semibold tracking-[0.12em] uppercase'>
             {t('tokens')}
           </div>
         </div>
@@ -209,11 +204,11 @@ export function ModelsSection(props: ModelsSectionProps) {
       {/* Leaderboard block ----------------------------------------------- */}
       <div className='border-t'>
         <header className='px-5 pt-4 pb-2'>
-          <h3 className='text-foreground inline-flex items-center gap-2 text-sm font-semibold'>
-            <Trophy className='size-3.5 text-amber-500' />
+          <h3 className='ed-display inline-flex items-center gap-2 text-lg'>
+            <Trophy className='text-primary size-4' aria-hidden='true' />
             {t('LLM Leaderboard')}
           </h3>
-          <p className='text-muted-foreground/80 mt-0.5 text-xs'>
+          <p className='text-muted-foreground mt-0.5 text-xs'>
             {t('Compare the most popular models on the platform')}
           </p>
         </header>

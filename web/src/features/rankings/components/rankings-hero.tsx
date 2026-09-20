@@ -18,8 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
-import { cn } from '@/lib/utils'
-
 import type { RankingPeriod } from '../types'
 
 const PERIODS: { id: RankingPeriod; labelKey: string }[] = [
@@ -42,51 +40,30 @@ export function RankingsHero(props: RankingsHeroProps) {
   const { t } = useTranslation()
 
   return (
-    <section className='space-y-5'>
-      <div className='space-y-2'>
-        <h1 className='text-[clamp(1.75rem,4vw,2.5rem)] leading-[1.15] font-bold tracking-tight'>
-          {t('Rankings')}
-        </h1>
-        <p className='text-muted-foreground/80 max-w-2xl text-sm'>
+    <section className='ed-pageHead'>
+      <div>
+        <p className='ed-eyebrow'>{t('Live usage data')}</p>
+        <h1 className='ed-display'>{t('Rankings')}</h1>
+        <p>
           {t(
             'Discover the most-used models and rising vendors on the platform, updated from live usage data.'
           )}
         </p>
       </div>
 
-      {/* Underline tabs for period — clean and unobtrusive. */}
-      <div
-        role='tablist'
-        aria-label={t('Period')}
-        className='border-border/60 flex items-center border-b'
-      >
-        {PERIODS.map((p) => {
-          const isActive = props.period === p.id
-          return (
-            <button
-              key={p.id}
-              role='tab'
-              type='button'
-              aria-selected={isActive}
-              onClick={() => props.onPeriodChange(p.id)}
-              className={cn(
-                'focus-visible:ring-ring/40 relative -mb-px rounded-sm px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none',
-                isActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {t(p.labelKey)}
-              <span
-                aria-hidden
-                className={cn(
-                  'bg-foreground absolute inset-x-3 -bottom-px h-[2px] rounded-full transition-opacity',
-                  isActive ? 'opacity-100' : 'opacity-0'
-                )}
-              />
-            </button>
-          )
-        })}
+      <div role='tablist' aria-label={t('Period')} className='ed-chipRow'>
+        {PERIODS.map((p) => (
+          <button
+            key={p.id}
+            role='tab'
+            type='button'
+            aria-selected={props.period === p.id}
+            onClick={() => props.onPeriodChange(p.id)}
+            className='ed-chip'
+          >
+            {t(p.labelKey)}
+          </button>
+        ))}
       </div>
     </section>
   )
