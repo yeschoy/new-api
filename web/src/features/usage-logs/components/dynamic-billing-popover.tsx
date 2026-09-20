@@ -51,7 +51,7 @@ export function DynamicBillingPopover(props: DynamicBillingPopoverProps) {
             type='button'
             variant='outline'
             size='icon-xs'
-            className='ci-requestBillingHelp'
+            className='rounded-full'
             aria-label={t('Billing Details')}
           >
             <CircleQuestionMark aria-hidden='true' />
@@ -62,17 +62,17 @@ export function DynamicBillingPopover(props: DynamicBillingPopoverProps) {
         side='bottom'
         align='start'
         sideOffset={8}
-        className='ci-requestBillingPopover w-96 max-w-[calc(100vw-1.5rem)]'
+        className='ed-billingPopover w-96 max-w-[calc(100vw-1.5rem)]'
         role='tooltip'
         aria-label={t('Billing Details')}
       >
-        <div className='ci-requestBillingPopoverHeader'>
+        <div className='ed-billingPopoverHead'>
           <strong>{t('Billing Details')}</strong>
           <span>
             {t('Matched Tier')}: {props.details.tierLabel}
           </span>
         </div>
-        <dl className='ci-requestBillingLines'>
+        <dl className='ed-billingLines'>
           {props.details.lineItems.map((item) => (
             <div key={item.key}>
               <dt>
@@ -93,12 +93,12 @@ export function DynamicBillingPopover(props: DynamicBillingPopoverProps) {
           ))}
         </dl>
         {multiplier !== 1 ? (
-          <div className='ci-requestBillingMultiplier'>
+          <div className='ed-billingMultiplier'>
             <span>{t('Multiplier')}</span>
             <strong>{multiplier}x</strong>
           </div>
         ) : null}
-        <div className='ci-requestBillingTotals'>
+        <div className='ed-billingTotals'>
           <div>
             <span>{t('Before-discount estimate')}</span>
             <strong>

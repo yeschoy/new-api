@@ -56,7 +56,7 @@ export function ApiKeys() {
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <div className='flex h-full flex-col gap-3'>
-            <div className='dopa-key-guidance flex flex-wrap items-center gap-x-3 gap-y-2 border px-4 py-3'>
+            <div className='ed-keyGuidance flex flex-wrap items-center gap-x-3 gap-y-2 border px-4 py-3'>
               <Lightbulb className='text-primary size-4 shrink-0' />
               <p className='text-foreground/85 min-w-0 flex-1 text-sm text-pretty'>
                 {t('One tap — this is the password your AI tool needs')}
@@ -64,7 +64,7 @@ export function ApiKeys() {
               <Button
                 variant='outline'
                 size='sm'
-                className='dopa-spring shrink-0 rounded-full'
+                className='shrink-0 rounded-full'
                 render={<Link to='/guide' />}
               >
                 <BookOpen className='size-3.5' />

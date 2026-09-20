@@ -258,12 +258,12 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
         props.onClick()
       }}
       className={cn(
-        'dopa-model-tile dopa-scale-texture group relative flex min-w-0 flex-col gap-4 overflow-hidden rounded-3xl border p-4 transition-colors sm:p-5',
+        'ed-modelTile group relative flex min-w-0 flex-col gap-4 overflow-hidden p-4 transition-colors sm:p-5',
         'cursor-pointer hover:bg-muted/20'
       )}
     >
       <header className='flex min-w-0 items-start gap-3'>
-        <div className='bg-muted/40 flex size-10 shrink-0 items-center justify-center rounded-xl'>
+        <div className='bg-muted/40 flex size-10 shrink-0 items-center justify-center rounded-full'>
           {modelIcon || (
             <span className='text-muted-foreground text-sm font-bold'>
               {initial}

@@ -19,9 +19,15 @@ For commercial licensing, please contact support@quantumnous.com
 import { AccessAuthLayout } from './access-auth-layout'
 
 type AuthLayoutProps = {
+  title?: React.ReactNode
+  description?: string
   children: React.ReactNode
 }
 
-export function AuthLayout({ children }: AuthLayoutProps) {
-  return <AccessAuthLayout>{children}</AccessAuthLayout>
+export function AuthLayout(props: AuthLayoutProps) {
+  return (
+    <AccessAuthLayout title={props.title} description={props.description}>
+      {props.children}
+    </AccessAuthLayout>
+  )
 }

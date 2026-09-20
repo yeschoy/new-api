@@ -54,7 +54,7 @@ it('keeps a full logo boundary when the inline brand shares a narrow header with
   style.textContent = readFileSync(
     resolve(
       dirname(fileURLToPath(import.meta.url)),
-      '../../../../styles/dopamine.css'
+      '../../../../styles/editorial.css'
     ),
     'utf8'
   )
@@ -64,7 +64,7 @@ it('keeps a full logo boundary when the inline brand shares a narrow header with
 
   try {
     await renderApp(
-      <div className='dopa-developer-header flex' style={{ width: '52px' }}>
+      <div className='ed-console flex' style={{ width: '52px' }}>
         <SystemBrand variant='inline' />
         <button type='button' style={{ width: '32px', flexShrink: 0 }}>
           Action

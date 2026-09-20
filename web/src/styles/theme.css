@@ -31,12 +31,19 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 @theme inline {
+  /* Editorial system: humanist sans for UI copy, a serif display face for
+   * headlines and numbers that deserve a voice, and a quiet mono for code.
+   * Every stack ends in CJK fallbacks so Chinese copy stays consistent. */
   --font-sans:
-    'Maple Mono', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
-    'Microsoft YaHei', 'Noto Sans CJK SC', 'Source Han Sans SC', system-ui,
-    sans-serif;
+    'Inter Variable', 'Inter', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC',
+    'Source Han Sans SC', system-ui, sans-serif;
+  --font-display:
+    'Instrument Serif', 'Lora Variable', 'Lora', 'Noto Serif SC',
+    'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', Georgia, serif;
   --font-mono:
-    'Maple Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    'IBM Plex Mono', 'Maple Mono', ui-monospace, 'SFMono-Regular', Menlo,
+    Consolas, 'Liberation Mono', monospace;
   /* Editorial serif token — the body face used by the `serif` font axis
    * and by presets that opt in (currently Anthropic). Lora carries only
    * Latin glyphs, so the stack walks through CJK serifs (Noto / Source Han
@@ -121,7 +128,7 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 :root {
-  --radius: 1rem;
+  --radius: 0.75rem;
   --app-header-height: 3rem;
   /* Static build-channel fallback consumed when JS hasn't booted yet. */
   --app-rev: '2k6e8r7p';
@@ -130,51 +137,57 @@ For commercial licensing, please contact support@quantumnous.com
    * in theme-presets.css. Default mirrors `--font-sans` so behavior is
    * identical when no font preference is set. */
   --font-body: var(--font-sans);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.692 0.141 243.716);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0 0);
-  --secondary-foreground: oklch(0.42 0.16 250);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.49 0 0);
-  --accent: color-mix(in oklch, var(--primary) 12%, var(--background));
-  --accent-foreground: oklch(0.145 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+
+  /* ── Editorial palette ──────────────────────────────────────────────
+   * Warm paper canvas with ink text. A single clay accent carries every
+   * call to action; olive, kraft and sky are reserved for status. Cards
+   * are a touch lighter than the canvas so surfaces stack like sheets of
+   * paper rather than floating on shadows. */
+  --background: oklch(0.984 0.006 85);
+  --foreground: oklch(0.22 0.012 60);
+  --card: oklch(0.995 0.003 90);
+  --card-foreground: oklch(0.22 0.012 60);
+  --popover: oklch(0.995 0.003 90);
+  --popover-foreground: oklch(0.22 0.012 60);
+  --primary: oklch(0.6 0.145 38);
+  --primary-foreground: oklch(0.99 0.006 90);
+  --secondary: oklch(0.94 0.012 85);
+  --secondary-foreground: oklch(0.3 0.012 60);
+  --muted: oklch(0.955 0.01 85);
+  --muted-foreground: oklch(0.5 0.016 65);
+  --accent: oklch(0.93 0.024 70);
+  --accent-foreground: oklch(0.22 0.012 60);
+  --destructive: oklch(0.55 0.19 27);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.596 0.145 163.225);
+  --success: oklch(0.57 0.1 135);
   --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.681 0.162 75.834);
-  --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.588 0.158 241.966);
+  --warning: oklch(0.7 0.14 75);
+  --warning-foreground: oklch(0.22 0.012 60);
+  --info: oklch(0.58 0.09 240);
   --info-foreground: oklch(0.985 0 0);
-  --neutral: oklch(0.708 0 0);
-  --neutral-foreground: oklch(0.145 0 0);
-  --border: oklch(0.93 0 0);
-  --input: oklch(0.93 0 0);
-  --ring: oklch(0.708 0.16 249.003);
-  --chart-1: oklch(0.72 0.18 250);
-  --chart-2: oklch(0.65 0.15 200);
-  --chart-3: oklch(0.7 0.12 280);
-  --chart-4: oklch(0.68 0.19 325);
-  --chart-5: oklch(0.68 0.16 155);
-  --overview-accent-1: oklch(0.72 0.18 250);
-  --overview-accent-2: oklch(0.65 0.15 200);
-  --overview-accent-3: oklch(0.7 0.12 280);
-  --sidebar: color-mix(in oklch, var(--foreground) 0.5%, var(--background));
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.64 0.197 253.892);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: color-mix(in oklch, var(--primary) 12%, var(--background));
-  --sidebar-accent-foreground: oklch(0.579 0.196 255.909);
-  --sidebar-border: oklch(0.93 0 0);
-  --sidebar-ring: oklch(0.58 0.2 250);
-  --skeleton-base: oklch(0.97 0 0);
-  --skeleton-highlight: oklch(0.985 0 0);
+  --neutral: oklch(0.5 0.016 65);
+  --neutral-foreground: oklch(0.22 0.012 60);
+  --border: oklch(0.885 0.012 80);
+  --input: oklch(0.86 0.014 80);
+  --ring: oklch(0.6 0.145 38);
+  --chart-1: oklch(0.6 0.145 38);
+  --chart-2: oklch(0.57 0.1 135);
+  --chart-3: oklch(0.58 0.09 240);
+  --chart-4: oklch(0.62 0.12 350);
+  --chart-5: oklch(0.7 0.08 160);
+  --overview-accent-1: oklch(0.6 0.145 38);
+  --overview-accent-2: oklch(0.57 0.1 135);
+  --overview-accent-3: oklch(0.58 0.09 240);
+  --sidebar: oklch(0.968 0.008 85);
+  --sidebar-foreground: oklch(0.26 0.012 60);
+  --sidebar-primary: oklch(0.6 0.145 38);
+  --sidebar-primary-foreground: oklch(0.99 0.006 90);
+  --sidebar-accent: oklch(0.92 0.022 70);
+  --sidebar-accent-foreground: oklch(0.22 0.012 60);
+  --sidebar-border: oklch(0.885 0.012 80);
+  --sidebar-ring: oklch(0.6 0.145 38);
+  --skeleton-base: oklch(0.94 0.01 85);
+  --skeleton-highlight: oklch(0.97 0.006 85);
   --table-row: var(--background);
   --table-header: color-mix(
     in oklch,
@@ -206,49 +219,50 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 .dark {
-  /* OpenAI-like dark mode with a crisp charcoal canvas. */
-  --background: oklch(0.235 0 0);
-  --foreground: oklch(0.965 0 0);
-  --card: oklch(0.285 0 0);
-  --card-foreground: oklch(0.965 0 0);
-  --popover: oklch(0.305 0 0);
-  --popover-foreground: oklch(0.965 0 0);
-  --primary: oklch(0.54 0.142 248.516);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.335 0 0);
-  --secondary-foreground: oklch(0.9 0.05 250);
-  --muted: oklch(0.305 0 0);
-  --muted-foreground: oklch(0.78 0 0);
-  --accent: color-mix(in oklch, var(--primary) 20%, var(--background));
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* Warm near-black, never pure black: the paper metaphor survives when
+   * inverted. Clay lifts slightly so it still reads as the single accent. */
+  --background: oklch(0.205 0.008 60);
+  --foreground: oklch(0.955 0.008 85);
+  --card: oklch(0.245 0.008 60);
+  --card-foreground: oklch(0.955 0.008 85);
+  --popover: oklch(0.27 0.008 60);
+  --popover-foreground: oklch(0.955 0.008 85);
+  --primary: oklch(0.72 0.13 42);
+  --primary-foreground: oklch(0.17 0.008 60);
+  --secondary: oklch(0.3 0.008 60);
+  --secondary-foreground: oklch(0.93 0.008 85);
+  --muted: oklch(0.285 0.008 60);
+  --muted-foreground: oklch(0.74 0.01 75);
+  --accent: oklch(0.33 0.012 60);
+  --accent-foreground: oklch(0.98 0.006 85);
+  --destructive: oklch(0.7 0.19 22);
   --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.696 0.17 162.48);
-  --success-foreground: oklch(0.145 0 0);
-  --warning: oklch(0.769 0.188 70.08);
-  --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.613 0.14 239.919);
-  --info-foreground: oklch(0.145 0 0);
-  --neutral: oklch(0.76 0 0);
-  --neutral-foreground: oklch(0.155 0 0);
+  --success: oklch(0.72 0.11 135);
+  --success-foreground: oklch(0.17 0.008 60);
+  --warning: oklch(0.8 0.13 75);
+  --warning-foreground: oklch(0.17 0.008 60);
+  --info: oklch(0.73 0.09 240);
+  --info-foreground: oklch(0.17 0.008 60);
+  --neutral: oklch(0.74 0.01 75);
+  --neutral-foreground: oklch(0.17 0.008 60);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 17%);
-  --ring: oklch(0.554 0.148 250.726);
-  --chart-1: oklch(0.76 0.14 250);
-  --chart-2: oklch(0.76 0.13 200);
-  --chart-3: oklch(0.76 0.13 285);
-  --chart-4: oklch(0.75 0.16 325);
-  --chart-5: oklch(0.76 0.14 155);
-  --sidebar: oklch(0.225 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.588 0.123 246.488);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: color-mix(in oklch, var(--primary) 20%, var(--background));
-  --sidebar-accent-foreground: oklch(0.9 0.05 250);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.72 0.13 42);
+  --chart-1: oklch(0.72 0.13 42);
+  --chart-2: oklch(0.72 0.11 135);
+  --chart-3: oklch(0.73 0.09 240);
+  --chart-4: oklch(0.76 0.12 350);
+  --chart-5: oklch(0.8 0.06 160);
+  --sidebar: oklch(0.195 0.008 60);
+  --sidebar-foreground: oklch(0.94 0.008 85);
+  --sidebar-primary: oklch(0.72 0.13 42);
+  --sidebar-primary-foreground: oklch(0.17 0.008 60);
+  --sidebar-accent: oklch(0.32 0.012 60);
+  --sidebar-accent-foreground: oklch(0.98 0.006 85);
   --sidebar-border: oklch(1 0 0 / 11%);
-  --sidebar-ring: oklch(0.7 0.17 250);
-  --skeleton-base: oklch(0.335 0 0);
-  --skeleton-highlight: oklch(0.44 0 0);
+  --sidebar-ring: oklch(0.72 0.13 42);
+  --skeleton-base: oklch(0.3 0.008 60);
+  --skeleton-highlight: oklch(0.4 0.008 60);
   --table-row: var(--background);
   --table-header: color-mix(in oklch, var(--foreground) 6%, var(--background));
   --table-header-hover: color-mix(

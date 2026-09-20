@@ -51,7 +51,7 @@ export function TerminalReports() {
       actions={
         <button
           type='button'
-          className='ci-button ci-button--size-xs'
+          className='ed-btn ed-btn--outline ed-btn--sm'
           onClick={exportCsv}
           disabled={summary.isError || !data || byDay.length === 0}
         >
@@ -64,13 +64,13 @@ export function TerminalReports() {
           {t(summary.error.message)}
         </p>
       ) : null}
-      <p className='ci-requestPeriod'>
+      <p className='ed-period'>
         {t('Last 10 days: {{start}} – {{end}}', {
           start: summary.start.format('YYYY-MM-DD'),
           end: summary.end.format('YYYY-MM-DD'),
         })}
       </p>
-      <section className='ci-statGrid'>
+      <section className='ed-stats ed-stats--four'>
         <article>
           <span>{t('Requests')}</span>
           <strong>{data?.requests.toLocaleString() ?? '—'}</strong>
@@ -96,36 +96,38 @@ export function TerminalReports() {
           <small>{t('Total tokens used in the last 10 days')}</small>
         </article>
       </section>
-      <section className='ci-panel'>
+      <section className='ed-panel'>
         {summary.isPending ? (
-          <div className='ci-empty'>{t('Loading...')}</div>
+          <div className='ed-empty'>{t('Loading...')}</div>
         ) : null}
         {data && byDay.length === 0 ? (
-          <div className='ci-empty'>
+          <div className='ed-empty'>
             <p>{t('No requests in this window.')}</p>
           </div>
         ) : null}
         {byDay.length > 0 ? (
-          <table className='ci-catalogTable'>
-            <thead>
-              <tr>
-                <th>{t('Date')}</th>
-                <th>{t('Requests')}</th>
-                <th>{t('Tokens')}</th>
-                <th>{t('Billed')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byDay.map((row) => (
-                <tr key={row.date}>
-                  <td>{row.date}</td>
-                  <td>{row.requests}</td>
-                  <td>{row.tokens.toLocaleString()}</td>
-                  <td>{formatConsoleMoney(row.quota)}</td>
+          <div className='ed-tableWrap'>
+            <table className='ed-table'>
+              <thead>
+                <tr>
+                  <th>{t('Date')}</th>
+                  <th>{t('Requests')}</th>
+                  <th>{t('Tokens')}</th>
+                  <th>{t('Billed')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {byDay.map((row) => (
+                  <tr key={row.date}>
+                    <td>{row.date}</td>
+                    <td>{row.requests}</td>
+                    <td>{row.tokens.toLocaleString()}</td>
+                    <td>{formatConsoleMoney(row.quota)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </section>
     </TerminalPage>

@@ -86,7 +86,7 @@ describe('community help entry', () => {
     const trigger = screen.getByRole('button', { name: 'Community' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(trigger).toHaveClass(
-      'ci-communityTrigger',
+      'ed-communityTrigger',
       'bg-primary',
       'text-primary-foreground'
     )

@@ -2,9 +2,9 @@
 Copyright (C) 2023-2026 QuantumNous
 
 This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -62,29 +62,31 @@ export function BeginnerGuidePage(props: BeginnerGuidePageProps) {
       )}
       wide
     >
-      <div className='ci-guideBody'>
-        <section className='ci-panel' id='essentials'>
-          <header className='ci-panelHeader'>
-            <h2>{t('The three things every tool asks for')}</h2>
-            <p>
-              {t(
-                'Every tool only ever asks you for three things. Grab them below, pick your tool, and follow the steps — done in about three minutes.'
-              )}
-            </p>
+      <div className='ed-guideBody'>
+        <section className='ed-panel' id='essentials'>
+          <header className='ed-panelHead'>
+            <div>
+              <h2>{t('The three things every tool asks for')}</h2>
+              <p>
+                {t(
+                  'Every tool only ever asks you for three things. Grab them below, pick your tool, and follow the steps — done in about three minutes.'
+                )}
+              </p>
+            </div>
           </header>
-          <div className='ci-panelBody'>
+          <div className='ed-panelBody'>
             <AddressKit address={address} />
-            <div className='ci-guideActions'>
-              <Link to='/keys' className='ci-button ci-button--size-sm'>
-                <KeyRound size={16} aria-hidden='true' />
+            <div className='ed-onboardActions'>
+              <Link to='/keys' className='ed-btn ed-btn--accent ed-btn--sm'>
+                <KeyRound aria-hidden='true' />
                 {t('Create my key')}
               </Link>
             </div>
           </div>
         </section>
 
-        <section className='ci-panel' id='usecases'>
-          <div className='ci-panelBody'>
+        <section className='ed-panel' id='usecases'>
+          <div className='ed-panelBody'>
             <UseCasePicker
               onPick={handleUseCasePick}
               activeUseCase={pickedUseCase?.useCase}
@@ -92,16 +94,18 @@ export function BeginnerGuidePage(props: BeginnerGuidePageProps) {
           </div>
         </section>
 
-        <section className='ci-panel' id='tools'>
-          <header className='ci-panelHeader'>
-            <h2>{t('Pick your tool, follow the steps')}</h2>
-            <p>
-              {t(
-                'Click any card for step-by-step setup. Addresses in the steps are already filled in with the real address of this site.'
-              )}
-            </p>
+        <section className='ed-panel' id='tools'>
+          <header className='ed-panelHead'>
+            <div>
+              <h2>{t('Pick your tool, follow the steps')}</h2>
+              <p>
+                {t(
+                  'Click any card for step-by-step setup. Addresses in the steps are already filled in with the real address of this site.'
+                )}
+              </p>
+            </div>
           </header>
-          <div className='ci-panelBody'>
+          <div className='ed-panelBody'>
             <ToolExplorer
               address={address}
               query={props.query}
@@ -113,8 +117,8 @@ export function BeginnerGuidePage(props: BeginnerGuidePageProps) {
           </div>
         </section>
 
-        <section className='ci-panel' id='troubleshoot'>
-          <div className='ci-panelBody'>
+        <section className='ed-panel' id='troubleshoot'>
+          <div className='ed-panelBody'>
             <Troubleshoot />
           </div>
         </section>

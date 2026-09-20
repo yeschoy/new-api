@@ -253,14 +253,13 @@ export function TerminalKeys() {
       description={t(
         'Pick a model to see the price, then pick a group. The key bills at that group rate.'
       )}
-      className='ci-keyPage'
       actions={
-        <div className='ci-keyHeaderActions flex max-w-full flex-wrap items-end justify-end gap-3'>
+        <div className='flex max-w-full flex-wrap items-end justify-end gap-3'>
           <ApiAccelerationUrls className='sm:w-[30rem]' />
           {(keysQuery.data?.total ?? 0) > 0 ? (
             <button
               type='button'
-              className='ci-button ci-button--danger-quiet ci-button--size-xs'
+              className='ed-btn ed-btn--danger ed-btn--xs'
               onClick={() => setRevokeTarget('all')}
               disabled={revoking}
             >
@@ -275,20 +274,22 @@ export function TerminalKeys() {
           {actionError || keysQuery.error?.message}
         </p>
       ) : null}
-      <section className='ci-panel'>
-        <header className='ci-panelHeader'>
-          <h2>{t('1. Pick a model')}</h2>
-          <p>
-            {t(
-              'This is only for quoting. The key can still call other models in the same group.'
-            )}
-          </p>
+      <section className='ed-panel'>
+        <header className='ed-panelHead'>
+          <div>
+            <h2>{t('1. Pick a model')}</h2>
+            <p>
+              {t(
+                'This is only for quoting. The key can still call other models in the same group.'
+              )}
+            </p>
+          </div>
         </header>
-        <div className='ci-panelBody'>
-          <label className='ci-field'>
+        <div className='ed-panelBody'>
+          <label className='ed-field'>
             <span>{t('Model')}</span>
             <select
-              className='ci-input ci-input--sm'
+              className='ed-input ed-input--sm'
               value={selectedModel?.modelName ?? ''}
               onChange={(event) => setModelName(event.target.value)}
             >
@@ -306,16 +307,18 @@ export function TerminalKeys() {
         </div>
       </section>
 
-      <section className='ci-panel'>
-        <header className='ci-panelHeader'>
-          <h2>{t('2. Pick a billing group')}</h2>
-          <p>
-            {t(
-              'Groups are price lanes. The discount applies to this key’s requests.'
-            )}
-          </p>
+      <section className='ed-panel'>
+        <header className='ed-panelHead'>
+          <div>
+            <h2>{t('2. Pick a billing group')}</h2>
+            <p>
+              {t(
+                'Groups are price lanes. The discount applies to this key’s requests.'
+              )}
+            </p>
+          </div>
         </header>
-        <div className='ci-panelBody'>
+        <div className='ed-panelBody'>
           {selectedModel && !selectedModel.quote ? (
             <Link
               to='/pricing/$modelId'
@@ -325,11 +328,11 @@ export function TerminalKeys() {
             </Link>
           ) : null}
           {groups.length === 0 ? (
-            <p className='ci-formNote'>
+            <p className='ed-panelNote'>
               {t('No billing groups are available for this model.')}
             </p>
           ) : (
-            <div className='ci-quoteGrid'>
+            <div className='ed-quoteGrid'>
               {groups.map((group) => {
                 const groupSavings =
                   selectedModel?.quote && selectedPricingModel
@@ -348,15 +351,15 @@ export function TerminalKeys() {
                   <button
                     key={group.value}
                     type='button'
-                    className={cn('ci-quoteCard', selected && 'is-selected')}
+                    className={cn('ed-quoteCard', selected && 'is-selected')}
                     onClick={() => setGroupName(group.value)}
                     aria-pressed={selected}
                   >
-                    <span className='ci-quoteHead'>
-                      <span className='ci-quoteName'>{group.label}</span>
+                    <span className='ed-quoteCardHead'>
+                      <span className='ed-quoteCardName'>{group.label}</span>
                       <GroupRatioPill ratio={group.ratio} />
                     </span>
-                    <span className='ci-quoteLane'>
+                    <span className='ed-quoteCardLane'>
                       {group.desc || discountLabel(t, discount)}
                     </span>
                     {groupQuote ? (
@@ -399,24 +402,26 @@ export function TerminalKeys() {
         </div>
       </section>
 
-      <section className='ci-panel'>
-        <header className='ci-panelHeader'>
-          <h2>{t('3. Create the key')}</h2>
-          <p>{t('Give it a name you will recognize later.')}</p>
+      <section className='ed-panel'>
+        <header className='ed-panelHead'>
+          <div>
+            <h2>{t('3. Create the key')}</h2>
+            <p>{t('Give it a name you will recognize later.')}</p>
+          </div>
         </header>
-        <div className='ci-panelBody'>
-          <label className='ci-field'>
+        <div className='ed-panelBody'>
+          <label className='ed-field'>
             <span>{t('Key name')}</span>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div className='ed-fieldRow'>
               <input
-                className='ci-input ci-input--sm'
+                className='ed-input ed-input--sm'
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder={t('Daily key')}
               />
               <button
                 type='button'
-                className='ci-button ci-button--size-xs'
+                className='ed-btn ed-btn--accent ed-btn--sm'
                 onClick={() => createMutation.mutate()}
                 disabled={
                   createMutation.isPending ||
@@ -424,7 +429,7 @@ export function TerminalKeys() {
                   !selectedGroup
                 }
               >
-                <KeyRound size={14} />
+                <KeyRound aria-hidden='true' />
                 {t('Create key')}
               </button>
             </div>
@@ -433,25 +438,26 @@ export function TerminalKeys() {
       </section>
 
       {createdKey ? (
-        <div className='ci-createdKey'>
+        <div className='ed-createdKey'>
           <code>{createdKey}</code>
           <button
             type='button'
-            className='ci-button ci-button--ghost ci-button--size-icon-xs'
+            className='ed-iconBtn ed-iconBtn--xs'
+            aria-label={t('Copy')}
             onClick={() => {
               void clipboard.copyToClipboard(createdKey)
             }}
           >
-            <Copy size={14} />
+            <Copy size={14} aria-hidden='true' />
           </button>
         </div>
       ) : null}
 
-      <section className='ci-panel'>
+      <section className='ed-panel'>
         {keys.length === 0 ? (
-          <div className='ci-empty'>
-            <span className='ci-emptyIcon'>
-              <KeyRound size={18} />
+          <div className='ed-empty'>
+            <span className='ed-emptyIcon'>
+              <KeyRound size={18} aria-hidden='true' />
             </span>
             <h3>{t('No API keys yet')}</h3>
             <p>
@@ -461,66 +467,70 @@ export function TerminalKeys() {
             </p>
           </div>
         ) : (
-          <table className='ci-catalogTable'>
-            <thead>
-              <tr>
-                <th>{t('Name')}</th>
-                <th>{t('Key')}</th>
-                <th>{t('Group')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {keys.map((key) => {
-                const meta = key.group ? groupMeta[key.group] : undefined
-                return (
-                  <tr key={key.id}>
-                    <td>{key.name}</td>
-                    <td>
-                      <code>{key.key}</code>
-                    </td>
-                    <td>
-                      <span className='ci-groupCell'>
-                        <span className='ci-groupName'>
-                          {key.group || t('Default')}
+          <div className='ed-tableWrap'>
+            <table className='ed-table'>
+              <thead>
+                <tr>
+                  <th>{t('Name')}</th>
+                  <th>{t('Key')}</th>
+                  <th>{t('Group')}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((key) => {
+                  const meta = key.group ? groupMeta[key.group] : undefined
+                  return (
+                    <tr key={key.id}>
+                      <td>{key.name}</td>
+                      <td>
+                        <code>{key.key}</code>
+                      </td>
+                      <td>
+                        <span className='ed-groupCell'>
+                          <span className='font-medium'>
+                            {key.group || t('Default')}
+                          </span>
+                          {meta?.ratio === undefined ? null : (
+                            <GroupRatioPill ratio={meta.ratio} />
+                          )}
                         </span>
-                        {meta?.ratio === undefined ? null : (
-                          <GroupRatioPill ratio={meta.ratio} />
-                        )}
-                      </span>
-                      {meta?.desc ? (
-                        <span className='ci-groupDesc'>{meta.desc}</span>
-                      ) : null}
-                    </td>
-                    <td>
-                      <button
-                        type='button'
-                        className='ci-button ci-button--ghost ci-button--size-xs'
-                        disabled={copyMutation.isPending}
-                        onClick={() => copyMutation.mutate(key.id)}
-                      >
-                        <Copy size={14} /> {t('Copy')}
-                      </button>
-                      <button
-                        type='button'
-                        className='ci-button ci-button--ghost ci-button--size-xs'
-                        disabled={revoking}
-                        onClick={() => setRevokeTarget(key.id)}
-                      >
-                        {t('Revoke')}
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                        {meta?.desc ? (
+                          <span className='ed-groupDesc'>{meta.desc}</span>
+                        ) : null}
+                      </td>
+                      <td>
+                        <span className='ed-tableActions'>
+                          <button
+                            type='button'
+                            className='ed-btn ed-btn--ghost ed-btn--xs'
+                            disabled={copyMutation.isPending}
+                            onClick={() => copyMutation.mutate(key.id)}
+                          >
+                            <Copy aria-hidden='true' /> {t('Copy')}
+                          </button>
+                          <button
+                            type='button'
+                            className='ed-btn ed-btn--ghost ed-btn--xs'
+                            disabled={revoking}
+                            onClick={() => setRevokeTarget(key.id)}
+                          >
+                            {t('Revoke')}
+                          </button>
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
       {pageCount > 1 ? (
-        <div className='ci-tablePager'>
+        <div className='ed-pager'>
           <button
-            className='ci-button ci-button--ghost ci-button--size-xs'
+            className='ed-btn ed-btn--ghost ed-btn--xs'
             type='button'
             disabled={page <= 1 || keysQuery.isFetching}
             onClick={() => setPage(page - 1)}
@@ -531,7 +541,7 @@ export function TerminalKeys() {
             {page} / {pageCount}
           </span>
           <button
-            className='ci-button ci-button--ghost ci-button--size-xs'
+            className='ed-btn ed-btn--ghost ed-btn--xs'
             type='button'
             disabled={page >= pageCount || keysQuery.isFetching}
             onClick={() => setPage(page + 1)}

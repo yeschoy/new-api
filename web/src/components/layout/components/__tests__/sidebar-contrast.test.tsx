@@ -33,7 +33,7 @@ import {
 const sidebarCss = readFileSync(
   resolve(
     dirname(fileURLToPath(import.meta.url)),
-    '../../../../styles/dopamine.css'
+    '../../../../styles/editorial.css'
   ),
   'utf8'
 )
@@ -60,7 +60,7 @@ function sidebarLuminance(color: string): number {
 
 function SidebarFixture(props: { walletActive?: boolean }) {
   return (
-    <SidebarProvider className='dopa-console dopa-console--developer'>
+    <SidebarProvider className='ed-console'>
       <SidebarMenuButton
         isActive={props.walletActive ?? true}
         render={<a href='/wallet' />}
@@ -104,7 +104,7 @@ describe.each(['light', 'dark'])(
       for (const selected of [wallet, nested]) {
         expect(selected).toHaveAttribute('data-active', '')
         expect(getComputedStyle(selected).color).toBe(
-          'var(--dopa-sidebar-active-ink)'
+          'var(--ed-sidebar-active-ink)'
         )
       }
       expect(screen.getByTestId('wallet-icon')).toHaveAttribute(
@@ -116,7 +116,7 @@ describe.each(['light', 'dark'])(
       )
       expect(
         getComputedStyle(screen.getByRole('link', { name: 'API keys' })).color
-      ).toBe('var(--dopa-sidebar-ink)')
+      ).toBe('var(--ed-sidebar-ink)')
     })
 
     it('keeps selected text dark during keyboard focus and restores light text after deselection', () => {
@@ -125,20 +125,20 @@ describe.each(['light', 'dark'])(
       wallet.focus()
       expect(wallet).toHaveFocus()
       expect(getComputedStyle(wallet).color).toBe(
-        'var(--dopa-sidebar-active-ink)'
+        'var(--ed-sidebar-active-ink)'
       )
       rerender(<SidebarFixture walletActive={false} />)
       expect(wallet).not.toHaveAttribute('data-active')
-      expect(getComputedStyle(wallet).color).toBe('var(--dopa-sidebar-ink)')
+      expect(getComputedStyle(wallet).color).toBe('var(--ed-sidebar-ink)')
     })
 
     it('maintains readable contrast between the selected background and its text token', () => {
       const tokens = getComputedStyle(document.documentElement)
       const foreground = sidebarLuminance(
-        tokens.getPropertyValue('--dopa-sidebar-active-ink').trim()
+        tokens.getPropertyValue('--ed-sidebar-active-ink').trim()
       )
       const background = sidebarLuminance(
-        tokens.getPropertyValue('--dopa-sidebar-active').trim()
+        tokens.getPropertyValue('--ed-sidebar-active').trim()
       )
       const contrast =
         (Math.max(foreground, background) + 0.05) /

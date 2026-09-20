@@ -21,7 +21,6 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { EasyOverviewDashboardView } from '@/features/dashboard/components/overview/easy-overview-dashboard'
-import { PriceSavings } from '@/features/home/components/sections/price-savings'
 import { getLogCostComparison } from '@/features/usage-logs/lib/cost-comparison'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -33,17 +32,6 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 describe('missing pricing and usage data', () => {
-  it('keeps a pricing recovery action visible without inventing estimates', () => {
-    render(<PriceSavings models={[]} calculatorModels={[]} />)
-
-    expect(screen.getByTestId('savings-unavailable')).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Model prices' })).toHaveAttribute(
-      'href',
-      '/pricing'
-    )
-    expect(screen.queryByTestId('annual-savings')).not.toBeInTheDocument()
-  })
-
   it('keeps a useful next action without inventing savings', () => {
     render(
       <EasyOverviewDashboardView

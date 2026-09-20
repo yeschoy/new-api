@@ -29,8 +29,6 @@ import { useUsageSummary } from '@/features/usage-logs/hooks/use-usage-summary'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatQuotaWithCurrency } from '@/lib/currency'
 
-import './terminal-billing.css'
-
 type TerminalBillingProps = {
   remainQuota: number | undefined
   usedQuota: number | undefined
@@ -59,38 +57,38 @@ export function TerminalBilling(props: TerminalBillingProps) {
 
   return (
     <>
-      <div className='ci-walletOverview'>
+      <div className='ed-paper ed-walletHero'>
         <section
-          className='ci-walletBalance'
+          className='ed-walletBalance'
           aria-label={t('Available balance')}
           aria-busy={props.loading}
         >
           <div>
-            <p className='ci-walletBalanceLabel'>{t('Available balance')}</p>
-            <strong className='ci-walletBalanceAmount'>{balance}</strong>
-            <p className='ci-walletLifetime'>
+            <p className='ed-walletLabel'>{t('Available balance')}</p>
+            <strong className='ed-walletAmount'>{balance}</strong>
+            <p className='ed-walletLifetime'>
               <span>{t('Lifetime spending')}</span>
               <span>{lifetimeSpending}</span>
             </p>
           </div>
-          <a href='#topup' className='ci-button ci-button--size-sm'>
+          <a href='#topup' className='ed-btn ed-btn--accent'>
             {t('Top up')}
           </a>
         </section>
 
         {summary.error && (
-          <p role='alert' className='ci-walletSavingsStatus'>
+          <p role='alert' className='ed-walletSavingsStatus'>
             {t('Savings unavailable')}
           </p>
         )}
         {!summary.error && summary.data && (
           <Collapsible
-            className='ci-walletSavings'
+            className='ed-walletSavings'
             open={detailsOpen}
             onOpenChange={setDetailsOpen}
           >
-            <div className='ci-walletSavingsRow'>
-              <p className='ci-walletSavingsSummary'>
+            <div className='ed-walletSavingsRow'>
+              <p className='ed-walletSavingsSummary'>
                 <span>
                   {t('Saved {{amount}} in the last 10 days', {
                     amount: formatQuotaWithCurrency(saved, moneyOptions),
@@ -98,13 +96,13 @@ export function TerminalBilling(props: TerminalBillingProps) {
                 </span>
                 {percent != null && <span>({percent}%)</span>}
               </p>
-              <CollapsibleTrigger className='ci-walletSavingsToggle'>
+              <CollapsibleTrigger className='ed-walletSavingsToggle'>
                 {detailsOpen ? t('Hide details') : t('View details')}
                 <ChevronDown size={14} aria-hidden='true' />
               </CollapsibleTrigger>
             </div>
             <CollapsibleContent
-              className='ci-walletSavingsDetails'
+              className='ed-walletSavingsDetails'
               role='region'
               aria-label={t('How much you saved')}
             >
@@ -125,7 +123,7 @@ export function TerminalBilling(props: TerminalBillingProps) {
           </Collapsible>
         )}
         {!summary.error && !summary.data && (
-          <p className='ci-walletSavingsStatus' role='status'>
+          <p className='ed-walletSavingsStatus' role='status'>
             {t('Loading...')}
           </p>
         )}

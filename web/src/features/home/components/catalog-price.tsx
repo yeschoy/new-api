@@ -42,7 +42,7 @@ export function CatalogPrice(props: {
   const site =
     props.side === 'input' ? quote.siteInputPrice : quote.siteOutputPrice
   return (
-    <div className='ci-priceCell'>
+    <div className='ed-priceCell'>
       <s>{formatPerMillionTokens(base)}</s>
       <b>{formatPerMillionTokens(site)}</b>
     </div>

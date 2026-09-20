@@ -31,7 +31,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { useTheme } from '@/context/theme-provider'
 import {
   formatBillingCurrencyFromUSD,
   formatQuotaWithCurrency,
@@ -59,7 +58,6 @@ const moneyOptions = { digitsLarge: 6, digitsSmall: 6, abbreviate: false }
 
 export function TerminalRequestDetails(props: { log: UsageLog }) {
   const { t } = useTranslation()
-  const { resolvedTheme } = useTheme()
   const log = props.log
   const other = parseLogOther(log.other)
   const failed = isFailedRequest(log)
@@ -193,26 +191,25 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
       side='right'
       overlayClassName='z-[65]'
       className={sideDrawerContentClassName(
-        'ci-landing ci-theme ci-requestDetails z-[70] sm:max-w-[760px]'
+        'ed-requestDetails z-[70] sm:max-w-[760px]'
       )}
-      data-theme={resolvedTheme}
       showCloseButton={false}
     >
-      <SheetHeader className='ci-requestDetailsHeader'>
+      <SheetHeader className='ed-requestDetailsHead'>
         <SheetTitle>{t('Request details')}</SheetTitle>
         <SheetDescription>
           {log.model_name || t('Unknown model')}
         </SheetDescription>
         <SheetClose
-          className='ci-appIconBtn ci-requestDetailsClose'
+          className='ed-iconBtn ed-requestDetailsClose'
           aria-label={t('Close')}
         >
           <X size={16} aria-hidden='true' />
         </SheetClose>
       </SheetHeader>
-      <div className={sideDrawerFormClassName('ci-requestDetailsBody')}>
+      <div className={sideDrawerFormClassName()}>
         {failed && (
-          <section className='ci-requestFailure' aria-label={t('Error')}>
+          <section className='ed-requestFailure' aria-label={t('Error')}>
             <h3>{t('Failed')}</h3>
             <p>
               {log.is_stream && other?.stream_status?.status === 'error'
@@ -231,9 +228,9 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
             )}
           </section>
         )}
-        <section className='ci-requestDetailsSection'>
+        <section className='ed-requestSection'>
           <h3>{t('Request overview')}</h3>
-          <dl className='ci-requestFacts'>
+          <dl className='ed-requestFacts'>
             {requestFacts.map((fact) => (
               <div key={fact.label}>
                 <dt>{fact.label}</dt>
@@ -244,15 +241,12 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
         </section>
         <div
           className={cn(
-            'ci-requestBilling',
-            prices.mode === 'dynamic' && 'ci-requestBilling--dynamic'
+            'ed-requestBilling',
+            prices.mode === 'dynamic' && 'ed-requestBilling--dynamic'
           )}
         >
-          <section
-            className='ci-requestDetailsSection'
-            aria-label={t('Request cost')}
-          >
-            <div className='ci-requestSectionHeading'>
+          <section className='ed-requestSection' aria-label={t('Request cost')}>
+            <div className='ed-requestSectionHead'>
               <h3>{t('Request cost')}</h3>
               {dynamicDetails ? (
                 <DynamicBillingPopover
@@ -261,17 +255,17 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
                 />
               ) : null}
               {prices.mode === 'dynamic' ? (
-                <span className='ci-requestBillingBadge'>
+                <span className='ed-badge ed-badge--accent'>
                   {t('Dynamic Pricing')}
                 </span>
               ) : null}
               {dynamicSummary?.tier.label ? (
-                <span className='ci-requestBillingTier'>
+                <span className='ed-billingTier'>
                   {t('Matched Tier')}: {dynamicSummary.tier.label}
                 </span>
               ) : null}
             </div>
-            <dl className='ci-requestFacts'>
+            <dl className='ed-requestFacts'>
               {prices.mode !== 'request' && (
                 <div>
                   <dt>{t('Before-discount estimate')}</dt>
@@ -308,7 +302,7 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
               )}
             </dl>
             {subscription && (
-              <p className='ci-requestDetailsNote'>
+              <p className='ed-requestNote'>
                 {t(
                   'This request used a subscription; cash savings are not comparable.'
                 )}
@@ -319,18 +313,18 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
               billed &&
               prices.mode !== 'request' &&
               prices.mode !== 'fee' && (
-                <p className='ci-requestDetailsNote'>
+                <p className='ed-requestNote'>
                   {t(
                     'The recorded price is incomplete, so savings cannot be calculated.'
                   )}
                 </p>
               )}
             {prices.mode === 'fee' && (
-              <p className='ci-requestDetailsNote'>{t('Violation Fee')}</p>
+              <p className='ed-requestNote'>{t('Violation Fee')}</p>
             )}
             {prices.mode === 'dynamic' &&
               (!dynamicSummary || dynamicSummary.priceEntries.length === 0) && (
-                <p className='ci-requestDetailsNote'>
+                <p className='ed-requestNote'>
                   {t(
                     'This request used dynamic pricing. The recorded charge includes its usage-based calculation.'
                   )}
@@ -339,11 +333,11 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
           </section>
           {prices.mode === 'tokens' && (
             <section
-              className='ci-requestDetailsSection'
+              className='ed-requestSection'
               aria-label={t('Base unit prices')}
             >
               <h3>{t('Base unit prices')}</h3>
-              <dl className='ci-requestFacts'>
+              <dl className='ed-requestFacts'>
                 {unitPriceFacts.map((fact) => (
                   <div key={fact.label}>
                     <dt>{fact.label}</dt>
@@ -365,7 +359,7 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
                   </div>
                 ))}
               </dl>
-              <p className='ci-requestDetailsNote'>
+              <p className='ed-requestNote'>
                 {t(
                   'Unit prices are per million tokens, before the request discount, using the rates recorded at the time.'
                 )}
@@ -376,11 +370,11 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
           dynamicSummary &&
           dynamicSummary.priceEntries.length > 0 ? (
             <section
-              className='ci-requestDetailsSection'
+              className='ed-requestSection'
               aria-label={t('Matched unit prices')}
             >
               <h3>{t('Matched unit prices')}</h3>
-              <dl className='ci-requestPriceFacts'>
+              <dl className='ed-requestFacts'>
                 {dynamicSummary.priceEntries.map((entry) => (
                   <div key={entry.key}>
                     <dt>{t(entry.shortLabel)}</dt>
@@ -394,16 +388,16 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
                 ))}
               </dl>
               {cacheIncludedInInput ? (
-                <p className='ci-requestDetailsNote'>
+                <p className='ed-requestNote'>
                   {t('Cache usage is included in the input price.')}
                 </p>
               ) : null}
             </section>
           ) : null}
         </div>
-        <section className='ci-requestDetailsSection'>
+        <section className='ed-requestSection'>
           <h3>{t('Token Breakdown')}</h3>
-          <dl className='ci-requestFacts'>
+          <dl className='ed-requestFacts'>
             {usageFacts.map((fact) => (
               <div key={fact.label}>
                 <dt>{fact.label}</dt>
@@ -412,9 +406,9 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
             ))}
           </dl>
         </section>
-        <section className='ci-requestDetailsSection'>
+        <section className='ed-requestSection'>
           <h3>{t('Timing')}</h3>
-          <dl className='ci-requestFacts'>
+          <dl className='ed-requestFacts'>
             <div>
               <dt>{t('Time taken')}</dt>
               <dd>{log.use_time > 0 ? `${log.use_time.toFixed(1)}s` : '—'}</dd>
@@ -430,15 +424,15 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
               )}
           </dl>
         </section>
-        <section className='ci-requestDetailsSection'>
+        <section className='ed-requestSection'>
           <h3>{t('Request ID')}</h3>
-          <div className='ci-requestId'>
+          <div className='ed-requestId'>
             <code>{log.request_id || '—'}</code>
             {log.request_id && (
               <CopyButton
                 value={log.request_id}
                 aria-label={t('Copy request ID')}
-                className='ci-appIconBtn'
+                className='ed-iconBtn'
               />
             )}
           </div>

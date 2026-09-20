@@ -55,19 +55,19 @@ export function TerminalHome() {
   if (funded && hasKey) currentStep = 3
   else if (funded) currentStep = 2
   let setupAction = (
-    <Link to='/playground' className='ci-button ci-button--size-sm'>
+    <Link to='/playground' className='ed-btn ed-btn--accent ed-btn--sm'>
       {t('Open playground')}
     </Link>
   )
   if (!funded) {
     setupAction = (
-      <Link to='/wallet' hash='topup' className='ci-button ci-button--size-sm'>
+      <Link to='/wallet' hash='topup' className='ed-btn ed-btn--accent ed-btn--sm'>
         {t('Top up')}
       </Link>
     )
   } else if (!hasKey) {
     setupAction = (
-      <Link to='/keys' className='ci-button ci-button--size-sm'>
+      <Link to='/keys' className='ed-btn ed-btn--accent ed-btn--sm'>
         {t('Create an API key')}
       </Link>
     )
@@ -83,42 +83,41 @@ export function TerminalHome() {
           {t(summary.error.message)}
         </p>
       ) : null}
-      <section className='ci-onboard'>
-        <span className='ci-onboardBadge'>{t('In progress')}</span>
-        <div className='ci-onboardHead'>
+      <section className='ed-paper ed-onboard'>
+        <div className='ed-onboardHead'>
           <div>
-            <div className='ci-onboardIcon'>
-              <Rocket size={18} />
-            </div>
-            <p className='ci-eyebrow'>{t('Get started')}</p>
-            <h2>{t('Send your first request')}</h2>
+            <p className='ed-eyebrow'>
+              <Rocket size={13} aria-hidden='true' />
+              {t('Get started')}
+            </p>
+            <h2 className='ed-display'>{t('Send your first request')}</h2>
             <p>
               {t(
                 'Three quick steps, each checked against your live workspace.'
               )}
             </p>
           </div>
-          <p className='ci-onboardMeta'>
+          <p className='ed-onboardMeta'>
             {t('{{done}} of 3 steps', { done: completedSteps })} ·{' '}
             {Math.round((completedSteps / 3) * 100)}%
           </p>
         </div>
-        <div className='ci-onboardSteps'>
+        <div className='ed-onboardSteps'>
           <article
-            className={cn('ci-onboardStep', currentStep === 1 && 'is-current')}
+            className={cn('ed-onboardStep', currentStep === 1 && 'is-current')}
           >
             <b>1</b>
             <h3>
-              <Wallet size={14} /> {t('Fund the wallet')}
+              <Wallet size={14} aria-hidden='true' /> {t('Fund the wallet')}
             </h3>
             <p>{t('Add credit so requests can run.')}</p>
           </article>
           <article
-            className={cn('ci-onboardStep', currentStep === 2 && 'is-current')}
+            className={cn('ed-onboardStep', currentStep === 2 && 'is-current')}
           >
             <b>2</b>
             <h3>
-              <KeyRound size={14} /> {t('Create an API key')}
+              <KeyRound size={14} aria-hidden='true' /> {t('Create an API key')}
             </h3>
             <p>
               {t(
@@ -127,17 +126,17 @@ export function TerminalHome() {
             </p>
           </article>
           <article
-            className={cn('ci-onboardStep', currentStep === 3 && 'is-current')}
+            className={cn('ed-onboardStep', currentStep === 3 && 'is-current')}
           >
             <b>3</b>
             <h3>{t('Make the first request')}</h3>
             <p>{t('Run a test from the playground with the workspace key.')}</p>
           </article>
         </div>
-        <div className='ci-panelBody'>{setupAction}</div>
+        <div className='ed-onboardActions'>{setupAction}</div>
       </section>
 
-      <section className='ci-statGrid ci-statGrid--three'>
+      <section className='ed-stats ed-stats--three'>
         <article>
           <span>{t('Available balance')}</span>
           <strong className={remainQuota <= 0 ? 'is-empty' : undefined}>
@@ -171,49 +170,52 @@ export function TerminalHome() {
         </article>
       </section>
 
-      <section className='ci-panel'>
-        <header className='ci-panelHeader'>
-          <h2>{t('Connect your client')}</h2>
-          <p>
-            {t('Drop-in OpenAI-compatible endpoint. Swap the base URL and go.')}
-          </p>
+      <section className='ed-panel'>
+        <header className='ed-panelHead'>
+          <div>
+            <h2>{t('Connect your client')}</h2>
+            <p>
+              {t(
+                'Drop-in OpenAI-compatible endpoint. Swap the base URL and go.'
+              )}
+            </p>
+          </div>
         </header>
-        <div className='ci-panelBody'>
-          <label className='ci-field'>
+        <div className='ed-panelBody'>
+          <div className='ed-field'>
             <span>{t('API key')}</span>
-            {hasKey ? (
-              <Link
-                to='/keys'
-                className='ci-button ci-button--outline ci-button--size-xs'
-              >
-                {t('Manage keys')}
-              </Link>
-            ) : (
-              <Link to='/keys' className='ci-button ci-button--size-xs'>
-                <KeyRound size={14} />
-                {t('Create your first key')}
-              </Link>
-            )}
-          </label>
-          <label className='ci-field'>
+            <div className='ed-fieldRow'>
+              {hasKey ? (
+                <Link to='/keys' className='ed-btn ed-btn--outline ed-btn--xs'>
+                  {t('Manage keys')}
+                </Link>
+              ) : (
+                <Link to='/keys' className='ed-btn ed-btn--xs'>
+                  <KeyRound aria-hidden='true' />
+                  {t('Create your first key')}
+                </Link>
+              )}
+            </div>
+          </div>
+          <div className='ed-field'>
             <span>{t('Base URL')}</span>
-            <div className='ci-inlineCopy'>
+            <div className='ed-inlineCopy'>
               <code>{address.baseUrl}</code>
               <button
                 type='button'
-                className='ci-button ci-button--ghost ci-button--size-icon-xs'
+                className='ed-iconBtn ed-iconBtn--xs'
+                aria-label={t('Copy')}
                 onClick={() => {
                   void clipboard.copyToClipboard(address.baseUrl)
                 }}
               >
-                <Copy size={14} />
+                <Copy size={14} aria-hidden='true' />
               </button>
             </div>
-          </label>
+          </div>
           <Link
             to='/beginner-guide'
-            className='ci-button ci-button--outline ci-button--size-xs'
-            style={{ marginTop: 12 }}
+            className='ed-btn ed-btn--outline ed-btn--xs'
           >
             {t('Read the docs')}
           </Link>

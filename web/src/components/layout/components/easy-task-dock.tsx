@@ -38,32 +38,12 @@ import {
 import { useMediaQuery } from '@/hooks/use-media-query'
 
 const EASY_TASKS = [
-  {
-    titleKey: 'Overview',
-    to: '/dashboard',
-    icon: LayoutDashboard,
-    tone: 'leaf',
-  },
-  { titleKey: 'My key', to: '/keys', icon: KeyRound, tone: 'model' },
-  {
-    titleKey: 'Model prices',
-    to: '/pricing',
-    icon: Sparkles,
-    tone: 'money',
-  },
-  {
-    titleKey: 'Beginner guide',
-    to: '/beginner-guide',
-    icon: BookOpen,
-    tone: 'signal',
-  },
-  {
-    titleKey: 'Spending details',
-    to: '/usage-logs',
-    icon: ReceiptText,
-    tone: 'money',
-  },
-  { titleKey: 'Wallet', to: '/wallet', icon: Wallet, tone: 'leaf' },
+  { titleKey: 'Overview', to: '/dashboard', icon: LayoutDashboard },
+  { titleKey: 'My key', to: '/keys', icon: KeyRound },
+  { titleKey: 'Model prices', to: '/pricing', icon: Sparkles },
+  { titleKey: 'Beginner guide', to: '/beginner-guide', icon: BookOpen },
+  { titleKey: 'Spending details', to: '/usage-logs', icon: ReceiptText },
+  { titleKey: 'Wallet', to: '/wallet', icon: Wallet },
 ] as const
 
 export function EasyTaskDock() {
@@ -107,7 +87,7 @@ export function EasyTaskDock() {
   }
 
   return (
-    <nav className='dopa-easy-task-dock' aria-label={t('Easy mode')}>
+    <nav className='ed-taskDock' aria-label={t('Easy mode')}>
       {EASY_TASKS.map((item) => {
         const Icon = item.icon
 
@@ -116,8 +96,7 @@ export function EasyTaskDock() {
             key={item.to}
             to={item.to}
             aria-label={t(item.titleKey)}
-            className='dopa-easy-task-link'
-            data-tone={item.tone}
+            className='ed-taskLink'
           >
             <Icon className='size-3.5 shrink-0' aria-hidden='true' />
             <span>{t(item.titleKey)}</span>

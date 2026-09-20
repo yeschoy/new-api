@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, Flame, ShieldCheck, TrendingDown } from 'lucide-react'
-import { type CSSProperties, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -128,7 +128,7 @@ function SummarySparkline(props: { data?: number[]; tone: YecaiTone }) {
   return (
     <svg
       aria-hidden='true'
-      className='dopa-dev-bento__sparkline'
+      className='ed-sparkline'
       data-tone={props.tone}
       viewBox='0 0 100 32'
       preserveAspectRatio='none'
@@ -276,47 +276,40 @@ export function SummaryCards() {
     }
   })
 
-  const runwayProgress = Math.min(1, Math.max(0, (runwayDays ?? 0) / 30))
-  const runwayStyle = {
-    '--dopa-runway-angle': `${Math.max(36, runwayProgress * 360)}deg`,
-  } as CSSProperties
-
   return (
-    <YecaiPanel
-      as='section'
-      className='dopa-dev-bento'
-      layer='raised'
-      tone='signal'
-    >
-      <header className='dopa-dev-bento__header'>
+    <YecaiPanel as='section' className='ed-deck' layer='raised' tone='signal'>
+      <header className='ed-deckHead'>
         <div>
-          <span>{t('Usage at a glance')}</span>
+          <p className='ed-eyebrow'>{t('Usage at a glance')}</p>
           <h3>{t('Monitor balance, usage, and request volume')}</h3>
         </div>
-        <span className='dopa-dev-bento__live'>
-          <i aria-hidden='true' />
+        <span className='ed-badge ed-badge--live'>
           {loading ? t('Loading') : t('Live')}
         </span>
       </header>
 
-      <YecaiBentoGrid className='dopa-dev-bento__grid'>
-        <div className='dopa-dev-bento__metrics'>
+      <YecaiBentoGrid>
+        <div className='ed-metricGrid'>
           {items.map((item) => {
             const Icon = item.icon
 
             return (
               <YecaiBentoItem
-                className='dopa-dev-bento__metric'
+                className='ed-metric flex-col'
                 key={item.key}
                 tone={item.tone}
               >
-                <span className='dopa-dev-bento__metric-icon'>
+                <span className='ed-metricIcon'>
                   <Icon aria-hidden='true' />
                 </span>
-                <span>{item.title}</span>
-                <strong>{loading ? '—' : item.value}</strong>
-                <small>{item.desc}</small>
-                <SummarySparkline data={item.sparkline} tone={item.tone} />
+                <span className='ed-metricCopy'>
+                  <span className='ed-metricLabel'>{item.title}</span>
+                  <strong className='ed-metricValue'>
+                    {loading ? '—' : item.value}
+                  </strong>
+                  <small className='ed-metricDetail'>{item.desc}</small>
+                  <SummarySparkline data={item.sparkline} tone={item.tone} />
+                </span>
               </YecaiBentoItem>
             )
           })}
@@ -324,14 +317,14 @@ export function SummaryCards() {
 
         <YecaiBentoItem
           as='aside'
-          className='dopa-dev-bento__runway'
+          className='ed-paper ed-runway'
           data-health={healthLevel}
           tone='signal'
         >
-          <div className='dopa-dev-bento__runway-copy'>
+          <div className='ed-runwayCopy'>
             <span>{t('Credit remaining')}</span>
             <strong>{formatQuota(remainQuota)}</strong>
-            <span className='dopa-dev-bento__health'>
+            <span className='ed-health'>
               <i className={healthCfg.dotClass} aria-hidden='true' />
               {t(healthCfg.labelKey)}
             </span>
@@ -339,8 +332,7 @@ export function SummaryCards() {
 
           <div
             aria-label={`${t('Runway')}: ${runwayDisplay}`}
-            className='dopa-dev-bento__orbit'
-            style={runwayStyle}
+            className='ed-runwayDial'
           >
             {runwayDays !== null && runwayDays < 3 ? (
               <TrendingDown aria-hidden='true' />
@@ -351,7 +343,7 @@ export function SummaryCards() {
             <span>{t('Runway')}</span>
           </div>
 
-          <div className='dopa-dev-bento__runway-foot'>
+          <div className='ed-runwayFoot'>
             <span>
               <Flame aria-hidden='true' />
               {t('Last 24h usage')}
@@ -361,7 +353,6 @@ export function SummaryCards() {
 
           <YecaiAction
             appearance='soft'
-            className='dopa-dev-bento__wallet'
             render={<Link to='/wallet' />}
             tone='money'
           >

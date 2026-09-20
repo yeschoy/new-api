@@ -19,14 +19,14 @@ For commercial licensing, please contact support@quantumnous.com
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import { CiStatusPage } from '@/components/layout/components/ci-status-page'
+import { StatusPage } from '@/components/layout/components/status-page'
 
 export function NotFoundError() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { history } = useRouter()
   return (
-    <CiStatusPage
+    <StatusPage
       code={404}
       title={t('Oops! Page Not Found!')}
       description={
@@ -40,14 +40,14 @@ export function NotFoundError() {
         <>
           <button
             type='button'
-            className='ci-button ci-button--outline ci-button--size-sm'
+            className='ed-btn ed-btn--outline ed-btn--sm'
             onClick={() => history.go(-1)}
           >
             {t('Go Back')}
           </button>
           <button
             type='button'
-            className='ci-button ci-button--size-sm'
+            className='ed-btn ed-btn--sm'
             onClick={() => navigate({ to: '/' })}
           >
             {t('Back to Home')}

@@ -23,6 +23,7 @@ import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { BrandMark } from '@/components/brand-mark'
 import { ErrorState } from '@/components/error-state'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { LoadingState } from '@/components/loading-state'
@@ -36,7 +37,6 @@ import {
 } from '@/components/ui/card'
 import { Form } from '@/components/ui/form'
 import { Skeleton } from '@/components/ui/skeleton'
-import { CiMark } from '@/features/home/components/ci-mark'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { resolveProductName } from '@/lib/product-brand'
 import { cn } from '@/lib/utils'
@@ -292,7 +292,7 @@ export function SetupWizard() {
             <Skeleton className='h-12 w-40' />
           ) : (
             <>
-              <CiMark size={40} withWordmark />
+              <BrandMark size={40} withWordmark />
               <h1 className='text-2xl font-semibold tracking-tight'>
                 {t('Initialize')} {productName}
               </h1>

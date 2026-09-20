@@ -28,26 +28,23 @@ type TerminalPageProps = {
   wide?: boolean
 }
 
+/** Page frame for the easy-mode console: editorial title, rule, body. */
 export function TerminalPage(props: TerminalPageProps) {
   return (
     <div
-      className={cn(
-        'ci-appPage',
-        props.wide && 'ci-appPage--wide',
-        props.className
-      )}
+      className={cn('ed-page', props.wide && 'ed-page--wide', props.className)}
     >
-      <header className='ci-appPageHeader'>
+      <header className='ed-pageHead'>
         <div>
-          <p className='ci-appCrumb'>{PRODUCT_NAME}</p>
-          <h1>{props.title}</h1>
+          <p className='ed-eyebrow'>{PRODUCT_NAME}</p>
+          <h1 className='ed-display'>{props.title}</h1>
           {props.description ? <p>{props.description}</p> : null}
         </div>
         {props.actions ? (
-          <div className='ci-appPageActions'>{props.actions}</div>
+          <div className='ed-pageActions'>{props.actions}</div>
         ) : null}
       </header>
-      <div className='ci-appPageBody'>{props.children}</div>
+      <div className='ed-pageBody'>{props.children}</div>
     </div>
   )
 }

@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { AuthenticatedLayout } from '@/components/layout/components/authenticated-layout'
 import { PublicLayout } from '@/components/layout/components/public-layout'
-import { GlassCursor } from '@/features/home/components/glass-cursor'
 import { useConsoleMode } from '@/hooks/use-console-mode'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -34,33 +33,25 @@ export function CatalogPageLayout(props: CatalogPageLayoutProps) {
   const mode = useConsoleMode()
   if (user) {
     return (
-      <>
-        {mode === 'developer' ? (
-          <GlassCursor scopeSelector='.ci-app, .dopa-console, .ci-landing' />
-        ) : null}
-        <AuthenticatedLayout>
-          <div
-            data-catalog-layout={
-              mode === 'developer' && props.fullWidth ? 'full-width' : undefined
-            }
-            className={cn(
-              mode === 'developer' &&
-                'min-h-0 flex-1 overflow-y-auto overscroll-contain',
-              props.showMainContainer !== false && 'px-4 py-6'
-            )}
-          >
-            {props.children}
-          </div>
-        </AuthenticatedLayout>
-      </>
+      <AuthenticatedLayout>
+        <div
+          data-catalog-layout={
+            mode === 'developer' && props.fullWidth ? 'full-width' : undefined
+          }
+          className={cn(
+            mode === 'developer' &&
+              'min-h-0 flex-1 overflow-y-auto overscroll-contain',
+            props.showMainContainer !== false && 'px-4 py-6'
+          )}
+        >
+          {props.children}
+        </div>
+      </AuthenticatedLayout>
     )
   }
   return (
-    <>
-      <GlassCursor scopeSelector='.ci-landing' />
-      <PublicLayout showMainContainer={props.showMainContainer}>
-        {props.children}
-      </PublicLayout>
-    </>
+    <PublicLayout showMainContainer={props.showMainContainer}>
+      {props.children}
+    </PublicLayout>
   )
 }

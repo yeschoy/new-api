@@ -126,12 +126,12 @@ export function TerminalRequests() {
             )}
           </p>
         ) : null}
-        <p className='ci-requestPeriod'>
+        <p className='ed-period'>
           {t('Today ({{date}}) · since 00:00 in your time zone', {
             date: start.format('YYYY-MM-DD'),
           })}
         </p>
-        <section className='ci-statGrid ci-requestStats'>
+        <section className='ed-stats ed-stats--three'>
           <article>
             <span>{t('Requests today')}</span>
             <strong>{summary.data?.requests.toLocaleString() ?? '—'}</strong>
@@ -154,16 +154,18 @@ export function TerminalRequests() {
           </article>
         </section>
 
-        <section className='ci-panel'>
-          <header className='ci-panelHeader'>
-            <p>
-              {t(
-                'Charges may apply even if a request fails or is interrupted.'
-              )}
-            </p>
-            <p>{t('Page filters do not change the daily totals above.')}</p>
+        <section className='ed-panel'>
+          <header className='ed-panelHead'>
+            <div>
+              <p>
+                {t(
+                  'Charges may apply even if a request fails or is interrupted.'
+                )}
+              </p>
+              <p>{t('Page filters do not change the daily totals above.')}</p>
+            </div>
           </header>
-          <div className='ci-requestFilters'>
+          <div className='ed-requestFilters'>
             <span>{t('Filter this page')}</span>
             {(
               [
@@ -176,21 +178,21 @@ export function TerminalRequests() {
                 key={value}
                 type='button'
                 aria-pressed={filter === value}
-                className={cn('ci-chip', filter === value && 'is-active')}
+                className={cn('ed-chip', filter === value && 'is-active')}
                 onClick={() => setFilter(value)}
               >
-                {label} {count}
+                {label} <span>{count}</span>
               </button>
             ))}
           </div>
           {logsQuery.isPending && (
-            <div className='ci-empty'>{t('Loading...')}</div>
+            <div className='ed-empty'>{t('Loading...')}</div>
           )}
           {!logsQuery.isPending &&
             !logsQuery.error &&
             !empty &&
             visible.length === 0 && (
-              <div className='ci-empty'>
+              <div className='ed-empty'>
                 <p>
                   {t(
                     'No matching requests on this page. Try another filter or page.'
@@ -199,9 +201,9 @@ export function TerminalRequests() {
               </div>
             )}
           {!logsQuery.isPending && !logsQuery.error && empty && (
-            <div className='ci-empty'>
-              <span className='ci-emptyIcon'>
-                <Inbox size={18} />
+            <div className='ed-empty'>
+              <span className='ed-emptyIcon'>
+                <Inbox size={18} aria-hidden='true' />
               </span>
               <h3>{t('No matching requests on this page')}</h3>
               <p>
@@ -209,17 +211,13 @@ export function TerminalRequests() {
                   'Create a key, fill it into your tool, then come back here.'
                 )}
               </p>
-              <Link
-                to='/keys'
-                className='ci-button ci-button--size-sm'
-                style={{ marginTop: 12 }}
-              >
+              <Link to='/keys' className='ed-btn ed-btn--accent ed-btn--sm mt-2'>
                 {t('Go create a key')}
               </Link>
             </div>
           )}
           {!logsQuery.isPending && !logsQuery.error && !empty && (
-            <div className='ci-requestList'>
+            <div className='ed-requestList'>
               {visible.map((log) => {
                 const failed = isFailedRequest(log)
                 const other = parseLogOther(log.other)
@@ -241,14 +239,14 @@ export function TerminalRequests() {
                 return (
                   <article
                     key={`${log.type}-${log.id}`}
-                    className={cn('ci-requestRow', failed && 'is-failed')}
+                    className={cn('ed-requestRow', failed && 'is-failed')}
                   >
                     <SheetTrigger
-                      className='ci-requestMain'
+                      className='ed-requestMain'
                       onClick={() => setSelectedLog(log)}
                     >
-                      <div className='ci-requestHeading'>
-                        <div className='ci-requestIdentity'>
+                      <div className='ed-requestHeading'>
+                        <div className='ed-requestIdentity'>
                           <strong>
                             {log.model_name || t('Unknown model')}
                           </strong>
@@ -261,14 +259,14 @@ export function TerminalRequests() {
                         </div>
                         <b
                           className={cn(
-                            'ci-requestStatus',
+                            'ed-requestStatus',
                             failed ? 'is-failed' : 'is-ok'
                           )}
                         >
                           {failed ? t('Failed') : t('Worked')}
                         </b>
                         <ChevronRight
-                          className='ci-requestDisclosure'
+                          className='ed-requestDisclosure'
                           size={16}
                           aria-hidden='true'
                         />
@@ -328,10 +326,10 @@ export function TerminalRequests() {
             </div>
           )}
         </section>
-        <div className='ci-tablePager'>
+        <div className='ed-pager'>
           <button
             type='button'
-            className='ci-button ci-button--ghost ci-button--size-xs'
+            className='ed-btn ed-btn--ghost ed-btn--xs'
             disabled={page === 1 || logsQuery.isFetching}
             onClick={() => {
               setPagination({ scope, page: page - 1 })
@@ -344,7 +342,7 @@ export function TerminalRequests() {
           </span>
           <button
             type='button'
-            className='ci-button ci-button--ghost ci-button--size-xs'
+            className='ed-btn ed-btn--ghost ed-btn--xs'
             disabled={
               page * 50 >= (logsQuery.data?.total ?? 0) || logsQuery.isFetching
             }

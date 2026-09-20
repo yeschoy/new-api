@@ -138,20 +138,15 @@ function DeveloperOverviewDashboard() {
   const showContentPanels = showLeftContentPanels || showUptimePanel
 
   return (
-    <div className='dopa-developer-workbench flex flex-col gap-4'>
-      <YecaiPanel
-        as='section'
-        tone='model'
-        layer='hero'
-        className='dopa-dev-command-deck dopa-cut-corner dopa-signal-scan'
-      >
-        <header className='dopa-dev-command-deck__header'>
+    <div className='flex flex-col gap-4'>
+      <YecaiPanel as='section' tone='model' layer='hero' className='ed-deck'>
+        <header className='ed-deckHead'>
           <div>
-            <span className='dopa-section-kicker'>
-              <TerminalSquare className='size-3.5' aria-hidden='true' />
+            <p className='ed-eyebrow'>
+              <TerminalSquare size={13} aria-hidden='true' />
               {t('Developer mode')}
-            </span>
-            <p className='text-muted-foreground mt-2 max-w-2xl text-xs leading-relaxed'>
+            </p>
+            <p>
               {t(
                 'A focused home for keys, balance, routing, and service health.'
               )}
@@ -159,7 +154,7 @@ function DeveloperOverviewDashboard() {
           </div>
         </header>
 
-        <div className='dopa-dev-signal-grid'>
+        <div className='ed-metricGrid'>
           {heroSignals.map((signal) => {
             const Icon = signal.icon
 

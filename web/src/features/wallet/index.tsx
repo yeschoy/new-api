@@ -361,12 +361,14 @@ export function Wallet(props: WalletProps) {
             usedQuota={user ? Number(user.used_quota) : undefined}
             loading={userLoading}
           >
-            <section id='topup' className='ci-panel'>
-              <header className='ci-panelHeader'>
-                <h2>{t('Top up')}</h2>
-                <p>{t('Add money so new requests can keep running.')}</p>
+            <section id='topup' className='ed-panel'>
+              <header className='ed-panelHead'>
+                <div>
+                  <h2>{t('Top up')}</h2>
+                  <p>{t('Add money so new requests can keep running.')}</p>
+                </div>
               </header>
-              <div className='ci-panelBody' id='wallet-add-funds'>
+              <div className='ed-panelBody' id='wallet-add-funds'>
                 <RechargeFormCard
                   topupInfo={topupInfo}
                   presetAmounts={presetAmounts}

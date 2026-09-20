@@ -39,11 +39,10 @@ import {
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { SignOutDialog } from '@/components/sign-out-dialog'
 import { useTheme } from '@/context/theme-provider'
-import { CiMark } from '@/features/home/components/ci-mark'
-import { GlassCursor } from '@/features/home/components/glass-cursor'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
 import { useUserDisplay } from '@/hooks/use-user-display'
@@ -111,6 +110,94 @@ function readCollapsed(): boolean {
   return isCompactViewport()
 }
 
+type NavLinkProps = {
+  path: string
+  href: string
+  className: string
+  label: string
+  children: React.ReactNode
+}
+
+/** Route-typed link for each console destination. */
+function ConsoleNavLink(props: NavLinkProps) {
+  const shared = {
+    className: props.className,
+    title: props.label,
+    'aria-label': props.label,
+  }
+  if (props.path === '/usage-logs/common') {
+    return (
+      <Link
+        {...shared}
+        to='/usage-logs/$section'
+        params={{ section: 'common' }}
+      >
+        {props.children}
+      </Link>
+    )
+  }
+  if (props.path === '/dashboard/overview') {
+    return (
+      <Link
+        {...shared}
+        to='/dashboard/$section'
+        params={{ section: 'overview' }}
+      >
+        {props.children}
+      </Link>
+    )
+  }
+  if (props.path === '/dashboard/reports') {
+    return (
+      <Link
+        {...shared}
+        to='/dashboard/$section'
+        params={{ section: 'reports' }}
+      >
+        {props.children}
+      </Link>
+    )
+  }
+  if (props.path === '/pricing') {
+    return (
+      <Link {...shared} to='/pricing'>
+        {props.children}
+      </Link>
+    )
+  }
+  if (props.path === '/playground') {
+    return (
+      <Link {...shared} to='/playground'>
+        {props.children}
+      </Link>
+    )
+  }
+  if (props.path === '/keys') {
+    return (
+      <Link {...shared} to='/keys'>
+        {props.children}
+      </Link>
+    )
+  }
+  if (props.path === '/wallet') {
+    return (
+      <Link
+        {...shared}
+        to='/wallet'
+        hash={props.href.includes('#') ? 'redeem' : undefined}
+      >
+        {props.children}
+      </Link>
+    )
+  }
+  return (
+    <Link {...shared} to='/beginner-guide'>
+      {props.children}
+    </Link>
+  )
+}
+
+/** Easy-mode console shell: rail sidebar, quiet top bar, page frame. */
 export function TerminalLayout(props: TerminalLayoutProps) {
   const { t } = useTranslation()
   const { resolvedTheme, setTheme } = useTheme()
@@ -184,25 +271,18 @@ export function TerminalLayout(props: TerminalLayoutProps) {
   }
 
   return (
-    <div
-      className={cn(
-        'ci-landing ci-theme ci-app',
-        collapsed && 'ci-app--collapsed'
-      )}
-      data-theme={isDark ? 'dark' : 'light'}
-    >
-      <GlassCursor scopeSelector='.ci-app' />
+    <div className={cn('ed-app', collapsed && 'ed-app--collapsed')}>
       <aside
         id={sidebarId}
-        className='ci-appSidebar'
+        className='ed-appSidebar'
         inert={compactViewport && collapsed}
         aria-hidden={(compactViewport && collapsed) || undefined}
       >
-        <Link to='/' className='ci-appBrand' aria-label={PRODUCT_NAME}>
-          <CiMark size={22} withWordmark />
+        <Link to='/' className='ed-appBrand' aria-label={PRODUCT_NAME}>
+          <BrandMark size={28} withWordmark />
         </Link>
-        <label className='ci-appSearch'>
-          <Search size={14} />
+        <label className='ed-appSearch'>
+          <Search size={14} aria-hidden='true' />
           <input
             disabled={collapsed}
             value={query}
@@ -211,181 +291,77 @@ export function TerminalLayout(props: TerminalLayoutProps) {
             aria-label={t('Search')}
           />
         </label>
-        <nav className='ci-appNav' aria-label={t('Workspace')}>
+        <nav className='ed-appNav' aria-label={t('Workspace')}>
           {CONSOLE_NAV_GROUPS.map((group) => {
             const items = visibleNav.filter((item) => item.group === group.id)
             if (items.length === 0) return null
             return (
-              <div key={group.id} className='ci-appNavGroup'>
+              <div key={group.id} className='ed-appNavGroup'>
                 {group.label ? (
-                  <p className='ci-appNavLabel'>{t(group.label)}</p>
+                  <p className='ed-appNavLabel'>{t(group.label)}</p>
                 ) : null}
                 {items.map((item) => {
                   const Icon = NAV_ICONS[item.id as keyof typeof NAV_ICONS]
                   const path = consoleNavPath(item.href)
                   const active = isConsoleNavActive(pathname, item.href)
-                  const className = cn('ci-appNavItem', active && 'is-active')
-                  if (path === '/usage-logs/common') {
-                    return (
-                      <Link
-                        key={item.id}
-                        to='/usage-logs/$section'
-                        params={{ section: 'common' }}
-                        className={className}
-                        title={t(item.title)}
-                        aria-label={t(item.title)}
-                      >
-                        <Icon size={16} />
-                        <span className='ci-appNavText'>{t(item.title)}</span>
-                      </Link>
-                    )
-                  }
-                  if (path === '/dashboard/overview') {
-                    return (
-                      <Link
-                        key={item.id}
-                        to='/dashboard/$section'
-                        params={{ section: 'overview' }}
-                        className={className}
-                        title={t(item.title)}
-                        aria-label={t(item.title)}
-                      >
-                        <Icon size={16} />
-                        <span className='ci-appNavText'>{t(item.title)}</span>
-                      </Link>
-                    )
-                  }
-                  if (path === '/dashboard/reports') {
-                    return (
-                      <Link
-                        key={item.id}
-                        to='/dashboard/$section'
-                        params={{ section: 'reports' }}
-                        className={className}
-                        title={t(item.title)}
-                        aria-label={t(item.title)}
-                      >
-                        <Icon size={16} />
-                        <span className='ci-appNavText'>{t(item.title)}</span>
-                      </Link>
-                    )
-                  }
-                  if (path === '/pricing') {
-                    return (
-                      <Link
-                        key={item.id}
-                        to='/pricing'
-                        className={className}
-                        title={t(item.title)}
-                        aria-label={t(item.title)}
-                      >
-                        <Icon size={16} />
-                        <span className='ci-appNavText'>{t(item.title)}</span>
-                      </Link>
-                    )
-                  }
-                  if (path === '/playground') {
-                    return (
-                      <Link
-                        key={item.id}
-                        to='/playground'
-                        className={className}
-                        title={t(item.title)}
-                        aria-label={t(item.title)}
-                      >
-                        <Icon size={16} />
-                        <span className='ci-appNavText'>{t(item.title)}</span>
-                      </Link>
-                    )
-                  }
-                  if (path === '/keys') {
-                    return (
-                      <Link
-                        key={item.id}
-                        to='/keys'
-                        className={className}
-                        title={t(item.title)}
-                        aria-label={t(item.title)}
-                      >
-                        <Icon size={16} />
-                        <span className='ci-appNavText'>{t(item.title)}</span>
-                      </Link>
-                    )
-                  }
-                  if (path === '/wallet') {
-                    return (
-                      <Link
-                        key={item.id}
-                        to='/wallet'
-                        hash={item.href.includes('#') ? 'redeem' : undefined}
-                        className={className}
-                        title={t(item.title)}
-                        aria-label={t(item.title)}
-                      >
-                        <Icon size={16} />
-                        <span className='ci-appNavText'>{t(item.title)}</span>
-                      </Link>
-                    )
-                  }
                   return (
-                    <Link
+                    <ConsoleNavLink
                       key={item.id}
-                      to='/beginner-guide'
-                      className={className}
-                      title={t(item.title)}
-                      aria-label={t(item.title)}
+                      path={path}
+                      href={item.href}
+                      label={t(item.title)}
+                      className={cn('ed-navItem', active && 'is-active')}
                     >
-                      <Icon size={16} />
-                      <span className='ci-appNavText'>{t(item.title)}</span>
-                    </Link>
+                      <Icon aria-hidden='true' />
+                      <span className='ed-navText'>{t(item.title)}</span>
+                    </ConsoleNavLink>
                   )
                 })}
               </div>
             )
           })}
         </nav>
-        <div className='ci-appSidebarFooter'>
+        <div className='ed-appSidebarFooter'>
           {showBalanceCard ? (
-            <div className='ci-appBalanceRegion' inert={collapsed}>
-              <div>
-                <div className='ci-appBalance'>
-                  <div className='ci-appBalanceRow'>
-                    <span>{t('Balance')}</span>
-                    <strong
-                      className={remainQuota <= 0 ? 'is-empty' : undefined}
-                    >
-                      {formatConsoleMoney(remainQuota)}
-                    </strong>
-                  </div>
-                  <p>
-                    {remainQuota <= 0
-                      ? t('Balance is empty. Top up or requests will fail.')
-                      : t('Balance is getting low. Top up when you can.')}
-                  </p>
-                  <Link
-                    to='/wallet'
-                    hash='topup'
-                    className='ci-button ci-button--outline ci-button--size-xs ci-appTopup'
-                  >
-                    <Plus size={14} />
-                    {t('Top up')}
-                  </Link>
+            <div className='ed-appBalanceRegion' inert={collapsed}>
+              <div className='ed-appBalance'>
+                <div className='ed-appBalanceRow'>
+                  <span>{t('Balance')}</span>
+                  <strong className={remainQuota <= 0 ? 'is-empty' : undefined}>
+                    {formatConsoleMoney(remainQuota)}
+                  </strong>
                 </div>
+                <p>
+                  {remainQuota <= 0
+                    ? t('Balance is empty. Top up or requests will fail.')
+                    : t('Balance is getting low. Top up when you can.')}
+                </p>
+                <Link
+                  to='/wallet'
+                  hash='topup'
+                  className='ed-btn ed-btn--outline ed-btn--xs'
+                >
+                  <Plus aria-hidden='true' />
+                  {t('Top up')}
+                </Link>
               </div>
             </div>
           ) : null}
-          <div className='ci-appUserWrap'>
+          <div className='ed-appUserWrap'>
             <button
               type='button'
-              className='ci-appUser'
+              className='ed-appUser'
+              aria-expanded={userMenuOpen}
               onClick={() => setUserMenuOpen((open) => !open)}
             >
-              <span className='ci-appUserMark'>{initials.slice(0, 1)}</span>
-              <span className='ci-appUserName'>{handleLabel}</span>
-              <ChevronDown size={14} />
+              <span className='ed-appUserMark' aria-hidden='true'>
+                {initials.slice(0, 1)}
+              </span>
+              <span className='ed-appUserName'>{handleLabel}</span>
+              <ChevronDown size={14} aria-hidden='true' />
             </button>
             {userMenuOpen ? (
-              <div className='ci-appUserMenu'>
+              <div className='ed-appUserMenu'>
                 <button
                   type='button'
                   onClick={() => {
@@ -393,7 +369,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
                     void navigate({ to: '/profile' })
                   }}
                 >
-                  <UserRound size={14} />
+                  <UserRound size={14} aria-hidden='true' />
                   {t('Profile')}
                 </button>
                 {isAdmin ? (
@@ -405,7 +381,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
                       void navigate({ to: '/channels' })
                     }}
                   >
-                    <Settings size={14} />
+                    <Settings size={14} aria-hidden='true' />
                     {t('Operator')}
                   </button>
                 ) : null}
@@ -416,7 +392,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
                     setSignOutOpen(true)
                   }}
                 >
-                  <LogOut size={14} />
+                  <LogOut size={14} aria-hidden='true' />
                   {t('Sign out')}
                 </button>
               </div>
@@ -426,7 +402,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
       </aside>
       <button
         type='button'
-        className='ci-appBackdrop'
+        className='ed-appBackdrop'
         aria-label={t('Collapse sidebar')}
         aria-hidden={!compactViewport || collapsed}
         tabIndex={-1}
@@ -436,36 +412,39 @@ export function TerminalLayout(props: TerminalLayoutProps) {
           setUserMenuOpen(false)
         }}
       />
-      <div className='ci-appFrame'>
-        <header className='ci-appTopbar'>
+      <div className='ed-appFrame'>
+        <header className='ed-appTopbar'>
           <button
             type='button'
-            className='ci-appIconBtn ci-appSidebarToggle'
+            className='ed-iconBtn'
             aria-expanded={!collapsed}
             aria-controls={sidebarId}
             aria-label={collapsed ? t('Expand sidebar') : t('Collapse sidebar')}
             onClick={toggleCollapsed}
           >
-            <PanelLeft size={16} />
+            <PanelLeft size={16} aria-hidden='true' />
           </button>
-          <div className='ci-appTopbarRight'>
+          <div className='ed-appTopbarRight'>
             <CommunityHelp variant='header' />
             <ConsoleModeControl compact />
-            <span className='ci-appUsd'>¥</span>
             <LanguageSwitcher />
             <button
               type='button'
-              className='ci-appIconBtn'
+              className='ed-iconBtn'
               aria-label={
                 isDark ? t('Switch to light mode') : t('Switch to dark mode')
               }
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
             >
-              {isDark ? <Moon size={16} /> : <Sun size={16} />}
+              {isDark ? (
+                <Sun size={16} aria-hidden='true' />
+              ) : (
+                <Moon size={16} aria-hidden='true' />
+              )}
             </button>
           </div>
         </header>
-        <div className={cn('ci-appMain', isPlayground && 'ci-appMain--flush')}>
+        <div className={cn('ed-appMain', isPlayground && 'ed-appMain--flush')}>
           {props.children}
         </div>
       </div>

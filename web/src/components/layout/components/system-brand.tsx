@@ -42,10 +42,7 @@ type SystemBrandProps = {
 }
 
 /**
- * System brand component
- * Displays current system logo + name.
- * - inline: compact pill in the top app bar; clicking navigates to home (/)
- * - sidebar: stacked card in the sidebar header; clicking navigates to home (/)
+ * System brand component. Displays the current logo + name and links home.
  */
 export function SystemBrand(props: SystemBrandProps) {
   const { t } = useTranslation()
@@ -65,18 +62,20 @@ export function SystemBrand(props: SystemBrandProps) {
         to='/'
         aria-label={t('Go to home')}
         className={cn(
-          'text-foreground dopa-system-brand inline-flex h-8 min-w-0 items-center gap-2 rounded-xl border border-primary/10 bg-primary/6 px-2 text-sm font-bold transition-colors outline-none select-none',
-          'hover:bg-primary/10 focus-visible:ring-ring/40 focus-visible:ring-2'
+          'ed-systemBrand text-foreground inline-flex h-8 min-w-0 items-center gap-2 rounded-full px-1.5 text-sm font-medium transition-colors outline-none select-none',
+          'hover:bg-muted focus-visible:ring-ring/40 focus-visible:ring-2'
         )}
       >
-        <div className='flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md'>
+        <div className='bg-foreground flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full'>
           <img
             src={logo}
             alt={t('Logo')}
-            className='size-full rounded-md object-cover'
+            className='size-full rounded-full object-cover'
           />
         </div>
-        <span className='max-w-[12rem] min-w-0 truncate'>{name}</span>
+        <span className='ed-display max-w-[12rem] min-w-0 truncate text-base'>
+          {name}
+        </span>
       </Link>
     )
   }
@@ -89,16 +88,18 @@ export function SystemBrand(props: SystemBrandProps) {
           className='hover:text-sidebar-foreground active:text-sidebar-foreground'
           render={<Link to='/' aria-label={t('Go to home')} />}
         >
-          <div className='flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg'>
+          <div className='bg-foreground flex aspect-square size-8 items-center justify-center overflow-hidden rounded-full'>
             <img
               src={logo}
               alt={t('Logo')}
-              className='size-full rounded-lg object-cover'
+              className='size-full rounded-full object-cover'
             />
           </div>
           <div className='grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden'>
-            <span className='truncate font-semibold'>{name}</span>
-            <span className='truncate text-xs'>{version}</span>
+            <span className='ed-display truncate text-base'>{name}</span>
+            <span className='text-muted-foreground truncate text-xs'>
+              {version}
+            </span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>

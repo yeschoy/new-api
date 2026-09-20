@@ -18,12 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 
-import { CiStatusPage } from '@/components/layout/components/ci-status-page'
+import { StatusPage } from '@/components/layout/components/status-page'
 
 export function MaintenanceError() {
   const { t } = useTranslation()
   return (
-    <CiStatusPage
+    <StatusPage
       code={503}
       title={t('Website is under maintenance!')}
       description={

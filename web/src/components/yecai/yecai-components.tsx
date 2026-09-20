@@ -17,11 +17,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Button as ButtonPrimitive } from '@base-ui/react/button'
-import { CircleDollarSign, Sparkles, type LucideIcon } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { isValidElement, type HTMLAttributes, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
 
+/**
+ * Editorial building blocks shared by the console dashboards.
+ *
+ * `tone` is retained as a data attribute for tests and future theming, but
+ * the visual system no longer colours panels by tone: every panel is paper
+ * with a hairline rule, and the accent appears only on actions and numbers.
+ */
 export type YecaiTone = 'leaf' | 'model' | 'money' | 'signal' | 'neutral'
 
 type YecaiPanelElement = 'article' | 'aside' | 'div' | 'li' | 'section'
@@ -44,7 +51,7 @@ export function YecaiPanel(props: YecaiPanelProps) {
   return (
     <Element
       {...panelProps}
-      className={cn('yecai-panel', className)}
+      className={cn('ed-paper', layer === 'hero' && 'ed-paper--tint', className)}
       data-layer={layer}
       data-tone={tone}
     />
@@ -61,7 +68,7 @@ export function YecaiBentoGrid(props: YecaiBentoGridProps) {
   return (
     <div
       {...gridProps}
-      className={cn('yecai-bento-grid', className)}
+      className={cn('ed-bento', className)}
       data-density={density}
     />
   )
@@ -80,13 +87,7 @@ export function YecaiBentoItem(props: YecaiBentoItemProps) {
     ...itemProps
   } = props
 
-  return (
-    <Element
-      {...itemProps}
-      className={cn('yecai-bento-item', className)}
-      data-tone={tone}
-    />
-  )
+  return <Element {...itemProps} className={className} data-tone={tone} />
 }
 
 export type YecaiActionProps = ButtonPrimitive.Props & {
@@ -98,6 +99,22 @@ export type YecaiActionProps = ButtonPrimitive.Props & {
 function isNativeButtonRender(render: ButtonPrimitive.Props['render']) {
   if (!render || !isValidElement(render)) return true
   return render.type === 'button'
+}
+
+const ACTION_APPEARANCE: Record<
+  NonNullable<YecaiActionProps['appearance']>,
+  string
+> = {
+  solid: 'ed-btn--accent',
+  soft: 'ed-btn--outline',
+  outline: 'ed-btn--ghost',
+}
+
+const ACTION_SIZE: Record<NonNullable<YecaiActionProps['size']>, string> = {
+  sm: 'ed-btn--xs',
+  md: 'ed-btn--sm',
+  lg: 'ed-btn--lg',
+  tile: '',
 }
 
 export function YecaiAction(props: YecaiActionProps) {
@@ -114,7 +131,12 @@ export function YecaiAction(props: YecaiActionProps) {
   return (
     <ButtonPrimitive
       {...buttonProps}
-      className={cn('yecai-action', className)}
+      className={cn(
+        'ed-btn',
+        ACTION_APPEARANCE[appearance],
+        ACTION_SIZE[size],
+        className
+      )}
       data-appearance={appearance}
       data-slot='yecai-action'
       data-tone={tone}
@@ -147,18 +169,16 @@ export function YecaiMetric(props: YecaiMetricProps) {
   return (
     <div
       {...metricProps}
-      className={cn('yecai-metric', className)}
+      className={cn('ed-metric', className)}
       data-tone={tone}
     >
-      <span className='yecai-metric__icon' aria-hidden='true'>
+      <span className='ed-metricIcon' aria-hidden='true'>
         <Icon />
       </span>
-      <span className='yecai-metric__copy'>
-        <span className='yecai-metric__label'>{label}</span>
-        <strong className='yecai-metric__value'>{value}</strong>
-        {detail ? (
-          <small className='yecai-metric__detail'>{detail}</small>
-        ) : null}
+      <span className='ed-metricCopy'>
+        <span className='ed-metricLabel'>{label}</span>
+        <strong className='ed-metricValue'>{value}</strong>
+        {detail ? <small className='ed-metricDetail'>{detail}</small> : null}
       </span>
     </div>
   )
@@ -175,6 +195,7 @@ interface YecaiPriceFlowProps extends HTMLAttributes<HTMLElement> {
   size?: 'compact' | 'hero'
 }
 
+/** Receipt-style comparison of the base price against the site price. */
 export function YecaiPriceFlow(props: YecaiPriceFlowProps) {
   const {
     accessibleLabel,
@@ -193,45 +214,23 @@ export function YecaiPriceFlow(props: YecaiPriceFlowProps) {
     <figure
       {...flowProps}
       aria-label={accessibleLabel}
-      className={cn('yecai-price-flow', className)}
+      className={cn('m-0', className)}
       data-size={size}
     >
-      <div className='yecai-price-flow__node' data-side='official'>
-        <span className='yecai-price-flow__icon' aria-hidden='true'>
-          <CircleDollarSign />
-        </span>
-        <span>{officialLabel}</span>
-        <strong>{officialValue}</strong>
-      </div>
-
-      <svg
-        className='yecai-price-flow__curve'
-        viewBox='0 0 160 70'
-        preserveAspectRatio='none'
-        aria-hidden='true'
-      >
-        <path d='M 8 50 C 48 8, 108 65, 152 20' />
-        <circle className='yecai-price-flow__traveler' r='4'>
-          <animateMotion
-            dur='3.2s'
-            repeatCount='indefinite'
-            path='M 8 50 C 48 8, 108 65, 152 20'
-          />
-        </circle>
-      </svg>
-
-      <div className='yecai-price-flow__node' data-side='site'>
-        <span className='yecai-price-flow__icon' aria-hidden='true'>
-          <Sparkles />
-        </span>
-        <span>{siteLabel}</span>
-        <strong>{siteValue}</strong>
-      </div>
-
+      <dl className='ed-receiptRows'>
+        <div>
+          <dt>{officialLabel}</dt>
+          <dd className='is-base'>{officialValue}</dd>
+        </div>
+        <div>
+          <dt>{siteLabel}</dt>
+          <dd>{siteValue}</dd>
+        </div>
+      </dl>
       {savingsValue ? (
-        <figcaption className='yecai-price-flow__saving'>
+        <figcaption className='ed-savings mt-3 flex items-center justify-between gap-3 text-sm'>
           <span>{savingsLabel}</span>
-          <strong>{savingsValue}</strong>
+          <strong className='ed-num text-lg'>{savingsValue}</strong>
         </figcaption>
       ) : null}
     </figure>

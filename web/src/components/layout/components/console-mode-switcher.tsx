@@ -81,7 +81,7 @@ export function ConsoleModeControl(props: ConsoleModeControlProps) {
             <Button
               variant='ghost'
               size='icon'
-              className='dopa-mode-control text-primary size-10 shrink-0 rounded-full border'
+              className='ed-modeControl--mobile text-primary size-10 shrink-0 rounded-full'
               aria-label={t('Mode')}
             />
           }
@@ -116,12 +116,7 @@ export function ConsoleModeControl(props: ConsoleModeControlProps) {
   }
 
   return (
-    <div
-      className={cn(
-        'dopa-mode-control grid shrink-0 grid-cols-2 gap-1 border p-1',
-        props.compact ? 'dopa-mode-control--compact' : 'rounded-xl'
-      )}
-    >
+    <div className='ed-modeControl shrink-0'>
       {options.map((option) => {
         const Icon = option.icon
         const selected = mode === option.id
@@ -133,9 +128,9 @@ export function ConsoleModeControl(props: ConsoleModeControlProps) {
             aria-pressed={selected}
             aria-label={option.label}
             className={cn(
-              'flex min-h-8 items-center justify-center gap-1.5 px-2 text-[11px] font-bold transition-colors',
+              'flex min-h-7 items-center justify-center gap-1.5 px-2.5 text-[11px] font-semibold transition-colors',
               selected
-                ? 'bg-background text-primary shadow-xs'
+                ? 'bg-background text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
@@ -160,7 +155,7 @@ export function ConsoleModeSwitcher() {
 
   return (
     <SidebarFooter className='border-sidebar-border border-t p-2'>
-      <p className='text-muted-foreground px-1 pb-1.5 text-[10px] font-bold tracking-[0.14em] uppercase group-data-[collapsible=icon]:hidden'>
+      <p className='text-muted-foreground px-1 pb-1.5 text-[10px] font-semibold tracking-[0.14em] uppercase group-data-[collapsible=icon]:hidden'>
         {t('Mode')}
       </p>
       <ConsoleModeControl />

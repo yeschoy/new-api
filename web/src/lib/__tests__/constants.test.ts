@@ -43,8 +43,8 @@ describe('resolveSystemName', () => {
 })
 
 describe('resolveLogoUrl', () => {
-  it('uses the selected SVG mascot as the product default', () => {
-    expect(DEFAULT_LOGO).toBe('/yecai-logo-mascot.svg')
+  it('uses the editorial brand mark as the product default', () => {
+    expect(DEFAULT_LOGO).toBe('/brand-mark.svg')
   })
 
   it.each([
@@ -56,8 +56,10 @@ describe('resolveLogoUrl', () => {
     'logo.png',
     '/yecai-logo.svg',
     'yecai-logo.svg',
+    '/yecai-logo-mascot.svg',
+    'yecai-logo-mascot.svg',
   ])(
-    'preserves the protected default logo for empty or existing value %s',
+    'maps empty or legacy default logo value %s onto the current mark',
     (value) => {
       expect(resolveLogoUrl(value)).toBe(DEFAULT_LOGO)
     }

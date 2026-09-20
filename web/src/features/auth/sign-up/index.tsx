@@ -30,22 +30,19 @@ export function SignUp() {
   const { status } = useStatus()
 
   return (
-    <AccessAuthLayout title={t('Create an account')}>
-      <div className='w-full space-y-8'>
-        <div className='space-y-2'>
-          <p className='text-muted-foreground text-left text-sm sm:text-base'>
+    <AccessAuthLayout
+      title={t('Create an account')}
+      description={t('One account for your AI workflow.')}
+    >
+      <div className='w-full space-y-6'>
+        <SignUpForm />
+
+        <div className='ed-authSwitch'>
+          <p>
             {t('Already have an account?')}{' '}
-            <Link
-              to='/sign-in'
-              className='hover:text-primary font-medium underline underline-offset-4'
-            >
-              {t('Sign in')}
-            </Link>
-            .
+            <Link to='/sign-in'>{t('Sign in')}</Link>
           </p>
         </div>
-
-        <SignUpForm />
 
         <TermsFooter
           variant='sign-up'

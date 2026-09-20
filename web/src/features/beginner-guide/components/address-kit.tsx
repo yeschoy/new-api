@@ -72,19 +72,19 @@ export function AddressKit({ address }: AddressKitProps) {
   ]
 
   return (
-    <div className='dopa-guide-address-flow grid gap-4 md:grid-cols-3'>
+    <div className='grid gap-4 md:grid-cols-3'>
       {items.map((item, index) => {
         const Icon = item.icon
         const copied = copiedText === item.value
         return (
           <div
             key={item.title}
-            className='dopa-guide-address-node dopa-lift border-border bg-card relative flex flex-col gap-3 rounded-3xl border p-5'
+            className='ed-paper relative flex flex-col gap-3 p-5'
             data-step={index + 1}
           >
             <div className='flex items-center gap-3'>
               <span
-                className='flex size-10 items-center justify-center rounded-2xl'
+                className='flex size-10 items-center justify-center rounded-full'
                 style={{
                   backgroundColor: `color-mix(in oklab, ${item.hue} 14%, transparent)`,
                   color: item.hue,
@@ -93,25 +93,23 @@ export function AddressKit({ address }: AddressKitProps) {
                 <Icon className='size-5' />
               </span>
               <div className='min-w-0'>
-                <p className='text-sm font-bold'>{item.title}</p>
+                <p className='text-sm font-semibold'>{item.title}</p>
                 <p className='text-muted-foreground text-xs'>{item.subtitle}</p>
               </div>
             </div>
-            <div className='border-border bg-muted/60 flex items-center gap-2 rounded-xl border px-3 py-2'>
-              <code className='min-w-0 flex-1 truncate font-mono text-xs'>
-                {item.value}
-              </code>
+            <div className='ed-inlineCopy'>
+              <code>{item.value}</code>
               {item.copyable && (
                 <Button
                   variant='ghost'
                   size='icon'
-                  className='size-7 shrink-0'
+                  className='size-7 shrink-0 rounded-full'
                   aria-label={t('Copy {{label}}', { label: item.title })}
                   onClick={() => copyToClipboard(item.value)}
                 >
                   {copied ? (
                     <Check
-                      className='dopa-pop-in size-3.5'
+                      className='ed-pop size-3.5'
                       style={{ color: 'var(--success)' }}
                     />
                   ) : (

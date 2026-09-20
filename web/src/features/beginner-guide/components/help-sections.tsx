@@ -68,8 +68,8 @@ export function UseCasePicker(props: {
               onClick={() => props.onPick(row)}
               aria-pressed={selected}
               className={cn(
-                'dopa-lift border-border bg-card flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 text-left',
-                selected && 'border-primary/60 bg-primary/5'
+                'ed-paper flex items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/40',
+                selected && 'border-primary bg-primary/5'
               )}
             >
               <span className='min-w-0'>

@@ -36,24 +36,19 @@ export function SignIn() {
         <>
           {t('Welcome back.')}
           <br />
-          {t('Keep creating.')}
+          <em>{t('Keep creating.')}</em>
         </>
       }
       description={t('Sign in to manage your API keys, usage, and account.')}
     >
-      <div className='yecai-authFormContent'>
+      <div className='w-full'>
         <UserAuthForm redirectTo={redirect} />
-        <div className='yecai-authAccountSwitch'>
+        <div className='ed-authSwitch'>
           {!status?.self_use_mode_enabled &&
             status?.register_enabled !== false && (
               <p>
                 {t("Don't have an account?")}{' '}
-                <Link
-                  to='/sign-up'
-                  className='hover:text-primary font-medium underline underline-offset-4'
-                >
-                  {t('Sign up')}
-                </Link>
+                <Link to='/sign-up'>{t('Sign up')}</Link>
               </p>
             )}
         </div>
@@ -61,7 +56,7 @@ export function SignIn() {
         <TermsFooter
           variant='sign-in'
           status={status}
-          className='text-center'
+          className='mt-4 text-center'
         />
       </div>
     </AccessAuthLayout>

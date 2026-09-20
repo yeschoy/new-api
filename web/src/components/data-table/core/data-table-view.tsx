@@ -63,7 +63,7 @@ export function DataTableView<TData>(props: DataTableViewProps<TData>) {
     <div
       data-slot='data-table-view'
       className={cn(
-        'dopa-paper dopa-data-surface overflow-hidden rounded-3xl',
+        'ed-dataSurface overflow-hidden',
         props.containerClassName
       )}
       {...props.containerProps}

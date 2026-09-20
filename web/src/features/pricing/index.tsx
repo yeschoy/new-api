@@ -176,37 +176,20 @@ export function Pricing() {
   }
 
   const pricingInner = (
-    <div className='dopa-pricing-canvas relative'>
-      <div
-        aria-hidden
-        className='pointer-events-none absolute inset-x-0 top-0 h-[600px] opacity-20 dark:opacity-[0.10]'
-        style={{
-          background: [
-            'radial-gradient(ellipse 60% 50% at 20% 20%, oklch(0.72 0.18 250 / 80%) 0%, transparent 70%)',
-            'radial-gradient(ellipse 50% 40% at 80% 15%, oklch(0.65 0.15 200 / 60%) 0%, transparent 70%)',
-            'radial-gradient(ellipse 40% 35% at 50% 70%, oklch(0.70 0.12 280 / 40%) 0%, transparent 70%)',
-          ].join(', '),
-          maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
-          WebkitMaskImage:
-            'linear-gradient(to bottom, black 40%, transparent 100%)',
-        }}
-      />
+    <div className='relative'>
       <PageTransition className='relative mx-auto w-full max-w-[1500px] px-3 pt-24 pb-8 sm:px-6 sm:pt-28 sm:pb-10 xl:px-8'>
-        <header
-          className='dopa-section-shell dopa-catalog-hero dopa-token-grid mb-7 grid items-end gap-6 sm:mb-9 lg:grid-cols-[0.75fr_1.25fr]'
-          data-section='MODELS'
-        >
+        <header className='ed-catalogHero mb-7 sm:mb-9' data-section='MODELS'>
           <div>
-            <p className='dopa-section-kicker'>{t('Live pricing')}</p>
-            <h1 className='mt-4 text-[clamp(2.5rem,6vw,4.75rem)] leading-[0.98] font-black tracking-[-0.07em]'>
+            <p className='ed-eyebrow'>{t('Live pricing')}</p>
+            <h1 className='ed-display mt-4 text-[clamp(2.5rem,6vw,4.5rem)]'>
               {t('Model Square')}
             </h1>
-            <p className='text-muted-foreground/80 mt-3 text-sm sm:mt-4 sm:text-base'>
+            <p className='text-muted-foreground mt-3 text-sm sm:mt-4 sm:text-base'>
               {t('This site currently has {{count}} models enabled', {
                 count: models?.length || 0,
               })}
             </p>
-            <p className='text-muted-foreground/60 mx-auto mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
+            <p className='text-muted-foreground mt-2 max-w-2xl text-xs leading-relaxed sm:text-sm'>
               {t(
                 'Discover curated AI models, compare pricing and capabilities, and choose the right model for every scenario.'
               )}
@@ -226,7 +209,7 @@ export function Pricing() {
         </header>
 
         <div
-          className='dopa-section-shell dopa-catalog-workbench grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]'
+          className='grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]'
           data-section='CATALOG'
         >
           <PricingSidebar
@@ -247,7 +230,7 @@ export function Pricing() {
             models={models || []}
             hasActiveFilters={hasActiveFilters}
             onClearFilters={clearFilters}
-            className='dopa-paper hover-scrollbar sticky top-20 hidden max-h-[calc(100dvh-6rem)] self-start overflow-y-auto rounded-[1.4rem] xl:block'
+            className='ed-paper hover-scrollbar sticky top-20 hidden max-h-[calc(100dvh-6rem)] self-start overflow-y-auto xl:block'
           />
 
           <main className='min-w-0 space-y-4'>

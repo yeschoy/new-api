@@ -44,48 +44,50 @@ export function Footer(props: FooterProps) {
   ].filter((link): link is { href: string; label: string } => link !== null)
 
   return (
-    <footer
-      className={cn('border-border/40 relative z-10 border-t', props.className)}
-    >
-      <div className='mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row'>
-        <a href='/' className='flex items-center gap-2.5'>
-          <img
-            src={logo}
-            alt={productName}
-            className='size-7 rounded-lg object-contain'
-          />
-          <span className='text-sm font-semibold tracking-tight'>
-            {productName}
-          </span>
-        </a>
-        {footerHtml ? (
-          <RichContent
-            mode='html'
-            content={footerHtml}
-            className='custom-footer text-muted-foreground min-w-0 text-center text-sm sm:text-left'
-          />
-        ) : null}
-        <div className='text-muted-foreground/50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-xs sm:ms-auto'>
-          {legalLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className='hover:text-foreground transition-colors'
+    <footer className={cn('ed-footer', props.className)}>
+      <div className='ed-container ed-footerInner'>
+        <div className='ed-footerBrand'>
+          <a href='/' className='ed-brand'>
+            <span
+              className='ed-brandMark'
+              style={{ inlineSize: 26, blockSize: 26 }}
+              aria-hidden='true'
             >
-              {link.label}
-            </a>
-          ))}
+              <img src={logo} alt='' width={26} height={26} />
+            </span>
+            <span className='ed-brandName'>{productName}</span>
+          </a>
+          <p>{t('Professional AI model platform')}</p>
+          {footerHtml ? (
+            <RichContent
+              mode='html'
+              content={footerHtml}
+              className='custom-footer min-w-0 text-sm'
+            />
+          ) : null}
+        </div>
+        {legalLinks.length > 0 ? (
+          <nav className='ed-footerLinks' aria-label={t('Legal')}>
+            {legalLinks.map((link) => (
+              <a key={link.href} href={link.href}>
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        ) : null}
+        <div className='ed-footerMeta'>
           <span>
-            &copy; {currentYear}{' '}
+            &copy; {currentYear} {productName}. {t('footer.defaultCopyright')}
+          </span>
+          <span>
+            {t('Built on')}{' '}
             <a
               href='https://github.com/QuantumNous/new-api'
               target='_blank'
               rel='noopener noreferrer'
-              className='text-foreground/70 hover:text-foreground font-semibold transition-colors'
             >
               {t('New API')}
             </a>
-            . {t('footer.defaultCopyright')}
           </span>
         </div>
       </div>

@@ -25,17 +25,11 @@ For commercial licensing, please contact support@quantumnous.com
 
 export const THEME_PRESETS = [
   {
+    // The shipped editorial system: warm paper canvas with a single clay
+    // accent. Swatches preview the canvas → accent pair.
     value: 'default',
     name: 'Default',
-    swatches: ['oklch(0.72 0.18 250)', 'oklch(0.7 0.12 280)'],
-  },
-  {
-    // Inspired by Anthropic's official brand language: warm cream canvas
-    // (#faf9f5) paired with clay/coral (#d97757) as the single accent.
-    // Swatches preview the canvas → accent gradient that defines the system.
-    value: 'anthropic',
-    name: 'Anthropic',
-    swatches: ['oklch(0.984 0.005 95)', 'oklch(0.685 0.142 38)'],
+    swatches: ['oklch(0.984 0.006 85)', 'oklch(0.6 0.145 38)'],
   },
   {
     value: 'simple-large',
@@ -88,14 +82,14 @@ export type ContentLayout = 'full' | 'centered'
  * Font axis for the theme.
  *
  * - `default` — resolve at runtime from the active preset
- *   (see `PRESET_DEFAULT_FONT`). The shipped `default` and `anthropic`
- *   presets resolve to serif; other named color presets fall back to
- *   sans unless they list a different choice. Mirrors how
- *   `radius: 'default'` defers to a per-preset hint.
- * - `sans` — humanist sans (Public Sans), the project's UI fallback.
- * - `serif` — editorial serif (Lora + CJK fallbacks), the project's
- *   "soul" typography. Inherits across the whole UI; monospace contexts
- *   keep their own family via Tailwind preflight and `.font-mono`.
+ *   (see `PRESET_DEFAULT_FONT`). The shipped `default` preset resolves to
+ *   sans; named color presets fall back to sans unless they list a
+ *   different choice. Mirrors how `radius: 'default'` defers to a
+ *   per-preset hint.
+ * - `sans` — humanist sans (Inter), the project's UI face.
+ * - `serif` — editorial serif (Lora + CJK fallbacks) for body copy.
+ *   Inherits across the whole UI; monospace contexts keep their own family
+ *   via Tailwind preflight and `.font-mono`.
  */
 export type ThemeFont = 'default' | 'sans' | 'serif'
 
@@ -177,7 +171,6 @@ export const PRESET_DEFAULT_FONT: Partial<
   Record<ThemePreset, ResolvedThemeFont>
 > = {
   default: 'sans',
-  anthropic: 'serif',
 }
 
 /**

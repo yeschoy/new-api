@@ -23,8 +23,6 @@ import { useTranslation } from 'react-i18next'
 import { MarketingHeader } from '@/components/layout'
 import { Footer } from '@/components/layout/components/footer'
 import { useTheme } from '@/context/theme-provider'
-import { CiMark } from '@/features/home/components/ci-mark'
-import { GlassCursor } from '@/features/home/components/glass-cursor'
 import { PRODUCT_NAME } from '@/lib/product-brand'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -33,8 +31,6 @@ import {
   resolveDownload,
   type DownloadEnvironment,
 } from './lib/downloads'
-
-import '@/styles/client-landing.css'
 
 export type DesktopClientRuntime = {
   hostname: string
@@ -75,6 +71,34 @@ function getBrowserRuntime(): DesktopClientRuntime {
   }
 }
 
+function Screenshot(props: {
+  src: string
+  alt: string
+  width: number
+  height: number
+  caption: string
+  priority?: boolean
+}) {
+  return (
+    <figure className='ed-paper m-0 overflow-hidden'>
+      <figcaption className='ed-codeHead'>
+        <span>{props.caption}</span>
+      </figcaption>
+      <img
+        src={props.src}
+        alt={props.alt}
+        width={props.width}
+        height={props.height}
+        className='block h-auto w-full'
+        fetchPriority={props.priority ? 'high' : undefined}
+        loading={props.priority ? undefined : 'lazy'}
+        decoding='async'
+      />
+    </figure>
+  )
+}
+
+/** Desktop client marketing page: download call, three feature stories. */
 export function DesktopClientPage(props: DesktopClientPageProps = {}) {
   const { t } = useTranslation()
   const { resolvedTheme } = useTheme()
@@ -136,220 +160,189 @@ export function DesktopClientPage(props: DesktopClientPageProps = {}) {
     }
   }
 
+  const features = [
+    {
+      id: 'client-access-title',
+      index: '01',
+      kicker: t('Client'),
+      title: t('Your apps, ready to connect'),
+      copy: t(
+        'Find supported desktop apps and finish setup without copying settings by hand.'
+      ),
+      image: {
+        src: '/client/yecai-client-app-connection-showcase.webp',
+        alt: t('Yecai Client application access setup'),
+        width: 1825,
+        height: 982,
+      },
+    },
+    {
+      id: 'client-pricing-title',
+      index: '02',
+      kicker: t('Client'),
+      title: t('Choose with the full picture'),
+      copy: t(
+        'Compare complete model IDs, routes, and billing groups before connecting.'
+      ),
+      note: t(
+        'Pricing shown in the product preview is illustrative and may change.'
+      ),
+      image: {
+        src: '/client/yecai-client-model-pricing-showcase.webp',
+        alt: t('Yecai Client model and pricing choices'),
+        width: 1820,
+        height: 1344,
+      },
+    },
+    {
+      id: 'client-theme-title',
+      index: '03',
+      kicker: t('Theme'),
+      title: t('Comfortable in light or dark'),
+      copy: t(
+        'Follow your system theme while keeping the same clear application workspace.'
+      ),
+      image: {
+        src: alternateOverview.src,
+        alt: alternateOverviewAlt,
+        width: alternateOverview.width,
+        height: alternateOverview.height,
+      },
+    },
+  ]
+
   return (
-    <div
-      className='ci-landing ci-theme client-landing'
-      data-theme={isDark ? 'dark' : 'light'}
-    >
-      <GlassCursor scopeSelector='.client-landing' />
-      <div className='ci-handoffRoot'>
-        <MarketingHeader
-          isAuthenticated={isAuthenticated}
-          currentPage='client'
-        />
-        <main>
-          <section className='client-hero' aria-labelledby='client-hero-title'>
-            <span className='client-ambient' aria-hidden='true' />
-            <div className='client-hero__copy'>
-              <div className='client-hero__brand'>
-                <CiMark size={46} />
-                <span>{PRODUCT_NAME}</span>
-                <span>{t('Client')}</span>
-              </div>
-              <p className='client-kicker'>{t('Desktop client')}</p>
-              <h1 id='client-hero-title'>
+    <div className='ed-site'>
+      <MarketingHeader isAuthenticated={isAuthenticated} currentPage='client' />
+      <main>
+        <section className='ed-hero' aria-labelledby='client-hero-title'>
+          <div className='ed-container ed-heroGrid'>
+            <div className='ed-heroCopy ed-rise'>
+              <p className='ed-eyebrow'>
+                {PRODUCT_NAME} · {t('Desktop client')}
+              </p>
+              <h1 id='client-hero-title' className='ed-display'>
                 {t('AI workspace, now on your desktop')}
               </h1>
-              <p className='client-hero__description'>
+              <p className='ed-lede'>
                 {t(
                   'Use one client to connect apps, choose models, and understand every price.'
                 )}
               </p>
-              <div className='client-hero__actions'>
+              <div className='ed-heroActions'>
                 <a
-                  className='ci-button ci-button--lime client-downloadButton'
+                  className='ed-btn ed-btn--accent ed-btn--lg'
                   href={automaticDownload?.url ?? '#manual-downloads'}
                   onClick={handleAutomaticDownload}
                 >
-                  <Download size={17} aria-hidden='true' />
+                  <Download aria-hidden='true' />
                   {automaticLabel}
-                  <ArrowRight size={17} aria-hidden='true' />
+                  <ArrowRight aria-hidden='true' />
                 </a>
                 <a
-                  className='ci-button ci-button--outline client-manualButton'
+                  className='ed-btn ed-btn--outline ed-btn--lg'
                   href='#manual-downloads'
                 >
                   {t('Choose another version')}
-                  <ArrowRight size={16} aria-hidden='true' />
+                  <ArrowRight aria-hidden='true' />
                 </a>
               </div>
             </div>
-
-            <div className='client-productStage'>
-              <figure className='client-appWindow'>
-                <figcaption className='client-appWindow__bar'>
-                  <span className='client-appWindow__dots' aria-hidden='true'>
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  <span>
-                    {PRODUCT_NAME} {t('Client')}
-                  </span>
-                </figcaption>
-                <img
-                  src={heroOverview.src}
-                  alt={heroOverviewAlt}
-                  width={heroOverview.width}
-                  height={heroOverview.height}
-                  fetchPriority='high'
-                  decoding='async'
-                />
-              </figure>
-            </div>
-          </section>
-
-          <section
-            className='client-feature client-feature--access'
-            aria-labelledby='client-access-title'
-          >
-            <div className='client-feature__copy'>
-              <p className='client-kicker'>01 / {t('Client')}</p>
-              <h2 id='client-access-title'>
-                {t('Your apps, ready to connect')}
-              </h2>
-              <p>
-                {t(
-                  'Find supported desktop apps and finish setup without copying settings by hand.'
-                )}
-              </p>
-            </div>
-            <figure className='client-screenshotFrame'>
-              <figcaption>{t('Your apps, ready to connect')}</figcaption>
-              <img
-                src='/client/yecai-client-app-connection-showcase.webp'
-                alt={t('Yecai Client application access setup')}
-                width={1825}
-                height={982}
-                loading='lazy'
-                decoding='async'
+            <div className='ed-rise ed-rise--2'>
+              <Screenshot
+                src={heroOverview.src}
+                alt={heroOverviewAlt}
+                width={heroOverview.width}
+                height={heroOverview.height}
+                caption={`${PRODUCT_NAME} ${t('Client')}`}
+                priority
               />
-            </figure>
-          </section>
-
-          <section
-            className='client-feature client-feature--pricing'
-            aria-labelledby='client-pricing-title'
-          >
-            <div className='client-feature__copy'>
-              <p className='client-kicker'>02 / {t('Client')}</p>
-              <h2 id='client-pricing-title'>
-                {t('Choose with the full picture')}
-              </h2>
-              <p>
-                {t(
-                  'Compare complete model IDs, routes, and billing groups before connecting.'
-                )}
-              </p>
-              <small>
-                {t(
-                  'Pricing shown in the product preview is illustrative and may change.'
-                )}
-              </small>
             </div>
-            <figure className='client-screenshotFrame'>
-              <figcaption>{t('Choose with the full picture')}</figcaption>
-              <img
-                src='/client/yecai-client-model-pricing-showcase.webp'
-                alt={t('Yecai Client model and pricing choices')}
-                width={1820}
-                height={1344}
-                loading='lazy'
-                decoding='async'
-              />
-            </figure>
-          </section>
+          </div>
+        </section>
 
+        {features.map((feature) => (
           <section
-            className='client-feature client-feature--theme'
-            aria-labelledby='client-theme-title'
+            key={feature.id}
+            className='ed-section'
+            aria-labelledby={feature.id}
           >
-            <div className='client-feature__copy'>
-              <p className='client-kicker'>03 / {t('Theme')}</p>
-              <h2 id='client-theme-title'>
-                {t('Comfortable in light or dark')}
-              </h2>
-              <p>
-                {t(
-                  'Follow your system theme while keeping the same clear application workspace.'
-                )}
-              </p>
+            <div className='ed-container ed-integration'>
+              <div className='ed-integrationCopy'>
+                <p className='ed-eyebrow'>
+                  {feature.index} / {feature.kicker}
+                </p>
+                <h2 id={feature.id} className='ed-display'>
+                  {feature.title}
+                </h2>
+                <p className='ed-lede'>{feature.copy}</p>
+                {feature.note ? (
+                  <p className='ed-panelNote'>{feature.note}</p>
+                ) : null}
+              </div>
+              <Screenshot
+                src={feature.image.src}
+                alt={feature.image.alt}
+                width={feature.image.width}
+                height={feature.image.height}
+                caption={feature.title}
+              />
             </div>
-            <figure className='client-screenshotFrame'>
-              <figcaption>
-                {isDark ? t('Light') : t('Dark')} · {t('Theme')}
-              </figcaption>
-              <img
-                src={alternateOverview.src}
-                alt={alternateOverviewAlt}
-                width={alternateOverview.width}
-                height={alternateOverview.height}
-                loading='lazy'
-                decoding='async'
-              />
-            </figure>
           </section>
+        ))}
 
-          <section
-            id='manual-downloads'
-            className='client-downloads'
-            aria-labelledby='manual-download-title'
-          >
-            <div className='client-downloads__intro'>
-              <p className='client-kicker'>04 / {t('Client')}</p>
+        <section
+          id='manual-downloads'
+          className='ed-section'
+          aria-labelledby='manual-download-title'
+        >
+          <div className='ed-container'>
+            <div className='ed-sectionHead'>
+              <p className='ed-eyebrow'>04 / {t('Client')}</p>
               <h2
                 id='manual-download-title'
                 ref={manualHeadingRef}
                 tabIndex={-1}
+                className='ed-display'
               >
                 {t('Choose your download')}
               </h2>
-              <p role='status' aria-live='polite'>
+              <p className='ed-lede' role='status' aria-live='polite'>
                 {platformMessage}
               </p>
             </div>
-            <div className='client-download-grid'>
+            <div className='ed-trustGrid'>
               <a
-                className='client-downloadOption'
+                className='ed-trustCard'
                 href={getDownloadUrl('windows', runtime.hostname)}
               >
-                <span className='client-downloadOption__icon'>
-                  <MonitorDown size={24} aria-hidden='true' />
+                <span className='ed-emptyIcon'>
+                  <MonitorDown size={20} aria-hidden='true' />
                 </span>
-                <span className='client-downloadOption__body'>
-                  <strong>{t('Windows installer')}</strong>
-                  <span>{t('Windows 10 or later')} · x86_64</span>
+                <h3>{t('Windows installer')}</h3>
+                <p>{t('Windows 10 or later')} · x86_64</p>
+                <span>
+                  {t('Download')} <ArrowRight aria-hidden='true' />
                 </span>
-                <ArrowRight size={18} aria-hidden='true' />
               </a>
               <a
-                className='client-downloadOption'
+                className='ed-trustCard'
                 href={getDownloadUrl('macos', runtime.hostname)}
               >
-                <span className='client-downloadOption__icon'>
-                  <Apple size={24} aria-hidden='true' />
+                <span className='ed-emptyIcon'>
+                  <Apple size={20} aria-hidden='true' />
                 </span>
-                <span className='client-downloadOption__body'>
-                  <strong>{t('Universal macOS DMG')}</strong>
-                  <span>{t('Intel and Apple silicon')}</span>
+                <h3>{t('Universal macOS DMG')}</h3>
+                <p>{t('Intel and Apple silicon')}</p>
+                <span>
+                  {t('Download')} <ArrowRight aria-hidden='true' />
                 </span>
-                <ArrowRight size={18} aria-hidden='true' />
               </a>
             </div>
-          </section>
-        </main>
-        <Footer />
-      </div>
+          </div>
+        </section>
+      </main>
+      <Footer />
     </div>
   )
 }

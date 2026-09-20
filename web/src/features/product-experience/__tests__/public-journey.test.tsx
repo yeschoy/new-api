@@ -20,7 +20,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { CiLandingPage } from '@/features/home/components/ci-landing-page'
+import { LandingPage } from '@/features/home/components/landing-page'
 import { renderApp } from '@/test-utils/render-app'
 
 let client: QueryClient | undefined
@@ -32,11 +32,7 @@ describe('public product journey', () => {
     })
     client.setQueryData(['status'], {}, { updatedAt: Date.now() + 60000 })
     await renderApp(
-      <CiLandingPage
-        isAuthenticated={false}
-        models={[]}
-        maxSavingsPercent={0}
-      />,
+      <LandingPage isAuthenticated={false} models={[]} maxSavingsPercent={0} />,
       client
     )
     expect(

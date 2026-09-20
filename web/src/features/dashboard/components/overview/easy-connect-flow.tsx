@@ -87,7 +87,7 @@ function ConnectionValue(props: {
   const Icon = props.icon
 
   return (
-    <div className='dopa-easy-pass__value'>
+    <div className='ed-passValue'>
       <span aria-hidden='true'>
         <Icon />
       </span>
@@ -394,17 +394,17 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
   return (
     <YecaiPanel
       as='section'
-      className='dopa-easy-connect'
+      className='ed-connect'
       data-testid='easy-connect-flow'
       layer='raised'
       tone='model'
     >
-      <header className='dopa-easy-connect__header'>
+      <header className='ed-deckHead'>
         <div>
-          <span className='dopa-section-kicker'>
-            <Sparkles className='size-4' aria-hidden='true' />
+          <p className='ed-eyebrow'>
+            <Sparkles size={13} aria-hidden='true' />
             {t('Three-step quick connect')}
-          </span>
+          </p>
           <h2>{t('Choose it. Copy it. Start using AI.')}</h2>
           <p>
             {t(
@@ -412,15 +412,15 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
             )}
           </p>
         </div>
-        <span className='dopa-easy-connect__ready'>
-          <Check aria-hidden='true' />
+        <span className='ed-badge ed-badge--success'>
+          <Check size={12} aria-hidden='true' />
           {t('Manual setup stays available')}
         </span>
       </header>
 
-      <div className='dopa-easy-connect__choices'>
-        <section className='dopa-easy-connect__step' data-tone='model'>
-          <div className='dopa-easy-connect__step-heading'>
+      <div className='ed-connectSteps'>
+        <section className='ed-connectStep'>
+          <div className='ed-stepHead'>
             <span>1</span>
             <div>
               <h3>
@@ -429,7 +429,7 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
               <p>{t('Which AI do you want to use?')}</p>
             </div>
           </div>
-          <div className='dopa-easy-connect__model-picker'>
+          <div className='ed-modelPicker'>
             <Search aria-hidden='true' />
             <Combobox
               id={modelInputId}
@@ -443,11 +443,11 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
                 optionsLoading ? t('Loading models') : t('Search models...')
               }
               emptyText={t('No model found.')}
-              className='h-14 rounded-2xl border-0 bg-transparent pl-10 font-mono shadow-none'
+              className='h-11 rounded-lg pl-10 font-mono'
             />
           </div>
           {modelsError ? (
-            <div role='alert' className='dopa-easy-connect__empty'>
+            <div role='alert' className='ed-connectEmpty'>
               <p>{t('Could not load models. Please retry.')}</p>
               <YecaiAction
                 appearance='outline'
@@ -459,14 +459,14 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
             </div>
           ) : null}
           {!modelsError && !modelsQuery.isLoading && models.length === 0 ? (
-            <p className='dopa-easy-connect__empty'>
+            <p className='ed-connectEmpty'>
               {t('No available models yet. Ask support to enable one first.')}
             </p>
           ) : null}
         </section>
 
-        <section className='dopa-easy-connect__step' data-tone='money'>
-          <div className='dopa-easy-connect__step-heading'>
+        <section className='ed-connectStep'>
+          <div className='ed-stepHead'>
             <span>2</span>
             <div>
               <h3>{t('Choose a billing route')}</h3>
@@ -476,7 +476,7 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
           <div
             aria-busy={routesLoading}
             aria-label={t('Billing route')}
-            className='dopa-easy-connect__groups'
+            className='ed-routeList'
             role='radiogroup'
           >
             {groups.map((group) => {
@@ -485,15 +485,12 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
                 <button
                   key={group.value}
                   aria-checked={selected}
-                  className={cn(
-                    'dopa-easy-connect__group',
-                    selected && 'is-selected'
-                  )}
+                  className={cn('ed-route', selected && 'is-selected')}
                   onClick={() => handleGroupChange(group.value)}
                   role='radio'
                   type='button'
                 >
-                  <span className='dopa-easy-connect__group-check'>
+                  <span className='ed-routeCheck'>
                     {selected ? <Check aria-hidden='true' /> : null}
                   </span>
                   <span>
@@ -507,12 +504,12 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
             })}
           </div>
           {routesLoading ? (
-            <p role='status' className='dopa-easy-connect__empty'>
+            <p role='status' className='ed-connectEmpty'>
               {t('Checking available routes...')}
             </p>
           ) : null}
           {routesError ? (
-            <div role='alert' className='dopa-easy-connect__empty'>
+            <div role='alert' className='ed-connectEmpty'>
               <p>
                 {t(
                   'Some billing routes could not be checked. Retry to see all available routes.'
@@ -533,7 +530,7 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
             </div>
           ) : null}
           {!routesLoading && !routesError && groups.length === 0 ? (
-            <p className='dopa-easy-connect__empty'>
+            <p className='ed-connectEmpty'>
               {userGroups.length === 0
                 ? t('No billing route is available for this account.')
                 : t(
@@ -545,10 +542,10 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
       </div>
 
       <section
-        className='dopa-easy-pass'
+        className='ed-pass'
         data-ready={visibleConnection ? 'true' : 'false'}
       >
-        <div className='dopa-easy-pass__intro'>
+        <div className='ed-stepHead'>
           <span>3</span>
           <div>
             <h3>
@@ -561,7 +558,7 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
         </div>
 
         {visibleConnection ? (
-          <div className='dopa-easy-pass__details'>
+          <div className='ed-passDetails'>
             <ConnectionValue
               icon={Link2}
               label={t('API address')}
@@ -579,7 +576,7 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
             />
           </div>
         ) : (
-          <div className='dopa-easy-pass__summary'>
+          <div className='ed-passSummary'>
             <span>
               <small>{t('Model')}</small>
               <strong>{selectedModel || t('Not selected')}</strong>
@@ -596,20 +593,14 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
           </div>
         )}
 
-        <div className='dopa-easy-pass__actions'>
+        <div className='ed-passActions'>
           {visibleConnection ? (
-            <YecaiAction
-              className='dopa-easy-pass__primary'
-              onClick={handleCopyConnection}
-              size='lg'
-              tone='leaf'
-            >
+            <YecaiAction onClick={handleCopyConnection} size='lg' tone='leaf'>
               <Copy data-icon='inline-start' />
               {t('Copy everything')}
             </YecaiAction>
           ) : (
             <YecaiAction
-              className='dopa-easy-pass__primary'
               disabled={!selectionReady || isPreparing}
               onClick={handlePrepareConnection}
               size='lg'
@@ -626,7 +617,7 @@ export function EasyConnectFlow(props: EasyConnectFlowProps) {
               {prepareActionLabel}
             </YecaiAction>
           )}
-          <Link to='/beginner-guide' className='dopa-easy-pass__help'>
+          <Link to='/beginner-guide' className='ed-passHelp'>
             {t('Need help with a specific app?')}
             <ArrowRight aria-hidden='true' />
           </Link>

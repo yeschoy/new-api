@@ -181,11 +181,11 @@ export function LogCostDisplay(props: LogCostDisplayProps) {
   }
   const costContent = comparison ? (
     <div
-      className='dopa-cost-stack'
+      className='ed-costStack'
       data-testid='log-savings-comparison'
       aria-label={savingsLabel}
     >
-      <span className='dopa-cost-stack__official'>
+      <span className='ed-costStack__official'>
         <Tooltip>
           <TooltipTrigger
             render={<span tabIndex={0} className='cursor-help' />}
@@ -212,11 +212,11 @@ export function LogCostDisplay(props: LogCostDisplayProps) {
         </Tooltip>{' '}
         <del>{officialPrice}</del>
       </span>
-      <span className='dopa-cost-stack__actual'>
+      <span className='ed-costStack__actual'>
         {t('Yecai price')} {formatEasySavingsCny(comparison.siteCost)}
       </span>
       {savingsLabel && (
-        <span className='dopa-cost-stack__saved'>{savingsLabel}</span>
+        <span className='ed-costStack__saved'>{savingsLabel}</span>
       )}
     </div>
   ) : (

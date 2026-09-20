@@ -123,7 +123,7 @@ export function ToolExplorer({
 
       {/* Category pills */}
       <div
-        className='dopa-tab-strip flex flex-wrap items-center gap-2'
+        className='ed-chipRow'
         role='tablist'
         aria-label={t('Tool categories')}
       >
@@ -136,11 +136,7 @@ export function ToolExplorer({
               role='tab'
               aria-selected={selected}
               onClick={() => setCategory(c.value)}
-              className={`dopa-tab-pill dopa-press rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-                selected
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              }`}
+              className='ed-chip'
             >
               {t(c.label)}
             </button>
@@ -166,7 +162,7 @@ export function ToolExplorer({
       ) : null}
 
       {/* Tool cards */}
-      <div className='dopa-bento-tools grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
         {tools.map((tool, i) => {
           const meta = STATUS_META[tool.status]
           return (
@@ -174,7 +170,7 @@ export function ToolExplorer({
               key={tool.id}
               type='button'
               onClick={() => setActive(tool)}
-              className='dopa-tool-tile dopa-lift dopa-fade-up border-border bg-card group flex flex-col gap-2.5 rounded-3xl border p-5 text-left'
+              className='ed-paper ed-rise group flex flex-col gap-2.5 p-5 text-left transition-colors hover:bg-muted/40'
               data-recommended={tool.recommended ? 'true' : undefined}
               style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}
             >
@@ -277,7 +273,7 @@ export function ToolExplorer({
                     >
                       {copiedText === address.fill(active.snippet.code) ? (
                         <Check
-                          className='dopa-pop-in size-3'
+                          className='ed-pop size-3'
                           style={{ color: 'var(--success)' }}
                         />
                       ) : (

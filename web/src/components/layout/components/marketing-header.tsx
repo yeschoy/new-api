@@ -25,14 +25,15 @@ import {
   MonitorDown,
   Moon,
   Sun,
+  X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BrandMark } from '@/components/brand-mark'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { useTheme } from '@/context/theme-provider'
-import { CiMark } from '@/features/home/components/ci-mark'
 import { PRODUCT_NAME } from '@/lib/product-brand'
 import { cn } from '@/lib/utils'
 
@@ -43,122 +44,113 @@ type MarketingHeaderProps = {
   currentPage?: 'home' | 'client'
 }
 
+/** Sticky header for the public marketing pages. */
 export function MarketingHeader(props: MarketingHeaderProps) {
   const { t } = useTranslation()
   const { resolvedTheme, setTheme } = useTheme()
   const [navOpen, setNavOpen] = useState(false)
   const primaryTo = props.isAuthenticated ? '/dashboard' : '/sign-up'
+  const primaryLabel = props.isAuthenticated ? t('Overview') : t('Start saving')
   const isDark = resolvedTheme === 'dark'
+  const closeNav = () => setNavOpen(false)
+
+  const links = (
+    <>
+      <a className='ed-navLink' href='/#models' onClick={closeNav}>
+        <Boxes className='size-4 sm:hidden' aria-hidden='true' />
+        <span>{t('Models')}</span>
+      </a>
+      {props.isAuthenticated ? (
+        <Link className='ed-navLink' to='/guide' onClick={closeNav}>
+          <BookOpen className='size-4 sm:hidden' aria-hidden='true' />
+          <span>{t('Docs')}</span>
+        </Link>
+      ) : null}
+      <Link
+        className='ed-navLink'
+        to='/client'
+        aria-current={props.currentPage === 'client' ? 'page' : undefined}
+        onClick={closeNav}
+      >
+        <MonitorDown className='size-4 sm:hidden' aria-hidden='true' />
+        <span>{t('Client')}</span>
+      </Link>
+    </>
+  )
 
   return (
-    <header className='ci-header'>
-      <div className='ci-headerInner'>
-        <a className='ci-logo' aria-label={`${PRODUCT_NAME} home`} href='/#top'>
-          <CiMark size={22} withWordmark />
+    <header className='ed-header'>
+      <div className='ed-container ed-headerInner'>
+        <a className='ed-brand' aria-label={`${PRODUCT_NAME} home`} href='/#top'>
+          <BrandMark size={30} withWordmark />
         </a>
+
         <nav
           id='main-navigation'
-          className={cn('ci-nav', navOpen && 'is-open')}
+          className={cn('ed-nav', navOpen && 'is-open')}
           aria-label={t('Main navigation')}
         >
-          <div className='ci-navLinks'>
-            <a
-              className='ci-navItem'
-              href='/#models'
-              onClick={() => setNavOpen(false)}
-            >
-              <Boxes
-                className='ci-mobileNavIcon'
-                size={18}
-                aria-hidden='true'
-              />
-              <span>{t('Models')}</span>
-            </a>
-            {props.isAuthenticated ? (
-              <Link
-                className='ci-navItem'
-                to='/guide'
-                onClick={() => setNavOpen(false)}
-              >
-                <BookOpen
-                  className='ci-mobileNavIcon'
-                  size={18}
-                  aria-hidden='true'
-                />
-                <span>{t('Docs')}</span>
-              </Link>
-            ) : null}
-            <Link
-              className='ci-navItem'
-              to='/client'
-              aria-current={props.currentPage === 'client' ? 'page' : undefined}
-              onClick={() => setNavOpen(false)}
-            >
-              <MonitorDown
-                className='ci-mobileNavIcon'
-                size={18}
-                aria-hidden='true'
-              />
-              <span>{t('Client')}</span>
-            </Link>
-          </div>
-          <div className='ci-mobileNavActions'>
-            {!props.isAuthenticated && (
-              <Link
-                to='/sign-in'
-                className='ci-button ci-button--outline ci-button--size-xs'
-              >
-                {t('Sign in')}
-              </Link>
-            )}
-            <Link
-              to={primaryTo}
-              className='ci-button ci-button--default ci-button--size-xs'
-            >
-              {props.isAuthenticated ? t('Overview') : t('Start saving')}
-            </Link>
-          </div>
+          {links}
+          {navOpen ? (
+            <div className='ed-mobileNav'>
+              {links}
+              <div className='ed-mobileNavActions'>
+                {!props.isAuthenticated ? (
+                  <Link
+                    to='/sign-in'
+                    className='ed-btn ed-btn--outline'
+                    onClick={closeNav}
+                  >
+                    {t('Sign in')}
+                  </Link>
+                ) : null}
+                <Link
+                  to={primaryTo}
+                  className='ed-btn ed-btn--accent'
+                  onClick={closeNav}
+                >
+                  {primaryLabel}
+                </Link>
+              </div>
+            </div>
+          ) : null}
         </nav>
-        <div className='ci-headerControls'>
+
+        <div className='ed-headerActions'>
           <button
-            className='ci-button ci-button--ghost ci-button--size-icon-sm ci-themeToggle'
+            className='ed-iconBtn'
             type='button'
             aria-label={
               isDark ? t('Switch to light theme') : t('Switch to dark theme')
             }
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
           >
-            {isDark ? <Moon size={18} /> : <Sun size={18} />}
+            {isDark ? <Sun size={17} /> : <Moon size={17} />}
           </button>
           <LanguageSwitcher />
           <CommunityHelp variant='header' />
-          {props.isAuthenticated && <ProfileDropdown />}
-          <div className='ci-desktopNavActions'>
-            {!props.isAuthenticated && (
-              <Link
-                to='/sign-in'
-                className='ci-button ci-button--ghost ci-button--size-xs'
-              >
+          {props.isAuthenticated ? <ProfileDropdown /> : null}
+          <div className='ed-headerActions ed-headerActions--desktop'>
+            <span className='ed-headerDivider' aria-hidden='true' />
+            {!props.isAuthenticated ? (
+              <Link to='/sign-in' className='ed-btn ed-btn--ghost ed-btn--sm'>
                 {t('Sign in')}
               </Link>
-            )}
-            <Link
-              to={primaryTo}
-              className='ci-button ci-button--default ci-button--size-xs'
-            >
-              {props.isAuthenticated ? t('Overview') : t('Start saving')}{' '}
-              <ArrowRight size={17} aria-hidden='true' />
+            ) : null}
+            <Link to={primaryTo} className='ed-btn ed-btn--sm'>
+              {primaryLabel}
+              <ArrowRight aria-hidden='true' />
             </Link>
           </div>
           <button
-            className='ci-button ci-button--ghost ci-button--size-icon-sm ci-menuButton'
+            className='ed-iconBtn ed-menuButton'
             type='button'
             aria-label={t('Open navigation')}
             aria-expanded={navOpen}
             aria-controls='main-navigation'
             onClick={() => setNavOpen((value) => !value)}
           >
-            <Menu size={20} aria-hidden='true' />
+            {navOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </div>

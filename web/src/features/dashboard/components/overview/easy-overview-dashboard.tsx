@@ -54,66 +54,60 @@ function SavingsReceipt(props: { savings: EasySavingsSummary }) {
       as='aside'
       tone='money'
       layer='raised'
-      className='dopa-easy-savings-ledger dopa-token-grid'
+      className='ed-receipt'
       data-testid='easy-savings-receipt'
     >
-      <div>
-        <div className='flex items-center justify-between gap-3 pb-3'>
-          <span className='text-warning inline-flex items-center gap-2 text-xs font-black tracking-[0.12em]'>
-            <ReceiptText className='size-4' aria-hidden='true' />
-            {t('Savings receipt')}
-          </span>
-          <span className='bg-background/70 text-muted-foreground border px-2.5 py-1 text-[10px] font-bold'>
-            {t('Automatically estimated')}
-          </span>
-        </div>
+      <div className='flex items-center justify-between gap-3'>
+        <p className='ed-eyebrow'>
+          <ReceiptText size={13} aria-hidden='true' />
+          {t('Savings receipt')}
+        </p>
+        <span className='ed-badge'>{t('Automatically estimated')}</span>
+      </div>
 
-        <p className='text-muted-foreground mt-5 text-xs font-medium'>
+      <div>
+        <p className='text-muted-foreground m-0 text-xs font-medium'>
           {t('Savings versus base price')}
         </p>
-        <p className='mt-2 pb-1 text-5xl leading-none font-black tracking-[-0.08em] tabular-nums sm:text-6xl'>
-          <span
-            key={props.savings.savings}
-            className='dopa-number-change inline-block'
-          >
+        <p className='ed-receiptAmount ed-savings mt-2'>
+          <span key={props.savings.savings} className='ed-pop inline-block'>
             {formatEasySavingsCny(props.savings.savings)}
           </span>
         </p>
+      </div>
 
-        <YecaiPriceFlow
-          accessibleLabel={t('Savings receipt')}
-          className='mt-9'
-          officialLabel={t('Base billing estimate')}
-          officialValue={formatEasySavingsCny(props.savings.baseCost)}
-          siteLabel={t('Yecai billing')}
-          siteValue={formatEasySavingsCny(props.savings.siteCost)}
-        />
+      <YecaiPriceFlow
+        accessibleLabel={t('Savings receipt')}
+        officialLabel={t('Base billing estimate')}
+        officialValue={formatEasySavingsCny(props.savings.baseCost)}
+        siteLabel={t('Yecai billing')}
+        siteValue={formatEasySavingsCny(props.savings.siteCost)}
+      />
 
-        <p className='text-muted-foreground mt-3 text-xs leading-relaxed'>
-          {t(
-            'Compared with site base prices before group discounts, not official provider prices.'
-          )}
+      <p className='ed-panelNote'>
+        {t(
+          'Compared with site base prices before group discounts, not official provider prices.'
+        )}
+      </p>
+
+      <div className='flex items-end justify-between gap-4'>
+        <p className='ed-panelNote'>
+          {hasComparableRequests
+            ? t(
+                'Based on {{count}} recent comparable requests and their recorded group rates.',
+                { count: props.savings.comparableRequests }
+              )
+            : t(
+                'After your first comparable request, savings will appear here automatically.'
+              )}
         </p>
-
-        <div className='mt-4 flex items-end justify-between gap-4'>
-          <p className='text-muted-foreground text-xs leading-relaxed'>
-            {hasComparableRequests
-              ? t(
-                  'Based on {{count}} recent comparable requests and their recorded group rates.',
-                  { count: props.savings.comparableRequests }
-                )
-              : t(
-                  'After your first comparable request, savings will appear here automatically.'
-                )}
-          </p>
-          <Link
-            to='/pricing'
-            className='text-primary inline-flex shrink-0 items-center gap-1 text-xs font-black'
-          >
-            {t('Model prices')}
-            <ArrowRight className='size-3.5' aria-hidden='true' />
-          </Link>
-        </div>
+        <Link
+          to='/pricing'
+          className='text-foreground inline-flex shrink-0 items-center gap-1 text-xs font-semibold'
+        >
+          {t('Model prices')}
+          <ArrowRight className='size-3.5' aria-hidden='true' />
+        </Link>
       </div>
     </YecaiPanel>
   )
@@ -125,20 +119,16 @@ export function EasyOverviewDashboardView(
   const { t } = useTranslation()
 
   return (
-    <div className='dopa-easy-overview' data-testid='easy-overview'>
-      <YecaiPanel
-        as='section'
-        tone='leaf'
-        layer='hero'
-        className='dopa-easy-workbench dopa-cut-corner dopa-signal-scan'
-        data-testid='easy-setup-runway'
-      >
-        <header className='dopa-easy-workbench__header'>
-          <span className='dopa-section-kicker'>
-            <Leaf className='size-4' aria-hidden='true' />
-            {t('Easy mode')}
-          </span>
-          <div className='dopa-easy-balance-strip'>
+    <div className='flex flex-col gap-5' data-testid='easy-overview'>
+      <section className='ed-paper ed-deck' data-testid='easy-setup-runway'>
+        <header className='ed-deckHead'>
+          <div>
+            <p className='ed-eyebrow'>
+              <Leaf size={13} aria-hidden='true' />
+              {t('Easy mode')}
+            </p>
+          </div>
+          <div className='ed-metricGrid w-full sm:w-auto sm:min-w-[24rem]'>
             <YecaiMetric
               icon={Wallet}
               label={t('Credit remaining')}
@@ -154,11 +144,11 @@ export function EasyOverviewDashboardView(
           </div>
         </header>
 
-        <div className='dopa-easy-workbench__main'>
+        <div className='ed-easyGrid'>
           {props.connectPanel}
           <SavingsReceipt savings={props.savings} />
         </div>
-      </YecaiPanel>
+      </section>
     </div>
   )
 }

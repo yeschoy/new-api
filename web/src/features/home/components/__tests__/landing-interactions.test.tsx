@@ -23,14 +23,13 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { PRODUCT_NAME } from '@/lib/product-brand'
 import { useAuthStore } from '@/stores/auth-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 import { renderApp } from '@/test-utils/render-app'
 
 import { buildModelCatalog } from '../../lib/catalog'
-import { CiLandingPage } from '../ci-landing-page'
+import { LandingPage } from '../landing-page'
 
 let client: QueryClient
 let style: HTMLStyleElement
@@ -67,13 +66,9 @@ const models = buildModelCatalog(
 )
 
 describe('landing interactions and price layout', () => {
-  it('keeps the hero brand in mark, product, and yeschoy capsule order', async () => {
-    style.textContent = readFileSync(
-      'src/features/home/components/home-glass.css',
-      'utf8'
-    )
-    const { container } = await renderApp(
-      <CiLandingPage
+  it('keeps one community action in the header that reads as the accent action', async () => {
+    await renderApp(
+      <LandingPage
         isAuthenticated={false}
         models={models}
         maxSavingsPercent={0}
@@ -81,30 +76,16 @@ describe('landing interactions and price layout', () => {
       client
     )
 
-    const brand = container.querySelector('.ci-heroBrand')
-    if (!brand) throw new Error('Missing hero brand')
-    expect(brand.children).toHaveLength(3)
-    expect(brand.children[0]).toHaveClass('ci-mark')
-    expect(brand.children[1]).toHaveClass('ci-heroProductName')
-    expect(brand.children[1]).toHaveTextContent(PRODUCT_NAME)
-    expect(brand.children[2]).toHaveClass('ci-heroBrandBadge')
-    expect(brand.children[2]).toHaveTextContent('yeschoy')
-
-    const badge = brand.children[2]
-    expect(getComputedStyle(badge).borderRadius).toBe('999px')
-    expect(getComputedStyle(badge).color).toBe('rgb(63, 80, 61)')
-    const landing = container.querySelector('.ci-liquidHome')
-    if (!landing) throw new Error('Missing landing page')
-    landing.setAttribute('data-theme', 'dark')
-    expect(getComputedStyle(badge).color).toBe('rgb(225, 234, 216)')
-
-    const community = within(screen.getByRole('banner')).getByRole('button', {
+    const header = screen.getByRole('banner')
+    const community = within(header).getAllByRole('button', {
       name: 'Community',
     })
-    expect(community).toBeVisible()
-    expect(community).toHaveClass('ci-communityTrigger')
-    expect(readFileSync('src/styles/ci-landing.css', 'utf8')).toMatch(
-      /\.ci-handoffRoot button\.ci-communityTrigger\s*{[^}]*color:\s*var\(--primary-foreground\)/
+    expect(community).toHaveLength(1)
+    expect(community[0]).toBeVisible()
+    expect(community[0]).toHaveClass('bg-primary', 'text-primary-foreground')
+    expect(within(header).getByRole('link', { name: '野菜 home' })).toHaveAttribute(
+      'href',
+      '/#top'
     )
   })
 
@@ -116,7 +97,7 @@ describe('landing interactions and price layout', () => {
       user: { ...bundle.user, display_name: 'Demo User' },
     })
     await renderApp(
-      <CiLandingPage isAuthenticated models={models} maxSavingsPercent={0} />,
+      <LandingPage isAuthenticated models={models} maxSavingsPercent={0} />,
       client
     )
     const header = screen.getByRole('banner')
@@ -154,27 +135,26 @@ describe('landing interactions and price layout', () => {
       within(navigation).getByRole('link', { name: 'Overview' })
     ).toHaveAttribute('href', '/dashboard')
   })
+
   it.each([
     [false, '/sign-up'],
     [true, '/dashboard'],
   ])(
-    'centers the hero client action beside the auth-aware primary action (authenticated=%s)',
+    'keeps the hero client action beside the auth-aware primary action (authenticated=%s)',
     async (isAuthenticated, primaryHref) => {
       if (isAuthenticated) {
         useAuthStore.getState().auth.setBundle(createTestAuthBundle())
       }
-      const { container } = await renderApp(
-        <CiLandingPage
+      await renderApp(
+        <LandingPage
           isAuthenticated={isAuthenticated}
           models={models}
           maxSavingsPercent={0}
         />,
         client
       )
-      const hero = container.querySelector<HTMLElement>('.ci-hero')
+      const hero = screen.getByRole('heading', { level: 1 }).closest('section')
       if (!hero) throw new Error('Missing hero')
-      const actions = hero.querySelector('.ci-heroActions--primary')
-      expect(actions).not.toBeNull()
       expect(
         within(hero).getByRole('link', { name: 'Start saving' })
       ).toHaveAttribute('href', primaryHref)
@@ -190,7 +170,7 @@ describe('landing interactions and price layout', () => {
       1
     )
     await renderApp(
-      <CiLandingPage
+      <LandingPage
         isAuthenticated={false}
         models={discounted}
         maxSavingsPercent={50}
@@ -199,48 +179,11 @@ describe('landing interactions and price layout', () => {
     )
     expect(screen.getAllByText('Save 50%').length).toBeGreaterThan(0)
   })
-  it.each([
-    ['qwen-max', 'Qwen', 'Qwen.Color', null],
-    ['kimi-k2', 'Moonshot', 'Moonshot', null],
-    ['private-model', 'Acme', undefined, 'A'],
-  ])(
-    'uses the matching or neutral hero icon for %s',
-    async (modelName, vendorName, vendorIcon, fallbackText) => {
-      const catalog = buildModelCatalog(
-        [
-          {
-            ...models[0].pricingModel,
-            model_name: modelName,
-            vendor_name: vendorName,
-            vendor_icon: vendorIcon,
-            group_ratio: { default: 0.5 },
-          },
-        ],
-        1
-      )
-      const { container } = await renderApp(
-        <CiLandingPage
-          isAuthenticated={false}
-          models={catalog}
-          maxSavingsPercent={50}
-        />,
-        client
-      )
-      const logo = container.querySelector('.ci-heroModelLogo')
 
-      expect(logo).not.toBeNull()
-      expect(logo?.querySelector('img')).toBeNull()
-      if (fallbackText) {
-        expect(logo).toHaveTextContent(fallbackText)
-      } else {
-        expect(logo?.querySelector('svg')).not.toBeNull()
-      }
-    }
-  )
   it('closes mobile navigation when an in-page destination is selected', async () => {
     const user = userEvent.setup()
     await renderApp(
-      <CiLandingPage
+      <LandingPage
         isAuthenticated={false}
         models={models}
         maxSavingsPercent={0}
@@ -269,18 +212,23 @@ describe('landing interactions and price layout', () => {
       within(navigation).queryByRole('link', { name: 'Docs' })
     ).not.toBeInTheDocument()
     expect(
-      within(navigation).getByRole('link', { name: 'Client' })
+      within(navigation).getAllByRole('link', { name: 'Client' })[0]
     ).toHaveAttribute('href', '/client')
-    await user.click(screen.getByRole('link', { name: 'Models' }))
+    await user.click(within(navigation).getAllByRole('link', { name: 'Models' })[1])
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })
-  it('keeps table-cell layout and makes the loaded live comparison visible', async () => {
-    style.textContent = readFileSync('src/styles/ci-landing.css', 'utf8')
+
+  it('keeps table-cell layout and shows the live comparison for a discounted model', async () => {
+    style.textContent = readFileSync('src/styles/editorial.css', 'utf8')
+    const discounted = buildModelCatalog(
+      [{ ...models[0].pricingModel, group_ratio: { default: 0.5 } }],
+      1
+    )
     const { container } = await renderApp(
-      <CiLandingPage
+      <LandingPage
         isAuthenticated={false}
-        models={models}
-        maxSavingsPercent={0}
+        models={discounted}
+        maxSavingsPercent={50}
       />,
       client
     )
@@ -289,9 +237,9 @@ describe('landing interactions and price layout', () => {
     expect(
       cells.every((cell) => getComputedStyle(cell).display === 'table-cell')
     ).toBe(true)
-    const comparison = container.querySelector('.ci-rateComparison')
-    if (!comparison) throw new Error('Missing live comparison')
-    expect(getComputedStyle(comparison).opacity).toBe('1')
+    const comparison = screen.getByTestId('live-comparison')
+    expect(comparison).toBeVisible()
+    expect(within(comparison).getByText('test-model')).toBeVisible()
   })
 })
 
@@ -312,7 +260,7 @@ describe('configured landing footer', () => {
         { updatedAt: Date.now() + 60000 }
       )
       await renderApp(
-        <CiLandingPage
+        <LandingPage
           isAuthenticated={false}
           models={models}
           maxSavingsPercent={0}

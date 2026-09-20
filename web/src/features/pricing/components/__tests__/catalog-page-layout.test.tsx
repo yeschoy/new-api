@@ -27,10 +27,6 @@ vi.mock('@/components/layout/components/authenticated-layout', () => ({
   ),
 }))
 
-vi.mock('@/features/home/components/glass-cursor', () => ({
-  GlassCursor: () => null,
-}))
-
 vi.mock('@/hooks/use-console-mode', () => ({
   useConsoleMode: () => 'developer',
 }))

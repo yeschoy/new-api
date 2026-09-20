@@ -26,7 +26,7 @@ import { usePricingData } from '@/features/pricing/hooks'
 import { isLikelyHtml } from '@/lib/content-format'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { CiLandingPage } from './components/ci-landing-page'
+import { LandingPage } from './components/landing-page'
 import { useHomePageContent } from './hooks'
 import { buildModelCatalog } from './lib/catalog'
 import { getMaximumSavingsPercent } from './lib/pricing-savings'
@@ -43,7 +43,7 @@ function DefaultHome(props: { isAuthenticated: boolean }) {
   )
 
   return (
-    <CiLandingPage
+    <LandingPage
       isAuthenticated={props.isAuthenticated}
       models={savingsCatalog}
       maxSavingsPercent={savingsCatalog.length > 0 ? maxSavingsPercent : 0}

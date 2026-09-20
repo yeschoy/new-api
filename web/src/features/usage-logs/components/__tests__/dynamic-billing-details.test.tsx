@@ -124,7 +124,7 @@ beforeEach(() => {
   stylesheet.textContent = readFileSync(
     resolve(
       dirname(fileURLToPath(import.meta.url)),
-      '../../../../styles/ci-landing.css'
+      '../../../../styles/editorial.css'
     ),
     'utf8'
   )

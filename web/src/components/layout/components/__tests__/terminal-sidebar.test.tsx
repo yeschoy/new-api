@@ -142,7 +142,7 @@ describe('terminal sidebar transitions', () => {
     })
     expect(community).toBeVisible()
     expect(community).toHaveClass('bg-primary', 'text-primary-foreground')
-    expect(community).not.toHaveClass('ci-button--lime')
+    expect(community).not.toHaveClass('ed-btn--outline')
     expect(
       within(topbar).getAllByRole('button', { name: 'Community' })
     ).toHaveLength(1)

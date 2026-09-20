@@ -36,7 +36,7 @@ beforeEach(() => {
   stylesheet.textContent = readFileSync(
     resolve(
       dirname(fileURLToPath(import.meta.url)),
-      '../../../../styles/dopamine.css'
+      '../../../../styles/editorial.css'
     ),
     'utf8'
   )
@@ -55,7 +55,7 @@ describe.each(['sidebar', 'floating', 'inset'] as const)(
       async (collapsible) => {
         const user = userEvent.setup()
         const view = render(
-          <SidebarProvider className='dopa-console--developer'>
+          <SidebarProvider className='ed-console'>
             <SidebarTrigger />
             <Sidebar variant={variant} collapsible={collapsible}>
               Navigation

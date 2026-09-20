@@ -21,43 +21,22 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SUPPORT_QQ_GROUP } from '@/lib/support-contact'
+import { cn } from '@/lib/utils'
 
 type CommunityHelpVariant = 'console' | 'header'
 
 type CommunityHelpProps = {
   /**
-   * `console` keeps the lime console button, `header` uses a prominent site
-   * header action whose label only collapses on phone-sized screens.
+   * `console` renders a compact outline pill for dense toolbars; `header`
+   * renders the solid accent action whose label collapses on phones.
    */
   variant?: CommunityHelpVariant
 }
-
-const VARIANT_CLASSNAMES = {
-  console: {
-    trigger: 'ci-button ci-button--lime ci-button--size-xs',
-    panel: 'ci-appHelpPanel',
-    label: undefined,
-    qr: undefined,
-    title: undefined,
-    hint: undefined,
-  },
-  header: {
-    trigger:
-      'ci-communityTrigger bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary px-3 text-sm font-semibold shadow-sm transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
-    panel:
-      'border-border bg-background text-foreground absolute top-[calc(100%+10px)] right-0 z-30 grid w-60 justify-items-center gap-2.5 rounded-2xl border p-4 text-center shadow-xl',
-    label: 'hidden whitespace-nowrap sm:inline',
-    qr: 'size-[180px] shrink-0 rounded-lg bg-white object-contain',
-    title: 'text-[13px]',
-    hint: 'text-muted-foreground text-xs leading-snug',
-  },
-} as const
 
 export function CommunityHelp(props: CommunityHelpProps = {}) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
-  const styles = VARIANT_CLASSNAMES[props.variant ?? 'console']
   const isHeader = props.variant === 'header'
   const label = t('Community')
 
@@ -80,10 +59,15 @@ export function CommunityHelp(props: CommunityHelpProps = {}) {
   }, [open])
 
   return (
-    <div className='ci-appHelp' ref={rootRef}>
+    <div className='ed-help' ref={rootRef}>
       <button
         type='button'
-        className={styles.trigger}
+        className={cn(
+          'ed-communityTrigger',
+          isHeader
+            ? 'bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-primary px-3 text-sm font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none'
+            : 'ed-btn ed-btn--outline ed-btn--xs'
+        )}
         aria-expanded={open}
         aria-label={isHeader ? label : undefined}
         onClick={() => setOpen((value) => !value)}
@@ -91,23 +75,20 @@ export function CommunityHelp(props: CommunityHelpProps = {}) {
         {isHeader ? (
           <MessagesSquare className='size-4 shrink-0' aria-hidden='true' />
         ) : null}
-        <span className={styles.label}>{label}</span>
+        <span className={isHeader ? 'hidden whitespace-nowrap sm:inline' : ''}>
+          {label}
+        </span>
       </button>
       {open ? (
-        <div className={styles.panel} role='dialog' aria-label={label}>
+        <div className='ed-helpPanel' role='dialog' aria-label={label}>
           <img
             src='/qq-community-qr.png'
             alt={t('QQ after-sales group QR code')}
-            width={180}
-            height={180}
-            className={styles.qr}
+            width={176}
+            height={176}
           />
-          <strong className={styles.title}>
-            {t('QQ group: {{group}}', { group: SUPPORT_QQ_GROUP })}
-          </strong>
-          <p className={styles.hint}>
-            {t('Scan to join the QQ group for setup help.')}
-          </p>
+          <strong>{t('QQ group: {{group}}', { group: SUPPORT_QQ_GROUP })}</strong>
+          <p>{t('Scan to join the QQ group for setup help.')}</p>
         </div>
       ) : null}
     </div>

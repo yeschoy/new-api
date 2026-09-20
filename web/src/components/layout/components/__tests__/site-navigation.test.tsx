@@ -76,30 +76,22 @@ it('shows site links directly without a dropdown and keeps keyboard and disabled
 
 it('reserves a second header row and contains overflow for narrow navigation without changing headers that have no site links', async () => {
   const style = document.createElement('style')
-  style.textContent =
-    readFileSync('src/styles/dopamine.css', 'utf8') +
-    readFileSync('src/styles/operator-theme.css', 'utf8')
+  style.textContent = readFileSync('src/styles/editorial.css', 'utf8')
   document.head.append(style)
   const client = new QueryClient()
   try {
     await renderApp(
       <>
-        <section
-          aria-label='Developer shell'
-          className='dopa-console dopa-console--developer'
-        >
-          <Header showSidebarTrigger={false} className='dopa-developer-header'>
+        <section aria-label='Developer shell' className='ed-console'>
+          <Header showSidebarTrigger={false}>
             <TopNav
               variant='inline'
-              className='dopa-site-nav'
+              className='ed-siteNav'
               links={[{ title: 'Home', href: '/' }]}
             />
           </Header>
         </section>
-        <section
-          aria-label='Other shell'
-          className='dopa-console dopa-console--developer'
-        />
+        <section aria-label='Other shell' className='ed-console' />
       </>,
       client
     )

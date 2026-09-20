@@ -84,7 +84,7 @@ export function TerminalModels() {
         'Find available models and compare prices and integration options.'
       )}
     >
-      <section className='ci-statGrid ci-statGrid--three'>
+      <section className='ed-stats ed-stats--three'>
         <article>
           <span>{t('Available models')}</span>
           <strong>{catalog.length}</strong>
@@ -97,16 +97,16 @@ export function TerminalModels() {
         </article>
         <article>
           <span>{t('Maximum savings')}</span>
-          <strong>{maxSavings}%</strong>
+          <strong className='is-saved'>{maxSavings}%</strong>
           <small>{t('Compared with pre-discount prices')}</small>
         </article>
       </section>
 
-      <div className='ci-catalogToolbar'>
-        <label>
-          {t('Search catalog')}
+      <div className='ed-catalogFilters'>
+        <label className='ed-field'>
+          <span>{t('Search catalog')}</span>
           <input
-            className='ci-input ci-input--sm'
+            className='ed-input ed-input--sm'
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
@@ -115,10 +115,10 @@ export function TerminalModels() {
             placeholder={t('Search models or providers')}
           />
         </label>
-        <label>
-          {t('Provider')}
+        <label className='ed-field'>
+          <span>{t('Provider')}</span>
           <select
-            className='ci-input ci-input--sm'
+            className='ed-input ed-input--sm'
             value={vendor}
             onChange={(event) => {
               setVendor(event.target.value)
@@ -133,10 +133,10 @@ export function TerminalModels() {
             ))}
           </select>
         </label>
-        <label>
-          {t('Sort by')}
+        <label className='ed-field'>
+          <span>{t('Sort by')}</span>
           <select
-            className='ci-input ci-input--sm'
+            className='ed-input ed-input--sm'
             value={sort}
             onChange={(event) => setSort(event.target.value as CatalogSort)}
           >
@@ -145,101 +145,100 @@ export function TerminalModels() {
             <option value='price-asc'>{t('Lowest price')}</option>
           </select>
         </label>
-        <p
-          style={{
-            margin: 0,
-            color: 'var(--ci-color-text-muted)',
-            fontSize: 13,
-          }}
-        >
+      </div>
+
+      <div className='flex flex-wrap items-center justify-between gap-3'>
+        <div className='ed-chipRow'>
+          {MODALITIES.map((item) => (
+            <button
+              key={item}
+              type='button'
+              className={item === modality ? 'ed-chip is-active' : 'ed-chip'}
+              onClick={() => {
+                setModality(item)
+                setPage(0)
+              }}
+            >
+              {t(MODALITY_LABEL[item])}
+              {item === 'all' ? <span>{filtered.length}</span> : null}
+            </button>
+          ))}
+        </div>
+        <p className='ed-panelNote'>
           {t('{{count}} results', { count: filtered.length })}
         </p>
       </div>
 
-      <div className='ci-chipRow'>
-        {MODALITIES.map((item) => (
-          <button
-            key={item}
-            type='button'
-            className={item === modality ? 'ci-chip is-active' : 'ci-chip'}
-            onClick={() => {
-              setModality(item)
-              setPage(0)
-            }}
-          >
-            {t(MODALITY_LABEL[item])}
-            {item === 'all' ? ` ${filtered.length}` : null}
-          </button>
-        ))}
-      </div>
-
-      <section className='ci-panel'>
+      <section className='ed-panel'>
         {isLoading ? (
-          <div className='ci-empty'>
+          <div className='ed-empty'>
             <p>{t('Loading catalog...')}</p>
           </div>
         ) : (
           <>
-            <table className='ci-catalogTable'>
-              <thead>
-                <tr>
-                  <th>{t('Model')}</th>
-                  <th>{t('Input')}</th>
-                  <th>{t('Output')}</th>
-                  <th>{t('Discount')}</th>
-                  <th>{t('Modality')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((model) => (
-                  <tr key={model.modelName}>
-                    <td>
-                      <div className='ci-modelCell'>
-                        <CatalogVendorIcon model={model} />
-                        <div>
-                          {model.modelName}
-                          <small>{model.vendorName}</small>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <CatalogPrice model={model} side='input' />
-                    </td>
-                    <td>
-                      <CatalogPrice model={model} side='output' />
-                    </td>
-                    <td>
-                      {model.savingsPercent > 0 ? (
-                        <span className='ci-offBadge'>
-                          {t('Save {{percent}}%', {
-                            percent: model.savingsPercent,
-                          })}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td>{getCatalogModality(model)}</td>
-                    <td>
-                      <Link
-                        to='/pricing/$modelId'
-                        params={{ modelId: model.modelName }}
-                        aria-label={model.modelName}
-                      >
-                        <ArrowUpRight size={16} />
-                      </Link>
-                    </td>
+            <div className='ed-tableWrap'>
+              <table className='ed-table'>
+                <thead>
+                  <tr>
+                    <th>{t('Model')}</th>
+                    <th>{t('Input')}</th>
+                    <th>{t('Output')}</th>
+                    <th>{t('Discount')}</th>
+                    <th>{t('Modality')}</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className='ci-tablePager'>
+                </thead>
+                <tbody>
+                  {visible.map((model) => (
+                    <tr key={model.modelName}>
+                      <td>
+                        <div className='ed-modelCell'>
+                          <CatalogVendorIcon model={model} />
+                          <div>
+                            <strong>{model.modelName}</strong>
+                            <small>{model.vendorName}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <CatalogPrice model={model} side='input' />
+                      </td>
+                      <td>
+                        <CatalogPrice model={model} side='output' />
+                      </td>
+                      <td>
+                        {model.savingsPercent > 0 ? (
+                          <span className='ed-savings'>
+                            {t('Save {{percent}}%', {
+                              percent: model.savingsPercent,
+                            })}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>{getCatalogModality(model)}</td>
+                      <td>
+                        <Link
+                          to='/pricing/$modelId'
+                          params={{ modelId: model.modelName }}
+                          aria-label={model.modelName}
+                          className='ed-iconBtn ed-iconBtn--xs'
+                        >
+                          <ArrowUpRight size={15} aria-hidden='true' />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className='ed-pager px-5 pb-4'>
               <span>{t('Live gateway rates')}</span>
               <span>
                 <button
                   type='button'
-                  className='ci-button ci-button--ghost ci-button--size-xs'
+                  className='ed-btn ed-btn--ghost ed-btn--xs'
                   disabled={safePage === 0}
                   onClick={() => setPage((current) => Math.max(0, current - 1))}
                 >
@@ -248,7 +247,7 @@ export function TerminalModels() {
                 {safePage + 1} / {pageCount}
                 <button
                   type='button'
-                  className='ci-button ci-button--ghost ci-button--size-xs'
+                  className='ed-btn ed-btn--ghost ed-btn--xs'
                   disabled={safePage + 1 >= pageCount}
                   onClick={() =>
                     setPage((current) => Math.min(pageCount - 1, current + 1))

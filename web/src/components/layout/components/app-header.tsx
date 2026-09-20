@@ -34,52 +34,17 @@ import { Header } from './header'
 import { SystemBrand } from './system-brand'
 import { TopNav } from './top-nav'
 
-/**
- * General application Header component
- * Integrates navigation bar, configuration and profile functions
- *
- * @example
- * // Basic usage
- * <AppHeader />
- *
- * @example
- * // Hide navigation bar
- * <AppHeader showTopNav={false} />
- *
- * @example
- * // Fully customize left and right content
- * <AppHeader
- *   leftContent={<CustomLeft />}
- *   rightContent={<CustomRight />}
- * />
- */
 type AppHeaderProps = {
   /** Fallback navigation when no backend links are available. */
   navLinks?: TopNavLink[]
   /** Whether to show the developer navigation. */
   showTopNav?: boolean
-  /**
-   * Optional content shown after the brand and task dock.
-   */
+  /** Optional content shown after the brand and task dock. */
   leftContent?: React.ReactNode
-  /**
-   * Custom right content, overrides default right content if provided
-   */
+  /** Custom right content, overrides default right content if provided. */
   rightContent?: React.ReactNode
-  /**
-   * Whether to show notification button
-   * @default true
-   */
   showNotifications?: boolean
-  /**
-   * Whether to show config drawer
-   * @default true
-   */
   showConfigDrawer?: boolean
-  /**
-   * Whether to show profile dropdown
-   * @default true
-   */
   showProfileDropdown?: boolean
 }
 
@@ -115,10 +80,7 @@ export function AppHeader({
   const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
 
   return (
-    <Header
-      showSidebarTrigger={!isEasyMode}
-      className={isEasyMode ? 'dopa-easy-header' : 'dopa-developer-header'}
-    >
+    <Header showSidebarTrigger={!isEasyMode}>
       <SystemBrand variant='inline' />
 
       {isEasyMode && <EasyTaskDock />}
@@ -127,7 +89,7 @@ export function AppHeader({
         showTopNav &&
         !isEasyMode &&
         links.length > 0 && (
-          <TopNav links={links} variant='inline' className='dopa-site-nav' />
+          <TopNav links={links} variant='inline' className='ed-siteNav' />
         )}
 
       {leftContent ? (
@@ -137,7 +99,7 @@ export function AppHeader({
       {rightContent ?? (
         <div
           className={cn(
-            'dopa-header-actions ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5',
+            'ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5 [&>*]:shrink-0',
             !isEasyMode && showTopNav && links.length > 0 && 'xl:ms-0'
           )}
         >

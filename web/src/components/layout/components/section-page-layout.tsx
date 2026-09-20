@@ -88,19 +88,19 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
 
   return (
     <PageFooterProvider container={footerContainer}>
-      <Main className='dopa-console-page dopa-section-page'>
+      <Main className='ed-sectionPage'>
         {(title != null ||
           titleAside != null ||
           actions != null ||
           breadcrumb != null) && (
-          <div className='dopa-section-page__header shrink-0 px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4'>
+          <div className='ed-sectionPageHead shrink-0 px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4'>
             {breadcrumb != null && (
               <div className='mb-2 sm:mb-3'>{breadcrumb}</div>
             )}
             <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:gap-x-4'>
               <div className='flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 sm:gap-x-4'>
                 {title != null && (
-                  <h2 className='dopa-console-title max-w-full min-w-0 truncate text-base font-extrabold tracking-tight sm:text-lg'>
+                  <h2 className='ed-consoleTitle max-w-full min-w-0 truncate'>
                     {title}
                   </h2>
                 )}
@@ -120,8 +120,8 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
         <div
           className={
             props.fixedContent
-              ? 'dopa-section-page__content min-h-0 flex-1 overflow-hidden px-3 pt-1 pb-3 sm:px-5 sm:pt-1.5 sm:pb-5'
-              : 'dopa-section-page__content min-h-0 flex-1 overflow-auto px-3 pt-1 pb-3 sm:px-5 sm:pt-1.5 sm:pb-5'
+              ? 'min-h-0 flex-1 overflow-hidden px-3 pt-3 pb-3 sm:px-5 sm:pt-4 sm:pb-5'
+              : 'min-h-0 flex-1 overflow-auto px-3 pt-3 pb-3 sm:px-5 sm:pt-4 sm:pb-5'
           }
         >
           {content}
