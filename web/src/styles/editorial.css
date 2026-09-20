@@ -1062,6 +1062,37 @@ For commercial licensing, please contact support@quantumnous.com
   line-height: 1.5;
 }
 
+.ed-quoteDots {
+  display: flex;
+  gap: 0.35rem;
+  margin-block-start: 0.85rem;
+}
+
+.ed-quoteDots button {
+  inline-size: 1.25rem;
+  block-size: 0.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ed-rule-strong);
+  opacity: 0.45;
+  cursor: pointer;
+  transition:
+    opacity var(--ed-duration) var(--ed-ease),
+    background-color var(--ed-duration) var(--ed-ease);
+}
+
+.ed-quoteDots button.is-active {
+  background: var(--primary);
+  opacity: 1;
+}
+
+.ed-cta .ed-eyebrow {
+  justify-content: center;
+  margin-block-end: 1.25rem;
+  color: color-mix(in oklch, var(--background) 65%, transparent);
+}
+
 .ed-endpoint {
   display: grid;
   gap: 0.45rem;
@@ -2838,24 +2869,21 @@ a.ed-trustCard:hover {
   letter-spacing: -0.015em;
 }
 
+.ed-console .ed-navLink {
+  min-block-size: 2rem;
+  padding-inline: 0.65rem;
+  font-size: 0.82rem;
+}
+
 .ed-siteNav {
-  flex-basis: 100%;
+  flex: 1 1 auto;
+  min-inline-size: 0;
   overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.ed-console:has(.ed-siteNav) {
-  --app-header-height: 5.5rem;
-}
-
-@media (min-width: 80rem) {
-  .ed-siteNav {
-    flex-basis: auto;
-    overflow-x: visible;
-  }
-
-  .ed-console:has(.ed-siteNav) {
-    --app-header-height: 3.25rem;
-  }
+.ed-siteNav::-webkit-scrollbar {
+  display: none;
 }
 
 .ed-modeControl {

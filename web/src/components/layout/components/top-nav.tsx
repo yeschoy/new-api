@@ -117,7 +117,7 @@ export function TopNav({
       <nav
         aria-label={t('Main navigation')}
         className={cn(
-          'items-center gap-3 whitespace-nowrap',
+          'items-center gap-1 whitespace-nowrap',
           variant === 'inline' ? 'flex' : 'me-2 hidden xl:flex',
           className
         )}
@@ -131,7 +131,7 @@ export function TopNav({
                   key={`${title}-${href}`}
                   role='link'
                   aria-disabled='true'
-                  className='text-muted-foreground opacity-50'
+                  className='ed-navLink'
                 >
                   {title}
                 </span>
@@ -143,7 +143,7 @@ export function TopNav({
                 href={href}
                 target='_blank'
                 rel='noopener noreferrer'
-                className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
+                className={cn('ed-navLink', isActive && 'is-active')}
               >
                 {title}
               </a>
@@ -152,7 +152,7 @@ export function TopNav({
                 key={`${title}-${href}`}
                 to={href}
                 disabled={disabled}
-                className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
+                className={cn('ed-navLink', isActive && 'is-active')}
               >
                 {title}
               </Link>

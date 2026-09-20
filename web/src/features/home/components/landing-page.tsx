@@ -21,7 +21,6 @@ import {
   ArrowRight,
   CalendarOff,
   Copy,
-  ExternalLink,
   Gauge,
   Search,
   Wallet,
@@ -34,6 +33,7 @@ import { MarketingHeader } from '@/components/layout/components/marketing-header
 import { useGuideAddress } from '@/features/guide/use-guide-address'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { PRODUCT_NAME } from '@/lib/product-brand'
+import { cn } from '@/lib/utils'
 
 import {
   filterCatalog,
@@ -88,13 +88,26 @@ export function LandingPage(props: LandingPageProps) {
   const clipboard = useCopyToClipboard({ notify: false })
   const primaryTo = props.isAuthenticated ? '/dashboard' : '/sign-up'
 
-  const featured = useMemo(
+  const spotlight = useMemo(
     () =>
       props.models
         .filter((model) => model.quote)
-        .sort((a, b) => b.savingsPercent - a.savingsPercent)[0],
+        .sort((a, b) => b.savingsPercent - a.savingsPercent)
+        .slice(0, 6),
     [props.models]
   )
+  const [spotlightIndex, setSpotlightIndex] = useState(0)
+  useEffect(() => {
+    setSpotlightIndex(0)
+    if (spotlight.length < 2) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const id = window.setInterval(
+      () => setSpotlightIndex((index) => (index + 1) % spotlight.length),
+      4200
+    )
+    return () => window.clearInterval(id)
+  }, [spotlight])
+  const featured = spotlight[spotlightIndex] ?? spotlight[0]
 
   return (
     <div className='ed-site' id='top'>
@@ -157,9 +170,13 @@ export function LandingPage(props: LandingPageProps) {
 
             <aside className='ed-heroAside ed-rise ed-rise--2'>
               {featured?.quote ? (
-                <div className='ed-paper ed-quote' data-testid='live-comparison'>
-                  <div className='ed-quoteHead'>
-                    <strong>
+                <div
+                  className='ed-paper ed-quote'
+                  data-testid='live-comparison'
+                  aria-live='polite'
+                >
+                  <div className='ed-quoteHead' key={featured.modelName}>
+                    <strong className='ed-pop'>
                       <CatalogVendorIcon model={featured} />
                       {featured.modelName}
                     </strong>
@@ -195,6 +212,19 @@ export function LandingPage(props: LandingPageProps) {
                   <p className='ed-quoteFoot'>
                     {t('Live rate comparison')} · {t('Output')} / 1M tokens
                   </p>
+                  {spotlight.length > 1 ? (
+                    <div className='ed-quoteDots' aria-hidden='true'>
+                      {spotlight.map((model, index) => (
+                        <button
+                          key={model.modelName}
+                          type='button'
+                          tabIndex={-1}
+                          className={cn(index === spotlightIndex && 'is-active')}
+                          onClick={() => setSpotlightIndex(index)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <div className='ed-paper ed-paper--tint ed-endpoint'>
@@ -300,8 +330,11 @@ export function LandingPage(props: LandingPageProps) {
         <section className='ed-section'>
           <div className='ed-container'>
             <div className='ed-paper ed-paper--ink ed-cta'>
+              <p className='ed-eyebrow'>{t('Our belief')}</p>
               <h2 className='ed-display'>
-                {t('Lower the cost of your')} <em>{t('next API request')}</em>
+                {t('Technology should belong to everyone.')}
+                <br />
+                <em>{t('Frontier models, at a fair price.')}</em>
               </h2>
               <p>
                 {t(
@@ -525,65 +558,63 @@ function Catalog(props: { models: CatalogEntry[] }) {
 
 function Trust() {
   const { t } = useTranslation()
+  const cards = [
+    {
+      title: t('Your content is never stored'),
+      copy: t(
+        'Prompts and responses pass straight through to the model. We keep only usage and billing metadata for your bill.'
+      ),
+      action: { label: t('Read the privacy policy'), href: '/privacy-policy' },
+    },
+    {
+      title: t('Encrypted in transit, scoped by key'),
+      copy: t(
+        'Every request travels over TLS. Each API key can be limited to specific models, groups, IP ranges and spending caps.'
+      ),
+      action: { label: t('Manage API keys'), href: '/keys' },
+    },
+    {
+      title: t('Enterprise-grade routing'),
+      copy: t(
+        'Multiple upstream channels per model with automatic retry and failover, plus mainland and global acceleration endpoints.'
+      ),
+      action: { label: t('Browse models'), href: '/pricing' },
+    },
+    {
+      title: t('Fully auditable usage'),
+      copy: t(
+        'Every call is recorded with its model, tokens, latency and exact charge, exportable whenever you need it.'
+      ),
+      action: { label: t('Open usage logs'), href: '/usage-logs' },
+    },
+  ]
   return (
     <section className='ed-section' id='trust'>
       <div className='ed-container'>
         <div className='ed-sectionHead ed-sectionHead--split'>
           <div>
-            <p className='ed-eyebrow'>{t('Trust')}</p>
+            <p className='ed-eyebrow'>{t('Security')}</p>
             <h2 className='ed-display'>
-              {t('Your data boundaries, clearly explained.')}
+              {t('Data security, enterprise configuration.')}
             </h2>
           </div>
           <p className='ed-lede'>
             {t(
-              'See what the marketplace records, where caching can occur, and which routes support zero-data-retention controls.'
+              'Built for teams that need to know exactly where their data goes and how their spend is controlled.'
             )}
           </p>
         </div>
         <div className='ed-trustGrid'>
-          <a className='ed-trustCard' href='/privacy-policy'>
-            <b>01</b>
-            <h3>{t('Application records')}</h3>
-            <p>
-              {t(
-                'Usage and billing metadata only; never prompt or response bodies.'
-              )}
-            </p>
-            <span>
-              {t('Read the privacy policy')} <ExternalLink aria-hidden='true' />
-            </span>
-          </a>
-          <div className='ed-trustCard'>
-            <b>02</b>
-            <h3>{t('Zero data retention available')}</h3>
-            <p>
-              {t(
-                'Choose supported routes when your workload requires zero-retention controls.'
-              )}
-            </p>
-            <span>{t('Check current security status')}</span>
-          </div>
-          <div className='ed-trustCard'>
-            <b>03</b>
-            <h3>{t('Upstream providers')}</h3>
-            <p>
-              {t(
-                'Each request reaches only the provider selected to serve that route.'
-              )}
-            </p>
-            <span>{t('Review subprocessors')}</span>
-          </div>
-          <div className='ed-trustCard'>
-            <b>04</b>
-            <h3>{t('Optional caching')}</h3>
-            <p>
-              {t(
-                'Cache controls pass through when the selected model supports them.'
-              )}
-            </p>
-            <span>{t('Review caching guidance')}</span>
-          </div>
+          {cards.map((card, index) => (
+            <Link key={card.title} className='ed-trustCard' to={card.action.href}>
+              <b>{String(index + 1).padStart(2, '0')}</b>
+              <h3>{card.title}</h3>
+              <p>{card.copy}</p>
+              <span>
+                {card.action.label} <ArrowRight aria-hidden='true' />
+              </span>
+            </Link>
+          ))}
         </div>
       </div>
     </section>

@@ -139,7 +139,7 @@ describe('developer overview summary', () => {
     )
   })
 
-  it('shows administrator health and configured uptime panels directly without an extra disclosure', async () => {
+  it('shows administrator health directly and never renders uptime or FAQ panels', async () => {
     const bundle = createTestAuthBundle()
     useAuthStore
       .getState()
@@ -150,20 +150,22 @@ describe('developer overview summary', () => {
         screen.getByRole('heading', { name: 'Performance health' })
       ).toBeVisible()
     )
-    await waitFor(() =>
-      expect(screen.getByText('No uptime monitoring configured')).toBeVisible()
-    )
+    expect(
+      screen.queryByText('No uptime monitoring configured')
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('FAQ')).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Service information & help' })
     ).not.toBeInTheDocument()
     await waitFor(() =>
       expect(requestedPaths).toContain('/api/perf-metrics/summary')
     )
+    expect(requestedPaths).not.toContain('/api/uptime/status')
   })
 
   it('does not request or reveal administrator health data to an ordinary account', async () => {
     await renderApp(<OverviewDashboard />, client)
-    await screen.findByText('No uptime monitoring configured')
+    await screen.findByText('Usage at a glance')
     expect(
       screen.queryByRole('heading', { name: 'Performance health' })
     ).not.toBeInTheDocument()

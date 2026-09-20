@@ -49,10 +49,8 @@ import {
 import { AnnouncementsPanel } from './announcements-panel'
 import { ApiInfoPanel } from './api-info-panel'
 import { EasyOverviewDashboard } from './easy-overview-dashboard'
-import { FAQPanel } from './faq-panel'
 import { PerformanceHealthPanel } from './performance-health-panel'
 import { SummaryCards } from './summary-cards'
-import { UptimePanel } from './uptime-panel'
 
 interface HeroSignal {
   label: string
@@ -72,8 +70,6 @@ function DeveloperOverviewDashboard() {
   const {
     apiInfo: showApiInfoPanel,
     announcements: showAnnouncementsPanel,
-    faq: showFAQPanel,
-    uptimeKuma: showUptimePanel,
   } = useDashboardContentVisibility()
   const remainQuota = Number(user?.quota ?? 0)
   const isAdmin = Boolean(user?.role && user.role >= ROLE.ADMIN)
@@ -133,9 +129,10 @@ function DeveloperOverviewDashboard() {
     ]
   )
 
-  const showLeftContentPanels =
-    isAdmin || showApiInfoPanel || showAnnouncementsPanel || showFAQPanel
-  const showContentPanels = showLeftContentPanels || showUptimePanel
+  const infoPanelCount =
+    Number(showApiInfoPanel && apiInfoItems.length > 0) +
+    Number(showAnnouncementsPanel)
+  const showContentPanels = isAdmin || infoPanelCount > 0
 
   return (
     <div className='flex flex-col gap-4'>
@@ -180,28 +177,20 @@ function DeveloperOverviewDashboard() {
       <SummaryCards />
 
       {showContentPanels && (
-        <CardStaggerContainer
-          className={cn(
-            'grid grid-cols-1 gap-4',
-            showLeftContentPanels &&
-              showUptimePanel &&
-              'xl:grid-cols-[minmax(0,1fr)_22rem]'
+        <CardStaggerContainer className='grid grid-cols-1 gap-4'>
+          {isAdmin && (
+            <CardStaggerItem>
+              <PerformanceHealthPanel />
+            </CardStaggerItem>
           )}
-        >
-          {showLeftContentPanels && (
+          {infoPanelCount > 0 && (
             <div
               className={cn(
                 'grid min-w-0 grid-cols-1 gap-4',
-                (showApiInfoPanel || showAnnouncementsPanel || showFAQPanel) &&
-                  'lg:grid-cols-2'
+                infoPanelCount > 1 && 'lg:grid-cols-2'
               )}
             >
-              {isAdmin && (
-                <CardStaggerItem className='lg:col-span-2'>
-                  <PerformanceHealthPanel />
-                </CardStaggerItem>
-              )}
-              {showApiInfoPanel && (
+              {showApiInfoPanel && apiInfoItems.length > 0 && (
                 <CardStaggerItem>
                   <ApiInfoPanel />
                 </CardStaggerItem>
@@ -211,17 +200,7 @@ function DeveloperOverviewDashboard() {
                   <AnnouncementsPanel />
                 </CardStaggerItem>
               )}
-              {showFAQPanel && (
-                <CardStaggerItem>
-                  <FAQPanel />
-                </CardStaggerItem>
-              )}
             </div>
-          )}
-          {showUptimePanel && (
-            <CardStaggerItem>
-              <UptimePanel />
-            </CardStaggerItem>
           )}
         </CardStaggerContainer>
       )}

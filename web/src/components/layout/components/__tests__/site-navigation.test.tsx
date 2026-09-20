@@ -74,7 +74,7 @@ it('shows site links directly without a dropdown and keeps keyboard and disabled
   client.clear()
 })
 
-it('reserves a second header row and contains overflow for narrow navigation without changing headers that have no site links', async () => {
+it('keeps the header a single row and lets narrow site navigation scroll horizontally', async () => {
   const style = document.createElement('style')
   style.textContent = readFileSync('src/styles/editorial.css', 'utf8')
   document.head.append(style)
@@ -101,14 +101,14 @@ it('reserves a second header row and contains overflow for narrow navigation wit
     })
     expect(
       getComputedStyle(shell).getPropertyValue('--app-header-height')
-    ).toBe('5.5rem')
+    ).toBe('3.25rem')
     expect(
       getComputedStyle(
         screen.getByRole('region', { name: 'Other shell' })
       ).getPropertyValue('--app-header-height')
     ).toBe('3.25rem')
     expect(getComputedStyle(navigation).overflowX).toBe('auto')
-    expect(getComputedStyle(navigation).flexBasis).toBe('100%')
+    expect(getComputedStyle(navigation).minInlineSize).toBe('0px')
   } finally {
     style.remove()
     client.clear()

@@ -23,7 +23,6 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { useConsoleMode } from '@/hooks/use-console-mode'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
-import { cn } from '@/lib/utils'
 
 import { defaultTopNavLinks } from '../config/top-nav.config'
 import type { TopNavLink } from '../types'
@@ -89,7 +88,11 @@ export function AppHeader({
         showTopNav &&
         !isEasyMode &&
         links.length > 0 && (
-          <TopNav links={links} variant='inline' className='ed-siteNav' />
+          <TopNav
+            links={links}
+            variant='inline'
+            className='ed-siteNav ms-3 gap-1'
+          />
         )}
 
       {leftContent ? (
@@ -97,12 +100,7 @@ export function AppHeader({
       ) : null}
 
       {rightContent ?? (
-        <div
-          className={cn(
-            'ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5 [&>*]:shrink-0',
-            !isEasyMode && showTopNav && links.length > 0 && 'xl:ms-0'
-          )}
-        >
+        <div className='ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5 [&>*]:shrink-0'>
           {showNotifications && !isEasyMode && <AppHeaderNotifications />}
           <CommunityHelp variant='header' />
           <ConsoleModeControl compact />
