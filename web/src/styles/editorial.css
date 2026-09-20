@@ -3557,54 +3557,24 @@ a.ed-trustCard:hover {
 
 /* ── Documentation ────────────────────────────────────────────────────── */
 .ed-docs {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  min-block-size: 0;
   flex: 1;
+  min-block-size: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding: clamp(1.25rem, 3vw, 2.5rem) var(--ed-gutter) 5rem;
   background: var(--background);
-}
-
-@media (min-width: 64rem) {
-  .ed-docs {
-    grid-template-columns: 17rem minmax(0, 1fr);
-  }
-}
-
-.ed-docsSide {
-  display: none;
-}
-
-@media (min-width: 64rem) {
-  .ed-docsSide {
-    position: sticky;
-    inset-block-start: 0;
-    display: block;
-    block-size: calc(100svh - var(--app-header-height, 0px));
-    overflow-y: auto;
-    border-inline-end: 1px solid var(--ed-rule);
-    background: var(--background);
-  }
-}
-
-.ed-docsOutline {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  padding: 1rem 0.75rem 2rem;
 }
 
 .ed-docsSearch {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0.25rem 0.75rem;
-  padding-inline: 0.7rem;
-  min-block-size: 2.25rem;
+  min-inline-size: 16rem;
+  min-block-size: 2.35rem;
+  padding-inline: 0.8rem 0.4rem;
   border: 1px solid var(--ed-rule);
   border-radius: 999px;
-  background: var(--card);
+  background: var(--background);
   color: var(--ed-ink-soft);
 }
 
@@ -3615,117 +3585,177 @@ a.ed-trustCard:hover {
   background: transparent;
   color: var(--foreground);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   outline: none;
 }
 
-.ed-docsOutline a {
-  display: block;
-  padding: 0.35rem 0.75rem;
-  border-inline-start: 2px solid transparent;
-  color: var(--ed-ink-soft);
-  font-size: 0.8rem;
-  line-height: 1.4;
-  text-decoration: none;
-  transition: color var(--ed-duration) var(--ed-ease);
+.ed-docsSearch button {
+  display: inline-flex;
+  padding: 0.3rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 
-.ed-docsOutline a[data-level='1'] {
-  margin-block-start: 0.9rem;
-  color: var(--foreground);
-  font-family: var(--font-display);
-  font-size: 0.95rem;
+.ed-collapsibleHead {
+  inline-size: 100%;
+  align-items: center;
+  border-block-end: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
 }
 
-.ed-docsOutline a[data-level='2'] {
-  padding-inline-start: 1.25rem;
-}
-
-.ed-docsOutline a:hover {
-  color: var(--foreground);
-}
-
-.ed-docsOutline a.is-active {
-  border-inline-start-color: var(--primary);
-  color: var(--foreground);
-  font-weight: 500;
-}
-
-.ed-docsMain {
-  min-inline-size: 0;
-  inline-size: min(100%, 76ch);
-  margin-inline: auto;
-  padding: clamp(1.25rem, 3vw, 2.5rem) var(--ed-gutter) 5rem;
-}
-
-.ed-docsMobileBar {
-  margin-block-end: 1.25rem;
-}
-
-@media (min-width: 64rem) {
-  .ed-docsMobileBar {
-    display: none;
-  }
-}
-
-.ed-docsHead {
-  display: grid;
-  gap: 0.75rem;
-  margin-block-end: 2rem;
-  padding-block-end: 1.75rem;
+.ed-collapsibleHead[aria-expanded='true'] {
   border-block-end: 1px solid var(--ed-rule);
 }
 
-.ed-docsHead h1 {
-  margin: 0;
-  font-size: clamp(2rem, 4.5vw, 3rem);
+.ed-collapsibleHead svg {
+  flex-shrink: 0;
+  color: var(--ed-ink-soft);
 }
 
-.ed-docsMeta {
+.ed-badge--warning {
+  background: color-mix(in oklch, var(--warning) 18%, transparent);
+  color: color-mix(in oklch, var(--warning) 70%, var(--foreground));
+}
+
+.ed-badge--danger {
+  background: color-mix(in oklch, var(--destructive) 12%, transparent);
+  color: var(--destructive);
+}
+
+.ed-toolGroup + .ed-toolGroup {
+  margin-block-start: 1.75rem;
+}
+
+.ed-toolGroupTitle {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 400;
+}
+
+.ed-toolGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+
+.ed-toolCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-block-size: 8.5rem;
+  padding: 1rem 1.1rem 1rem;
+  border: 1px solid var(--ed-rule);
+  border-radius: var(--ed-radius-panel);
+  background: var(--background);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    border-color var(--ed-duration) var(--ed-ease),
+    background-color var(--ed-duration) var(--ed-ease);
+}
+
+.ed-toolCard:hover {
+  border-color: var(--ed-rule-strong);
+  background: var(--ed-paper-tint);
+}
+
+.ed-toolCard:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.ed-toolCardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.6rem;
+}
+
+.ed-toolCardHead strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.ed-toolCard p {
   margin: 0;
   color: var(--ed-ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ed-toolCardMore {
+  margin-block-start: auto;
+  color: var(--primary);
   font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity var(--ed-duration) var(--ed-ease);
+}
+
+.ed-toolCard:hover .ed-toolCardMore,
+.ed-toolCard:focus-visible .ed-toolCardMore {
+  opacity: 1;
 }
 
 /* Long-form Markdown body */
 .ed-handbook {
-  font-size: 0.95rem;
-  line-height: 1.8;
+  font-size: 0.9rem;
+  line-height: 1.75;
 }
 
-.ed-handbook h1 {
-  margin-block: 3.25rem 1rem;
-  padding-block-start: 2rem;
-  border-block-start: 1px solid var(--ed-rule);
-  font-family: var(--font-display);
-  font-size: 1.85rem;
-  font-weight: 400;
-  letter-spacing: -0.015em;
-  scroll-margin-block-start: 1.5rem;
+.ed-handbook--dialog {
+  padding-block-start: 0.5rem;
 }
 
 .ed-handbook h2 {
-  margin-block: 2.5rem 0.75rem;
+  margin-block: 2rem 0.6rem;
   font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 400;
-  letter-spacing: -0.01em;
-  scroll-margin-block-start: 1.5rem;
+}
+
+.ed-handbook h2:first-child {
+  margin-block-start: 0;
 }
 
 .ed-handbook h3 {
-  margin-block: 1.5rem 0.5rem;
-  font-size: 1rem;
+  margin-block: 1.25rem 0.4rem;
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
 .ed-handbook p {
-  margin-block: 0.6rem;
+  margin-block: 0.5rem;
+}
+
+.ed-handbook > div > p > strong:only-child,
+.ed-handbook p:has(> strong:only-child) {
+  display: block;
+  margin-block: 1.4rem 0.5rem;
+  color: var(--ed-ink-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .ed-handbook blockquote {
-  margin-block: 1rem;
-  padding: 0.6rem 1rem;
+  margin-block: 0.85rem;
+  padding: 0.55rem 0.9rem;
   border-inline-start: 2px solid var(--primary);
   border-radius: 0 var(--ed-radius-control) var(--ed-radius-control) 0;
   background: var(--ed-paper-tint);
@@ -3734,16 +3764,16 @@ a.ed-trustCard:hover {
 }
 
 .ed-handbook blockquote p {
-  margin-block: 0.25rem;
+  margin-block: 0.2rem;
 }
 
 .ed-handbook table {
   display: table;
   inline-size: 100%;
-  margin-block: 1rem;
+  margin-block: 0.85rem;
   border-collapse: collapse;
-  font-size: 0.85rem;
-  line-height: 1.55;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .ed-handbook thead {
@@ -3753,16 +3783,16 @@ a.ed-trustCard:hover {
 .ed-handbook th,
 .ed-handbook td {
   border: 1px solid var(--ed-rule);
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.65rem;
   vertical-align: top;
 }
 
 .ed-handbook pre {
-  margin-block: 0.85rem;
+  margin-block: 0.75rem;
   border: 1px solid var(--ed-rule);
   border-radius: var(--ed-radius-control);
   background: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 
 .ed-handbook code {
@@ -3771,15 +3801,15 @@ a.ed-trustCard:hover {
 }
 
 .ed-handbook hr {
-  margin-block: 2rem;
+  margin-block: 1.5rem;
   border-color: var(--ed-rule);
 }
 
 .ed-handbook ol,
 .ed-handbook ul {
-  margin-block: 0.6rem;
+  margin-block: 0.5rem;
 }
 
 .ed-handbook li {
-  margin-block: 0.25rem;
+  margin-block: 0.2rem;
 }

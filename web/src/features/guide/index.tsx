@@ -16,164 +16,250 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Menu, Search } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, Search, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Markdown } from '@/components/ui/markdown'
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Markdown } from '@/components/ui/markdown'
 import { cn } from '@/lib/utils'
 
 import handbookSource from './content/handbook.zh'
 import {
-  parseHandbookHeadings,
-  stripHandbookTitle,
-  type HandbookHeading,
+  parseHandbook,
+  type HandbookTool,
+  type HandbookToolStatus,
 } from './lib/handbook'
 
-const headings = parseHandbookHeadings(handbookSource)
-const body = stripHandbookTitle(handbookSource)
+const handbook = parseHandbook(handbookSource)
 
-function matchesQuery(heading: HandbookHeading, query: string): boolean {
-  return heading.text.toLowerCase().includes(query)
+const STATUS_META: Record<
+  HandbookToolStatus,
+  { label: string; className: string }
+> = {
+  supported: { label: 'Direct support', className: 'ed-badge--success' },
+  converted: { label: 'Protocol conversion', className: 'ed-badge--accent' },
+  limited: { label: 'Limited support', className: 'ed-badge--warning' },
+  unsupported: { label: 'Not recommended', className: 'ed-badge--danger' },
+  other: { label: 'Helper tool', className: '' },
 }
 
-function Outline(props: {
-  activeId: string
-  query: string
-  onQueryChange: (query: string) => void
-  onNavigate?: () => void
-}) {
+function ToolCard(props: { tool: HandbookTool; onOpen: () => void }) {
   const { t } = useTranslation()
-  const needle = props.query.trim().toLowerCase()
-  const visible = needle
-    ? headings.filter((heading) => matchesQuery(heading, needle))
-    : headings
-
+  const meta = STATUS_META[props.tool.status]
   return (
-    <nav aria-label={t('Documentation')} className='ed-docsOutline'>
-      <label className='ed-docsSearch'>
-        <Search size={14} aria-hidden='true' />
-        <input
-          type='search'
-          value={props.query}
-          onChange={(event) => props.onQueryChange(event.target.value)}
-          aria-label={t('Search documentation')}
-          placeholder={t('Search documentation')}
-        />
-      </label>
-      {visible.length === 0 ? (
-        <p className='ed-panelNote px-3'>{t('No matching docs')}</p>
-      ) : null}
-      {visible.map((heading) => (
-        <a
-          key={heading.id}
-          href={`#${heading.id}`}
-          onClick={props.onNavigate}
-          data-level={heading.level}
-          className={cn(props.activeId === heading.id && 'is-active')}
-        >
-          {heading.text}
-        </a>
-      ))}
-    </nav>
+    <button type='button' className='ed-toolCard' onClick={props.onOpen}>
+      <span className='ed-toolCardHead'>
+        <strong>{props.tool.name}</strong>
+        <span className={cn('ed-badge', meta.className)}>{t(meta.label)}</span>
+      </span>
+      {props.tool.summary ? <p>{props.tool.summary}</p> : null}
+      <span className='ed-toolCardMore'>{t('View setup steps')} →</span>
+    </button>
   )
 }
 
-/** The documentation page: the complete tool handbook with an outline. */
+function Collapsible(props: {
+  id: string
+  title: string
+  body: string
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(Boolean(props.defaultOpen))
+  return (
+    <section className='ed-panel' id={props.id}>
+      <button
+        type='button'
+        className='ed-panelHead ed-collapsibleHead'
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <h2>{props.title}</h2>
+        <ChevronDown
+          size={18}
+          aria-hidden='true'
+          className={cn('transition-transform', open && 'rotate-180')}
+        />
+      </button>
+      {open ? (
+        <div className='ed-panelBody ed-handbook'>
+          <Markdown>{props.body}</Markdown>
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+/** Documentation page: the tool handbook presented as a card wall. */
 export function GuidePage() {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [activeId, setActiveId] = useState(headings[0]?.id ?? '')
-  const articleRef = useRef<HTMLDivElement>(null)
-  const readingMinutes = useMemo(
-    () => Math.max(5, Math.round(handbookSource.length / 900)),
-    []
-  )
+  const [categoryId, setCategoryId] = useState('all')
+  const [active, setActive] = useState<HandbookTool | null>(null)
+  const needle = query.trim().toLowerCase()
 
-  useEffect(() => {
-    const root = articleRef.current
-    if (!root) return
-    const rendered = [...root.querySelectorAll<HTMLElement>('h1, h2')]
-    rendered.forEach((element, index) => {
-      const heading = headings[index]
-      if (heading) element.id = heading.id
-    })
-    if (typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.find((entry) => entry.isIntersecting)
-        if (visible?.target.id) setActiveId(visible.target.id)
-      },
-      { rootMargin: '-10% 0px -75% 0px' }
-    )
-    rendered.forEach((element) => observer.observe(element))
-    return () => observer.disconnect()
-  }, [])
+  const categories = useMemo(() => {
+    return handbook.categories
+      .filter((category) => categoryId === 'all' || category.id === categoryId)
+      .map((category) => ({
+        ...category,
+        tools: category.tools.filter(
+          (tool) =>
+            !needle ||
+            tool.name.toLowerCase().includes(needle) ||
+            tool.summary.toLowerCase().includes(needle) ||
+            tool.body.toLowerCase().includes(needle)
+        ),
+      }))
+      .filter((category) => category.tools.length > 0)
+  }, [categoryId, needle])
+  const activeMeta = active ? STATUS_META[active.status] : null
 
   return (
     <div className='ed-docs' data-testid='guide-shell'>
-      <aside className='ed-docsSide'>
-        <Outline activeId={activeId} query={query} onQueryChange={setQuery} />
-      </aside>
-
-      <main className='ed-docsMain'>
-        <div className='ed-docsMobileBar'>
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger
-              render={
-                <button
-                  type='button'
-                  className='ed-btn ed-btn--outline ed-btn--sm'
-                  aria-label={t('Open documentation navigation')}
-                />
-              }
-            >
-              <Menu aria-hidden='true' />
-              {t('Contents')}
-            </SheetTrigger>
-            <SheetContent side='left' className='w-80 p-0'>
-              <SheetHeader className='sr-only'>
-                <SheetTitle>{t('Documentation')}</SheetTitle>
-                <SheetDescription>{t('On this page')}</SheetDescription>
-              </SheetHeader>
-              <div className='h-full overflow-y-auto py-4'>
-                <Outline
-                  activeId={activeId}
-                  query={query}
-                  onQueryChange={setQuery}
-                  onNavigate={() => setMobileOpen(false)}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-
-        <header className='ed-docsHead'>
-          <p className='ed-eyebrow'>{t('Developer docs')}</p>
-          <h1 className='ed-display'>{t('Complete tool handbook')}</h1>
-          <p className='ed-lede'>
-            {t(
-              'Step-by-step setup and error lookup for every popular client, from chat apps to coding agents and workflow platforms.'
-            )}
-          </p>
-          <p className='ed-docsMeta'>
-            {t('{{count}} min read', { count: readingMinutes })}
-          </p>
+      <div className='ed-page ed-page--wide'>
+        <header className='ed-pageHead'>
+          <div>
+            <p className='ed-eyebrow'>{t('Developer docs')}</p>
+            <h1 className='ed-display'>{handbook.title}</h1>
+            <p>
+              {t(
+                'Step-by-step setup and error lookup for every popular client, from chat apps to coding agents and workflow platforms.'
+              )}
+            </p>
+          </div>
         </header>
 
-        <div ref={articleRef} className='ed-handbook'>
-          <Markdown>{body}</Markdown>
+        <div className='ed-pageBody'>
+          <Collapsible
+            id='intro'
+            title={t('Before you start: the three values every tool needs')}
+            body={handbook.intro}
+            defaultOpen
+          />
+
+          <section className='ed-panel' id='tools'>
+            <header className='ed-panelHead'>
+              <div>
+                <h2>{t('Pick your tool, follow the steps')}</h2>
+                <p>
+                  {t(
+                    'Click any card for step-by-step setup, cautions and a quick error lookup.'
+                  )}
+                </p>
+              </div>
+              <label className='ed-docsSearch'>
+                <Search size={14} aria-hidden='true' />
+                <input
+                  type='search'
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label={t('Search documentation')}
+                  placeholder={t('Search tools or errors')}
+                />
+                {query ? (
+                  <button
+                    type='button'
+                    aria-label={t('Clear filters')}
+                    onClick={() => setQuery('')}
+                  >
+                    <X size={14} aria-hidden='true' />
+                  </button>
+                ) : null}
+              </label>
+            </header>
+            <div className='ed-panelBody'>
+              <div
+                className='ed-chipRow'
+                role='tablist'
+                aria-label={t('Tool categories')}
+              >
+                <button
+                  type='button'
+                  role='tab'
+                  aria-selected={categoryId === 'all'}
+                  className='ed-chip'
+                  onClick={() => setCategoryId('all')}
+                >
+                  {t('All')}
+                </button>
+                {handbook.categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type='button'
+                    role='tab'
+                    aria-selected={categoryId === category.id}
+                    className='ed-chip'
+                    onClick={() => setCategoryId(category.id)}
+                  >
+                    {category.title}
+                    <span>{category.tools.length}</span>
+                  </button>
+                ))}
+              </div>
+
+              {categories.length === 0 ? (
+                <div className='ed-empty'>
+                  <p>{t('No matching docs')}</p>
+                </div>
+              ) : null}
+
+              {categories.map((category) => (
+                <div key={category.id} className='ed-toolGroup'>
+                  <h3 className='ed-toolGroupTitle'>{category.title}</h3>
+                  <div className='ed-toolGrid'>
+                    {category.tools.map((tool) => (
+                      <ToolCard
+                        key={tool.id}
+                        tool={tool}
+                        onOpen={() => setActive(tool)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {handbook.chapters.map((chapter) => (
+            <Collapsible
+              key={chapter.id}
+              id={chapter.id}
+              title={chapter.title}
+              body={chapter.body}
+            />
+          ))}
         </div>
-      </main>
+      </div>
+
+      <Dialog open={active !== null} onOpenChange={(open) => !open && setActive(null)}>
+        <DialogContent className='max-h-[88vh] gap-0 overflow-y-auto sm:max-w-3xl'>
+          {active && activeMeta ? (
+            <>
+              <DialogHeader className='pb-3'>
+                <DialogTitle className='ed-display flex flex-wrap items-center gap-2.5 text-2xl'>
+                  {active.name}
+                  <span className={cn('ed-badge', activeMeta.className)}>
+                    {t(activeMeta.label)}
+                  </span>
+                </DialogTitle>
+                {active.summary ? (
+                  <DialogDescription>{active.summary}</DialogDescription>
+                ) : null}
+              </DialogHeader>
+              <div className='ed-handbook ed-handbook--dialog'>
+                <Markdown>{active.body}</Markdown>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
