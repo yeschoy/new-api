@@ -3,6 +3,7 @@ package model
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/assert"
@@ -162,6 +163,51 @@ func TestRedeemRejectsWalletOverflow(t *testing.T) {
 	var redemption Redemption
 	require.NoError(t, DB.First(&redemption, "key = ?", key).Error)
 	assert.Equal(t, common.RedemptionCodeStatusEnabled, redemption.Status)
+}
+
+func TestRedeemAcquiresQuotaFenceBeforeLockingCode(t *testing.T) {
+	userId, key := setupRedeemFixture(t, 500)
+	server := useUserCacheMiniRedis(t)
+	var user User
+	require.NoError(t, DB.First(&user, userId).Error)
+	require.NoError(t, populateUserCache(user))
+
+	hook := newBlockFirstEvalHook()
+	common.RDB.AddHook(hook)
+	redeemDone := make(chan error, 1)
+	go func() {
+		_, err := Redeem(key, userId)
+		redeemDone <- err
+	}()
+
+	select {
+	case <-hook.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("redemption quota fence acquisition did not reach Redis")
+	}
+
+	updateDone := make(chan error, 1)
+	go func() {
+		updateDone <- DB.Model(&Redemption{}).Where("key = ?", key).Update("status", common.RedemptionCodeStatusDisabled).Error
+	}()
+	select {
+	case err := <-updateDone:
+		require.NoError(t, err, "the redemption row must not be locked while Redis fence acquisition is waiting")
+	case <-time.After(500 * time.Millisecond):
+		close(hook.release)
+		t.Fatal("redemption update blocked while Redis fence acquisition was delayed")
+	}
+	close(hook.release)
+
+	assert.ErrorIs(t, <-redeemDone, ErrRedeemFailed)
+	assert.Zero(t, getUserQuotaFromDB(t, userId))
+	assert.False(t, server.Exists(getUserQuotaMutationFenceKey(userId)), "unused owned fence must be released")
+	cached, err := cacheGetUserBase(userId)
+	require.NoError(t, err)
+	assert.Zero(t, cached.Quota, "unused fence release must preserve the valid balance hash")
+	var redemption Redemption
+	require.NoError(t, DB.Where("key = ?", key).First(&redemption).Error)
+	assert.Equal(t, common.RedemptionCodeStatusDisabled, redemption.Status)
 }
 
 func TestRedemptionQuotaRejectsWalletOverflow(t *testing.T) {

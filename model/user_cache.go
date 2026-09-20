@@ -86,15 +86,17 @@ func updateUserCache(user User) error {
 
 // GetUserCache gets complete user cache from hash
 func GetUserCache(userId int) (*UserBase, error) {
-	// Try getting from Redis first
-	userCache, err := cacheGetUserBase(userId)
-	if err == nil {
+	// Try getting from Redis first.
+	userCache, cacheErr := cacheGetUserBase(userId)
+	if cacheErr == nil {
 		return userCache, nil
 	}
+	quotaMutationPending := errors.Is(cacheErr, ErrUserQuotaMutationPending)
 
-	// Redis misses and read failures both fall back to the shared database. A
-	// version fence newer than the database is the one exception: allowing that
-	// snapshot would re-authorize a user while a restrictive update is pending.
+	// Redis misses and read failures fall back to the shared database. During a
+	// quota mutation fence this snapshot is identity/display data only: it is
+	// returned without publishing a cache hash, while TryReserveUserQuota stays
+	// fail-closed on the fence. The authentication version floor still applies.
 	user, err := GetUserById(userId, false)
 	if err != nil {
 		return nil, err
@@ -103,6 +105,9 @@ func GetUserCache(userId int) (*UserBase, error) {
 		floor, floorErr := getUserAuthVersionFloor(userId)
 		if floorErr == nil && floor > user.AuthVersion {
 			return nil, ErrUserAuthCachePending
+		}
+		if quotaMutationPending {
+			return user.ToBaseUser(), nil
 		}
 		if err := populateUserCache(*user); err != nil {
 			if errors.Is(err, ErrUserAuthCachePending) {
@@ -118,13 +123,44 @@ func cacheGetUserBase(userId int) (*UserBase, error) {
 	if !common.RedisEnabled {
 		return nil, fmt.Errorf("redis is not enabled")
 	}
-	var userCache UserBase
-	// Try getting from Redis first
-	err := common.RedisHGetObj(getUserCacheKey(userId), &userCache)
+	fenced, err := userQuotaMutationFenceExists(userId)
 	if err != nil {
 		return nil, err
 	}
+	if fenced {
+		return nil, ErrUserQuotaMutationPending
+	}
+	var userCache UserBase
+	// A shared batch marker does not invalidate an existing quota hash: Redis
+	// already contains every queued delta and remains the spend authority.
+	if err := common.RedisHGetObj(getUserCacheKey(userId), &userCache); err != nil {
+		pending, pendingErr := userQuotaMutationPendingExists(userId)
+		if pendingErr != nil {
+			return nil, pendingErr
+		}
+		if pending {
+			return nil, ErrUserQuotaMutationPending
+		}
+		return nil, err
+	}
+	// Recheck the exclusive fence after HGETALL so a transaction raised
+	// concurrently cannot expose its pre-transaction snapshot. Batch markers
+	// deliberately remain readable while this valid hash exists.
+	fenced, err = userQuotaMutationFenceExists(userId)
+	if err != nil {
+		return nil, err
+	}
+	if fenced {
+		return nil, ErrUserQuotaMutationPending
+	}
 	if userCache.Id != userId || userCache.CacheSchema != userCacheSchemaVersion || userCache.AuthVersion <= 0 {
+		pending, pendingErr := userQuotaMutationPendingExists(userId)
+		if pendingErr != nil {
+			return nil, pendingErr
+		}
+		if pending {
+			return nil, ErrUserQuotaMutationPending
+		}
 		return nil, fmt.Errorf("user cache schema is stale")
 	}
 	floor, err := getUserAuthVersionFloor(userId)
@@ -144,24 +180,45 @@ func cacheIncrUserQuota(userId int, delta int64) error {
 	if !common.RedisEnabled {
 		return nil
 	}
-	_, err := cacheApplyUserQuotaDelta(userId, delta)
-	return err
+	result, err := cacheApplyUserQuotaDelta(userId, delta)
+	if err != nil {
+		return err
+	}
+	if result == cacheQuotaPending {
+		// The database mutation has already committed. Removing only the stale
+		// balance hash is safe while preserving the active owner's fence: a
+		// concurrent credit can no longer publish an increment over an older
+		// snapshot, and the next authoritative read hydrates from committed DB.
+		if invalidateErr := invalidateUserQuotaHash(userId); invalidateErr != nil {
+			return fmt.Errorf("%w: failed to invalidate user quota cache: %v", ErrUserQuotaMutationPending, invalidateErr)
+		}
+		return ErrUserQuotaMutationPending
+	}
+	return nil
 }
 
 func cacheDecrUserQuota(userId int, delta int64) error {
 	return cacheIncrUserQuota(userId, -delta)
 }
 
-// syncCreditUserQuotaCache 在授信事务（充值/兑换等）提交后同步把增量补进缓存
-// 余额。预扣以缓存值为准（存在期间），授信不能绕过它，否则新到账的额度在
-// 缓存过期前不可用；缓存未命中无需处理，下次读取会从已提交的数据库余额水合。
-func syncCreditUserQuotaCache(userId int, quota int, operation string) {
+// syncUserQuotaDeltaCache publishes a committed signed delta through the
+// exclusive quota fence acquired before the database mutation. On publication
+// failure the deferred fence finalizer invalidates the hash and keeps reads
+// fail-closed without reporting a false database rollback.
+func syncUserQuotaDeltaCache(fences *userQuotaMutationFences, userId int, delta int, operation string) {
+	if delta == 0 || fences == nil {
+		return
+	}
+	if err := fences.publishDelta(userId, delta); err != nil {
+		common.SysLog(fmt.Sprintf("failed to publish %s delta to user quota cache: %s", operation, err.Error()))
+	}
+}
+
+func syncCreditUserQuotaCache(fences *userQuotaMutationFences, userId int, quota int, operation string) {
 	if quota <= 0 {
 		return
 	}
-	if err := cacheIncrUserQuota(userId, int64(quota)); err != nil {
-		common.SysLog(fmt.Sprintf("failed to sync %s credit to user quota cache: %s", operation, err.Error()))
-	}
+	syncUserQuotaDeltaCache(fences, userId, quota, operation)
 }
 
 // Helper functions to get individual fields if needed
@@ -174,7 +231,21 @@ func getUserGroupCache(userId int) (string, error) {
 }
 
 func getUserQuotaCache(userId int) (int, error) {
-	cache, err := GetUserCache(userId)
+	// Quota-authoritative callers must not consume the direct database snapshot
+	// that GetUserCache intentionally exposes for identity/profile reads during
+	// a quota fence. Preserve the pending error so billing cannot enter the
+	// trust-quota bypass while money state is changing.
+	cache, err := cacheGetUserBase(userId)
+	if err == nil {
+		return cache.Quota, nil
+	}
+	if errors.Is(err, ErrUserQuotaMutationPending) {
+		return 0, err
+	}
+	if _, err = GetUserCache(userId); err != nil {
+		return 0, err
+	}
+	cache, err = cacheGetUserBase(userId)
 	if err != nil {
 		return 0, err
 	}

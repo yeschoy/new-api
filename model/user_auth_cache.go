@@ -59,6 +59,12 @@ func writeUserCache(user *UserBase, includeQuota bool) error {
 	}
 	ttl := userCacheTTLSeconds()
 	const script = `
+local clock = redis.call('TIME')
+local now = tonumber(clock[1]) * 1000 + math.floor(tonumber(clock[2]) / 1000)
+redis.call('ZREMRANGEBYSCORE', KEYS[5], '-inf', now)
+if redis.call('EXISTS', KEYS[4]) == 1 or redis.call('ZCARD', KEYS[5]) > 0 then
+  return -1
+end
 local incoming = tonumber(ARGV[1])
 local pending = tonumber(redis.call('GET', KEYS[2]) or '0')
 local committed = tonumber(redis.call('GET', KEYS[3]) or '0')
@@ -85,17 +91,27 @@ end
 redis.call('EXPIRE', KEYS[1], ARGV[12])
 return 1`
 	result, err := common.RDB.Eval(context.Background(), script,
-		[]string{getUserCacheKey(user.Id), getUserAuthFenceKey(user.Id), getUserAuthVersionKey(user.Id)},
+		[]string{
+			getUserCacheKey(user.Id),
+			getUserAuthFenceKey(user.Id),
+			getUserAuthVersionKey(user.Id),
+			getUserQuotaMutationFenceKey(user.Id),
+			getUserQuotaBatchPendingKey(user.Id),
+		},
 		user.AuthVersion, user.Id, user.Group, user.Email, user.Status, user.Role,
 		user.Username, user.Setting, user.CacheSchema, includeQuotaArg, user.Quota, ttl,
 	).Int()
 	if err != nil {
 		return err
 	}
-	if result == 0 {
+	switch result {
+	case -1:
+		return ErrUserQuotaMutationPending
+	case 0:
 		return ErrUserAuthCachePending
+	default:
+		return nil
 	}
-	return nil
 }
 
 func getUserAuthVersionFloor(userId int) (int64, error) {
@@ -219,19 +235,45 @@ func BumpUserAuthVersion(userId int) (int64, error) {
 		return 0, err
 	}
 	if err := PublishUserAuthCache(userId); err != nil {
-		return next, err
+		// The database mutation is already committed and its pending auth fence
+		// remains fail-closed until the older user hash expires. Do not report a
+		// false rollback to callers that still need to advance session state.
+		common.SysError(fmt.Sprintf("failed to publish committed auth cache for user %d: %v", userId, err))
 	}
 	return next, nil
 }
 
-// PublishUserAuthCache refreshes the current database state after a successful
-// auth-sensitive transaction without touching the cached quota field.
+// PublishUserAuthCache publishes the committed authentication-version floor
+// before refreshing the user hash. A concurrent quota mutation may defer the
+// hash refresh, but it must never keep a committed security change behind a
+// pending auth fence or make callers skip mandatory post-commit cleanup.
 func PublishUserAuthCache(userId int) error {
 	user, err := GetUserById(userId, false)
 	if err != nil {
 		return err
 	}
-	return updateUserCache(*user)
+	if err := publishCommittedUserAuthVersion(user.Id, user.AuthVersion); err != nil {
+		return err
+	}
+	if err := updateUserCache(*user); err != nil {
+		if errors.Is(err, ErrUserQuotaMutationPending) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// finalizeCommittedUserAuthMutation completes the security side effects that
+// follow an already-committed auth-version change. Cache publication is
+// best-effort because the pre-commit pending auth fence remains fail-closed;
+// required session revocation must still run and is the only returned error.
+func finalizeCommittedUserAuthMutation(userId int, reason string) error {
+	if err := PublishUserAuthCache(userId); err != nil {
+		common.SysError(fmt.Sprintf("failed to publish committed auth cache for user %d: %v", userId, err))
+	}
+	_, err := revokeAllUserSessionsAfterAuthVersionChange(userId, reason)
+	return err
 }
 
 // InitializeUserAuthVersions must run after AutoMigrate when upgrading an
@@ -248,6 +290,9 @@ func updateUserCacheFieldAtVersion(userId int, field string, value interface{}, 
 		return fmt.Errorf("invalid user auth version")
 	}
 	const script = `
+if redis.call('EXISTS', KEYS[4]) == 1 then
+  return -1
+end
 local incoming = tonumber(ARGV[1])
 local pending = tonumber(redis.call('GET', KEYS[2]) or '0')
 local committed = tonumber(redis.call('GET', KEYS[3]) or '0')
@@ -270,14 +315,23 @@ end
 redis.call('HSET', KEYS[1], ARGV[2], ARGV[3], 'CacheSchema', ARGV[4])
 return 1`
 	result, err := common.RDB.Eval(context.Background(), script,
-		[]string{getUserCacheKey(userId), getUserAuthFenceKey(userId), getUserAuthVersionKey(userId)},
+		[]string{
+			getUserCacheKey(userId),
+			getUserAuthFenceKey(userId),
+			getUserAuthVersionKey(userId),
+			getUserQuotaMutationFenceKey(userId),
+		},
 		authVersion, field, value, userCacheSchemaVersion,
 	).Int()
 	if err != nil {
 		return err
 	}
-	if result == 0 {
+	switch result {
+	case -1:
+		return ErrUserQuotaMutationPending
+	case 0:
 		return ErrUserAuthCachePending
+	default:
+		return nil
 	}
-	return nil
 }

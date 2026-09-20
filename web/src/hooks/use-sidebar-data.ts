@@ -22,6 +22,7 @@ import {
   Box,
   CreditCard,
   FileText,
+  HandCoins,
   FlaskConical,
   Key,
   LayoutDashboard,
@@ -211,6 +212,11 @@ export function useSidebarData(): SidebarData {
             title: t('Subscriptions'),
             url: '/subscriptions',
             icon: CreditCard,
+          },
+          {
+            title: t('Cashback Review'),
+            url: '/cashback',
+            icon: HandCoins,
           },
           {
             title: t('System Info'),

@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 const OPERATOR_PREFIXES = [
   '/guide',
   '/channels',
+  '/cashback',
   '/users',
   '/redemption-codes',
   '/subscriptions',

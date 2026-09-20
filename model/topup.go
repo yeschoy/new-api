@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -118,6 +119,84 @@ func creditTopUpQuota(tx *gorm.DB, userId int, creditedQuota int, updates map[st
 	return ErrTopUpQuotaLimitExceeded
 }
 
+type topUpQuotaFenceCandidate struct {
+	Id              int
+	UserId          int
+	Status          string
+	PaymentProvider string
+	PaymentMethod   string
+}
+
+const topUpQuotaFenceWaitTimeout = 5 * time.Second
+const topUpQuotaFenceRetryInterval = 20 * time.Millisecond
+
+func readTopUpQuotaFenceCandidate(refCol string, tradeNo string, expectedProvider string) (topUpQuotaFenceCandidate, error) {
+	var candidate topUpQuotaFenceCandidate
+	if err := DB.Model(&TopUp{}).
+		Select("id", "user_id", "status", "payment_provider", "payment_method").
+		Where(refCol+" = ?", tradeNo).
+		Take(&candidate).Error; err != nil {
+		return candidate, ErrTopUpNotFound
+	}
+	if expectedProvider != "" && candidate.PaymentProvider != expectedProvider {
+		return candidate, ErrPaymentMethodMismatch
+	}
+	return candidate, nil
+}
+
+func prepareTopUpQuotaFence(refCol string, tradeNo string, expectedProvider string) (topUpQuotaFenceCandidate, *userQuotaMutationFences, error) {
+	deadline := time.Now().Add(topUpQuotaFenceWaitTimeout)
+	for {
+		candidate, err := readTopUpQuotaFenceCandidate(refCol, tradeNo, expectedProvider)
+		if err != nil {
+			return candidate, nil, err
+		}
+		if candidate.Status != common.TopUpStatusPending {
+			return candidate, nil, nil
+		}
+		fences, acquireErr := acquireUserQuotaMutationFences(candidate.UserId)
+		if acquireErr == nil {
+			return candidate, fences, nil
+		}
+		terminal := !errors.Is(acquireErr, ErrUserQuotaMutationPending) || time.Now().Add(topUpQuotaFenceRetryInterval).After(deadline)
+		if terminal {
+			// The acquisition reply or final contention response can race with the
+			// winning callback's commit. Re-read once without holding a database
+			// lock so an already-completed order still gets idempotent success.
+			latest, latestErr := readTopUpQuotaFenceCandidate(refCol, tradeNo, expectedProvider)
+			if latestErr == nil && latest.Status == common.TopUpStatusSuccess {
+				return latest, nil, nil
+			}
+			return candidate, nil, acquireErr
+		}
+		time.Sleep(topUpQuotaFenceRetryInterval)
+	}
+}
+
+func validateTopUpQuotaFenceCandidateIdentity(topUp *TopUp, candidate topUpQuotaFenceCandidate) error {
+	if topUp.Id != candidate.Id || topUp.UserId != candidate.UserId || topUp.PaymentProvider != candidate.PaymentProvider {
+		return ErrTopUpStatusInvalid
+	}
+	return nil
+}
+
+func validateTopUpQuotaFenceCandidatePaymentMethod(topUp *TopUp, candidate topUpQuotaFenceCandidate) error {
+	if topUp.PaymentMethod != candidate.PaymentMethod {
+		return ErrTopUpStatusInvalid
+	}
+	return nil
+}
+
+func creditTopUpQuotaProtected(tx *gorm.DB, userId int, creditedQuota int, updates map[string]interface{}, fences *userQuotaMutationFences) error {
+	if common.RedisEnabled && (fences == nil || !fences.owns(userId)) {
+		return ErrUserQuotaMutationFenceLost
+	}
+	if err := fences.verify(); err != nil {
+		return err
+	}
+	return creditTopUpQuota(tx, userId, creditedQuota, updates)
+}
+
 func (topUp *TopUp) Update() error {
 	var err error
 	err = DB.Save(topUp).Error
@@ -176,6 +255,14 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 // alreadyDone=true 表示订单此前已完成，本次为幂等重复回调。
 // 进程内的 LockOrder 只是优化，正确性由本函数的数据库行锁保证。
 func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
+	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, callerIp, CashbackCompletionProviderCallback)
+}
+
+func RechargeEpayVerifiedReturn(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
+	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, callerIp, CashbackCompletionVerifiedReturn)
+}
+
+func rechargeEpayWithSource(tradeNo string, actualPaymentMethod string, callerIp string, completionSource CashbackCompletionSource) (alreadyDone bool, err error) {
 	if tradeNo == "" {
 		return false, errors.New("未提供支付单号")
 	}
@@ -185,11 +272,24 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		refCol = `"trade_no"`
 	}
 
+	candidate, creditFences, err := prepareTopUpQuotaFence(refCol, tradeNo, PaymentProviderEpay)
+	if err != nil {
+		return false, err
+	}
+	if candidate.Status == common.TopUpStatusSuccess {
+		return true, nil
+	}
+	creditCommitted := false
+	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
+
 	var quotaToAdd int
 	topUp := &TopUp{}
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return ErrTopUpNotFound
+		}
+		if err := validateTopUpQuotaFenceCandidateIdentity(topUp, candidate); err != nil {
+			return err
 		}
 		if topUp.PaymentProvider != PaymentProviderEpay {
 			return ErrPaymentMethodMismatch
@@ -200,6 +300,9 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		}
 		if topUp.Status != common.TopUpStatusPending {
 			return ErrTopUpStatusInvalid
+		}
+		if err := validateTopUpQuotaFenceCandidatePaymentMethod(topUp, candidate); err != nil {
+			return err
 		}
 		if actualPaymentMethod != "" && topUp.PaymentMethod != actualPaymentMethod {
 			topUp.PaymentMethod = actualPaymentMethod
@@ -216,7 +319,10 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		if err := tx.Save(topUp).Error; err != nil {
 			return err
 		}
-		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, completionSource); err != nil {
+			return err
+		}
+		return creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences)
 	})
 	if err != nil {
 		if !errors.Is(err, ErrTopUpNotFound) && !errors.Is(err, ErrPaymentMethodMismatch) && !errors.Is(err, ErrTopUpStatusInvalid) {
@@ -227,7 +333,8 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 	if alreadyDone {
 		return true, nil
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, "epay topup")
+	creditCommitted = true
+	syncCreditUserQuotaCache(creditFences, topUp.UserId, quotaToAdd, "epay topup")
 
 	common.SysLog(fmt.Sprintf("易支付充值成功 trade_no=%s user_id=%d quota_to_add=%d money=%.2f", topUp.TradeNo, topUp.UserId, quotaToAdd, topUp.Money))
 	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money), callerIp, topUp.PaymentMethod, PaymentProviderEpay)
@@ -240,25 +347,46 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 	}
 
 	var quota int
+	alreadyDone := false
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		refCol = `"trade_no"`
 	}
+	candidate, creditFences, err := prepareTopUpQuotaFence(refCol, referenceId, PaymentProviderStripe)
+	if err != nil {
+		common.SysError("topup failed: " + err.Error())
+		return errors.New("充值失败，请稍后重试")
+	}
+	if candidate.Status == common.TopUpStatusSuccess {
+		return nil
+	}
+	creditCommitted := false
+	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", referenceId).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
+		}
+		if err := validateTopUpQuotaFenceCandidateIdentity(topUp, candidate); err != nil {
+			return err
 		}
 
 		if topUp.PaymentProvider != PaymentProviderStripe {
 			return ErrPaymentMethodMismatch
 		}
 
+		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
+			return nil
+		}
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
+		}
+		if err := validateTopUpQuotaFenceCandidatePaymentMethod(topUp, candidate); err != nil {
+			return err
 		}
 
 		topUp.CompleteTime = common.GetTimestamp()
@@ -274,16 +402,23 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
 		}
-		return creditTopUpQuota(tx, topUp.UserId, quota, map[string]interface{}{
+		if err := CompleteTopUpCashbackTx(tx, topUp, quota, CashbackCompletionProviderCallback); err != nil {
+			return err
+		}
+		return creditTopUpQuotaProtected(tx, topUp.UserId, quota, map[string]interface{}{
 			"stripe_customer": customerId,
-		})
+		}, creditFences)
 	})
 
 	if err != nil {
 		common.SysError("topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quota, "stripe topup")
+	if alreadyDone {
+		return nil
+	}
+	creditCommitted = true
+	syncCreditUserQuotaCache(creditFences, topUp.UserId, quota, "stripe topup")
 
 	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%d", logger.FormatQuota(quota), topUp.Amount), callerIp, topUp.PaymentMethod, PaymentMethodStripe)
 
@@ -458,25 +593,43 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		refCol = `"trade_no"`
 	}
 
+	candidate, creditFences, err := prepareTopUpQuotaFence(refCol, tradeNo, "")
+	if err != nil {
+		return errors.New("充值订单不存在")
+	}
+	if candidate.Status == common.TopUpStatusSuccess {
+		return nil
+	}
+	creditCommitted := false
+	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
+
 	var userId int
 	var quotaToAdd int
 	var payMoney float64
 	var paymentMethod string
+	alreadyDone := false
 
-	err := DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		topUp := &TopUp{}
 		// 行级锁，避免并发补单
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return errors.New("充值订单不存在")
 		}
+		if err := validateTopUpQuotaFenceCandidateIdentity(topUp, candidate); err != nil {
+			return err
+		}
 
 		// 幂等处理：已成功直接返回
 		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
 			return nil
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("订单状态不是待支付，无法补单")
+		}
+		if err := validateTopUpQuotaFenceCandidatePaymentMethod(topUp, candidate); err != nil {
+			return err
 		}
 
 		// 计算应充值额度：
@@ -503,8 +656,12 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			return err
 		}
 
+		if err := MarkManualTopUpCashbackCompletionTx(tx, topUp, quotaToAdd); err != nil {
+			return err
+		}
+
 		// 增加用户额度（立即写库，保持一致性）
-		if err := creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil); err != nil {
+		if err := creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences); err != nil {
 			return err
 		}
 
@@ -517,9 +674,13 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	if err != nil {
 		return err
 	}
+	if alreadyDone {
+		return nil
+	}
+	creditCommitted = true
 
 	// 事务外记录日志，避免阻塞
-	syncCreditUserQuotaCache(userId, quotaToAdd, "manual topup")
+	syncCreditUserQuotaCache(creditFences, userId, quotaToAdd, "manual topup")
 	RecordTopupLog(userId, fmt.Sprintf("管理员补单成功，充值金额: %v，支付金额：%f", logger.FormatQuota(quotaToAdd), payMoney), callerIp, paymentMethod, "admin")
 	return nil
 }
@@ -529,25 +690,46 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 	}
 
 	var quota int
+	alreadyDone := false
 	topUp := &TopUp{}
 
 	refCol := "`trade_no`"
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		refCol = `"trade_no"`
 	}
+	candidate, creditFences, err := prepareTopUpQuotaFence(refCol, referenceId, PaymentProviderCreem)
+	if err != nil {
+		common.SysError("creem topup failed: " + err.Error())
+		return errors.New("充值失败，请稍后重试")
+	}
+	if candidate.Status == common.TopUpStatusSuccess {
+		return nil
+	}
+	creditCommitted := false
+	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", referenceId).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
+		}
+		if err := validateTopUpQuotaFenceCandidateIdentity(topUp, candidate); err != nil {
+			return err
 		}
 
 		if topUp.PaymentProvider != PaymentProviderCreem {
 			return ErrPaymentMethodMismatch
 		}
 
+		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
+			return nil
+		}
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
+		}
+		if err := validateTopUpQuotaFenceCandidatePaymentMethod(topUp, candidate); err != nil {
+			return err
 		}
 
 		topUp.CompleteTime = common.GetTimestamp()
@@ -561,6 +743,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 		quota, err = common.WalletQuotaFromDecimalStrict(decimal.NewFromInt(topUp.Amount))
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
+		}
+
+		if err := CompleteTopUpCashbackTx(tx, topUp, quota, CashbackCompletionProviderCallback); err != nil {
+			return err
 		}
 
 		// 构建更新字段，优先使用邮箱，如果邮箱为空则使用用户名
@@ -581,14 +767,18 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			}
 		}
 
-		return creditTopUpQuota(tx, topUp.UserId, quota, updateFields)
+		return creditTopUpQuotaProtected(tx, topUp.UserId, quota, updateFields, creditFences)
 	})
 
 	if err != nil {
 		common.SysError("creem topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quota, "creem topup")
+	if alreadyDone {
+		return nil
+	}
+	creditCommitted = true
+	syncCreditUserQuotaCache(creditFences, topUp.UserId, quota, "creem topup")
 
 	RecordTopupLog(topUp.UserId, fmt.Sprintf("使用Creem充值成功，充值额度: %v，支付金额：%.2f", quota, topUp.Money), callerIp, topUp.PaymentMethod, PaymentMethodCreem)
 
@@ -607,11 +797,25 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		refCol = `"trade_no"`
 	}
+	candidate, creditFences, err := prepareTopUpQuotaFence(refCol, tradeNo, PaymentProviderWaffo)
+	if err != nil {
+		common.SysError("waffo topup failed: " + err.Error())
+		return errors.New("充值失败，请稍后重试")
+	}
+	if candidate.Status == common.TopUpStatusSuccess {
+		return nil
+	}
+	creditCommitted := false
+	alreadyDone := false
+	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
+		}
+		if err := validateTopUpQuotaFenceCandidateIdentity(topUp, candidate); err != nil {
+			return err
 		}
 
 		if topUp.PaymentProvider != PaymentProviderWaffo {
@@ -619,11 +823,15 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		}
 
 		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
 			return nil // 幂等：已成功直接返回
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
+		}
+		if err := validateTopUpQuotaFenceCandidatePaymentMethod(topUp, candidate); err != nil {
+			return err
 		}
 
 		quotaToAdd, err = common.WalletQuotaFromDecimalStrict(
@@ -638,15 +846,22 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 		if err := tx.Save(topUp).Error; err != nil {
 			return err
 		}
+		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, CashbackCompletionProviderCallback); err != nil {
+			return err
+		}
 
-		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+		return creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences)
 	})
 
 	if err != nil {
 		common.SysError("waffo topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, "waffo topup")
+	if alreadyDone {
+		return nil
+	}
+	creditCommitted = true
+	syncCreditUserQuotaCache(creditFences, topUp.UserId, quotaToAdd, "waffo topup")
 
 	if quotaToAdd > 0 {
 		RecordTopupLog(topUp.UserId, fmt.Sprintf("Waffo充值成功，充值额度: %v，支付金额: %.2f", logger.FormatQuota(quotaToAdd), topUp.Money), callerIp, topUp.PaymentMethod, PaymentMethodWaffo)
@@ -667,11 +882,25 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		refCol = `"trade_no"`
 	}
+	candidate, creditFences, err := prepareTopUpQuotaFence(refCol, tradeNo, PaymentProviderWaffoPancake)
+	if err != nil {
+		common.SysError("waffo pancake topup failed: " + err.Error())
+		return errors.New("充值失败，请稍后重试")
+	}
+	if candidate.Status == common.TopUpStatusSuccess {
+		return nil
+	}
+	creditCommitted := false
+	alreadyDone := false
+	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
 
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = cashbackTransaction(func(tx *gorm.DB) error {
 		err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
+		}
+		if err := validateTopUpQuotaFenceCandidateIdentity(topUp, candidate); err != nil {
+			return err
 		}
 
 		if topUp.PaymentProvider != PaymentProviderWaffoPancake {
@@ -679,11 +908,15 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		}
 
 		if topUp.Status == common.TopUpStatusSuccess {
+			alreadyDone = true
 			return nil
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
+		}
+		if err := validateTopUpQuotaFenceCandidatePaymentMethod(topUp, candidate); err != nil {
+			return err
 		}
 
 		quotaToAdd, err = common.WalletQuotaFromDecimalStrict(
@@ -698,15 +931,22 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 		if err := tx.Save(topUp).Error; err != nil {
 			return err
 		}
+		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, CashbackCompletionProviderCallback); err != nil {
+			return err
+		}
 
-		return creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil)
+		return creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences)
 	})
 
 	if err != nil {
 		common.SysError("waffo pancake topup failed: " + err.Error())
 		return errors.New("充值失败，请稍后重试")
 	}
-	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, "waffo pancake topup")
+	if alreadyDone {
+		return nil
+	}
+	creditCommitted = true
+	syncCreditUserQuotaCache(creditFences, topUp.UserId, quotaToAdd, "waffo pancake topup")
 
 	if quotaToAdd > 0 {
 		RecordLog(topUp.UserId, LogTypeTopup, fmt.Sprintf("Waffo Pancake充值成功，充值额度: %v，支付金额: %.2f", logger.FormatQuota(quotaToAdd), topUp.Money))

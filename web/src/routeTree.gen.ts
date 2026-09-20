@@ -36,6 +36,7 @@ import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
 import { Route as authUserResetRouteImport } from './routes/(auth)/user/reset'
+import { Route as AuthenticatedCashbackIndexRouteImport } from './routes/_authenticated/cashback/index'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
 import { Route as AuthenticatedChatChatIdRouteImport } from './routes/_authenticated/chat/$chatId'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
@@ -209,6 +210,12 @@ const authUserResetRoute = authUserResetRouteImport.update({
   path: '/user/reset',
   getParentRoute: () => authRouteRoute,
 } as any)
+const AuthenticatedCashbackIndexRoute =
+  AuthenticatedCashbackIndexRouteImport.update({
+    id: '/cashback/',
+    path: '/cashback/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedChannelsIndexRoute =
   AuthenticatedChannelsIndexRouteImport.update({
     id: '/channels/',
@@ -458,6 +465,7 @@ export interface FileRoutesByFullPath {
   '/guide/$slug': typeof AuthenticatedGuideSlugRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
+  '/cashback/': typeof AuthenticatedCashbackIndexRoute
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/desktop-authorize/': typeof AuthenticatedDesktopAuthorizeIndexRoute
@@ -521,6 +529,7 @@ export interface FileRoutesByTo {
   '/guide/$slug': typeof AuthenticatedGuideSlugRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
+  '/cashback': typeof AuthenticatedCashbackIndexRoute
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/desktop-authorize': typeof AuthenticatedDesktopAuthorizeIndexRoute
@@ -588,6 +597,7 @@ export interface FileRoutesById {
   '/_authenticated/guide/$slug': typeof AuthenticatedGuideSlugRoute
   '/_authenticated/models/$section': typeof AuthenticatedModelsSectionRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
+  '/_authenticated/cashback/': typeof AuthenticatedCashbackIndexRoute
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/desktop-authorize/': typeof AuthenticatedDesktopAuthorizeIndexRoute
@@ -654,6 +664,7 @@ export interface FileRouteTypes {
     | '/guide/$slug'
     | '/models/$section'
     | '/usage-logs/$section'
+    | '/cashback/'
     | '/channels/'
     | '/dashboard/'
     | '/desktop-authorize/'
@@ -717,6 +728,7 @@ export interface FileRouteTypes {
     | '/guide/$slug'
     | '/models/$section'
     | '/usage-logs/$section'
+    | '/cashback'
     | '/channels'
     | '/dashboard'
     | '/desktop-authorize'
@@ -783,6 +795,7 @@ export interface FileRouteTypes {
     | '/_authenticated/guide/$slug'
     | '/_authenticated/models/$section'
     | '/_authenticated/usage-logs/$section'
+    | '/_authenticated/cashback/'
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
     | '/_authenticated/desktop-authorize/'
@@ -1026,6 +1039,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/user/reset'
       preLoaderRoute: typeof authUserResetRouteImport
       parentRoute: typeof authRouteRoute
+    }
+    '/_authenticated/cashback/': {
+      id: '/_authenticated/cashback/'
+      path: '/cashback'
+      fullPath: '/cashback/'
+      preLoaderRoute: typeof AuthenticatedCashbackIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/channels/': {
       id: '/_authenticated/channels/'
@@ -1382,6 +1402,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedGuideSlugRoute: typeof AuthenticatedGuideSlugRoute
   AuthenticatedModelsSectionRoute: typeof AuthenticatedModelsSectionRoute
   AuthenticatedUsageLogsSectionRoute: typeof AuthenticatedUsageLogsSectionRoute
+  AuthenticatedCashbackIndexRoute: typeof AuthenticatedCashbackIndexRoute
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedDesktopAuthorizeIndexRoute: typeof AuthenticatedDesktopAuthorizeIndexRoute
@@ -1410,6 +1431,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedGuideSlugRoute: AuthenticatedGuideSlugRoute,
   AuthenticatedModelsSectionRoute: AuthenticatedModelsSectionRoute,
   AuthenticatedUsageLogsSectionRoute: AuthenticatedUsageLogsSectionRoute,
+  AuthenticatedCashbackIndexRoute: AuthenticatedCashbackIndexRoute,
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedDesktopAuthorizeIndexRoute:

@@ -432,6 +432,28 @@ const AUDIT_TEMPLATES: Record<string, string> = {
   'option.payment_compliance': 'Confirmed payment compliance',
   'option.reset_ratio': 'Reset model ratios',
   'option.clear_affinity_cache': 'Cleared channel affinity cache',
+  // Referral cashback
+  'cashback.config_update':
+    'Updated referral cashback configuration fields: {{fields}}',
+  'cashback.config_update_attempt':
+    'Attempted to update referral cashback configuration',
+  'cashback.review_attempt': 'Attempted cashback reward review',
+  'cashback.review_approve': 'Approved cashback reward {{reward_id}}',
+  'cashback.review_reject': 'Rejected cashback reward {{reward_id}}',
+  'cashback.reward_credited':
+    'Referral cashback reward {{reward_id}} credited {{quota}}',
+  'cashback.incident': 'Recorded {{kind}} incident for top-up {{top_up_id}}',
+  'cashback.incident_attempt':
+    'Attempted to record a cashback payment incident',
+  'cashback.reward_debt_resolve': 'Resolved cashback reward debt {{reward_id}}',
+  'cashback.reward_debt_resolve_attempt':
+    'Attempted to resolve cashback reward debt',
+  'cashback.principal_debt_resolve':
+    'Resolved cashback principal debt for top-up {{top_up_id}}',
+  'cashback.principal_debt_resolve_attempt':
+    'Attempted to resolve cashback principal debt',
+  'cashback.sensitive_view':
+    'Viewed sensitive cashback details for reward {{reward_id}}',
   // Custom OAuth
   'custom_oauth.create': 'Created a custom OAuth provider',
   'custom_oauth.update': 'Updated a custom OAuth provider',
@@ -506,5 +528,9 @@ export function renderAuditContent(
   if (!op?.action) return null
   const template = AUDIT_TEMPLATES[op.action]
   if (!template) return null
-  return t(template, (op.params ?? {}) as Record<string, unknown>)
+  const params = { ...((op.params ?? {}) as Record<string, unknown>) }
+  if (op.action === 'cashback.incident' && typeof params.kind === 'string') {
+    params.kind = t(params.kind)
+  }
+  return t(template, params)
 }

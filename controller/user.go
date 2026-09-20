@@ -230,6 +230,11 @@ func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin
 // completeLogin publishes a successfully created session using the shared
 // cookie, audit and safe dashboard-user response contract.
 func completeLogin(user *model.User, bundle *service.AuthBundle, c *gin.Context) {
+	deviceSource := model.CashbackDeviceSourceLogin
+	if c.FullPath() == "/api/user/register" {
+		deviceSource = model.CashbackDeviceSourceRegistration
+	}
+	captureCashbackDeviceLink(c, user.Id, deviceSource)
 	model.UpdateUserLastLoginAt(user.Id)
 	service.WriteRefreshCookie(c, bundle.RefreshToken)
 	setAuthNoStore(c)
@@ -335,6 +340,8 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
 		return
 	}
+	captureCashbackDeviceLink(c, insertedUser.Id, model.CashbackDeviceSourceRegistration)
+
 	// 生成默认令牌
 	if constant.GenerateDefaultToken {
 		key, err := common.GenerateKey()

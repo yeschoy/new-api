@@ -50,6 +50,34 @@ export type ConfirmPaymentComplianceResponse = {
   }
 }
 
+export type CashbackConfig = {
+  inviter_enabled: boolean
+  invitee_enabled: boolean
+  inviter_rate_bps: number
+  invitee_rate_bps: number
+  settlement_days: number
+  max_reward_quota: number
+  daily_reward_quota: number
+  ip_account_threshold: number
+  device_account_threshold: number
+  daily_topup_count_threshold: number
+  first_enabled_at: number
+  version: number
+  compliance_confirmed: boolean
+}
+
+export type CashbackConfigUpdate = Omit<
+  CashbackConfig,
+  'first_enabled_at' | 'version' | 'compliance_confirmed'
+>
+
+export type CashbackConfigResponse = {
+  success: boolean
+  message: string
+  data?: CashbackConfig
+  field?: string
+}
+
 export type SystemTaskStatus = 'pending' | 'running' | 'succeeded' | 'failed'
 
 export type SystemTask<

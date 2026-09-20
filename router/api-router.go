@@ -198,6 +198,25 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/subscription/epay/notify", controller.SubscriptionEpayNotify)
 		apiRouter.GET("/subscription/epay/return", controller.SubscriptionEpayReturn)
 		apiRouter.POST("/subscription/epay/return", anonymousRequestBodyLimit, controller.SubscriptionEpayReturn)
+		cashbackAdminRoute := apiRouter.Group("/cashback")
+		cashbackAdminRoute.Use(middleware.AdminAuth())
+		{
+			cashbackAdminRoute.GET("/rewards", controller.ListCashbackRewards)
+			cashbackAdminRoute.GET("/rewards/:id", controller.GetCashbackReward)
+			cashbackAdminRoute.GET("/summary", controller.GetCashbackSummary)
+			cashbackAdminRoute.POST("/rewards/:id/review", middleware.CriticalRateLimit(), controller.ReviewCashbackReward)
+			cashbackAdminRoute.POST("/topups/:id/incident", middleware.CriticalRateLimit(), controller.RecordCashbackIncident)
+			cashbackAdminRoute.POST("/rewards/:id/debt/resolve", middleware.CriticalRateLimit(), controller.ResolveCashbackRewardDebt)
+			cashbackAdminRoute.POST("/orders/:id/principal-debt/resolve", middleware.CriticalRateLimit(), controller.ResolveCashbackPrincipalDebt)
+		}
+
+		cashbackConfigRoute := apiRouter.Group("/cashback")
+		cashbackConfigRoute.Use(middleware.RootAuth())
+		{
+			cashbackConfigRoute.GET("/config", controller.GetCashbackConfig)
+			cashbackConfigRoute.PUT("/config", controller.UpdateCashbackConfig)
+		}
+
 		optionRoute := apiRouter.Group("/option")
 		optionRoute.Use(middleware.RootAuth())
 		{

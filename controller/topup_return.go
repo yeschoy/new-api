@@ -70,7 +70,7 @@ func EpayBrowserReturn(c *gin.Context) {
 	targetPath := "/wallet"
 	if verified.TradeStatus == epay.StatusTradeSuccess {
 		LockOrder(verified.ServiceTradeNo)
-		_, err = model.RechargeEpay(verified.ServiceTradeNo, verified.Type, c.ClientIP())
+		_, err = model.RechargeEpayVerifiedReturn(verified.ServiceTradeNo, verified.Type, c.ClientIP())
 		UnlockOrder(verified.ServiceTradeNo)
 		if err != nil {
 			c.AbortWithStatus(http.StatusServiceUnavailable)
