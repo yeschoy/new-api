@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, Flame, ShieldCheck, TrendingDown } from 'lucide-react'
+import { ArrowRight, ShieldCheck, TrendingDown } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -281,84 +281,73 @@ export function SummaryCards() {
       <header className='ed-deckHead'>
         <div>
           <p className='ed-eyebrow'>{t('Usage at a glance')}</p>
-          <h3>{t('Monitor balance, usage, and request volume')}</h3>
         </div>
         <span className='ed-badge ed-badge--live'>
           {loading ? t('Loading') : t('Live')}
         </span>
       </header>
 
-      <YecaiBentoGrid>
-        <div className='ed-metricGrid'>
-          {items.map((item) => {
-            const Icon = item.icon
+      <YecaiBentoGrid className='ed-metricGrid ed-metricGrid--four'>
+        {items.map((item) => {
+          const Icon = item.icon
 
-            return (
-              <YecaiBentoItem
-                className='ed-metric flex-col'
-                key={item.key}
-                tone={item.tone}
-              >
-                <span className='ed-metricIcon'>
-                  <Icon aria-hidden='true' />
-                </span>
-                <span className='ed-metricCopy'>
-                  <span className='ed-metricLabel'>{item.title}</span>
-                  <strong className='ed-metricValue'>
-                    {loading ? '—' : item.value}
-                  </strong>
-                  <small className='ed-metricDetail'>{item.desc}</small>
-                  <SummarySparkline data={item.sparkline} tone={item.tone} />
-                </span>
-              </YecaiBentoItem>
-            )
-          })}
-        </div>
+          return (
+            <YecaiBentoItem
+              className='ed-metric'
+              key={item.key}
+              tone={item.tone}
+            >
+              <span className='ed-metricIcon'>
+                <Icon aria-hidden='true' />
+              </span>
+              <span className='ed-metricCopy'>
+                <span className='ed-metricLabel'>{item.title}</span>
+                <strong className='ed-metricValue'>
+                  {loading ? '—' : item.value}
+                </strong>
+                <small className='ed-metricDetail'>{item.desc}</small>
+                <SummarySparkline data={item.sparkline} tone={item.tone} />
+              </span>
+            </YecaiBentoItem>
+          )
+        })}
 
         <YecaiBentoItem
           as='aside'
-          className='ed-paper ed-runway'
+          className='ed-metric ed-runway'
           data-health={healthLevel}
           tone='signal'
         >
-          <div className='ed-runwayCopy'>
-            <span>{t('Credit remaining')}</span>
-            <strong>{formatQuota(remainQuota)}</strong>
-            <span className='ed-health'>
-              <i className={healthCfg.dotClass} aria-hidden='true' />
-              {t(healthCfg.labelKey)}
-            </span>
-          </div>
-
-          <div
-            aria-label={`${t('Runway')}: ${runwayDisplay}`}
-            className='ed-runwayDial'
-          >
+          <span className='ed-metricIcon'>
             {runwayDays !== null && runwayDays < 3 ? (
               <TrendingDown aria-hidden='true' />
             ) : (
               <ShieldCheck aria-hidden='true' />
             )}
-            <strong>{runwayDisplay}</strong>
-            <span>{t('Runway')}</span>
-          </div>
-
-          <div className='ed-runwayFoot'>
-            <span>
-              <Flame aria-hidden='true' />
-              {t('Last 24h usage')}
+          </span>
+          <span className='ed-metricCopy'>
+            <span className='ed-metricLabel'>{t('Runway')}</span>
+            <strong
+              className='ed-metricValue'
+              aria-label={`${t('Runway')}: ${runwayDisplay}`}
+            >
+              {runwayDisplay}
+            </strong>
+            <span className='ed-health'>
+              <i className={healthCfg.dotClass} aria-hidden='true' />
+              {t(healthCfg.labelKey)}
             </span>
-            <strong>{formatQuota(recentUsage)}</strong>
-          </div>
-
-          <YecaiAction
-            appearance='soft'
-            render={<Link to='/wallet' />}
-            tone='money'
-          >
-            <span>{t('Wallet')}</span>
-            <ArrowRight data-icon='inline-end' />
-          </YecaiAction>
+            <YecaiAction
+              appearance='outline'
+              size='sm'
+              className='mt-2 w-fit'
+              render={<Link to='/wallet' />}
+              tone='money'
+            >
+              <span>{t('Wallet')}</span>
+              <ArrowRight data-icon='inline-end' />
+            </YecaiAction>
+          </span>
         </YecaiBentoItem>
       </YecaiBentoGrid>
     </YecaiPanel>

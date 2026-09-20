@@ -3076,10 +3076,21 @@ a.ed-trustCard:hover {
   }
 }
 
+.ed-metricGrid--four {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 64rem) {
+  .ed-metricGrid--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
 .ed-sparkline {
   inline-size: 100%;
-  block-size: 2rem;
-  margin-block-start: 0.6rem;
+  max-inline-size: 9rem;
+  block-size: 1.4rem;
+  margin-block-start: 0.5rem;
   overflow: visible;
 }
 
@@ -3093,10 +3104,7 @@ a.ed-trustCard:hover {
 }
 
 .ed-runway {
-  display: grid;
-  gap: 1.15rem;
-  align-content: start;
-  padding: 1.25rem 1.35rem 1.35rem;
+  background: var(--ed-paper);
 }
 
 .ed-runway[data-health='caution'] {
@@ -3105,27 +3113,6 @@ a.ed-trustCard:hover {
 
 .ed-runway[data-health='critical'] {
   background: color-mix(in oklch, var(--destructive) 7%, var(--card));
-}
-
-.ed-runwayCopy {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.ed-runwayCopy > span:first-child {
-  color: var(--ed-ink-soft);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.ed-runwayCopy strong {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  font-weight: 400;
-  letter-spacing: -0.025em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
 }
 
 .ed-health {
@@ -3140,52 +3127,6 @@ a.ed-trustCard:hover {
   inline-size: 0.5rem;
   block-size: 0.5rem;
   border-radius: 999px;
-}
-
-.ed-runwayDial {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--ed-rule);
-  border-radius: var(--ed-radius-panel);
-  background: var(--background);
-}
-
-.ed-runwayDial svg {
-  inline-size: 1rem;
-  block-size: 1rem;
-  color: var(--primary);
-}
-
-.ed-runwayDial strong {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  font-weight: 400;
-}
-
-.ed-runwayDial span {
-  color: var(--ed-ink-soft);
-  font-size: 0.74rem;
-}
-
-.ed-runwayFoot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-}
-
-.ed-runwayFoot span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--ed-ink-soft);
-}
-
-.ed-runwayFoot svg {
-  inline-size: 0.85rem;
-  block-size: 0.85rem;
 }
 
 /* ── Easy overview ────────────────────────────────────────────────────── */
@@ -3612,4 +3553,79 @@ a.ed-trustCard:hover {
   .ed-walletSavingsToggle svg {
     transition: none;
   }
+}
+
+/* ── Handbook (long-form Markdown) ────────────────────────────────────── */
+.ed-handbook {
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+.ed-handbook h1 {
+  margin-block: 3rem 1rem;
+  padding-block-start: 2rem;
+  border-block-start: 1px solid var(--ed-rule);
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+
+.ed-handbook h2 {
+  margin-block: 2.25rem 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  scroll-margin-block-start: 1.5rem;
+}
+
+.ed-handbook h1 {
+  scroll-margin-block-start: 1.5rem;
+}
+
+.ed-handbook h3 {
+  margin-block: 1.5rem 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.ed-handbook blockquote {
+  border-inline-start: 2px solid var(--primary);
+  border-radius: 0 var(--ed-radius-control) var(--ed-radius-control) 0;
+  background: var(--ed-paper-tint);
+  color: var(--foreground);
+  font-style: normal;
+}
+
+.ed-handbook table {
+  display: table;
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.ed-handbook thead {
+  background: var(--muted);
+}
+
+.ed-handbook th,
+.ed-handbook td {
+  border: 1px solid var(--ed-rule);
+  vertical-align: top;
+}
+
+.ed-handbook pre {
+  border-color: var(--ed-rule);
+  background: var(--muted);
+  font-size: 0.82rem;
+}
+
+.ed-handbook code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.ed-handbook hr {
+  border-color: var(--ed-rule);
 }

@@ -44,6 +44,7 @@ import { Route as AuthenticatedDesktopAuthorizeIndexRouteImport } from './routes
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedGuideIndexRouteImport } from './routes/_authenticated/guide/index'
 import { Route as AuthenticatedGuideSlugRouteImport } from './routes/_authenticated/guide/$slug'
+import { Route as AuthenticatedGuideHandbookRouteImport } from './routes/_authenticated/guide/handbook'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
@@ -254,6 +255,12 @@ const AuthenticatedGuideSlugRoute = AuthenticatedGuideSlugRouteImport.update({
   path: '/guide/$slug',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedGuideHandbookRoute =
+  AuthenticatedGuideHandbookRouteImport.update({
+    id: '/guide/handbook',
+    path: '/guide/handbook',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
   id: '/keys/',
   path: '/keys/',
@@ -456,6 +463,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/guide/$slug': typeof AuthenticatedGuideSlugRoute
+  '/guide/handbook': typeof AuthenticatedGuideHandbookRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/channels/': typeof AuthenticatedChannelsIndexRoute
@@ -519,6 +527,7 @@ export interface FileRoutesByTo {
   '/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/guide/$slug': typeof AuthenticatedGuideSlugRoute
+  '/guide/handbook': typeof AuthenticatedGuideHandbookRoute
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/channels': typeof AuthenticatedChannelsIndexRoute
@@ -586,6 +595,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/$section': typeof AuthenticatedDashboardSectionRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/guide/$slug': typeof AuthenticatedGuideSlugRoute
+  '/_authenticated/guide/handbook': typeof AuthenticatedGuideHandbookRoute
   '/_authenticated/models/$section': typeof AuthenticatedModelsSectionRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
@@ -652,6 +662,7 @@ export interface FileRouteTypes {
     | '/dashboard/$section'
     | '/errors/$error'
     | '/guide/$slug'
+    | '/guide/handbook'
     | '/models/$section'
     | '/usage-logs/$section'
     | '/channels/'
@@ -715,6 +726,7 @@ export interface FileRouteTypes {
     | '/dashboard/$section'
     | '/errors/$error'
     | '/guide/$slug'
+    | '/guide/handbook'
     | '/models/$section'
     | '/usage-logs/$section'
     | '/channels'
@@ -781,6 +793,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/$section'
     | '/_authenticated/errors/$error'
     | '/_authenticated/guide/$slug'
+    | '/_authenticated/guide/handbook'
     | '/_authenticated/models/$section'
     | '/_authenticated/usage-logs/$section'
     | '/_authenticated/channels/'
@@ -1083,6 +1096,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedGuideSlugRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/guide/handbook': {
+      id: '/_authenticated/guide/handbook'
+      path: '/guide/handbook'
+      fullPath: '/guide/handbook'
+      preLoaderRoute: typeof AuthenticatedGuideHandbookRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/keys/': {
       id: '/_authenticated/keys/'
       path: '/keys'
@@ -1380,6 +1400,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardSectionRoute: typeof AuthenticatedDashboardSectionRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedGuideSlugRoute: typeof AuthenticatedGuideSlugRoute
+  AuthenticatedGuideHandbookRoute: typeof AuthenticatedGuideHandbookRoute
   AuthenticatedModelsSectionRoute: typeof AuthenticatedModelsSectionRoute
   AuthenticatedUsageLogsSectionRoute: typeof AuthenticatedUsageLogsSectionRoute
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
@@ -1408,6 +1429,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardSectionRoute: AuthenticatedDashboardSectionRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedGuideSlugRoute: AuthenticatedGuideSlugRoute,
+  AuthenticatedGuideHandbookRoute: AuthenticatedGuideHandbookRoute,
   AuthenticatedModelsSectionRoute: AuthenticatedModelsSectionRoute,
   AuthenticatedUsageLogsSectionRoute: AuthenticatedUsageLogsSectionRoute,
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,

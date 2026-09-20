@@ -37,6 +37,8 @@ const GROUPS: Array<{ id: GuideGroup; label: string }> = [
 
 type DocsSidebarProps = {
   activeSlug: GuideDocSlug
+  /** True when the long-form handbook page is open. */
+  activeHandbook?: boolean
   query: string
   onQueryChange: (query: string) => void
   onNavigate?: () => void
@@ -125,6 +127,23 @@ export function DocsSidebar(props: DocsSidebarProps) {
         </div>
       ) : (
         <div className='flex flex-col gap-5 px-2 pb-5'>
+          <div>
+            <p className='text-muted-foreground mb-1 px-2 text-[0.68rem] font-medium tracking-[0.12em] uppercase'>
+              {t('Handbook')}
+            </p>
+            <Link
+              to='/guide/handbook'
+              onClick={props.onNavigate}
+              className={cn(
+                'hover:bg-muted focus-visible:ring-ring block rounded-lg px-2 py-2 text-sm outline-none focus-visible:ring-2',
+                props.activeHandbook && 'bg-primary/10 text-primary font-medium'
+              )}
+            >
+              <span aria-current={props.activeHandbook ? 'page' : undefined}>
+                {t('Complete tool handbook')}
+              </span>
+            </Link>
+          </div>
           {GROUPS.map((group) => {
             const docs = guideDocs.filter((doc) => doc.group === group.id)
             return (
@@ -134,7 +153,8 @@ export function DocsSidebar(props: DocsSidebarProps) {
                 </p>
                 <div className='flex flex-col gap-0.5'>
                   {docs.map((doc) => {
-                    const active = doc.slug === props.activeSlug
+                    const active =
+                      doc.slug === props.activeSlug && !props.activeHandbook
                     return (
                       <GuideLink
                         key={doc.slug}
