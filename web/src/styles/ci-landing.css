@@ -6081,6 +6081,15 @@ html:lang(zh-TW) .ci-finalCta h2 i {
   display: flex;
   gap: 8px;
 }
+@media (max-width: 780px) {
+  .ci-keyPage .ci-appPageHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .ci-keyPage .ci-keyHeaderActions {
+    justify-content: flex-start;
+  }
+}
 .ci-statGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

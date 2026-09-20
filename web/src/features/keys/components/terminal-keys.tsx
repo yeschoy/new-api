@@ -51,6 +51,7 @@ import {
   quoteGroupUsage,
   type GroupDiscount,
 } from '../lib/group-quote'
+import { ApiAccelerationUrls } from './api-acceleration-urls'
 
 function discountLabel(t: TFunction, discount: GroupDiscount) {
   if (discount.kind === 'original') return t('List price')
@@ -252,17 +253,21 @@ export function TerminalKeys() {
       description={t(
         'Pick a model to see the price, then pick a group. The key bills at that group rate.'
       )}
+      className='ci-keyPage'
       actions={
-        (keysQuery.data?.total ?? 0) > 0 ? (
-          <button
-            type='button'
-            className='ci-button ci-button--danger-quiet ci-button--size-xs'
-            onClick={() => setRevokeTarget('all')}
-            disabled={revoking}
-          >
-            {t('Revoke all active keys')}
-          </button>
-        ) : null
+        <div className='ci-keyHeaderActions flex max-w-full flex-wrap items-end justify-end gap-3'>
+          <ApiAccelerationUrls className='sm:w-[30rem]' />
+          {(keysQuery.data?.total ?? 0) > 0 ? (
+            <button
+              type='button'
+              className='ci-button ci-button--danger-quiet ci-button--size-xs'
+              onClick={() => setRevokeTarget('all')}
+              disabled={revoking}
+            >
+              {t('Revoke all active keys')}
+            </button>
+          ) : null}
+        </div>
       }
     >
       {actionError || keysQuery.error ? (
