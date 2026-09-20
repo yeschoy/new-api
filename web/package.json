@@ -22,7 +22,8 @@
     "copyright": "node scripts/add-copyright.mjs",
     "i18n:sync": "node scripts/sync-i18n.mjs",
     "knip": "knip",
-    "test:deployment": "node --test scripts/__tests__/vercel-config.test.mjs"
+    "test:deployment": "node --test scripts/__tests__/vercel-config.test.mjs",
+    "handbook": "node scripts/build-handbook.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

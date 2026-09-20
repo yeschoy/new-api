@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge'
 import { Markdown } from '@/components/ui/markdown'
 import { cn } from '@/lib/utils'
 
-import handbookSource from '../content/handbook.zh.md?raw'
+import handbookSource from '../content/handbook.zh'
 import { parseHandbookHeadings, stripHandbookTitle } from '../lib/handbook'
 import { MobileDocsNav } from './mobile-docs-nav'
 
