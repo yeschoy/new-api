@@ -144,10 +144,10 @@ describe('application header console mode', () => {
     ).toHaveAttribute('href', '/pricing')
     expect(
       within(navigation).getByRole('link', { name: 'Docs' })
-    ).toHaveAttribute('href', 'https://docs.example.com')
+    ).toHaveAttribute('href', '/guide')
   })
 
-  it('uses the private developer guide when no external docs link is configured', async () => {
+  it('keeps the built-in handbook as the docs destination when no external docs link is configured', async () => {
     useConsoleModeStore.getState().setMode('developer')
     client.setQueryData(['status'], {})
     await renderApp(<AppHeader />, client)
@@ -191,8 +191,8 @@ describe('application header console mode', () => {
       '/pricing'
     )
     expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute(
-      'target',
-      '_blank'
+      'href',
+      '/guide'
     )
     expect(
       screen.queryByRole('button', { name: 'Site' })

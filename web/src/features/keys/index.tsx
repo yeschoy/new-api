@@ -65,7 +65,7 @@ export function ApiKeys() {
                 variant='outline'
                 size='sm'
                 className='shrink-0 rounded-full'
-                render={<Link to='/guide/handbook' />}
+                render={<Link to='/guide' />}
               >
                 <BookOpen className='size-3.5' />
                 {t('How do I use it?')}

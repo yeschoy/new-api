@@ -3555,42 +3555,177 @@ a.ed-trustCard:hover {
   }
 }
 
-/* ── Handbook (long-form Markdown) ────────────────────────────────────── */
+/* ── Documentation ────────────────────────────────────────────────────── */
+.ed-docs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-block-size: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--background);
+}
+
+@media (min-width: 64rem) {
+  .ed-docs {
+    grid-template-columns: 17rem minmax(0, 1fr);
+  }
+}
+
+.ed-docsSide {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  .ed-docsSide {
+    position: sticky;
+    inset-block-start: 0;
+    display: block;
+    block-size: calc(100svh - var(--app-header-height, 0px));
+    overflow-y: auto;
+    border-inline-end: 1px solid var(--ed-rule);
+    background: var(--background);
+  }
+}
+
+.ed-docsOutline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 1rem 0.75rem 2rem;
+}
+
+.ed-docsSearch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0.25rem 0.75rem;
+  padding-inline: 0.7rem;
+  min-block-size: 2.25rem;
+  border: 1px solid var(--ed-rule);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ed-ink-soft);
+}
+
+.ed-docsSearch input {
+  flex: 1;
+  min-inline-size: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.ed-docsOutline a {
+  display: block;
+  padding: 0.35rem 0.75rem;
+  border-inline-start: 2px solid transparent;
+  color: var(--ed-ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: color var(--ed-duration) var(--ed-ease);
+}
+
+.ed-docsOutline a[data-level='1'] {
+  margin-block-start: 0.9rem;
+  color: var(--foreground);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+
+.ed-docsOutline a[data-level='2'] {
+  padding-inline-start: 1.25rem;
+}
+
+.ed-docsOutline a:hover {
+  color: var(--foreground);
+}
+
+.ed-docsOutline a.is-active {
+  border-inline-start-color: var(--primary);
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.ed-docsMain {
+  min-inline-size: 0;
+  inline-size: min(100%, 76ch);
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3vw, 2.5rem) var(--ed-gutter) 5rem;
+}
+
+.ed-docsMobileBar {
+  margin-block-end: 1.25rem;
+}
+
+@media (min-width: 64rem) {
+  .ed-docsMobileBar {
+    display: none;
+  }
+}
+
+.ed-docsHead {
+  display: grid;
+  gap: 0.75rem;
+  margin-block-end: 2rem;
+  padding-block-end: 1.75rem;
+  border-block-end: 1px solid var(--ed-rule);
+}
+
+.ed-docsHead h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+}
+
+.ed-docsMeta {
+  margin: 0;
+  color: var(--ed-ink-soft);
+  font-size: 0.78rem;
+}
+
+/* Long-form Markdown body */
 .ed-handbook {
   font-size: 0.95rem;
-  line-height: 1.75;
+  line-height: 1.8;
 }
 
 .ed-handbook h1 {
-  margin-block: 3rem 1rem;
+  margin-block: 3.25rem 1rem;
   padding-block-start: 2rem;
   border-block-start: 1px solid var(--ed-rule);
   font-family: var(--font-display);
-  font-size: 1.9rem;
+  font-size: 1.85rem;
   font-weight: 400;
   letter-spacing: -0.015em;
+  scroll-margin-block-start: 1.5rem;
 }
 
 .ed-handbook h2 {
-  margin-block: 2.25rem 0.75rem;
+  margin-block: 2.5rem 0.75rem;
   font-family: var(--font-display);
-  font-size: 1.45rem;
+  font-size: 1.4rem;
   font-weight: 400;
   letter-spacing: -0.01em;
   scroll-margin-block-start: 1.5rem;
 }
 
-.ed-handbook h1 {
-  scroll-margin-block-start: 1.5rem;
-}
-
 .ed-handbook h3 {
   margin-block: 1.5rem 0.5rem;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
+.ed-handbook p {
+  margin-block: 0.6rem;
+}
+
 .ed-handbook blockquote {
+  margin-block: 1rem;
+  padding: 0.6rem 1rem;
   border-inline-start: 2px solid var(--primary);
   border-radius: 0 var(--ed-radius-control) var(--ed-radius-control) 0;
   background: var(--ed-paper-tint);
@@ -3598,11 +3733,17 @@ a.ed-trustCard:hover {
   font-style: normal;
 }
 
+.ed-handbook blockquote p {
+  margin-block: 0.25rem;
+}
+
 .ed-handbook table {
   display: table;
   inline-size: 100%;
+  margin-block: 1rem;
   border-collapse: collapse;
   font-size: 0.85rem;
+  line-height: 1.55;
 }
 
 .ed-handbook thead {
@@ -3612,11 +3753,14 @@ a.ed-trustCard:hover {
 .ed-handbook th,
 .ed-handbook td {
   border: 1px solid var(--ed-rule);
+  padding: 0.5rem 0.75rem;
   vertical-align: top;
 }
 
 .ed-handbook pre {
-  border-color: var(--ed-rule);
+  margin-block: 0.85rem;
+  border: 1px solid var(--ed-rule);
+  border-radius: var(--ed-radius-control);
   background: var(--muted);
   font-size: 0.82rem;
 }
@@ -3627,5 +3771,15 @@ a.ed-trustCard:hover {
 }
 
 .ed-handbook hr {
+  margin-block: 2rem;
   border-color: var(--ed-rule);
+}
+
+.ed-handbook ol,
+.ed-handbook ul {
+  margin-block: 0.6rem;
+}
+
+.ed-handbook li {
+  margin-block: 0.25rem;
 }

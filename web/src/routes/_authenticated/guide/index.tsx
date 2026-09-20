@@ -19,30 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute } from '@tanstack/react-router'
 
 import { GuidePage } from '@/features/guide'
-import { guideSearchSchema } from '@/features/guide/route-search'
-import type { GuideSearch } from '@/features/guide/types'
 
 export const Route = createFileRoute('/_authenticated/guide/')({
-  validateSearch: guideSearchSchema,
-  component: GuideIndexRoute,
+  component: GuidePage,
 })
-
-function GuideIndexRoute() {
-  const search = Route.useSearch()
-  const navigate = Route.useNavigate()
-
-  return (
-    <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-      <GuidePage
-        slug='quick-start'
-        search={search}
-        onSearchChange={(next) =>
-          void navigate({
-            search: (current) => ({ ...current, ...next }) as GuideSearch,
-            replace: true,
-          })
-        }
-      />
-    </div>
-  )
-}
