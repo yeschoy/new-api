@@ -34,6 +34,11 @@ function SectionPageLayoutTitle(_props: SlotProps) {
 }
 SectionPageLayoutTitle.displayName = 'SectionPageLayout.Title'
 
+function SectionPageLayoutTitleAside(_props: SlotProps) {
+  return null
+}
+SectionPageLayoutTitleAside.displayName = 'SectionPageLayout.TitleAside'
+
 function SectionPageLayoutActions(_props: SlotProps) {
   return null
 }
@@ -60,6 +65,7 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
   )
 
   let title: ReactNode = null
+  let titleAside: ReactNode = null
   let actions: ReactNode = null
   let content: ReactNode = null
   let breadcrumb: ReactNode = null
@@ -69,6 +75,8 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
     const child = node as ReactElement<SlotProps>
     if (child.type === SectionPageLayoutTitle) {
       title = child.props.children
+    } else if (child.type === SectionPageLayoutTitleAside) {
+      titleAside = child.props.children
     } else if (child.type === SectionPageLayoutActions) {
       actions = child.props.children
     } else if (child.type === SectionPageLayoutContent) {
@@ -81,17 +89,23 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
   return (
     <PageFooterProvider container={footerContainer}>
       <Main className='dopa-console-page dopa-section-page'>
-        {(title != null || actions != null || breadcrumb != null) && (
+        {(title != null ||
+          titleAside != null ||
+          actions != null ||
+          breadcrumb != null) && (
           <div className='dopa-section-page__header shrink-0 px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4'>
             {breadcrumb != null && (
               <div className='mb-2 sm:mb-3'>{breadcrumb}</div>
             )}
             <div className='flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:gap-x-4'>
-              <div className='min-w-0 flex-1'>
+              <div className='flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 sm:gap-x-4'>
                 {title != null && (
-                  <h2 className='dopa-console-title truncate text-base font-extrabold tracking-tight sm:text-lg'>
+                  <h2 className='dopa-console-title max-w-full min-w-0 truncate text-base font-extrabold tracking-tight sm:text-lg'>
                     {title}
                   </h2>
+                )}
+                {titleAside != null && (
+                  <div className='max-w-full min-w-0'>{titleAside}</div>
                 )}
               </div>
               {actions != null && (
@@ -123,6 +137,7 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
 }
 
 SectionPageLayout.Title = SectionPageLayoutTitle
+SectionPageLayout.TitleAside = SectionPageLayoutTitleAside
 SectionPageLayout.Actions = SectionPageLayoutActions
 SectionPageLayout.Content = SectionPageLayoutContent
 SectionPageLayout.Breadcrumb = SectionPageLayoutBreadcrumb

@@ -48,8 +48,10 @@ export function ApiKeys() {
     <ApiKeysProvider>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>{t('API Keys')}</SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
+        <SectionPageLayout.TitleAside>
           <ApiAccelerationUrls />
+        </SectionPageLayout.TitleAside>
+        <SectionPageLayout.Actions>
           <ApiKeysPrimaryButtons />
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
