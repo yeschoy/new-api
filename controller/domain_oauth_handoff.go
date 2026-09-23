@@ -32,13 +32,14 @@ type domainLoginHandoffRequest struct {
 }
 
 type domainBindHandoffPayload struct {
-	DomainID               int64  `json:"domain_id"`
-	TargetHost             string `json:"target_host"`
-	BrowserBindingHash     string `json:"browser_binding_hash"`
-	ExpectedAuthVersion    int64  `json:"expected_auth_version"`
-	ExpectedSessionVersion int64  `json:"expected_session_version"`
-	ProviderUserID         string `json:"provider_user_id"`
-	ProviderColumn         string `json:"provider_column"`
+	DomainID               int64                        `json:"domain_id"`
+	TargetHost             string                       `json:"target_host"`
+	BrowserBindingHash     string                       `json:"browser_binding_hash"`
+	ExpectedAuthVersion    int64                        `json:"expected_auth_version"`
+	ExpectedSessionVersion int64                        `json:"expected_session_version"`
+	ProviderUserID         string                       `json:"provider_user_id"`
+	ProviderColumn         string                       `json:"provider_column"`
+	Authorization          *model.AuthFlowAuthorization `json:"authorization,omitempty"`
 }
 
 type domainLoginFallbackPayload struct {
@@ -198,6 +199,7 @@ func issueDomainBindHandoff(c *gin.Context, provider oauth.Provider, oauthUser *
 		ExpectedSessionVersion: statePayload.ExpectedSessionVersion,
 		ProviderUserID:         oauthUser.ProviderUserID,
 		ProviderColumn:         providerColumn,
+		Authorization:          statePayload.Authorization,
 	})
 	if err != nil {
 		return err
@@ -410,16 +412,26 @@ func ConsumeDomainBindHandoff(c *gin.Context) {
 		writeInvalidDomainBindHandoff(c, http.StatusForbidden)
 		return
 	}
+	context, err := common.Marshal(service.AccountBindingContext{Provider: flow.Provider})
+	if err != nil || service.ValidateFlowAuthorization(identity, service.VerificationOperation{
+		Scope: service.VerificationScopeAccountBind, Context: context,
+	}, payload.Authorization) != nil {
+		writeInvalidDomainBindHandoff(c, http.StatusForbidden)
+		return
+	}
 	if _, err := model.ConsumeAuthFlowWithAction(request.Ticket, match, func(tx *gorm.DB, _ *model.AuthFlow) error {
-		return model.UpdateUserBindColumnWithTx(tx, identity.UserID, payload.ProviderColumn, payload.ProviderUserID)
+		return model.UpdateUserBindColumnForSessionWithTx(tx, identity.SessionIdentity(), payload.ProviderColumn, payload.ProviderUserID)
 	}); err != nil {
 		writeInvalidDomainBindHandoff(c, http.StatusForbidden)
 		return
 	}
+	user, err := model.GetUserById(identity.UserID, false)
+	notificationFailed := err != nil || service.NotifyAccountSecurityChange(user.Email, "Login account linked: "+provider.GetName()) != nil
+	recordUserSecurityAudit(c, identity.UserID, "user.binding_bind", map[string]any{"provider": flow.Provider, "success": true, "notification_failed": notificationFailed})
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    gin.H{"action": "bind"},
+		"data":    gin.H{"action": "bind", "notification_warning": notificationFailed},
 	})
 }
 

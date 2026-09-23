@@ -211,10 +211,10 @@ func TestFindOrCreateOAuthUserPersistsCustomDomainDefaultInviter(t *testing.T) {
 		{username: "oauth-domain-explicit", affCode: explicit.AffCode, expectedInviter: explicit.Id},
 	} {
 		t.Run(test.username, func(t *testing.T) {
-			created, err := findOrCreateOAuthUser(ctx, provider, &oauth.OAuthUser{
+			created, _, err := findOrCreateOAuthUser(ctx, provider, &oauth.OAuthUser{
 				ProviderUserID: "external-" + test.username,
 				Username:       test.username,
-			}, test.affCode, domain.Id)
+			}, nil, test.affCode, domain.Id)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectedInviter, created.InviterId)
 

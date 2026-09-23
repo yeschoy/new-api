@@ -818,13 +818,15 @@ func recordCashbackCreditLog(userID int, rewardID int64, quota int) {
 		"reward_id": rewardID,
 		"quota":     logger.LogQuota(quota),
 	}
+	other := NewLogOther()
+	other.SetPublic("op", map[string]any{"action": "cashback.reward_credited", "params": params})
 	log := &Log{
 		UserId:    userID,
 		Username:  username,
 		CreatedAt: common.GetTimestamp(),
 		Type:      LogTypeSystem,
 		Content:   fmt.Sprintf("Referral cashback reward %d credited %s", rewardID, logger.LogQuota(quota)),
-		Other:     common.MapToJsonStr(map[string]interface{}{"op": buildOpField("cashback.reward_credited", params)}),
+		Other:     other.JSONString(),
 	}
 	if err := createLog(log); err != nil {
 		common.SysLog("failed to record cashback credit log: " + err.Error())

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,7 +100,7 @@ func resetBatchUpdateTestState(t *testing.T) {
 	oldBatchEnabled := common.BatchUpdateEnabled
 	common.BatchUpdateEnabled = false
 	batchUpdateRunLock.Lock()
-	for i := 0; i < BatchUpdateTypeCount; i++ {
+	for i := range BatchUpdateTypeCount {
 		batchUpdateLocks[i].Lock()
 		batchUpdateStores[i] = make(map[int]int)
 		batchUpdateInFlightStores[i] = make(map[int]int)
@@ -109,7 +110,7 @@ func resetBatchUpdateTestState(t *testing.T) {
 	t.Cleanup(func() {
 		common.BatchUpdateEnabled = oldBatchEnabled
 		batchUpdateRunLock.Lock()
-		for i := 0; i < BatchUpdateTypeCount; i++ {
+		for i := range BatchUpdateTypeCount {
 			batchUpdateLocks[i].Lock()
 			batchUpdateStores[i] = make(map[int]int)
 			batchUpdateInFlightStores[i] = make(map[int]int)
@@ -503,7 +504,7 @@ func TestUserQuotaMutationFenceBlocksRehydrationAndSpending(t *testing.T) {
 	resetBatchUpdateTestState(t)
 	server := useUserCacheMiniRedis(t)
 
-	initialQuota := common.GetTrustQuota() + 1
+	initialQuota := int(operation_setting.GetQuotaSetting().TrustQuotaUSD*common.QuotaPerUnit) + 1
 	user := createReserveTestUser(t, initialQuota)
 	require.NoError(t, populateUserCache(user))
 	fences, err := acquireUserQuotaMutationFences(user.Id)
