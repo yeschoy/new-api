@@ -411,3 +411,25 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 14: 订阅套餐兑换码实现与三数据库验证
+<!-- trellis-session: v=2 fp=fa720c66a4f69aab -->
+
+**Date**: 2026-09-24
+**Task**: 订阅套餐兑换码实现与三数据库验证
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+复用现有兑换和后台管理流程新增套餐兑换码；额度码兼容。SQLite 3.50.4、MySQL 8.0.46、PostgreSQL 16.15 完成新建、rc.40 代表性升级及事务验证。前后端聚焦测试通过；全量 controller 旧失败在 HEAD 基线复现。任务完成并清理测试临时产物。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2956c0b18` | feat(redemption): support subscription plan codes |
+
+### Status
+
+[OK] **Completed**
