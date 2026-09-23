@@ -18,6 +18,8 @@ type Redemption struct {
 	Status       int            `json:"status" gorm:"default:1"`
 	Name         string         `json:"name" gorm:"index"`
 	Quota        int            `json:"quota" gorm:"default:100"`
+	PlanId       int            `json:"plan_id" gorm:"default:0"`
+	Type         string         `json:"type" gorm:"-:all"` // optional request discriminator; legacy requests omit it
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
 	RedeemedTime int64          `json:"redeemed_time" gorm:"bigint"`
 	Count        int            `json:"count" gorm:"-:all"` // only for api request
@@ -134,7 +136,13 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
-func Redeem(key string, userId int) (quota int, err error) {
+type SubscriptionRedemptionResult struct {
+	Type      string `json:"type"`
+	PlanId    int    `json:"plan_id"`
+	PlanTitle string `json:"plan_title"`
+}
+
+func Redeem(key string, userId int) (data any, err error) {
 	if key == "" {
 		return 0, errors.New("未提供兑换码")
 	}
@@ -155,8 +163,14 @@ func Redeem(key string, userId int) (quota int, err error) {
 	}
 	creditCommitted := false
 	defer func() { finalizeUserQuotaMutationFences(creditFences, creditCommitted) }()
+	var subscriptionPlan *SubscriptionPlan
 
 	err = DB.Transaction(func(tx *gorm.DB) error {
+		// Serialize grants for this user, including purchases with a per-user limit.
+		var user User
+		if err := lockForUpdate(tx).Select("id").Where("id = ?", userId).First(&user).Error; err != nil {
+			return err
+		}
 		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
 		if err != nil {
 			return errors.New("无效的兑换码")
@@ -167,11 +181,21 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("该兑换码已过期")
 		}
+		if redemption.PlanId < 0 || (redemption.PlanId == 0 && redemption.Quota <= 0) || (redemption.PlanId > 0 && redemption.Quota != 0) {
+			return errors.New("invalid redemption entitlement")
+		}
+		if redemption.PlanId > 0 {
+			var plan SubscriptionPlan
+			if err := lockForUpdate(tx).Where("id = ? AND enabled = ?", redemption.PlanId, true).First(&plan).Error; err != nil {
+				return err
+			}
+			subscriptionPlan = &plan
+		}
 		// Compare-and-swap on status: only the transaction that flips
 		// enabled -> used may credit quota, so a concurrent redeem of the
 		// same code loses here even without a row lock (e.g. on SQLite).
 		result := tx.Model(&Redemption{}).
-			Where("id = ? AND status = ?", redemption.Id, common.RedemptionCodeStatusEnabled).
+			Where("id = ? AND status = ? AND quota = ? AND plan_id = ?", redemption.Id, common.RedemptionCodeStatusEnabled, redemption.Quota, redemption.PlanId).
 			Updates(map[string]any{
 				"redeemed_time": common.GetTimestamp(),
 				"status":        common.RedemptionCodeStatusUsed,
@@ -183,11 +207,22 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if result.RowsAffected == 0 {
 			return errors.New("该兑换码已被使用")
 		}
+		if subscriptionPlan != nil {
+			_, err := CreateUserSubscriptionFromPlanTx(tx, userId, subscriptionPlan, "redemption")
+			return err
+		}
 		return creditTopUpQuotaProtected(tx, userId, redemption.Quota, nil, creditFences)
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())
 		return 0, ErrRedeemFailed
+	}
+	if subscriptionPlan != nil {
+		if subscriptionPlan.UpgradeGroup != "" {
+			refreshSubscriptionUserGroupCache(userId, "subscription redemption")
+		}
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码开通套餐 %d，兑换码ID %d", subscriptionPlan.Id, redemption.Id))
+		return SubscriptionRedemptionResult{Type: "subscription", PlanId: subscriptionPlan.Id, PlanTitle: subscriptionPlan.Title}, nil
 	}
 	creditCommitted = true
 	syncCreditUserQuotaCache(creditFences, userId, redemption.Quota, "redemption")
@@ -195,34 +230,102 @@ func Redeem(key string, userId int) (quota int, err error) {
 	return redemption.Quota, nil
 }
 
+func (redemption *Redemption) validateEntitlement(tx *gorm.DB, checkPlan bool) error {
+	if redemption.Type != "" && redemption.Type != "quota" && redemption.Type != "subscription" {
+		return errors.New("invalid redemption type")
+	}
+	if (redemption.Type == "quota" && redemption.PlanId != 0) || (redemption.Type == "subscription" && redemption.PlanId <= 0) {
+		return errors.New("redemption type does not match entitlement")
+	}
+	if redemption.PlanId < 0 {
+		return errors.New("invalid redemption plan id")
+	}
+	if redemption.PlanId == 0 {
+		if redemption.Quota <= 0 {
+			return errors.New("redemption quota must be positive")
+		}
+		return common.ValidateWalletQuota(redemption.Quota)
+	}
+	if redemption.Quota != 0 {
+		return errors.New("subscription redemption quota must be zero")
+	}
+	if checkPlan {
+		var plan SubscriptionPlan
+		return lockForUpdate(tx).Where("id = ? AND enabled = ?", redemption.PlanId, true).First(&plan).Error
+	}
+	return nil
+}
+
 func (redemption *Redemption) Insert() error {
-	if redemption.Quota <= 0 {
-		return errors.New("redemption quota must be positive")
+	if redemption.PlanId == 0 {
+		if err := redemption.validateEntitlement(DB, false); err != nil {
+			return err
+		}
+		return DB.Create(redemption).Error
 	}
-	if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-		return err
+	// Preserve the legacy quota column default for existing schemas. GORM fills
+	// zero-valued fields tagged with a default before INSERT, so explicitly set
+	// the gift code's quota to zero in the same transaction. Lock the enabled
+	// plan through commit so issuance cannot race with disabling it.
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		if err := redemption.validateEntitlement(tx, true); err != nil {
+			return err
+		}
+		if err := tx.Create(redemption).Error; err != nil {
+			return err
+		}
+		return tx.Model(redemption).Update("quota", 0).Error
+	})
+	if err == nil {
+		redemption.Quota = 0
 	}
-	var err error
-	err = DB.Create(redemption).Error
 	return err
 }
 
-func (redemption *Redemption) SelectUpdate() error {
-	// This can update zero values
-	return DB.Model(redemption).Select("redeemed_time", "status").Updates(redemption).Error
-}
-
-// Update Make sure your token's fields is completed, because this will update non-zero values
-func (redemption *Redemption) Update() error {
-	if redemption.Quota <= 0 {
-		return errors.New("redemption quota must be positive")
-	}
-	if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-		return err
-	}
-	var err error
-	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time", "expired_time").Updates(redemption).Error
-	return err
+// Update validates the current entitlement and atomically applies a full or status-only edit.
+func (redemption *Redemption) Update(statusOnly bool) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var current Redemption
+		if err := lockForUpdate(tx).Where("id = ?", redemption.Id).First(&current).Error; err != nil {
+			return err
+		}
+		if statusOnly {
+			// Status-only requests must never replay stale entitlement or metadata
+			// loaded by the controller before another administrator edited the code.
+			redemption.Name = current.Name
+			redemption.Quota = current.Quota
+			redemption.PlanId = current.PlanId
+			redemption.ExpiredTime = current.ExpiredTime
+			redemption.Type = ""
+		}
+		if current.Status != common.RedemptionCodeStatusUsed && redemption.Status == common.RedemptionCodeStatusUsed {
+			return errors.New("only redemption may mark a code as used")
+		}
+		if current.Status == common.RedemptionCodeStatusUsed &&
+			(redemption.Status != common.RedemptionCodeStatusUsed || redemption.Quota != current.Quota || redemption.PlanId != current.PlanId) {
+			return errors.New("used redemption entitlement cannot be changed or re-enabled")
+		}
+		if redemption.Status != common.RedemptionCodeStatusEnabled && redemption.Status != common.RedemptionCodeStatusDisabled && redemption.Status != common.RedemptionCodeStatusUsed {
+			return errors.New("invalid redemption status")
+		}
+		if err := redemption.validateEntitlement(tx, redemption.PlanId != current.PlanId); err != nil {
+			return err
+		}
+		if current.Name == redemption.Name && current.Status == redemption.Status &&
+			current.Quota == redemption.Quota && current.PlanId == redemption.PlanId &&
+			current.ExpiredTime == redemption.ExpiredTime {
+			return nil
+		}
+		result := tx.Model(&Redemption{}).Where("id = ? AND status = ? AND quota = ? AND plan_id = ?", current.Id, current.Status, current.Quota, current.PlanId).
+			Updates(map[string]any{"name": redemption.Name, "status": redemption.Status, "quota": redemption.Quota, "plan_id": redemption.PlanId, "expired_time": redemption.ExpiredTime})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return errors.New("redemption changed concurrently")
+		}
+		return nil
+	})
 }
 
 func (redemption *Redemption) Delete() error {

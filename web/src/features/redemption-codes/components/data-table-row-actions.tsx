@@ -79,7 +79,9 @@ export function DataTableRowActions<TData>({
     }
   }
 
-  const canEdit = isEnabled && !isExpired
+  // Administrators may correct metadata/expiry on any unused code, including
+  // disabled or expired codes. Used codes remain immutable in the UI.
+  const canEdit = !isUsed
   const canToggle = !isUsed && !isExpired
 
   return (

@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   fireEvent,
   render,
@@ -71,16 +72,24 @@ function readDownload(download: Download): Promise<string> {
   })
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+})
+
 function CreateDrawer() {
   const [open, setOpen] = useState(true)
   return (
-    <RedemptionsProvider>
-      <RedemptionsMutateDrawer open={open} onOpenChange={setOpen} />
-    </RedemptionsProvider>
+    <QueryClientProvider client={queryClient}>
+      <RedemptionsProvider>
+        <RedemptionsMutateDrawer open={open} onOpenChange={setOpen} />
+      </RedemptionsProvider>
+    </QueryClientProvider>
   )
 }
 
 afterEach(() => {
+  queryClient.clear()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   useSystemConfigStore
     .getState()
@@ -175,6 +184,27 @@ test('keeps names containing table delimiters and markup inside one Markdown cel
   await user.click(screen.getByRole('button', { name: 'Done' }))
   expect(await readDownload(downloads[0])).toBe(
     '| Name | Code | Quota |\n| --- | --- | --- |\n| A \\| \\[B\\] \\<x\\> | codeA | $10 |\n'
+  )
+})
+
+test('subscription code export names the plan rather than a zero wallet quota', async () => {
+  const downloads = captureDownloads()
+  const user = userEvent.setup()
+  render(
+    <RedemptionsExportDialog
+      data={{
+        keys: ['gift'],
+        name: 'launch',
+        type: 'subscription',
+        entitlement: 'Pro',
+      }}
+      onClose={() => undefined}
+    />
+  )
+  await user.click(screen.getByRole('checkbox', { name: 'Save as a file' }))
+  await user.click(screen.getByRole('button', { name: 'Done' }))
+  expect(await readDownload(downloads[0])).toBe(
+    'launch\tgift\tSubscription plan: Pro\n'
   )
 })
 

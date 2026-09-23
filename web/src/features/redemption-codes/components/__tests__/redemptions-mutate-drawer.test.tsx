@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   fireEvent,
   render,
@@ -23,6 +24,7 @@ import {
   waitFor,
   type RenderResult,
 } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, test } from 'vitest'
 
 import type { Redemption } from '../../types'
@@ -53,6 +55,7 @@ type ApiMethod = (url: string, data?: unknown) => Promise<{ data: unknown }>
 type MockableApi = {
   get: ApiMethod
   put: ApiMethod
+  post: ApiMethod
 }
 type RenderedDrawer = {
   result: RenderResult
@@ -65,6 +68,7 @@ type CurrencyFixture = {
 const apiClient = api as unknown as MockableApi
 const originalGet = apiClient.get
 const originalPut = apiClient.put
+const originalPost = apiClient.post
 const originalConsoleLog = Reflect.get(console, 'log')
 let renderedDrawer: RenderedDrawer | null = null
 
@@ -93,18 +97,24 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+})
+
 function drawerTree(currentRow: Redemption) {
   return (
-    <I18nextProvider i18n={i18n}>
-      <RedemptionsProvider>
-        <RedemptionsMutateDrawer
-          open
-          currentRow={currentRow}
-          onOpenChange={() => undefined}
-        />
-      </RedemptionsProvider>
-      <Toaster duration={60_000} />
-    </I18nextProvider>
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <RedemptionsProvider>
+          <RedemptionsMutateDrawer
+            open
+            currentRow={currentRow}
+            onOpenChange={() => undefined}
+          />
+        </RedemptionsProvider>
+        <Toaster duration={60_000} />
+      </I18nextProvider>
+    </QueryClientProvider>
   )
 }
 
@@ -178,8 +188,10 @@ async function waitForLoadedForm(): Promise<void> {
 }
 
 afterEach(() => {
+  queryClient.clear()
   apiClient.get = originalGet
   apiClient.put = originalPut
+  apiClient.post = originalPost
   Reflect.set(console, 'log', originalConsoleLog)
   toast.dismiss()
   localStorage.clear()
@@ -278,6 +290,104 @@ describe('redemption drawer', () => {
     await waitFor(() => expect(updates).toHaveLength(1))
 
     expect(updates[0]?.quota).toBe(1000000)
+  })
+
+  test('creates a plan code with zero wallet quota from an enabled plan', async () => {
+    const requests: Array<Record<string, unknown>> = []
+    apiClient.get = async () => ({
+      data: {
+        success: true,
+        data: [{ plan: { id: 9, title: 'Pro', enabled: true } }],
+      },
+    })
+    apiClient.post = async (_url, data) => {
+      requests.push(data as Record<string, unknown>)
+      return { data: { success: true, data: ['gift-code'] } }
+    }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RedemptionsProvider>
+          <RedemptionsMutateDrawer open onOpenChange={() => undefined} />
+        </RedemptionsProvider>
+      </QueryClientProvider>
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('radio', { name: 'Subscription plan' }))
+    const planInput = screen.getByRole('combobox', {
+      name: 'Subscription plan',
+    })
+    await user.click(planInput)
+    await user.type(planInput, 'Pro')
+    await user.click(await screen.findByRole('option', { name: 'Pro' }))
+    fireEvent.change(getControlByLabel('Name'), { target: { value: 'Gift' } })
+    submitForm()
+    await waitFor(() => expect(requests).toHaveLength(1))
+    expect(requests[0]).toMatchObject({
+      type: 'subscription',
+      plan_id: 9,
+      quota: 0,
+    })
+  })
+
+  test('rejects a plan-code submission without an enabled plan', async () => {
+    const requests: unknown[] = []
+    apiClient.get = async () => ({
+      data: {
+        success: true,
+        data: [{ plan: { id: 9, title: 'Paused', enabled: false } }],
+      },
+    })
+    apiClient.post = async (_url, data) => {
+      requests.push(data)
+      return { data: { success: true, data: [] } }
+    }
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RedemptionsProvider>
+          <RedemptionsMutateDrawer open onOpenChange={() => undefined} />
+        </RedemptionsProvider>
+      </QueryClientProvider>
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('radio', { name: 'Subscription plan' }))
+    fireEvent.change(getControlByLabel('Name'), { target: { value: 'Gift' } })
+    const planInput = screen.getByRole('combobox', { name: 'Subscription plan' })
+    await user.click(planInput)
+    expect(screen.queryByRole('option', { name: 'Paused' })).not.toBeInTheDocument()
+    submitForm()
+    await waitFor(() => expect(planInput).toHaveAttribute('aria-invalid', 'true'))
+    expect(requests).toHaveLength(0)
+  })
+
+  test('edits a subscription code without turning it into wallet quota', async () => {
+    const original = { ...redemption(3, 0), plan_id: 9 }
+    const updates: Array<Record<string, unknown>> = []
+    apiClient.get = async (url) => ({
+      data: url.includes('subscription/admin/plans')
+        ? {
+            success: true,
+            data: [{ plan: { id: 9, title: 'Pro', enabled: true } }],
+          }
+        : { success: true, data: original },
+    })
+    apiClient.put = async (_url, data) => {
+      updates.push(data as Record<string, unknown>)
+      return { data: { success: true, data: original } }
+    }
+    await renderDrawer(original)
+    await waitForLoadedForm()
+    expect(
+      screen.getByRole('radio', { name: 'Subscription plan' })
+    ).toBeChecked()
+    expect(screen.queryByLabelText('Quota (USD)')).not.toBeInTheDocument()
+    changeInput(getControlByLabel('Name'), 'gift')
+    submitForm()
+    await waitFor(() => expect(updates).toHaveLength(1))
+    expect(updates[0]).toMatchObject({
+      plan_id: 9,
+      quota: 0,
+      type: 'subscription',
+    })
   })
 
   test('ignores an older response after switching records', async () => {

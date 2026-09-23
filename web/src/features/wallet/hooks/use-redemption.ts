@@ -16,8 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import i18next from 'i18next'
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { getSelf } from '@/lib/api'
@@ -31,38 +31,58 @@ import { redeemTopupCode } from '../api'
 // ============================================================================
 
 export function useRedemption() {
+  const { t } = useTranslation()
   const [redeeming, setRedeeming] = useState(false)
 
-  const redeemCode = useCallback(async (code: string): Promise<boolean> => {
-    if (!code || code.trim() === '') {
-      toast.error(i18next.t('Please enter a redemption code'))
-      return false
-    }
-
-    try {
-      setRedeeming(true)
-      const response = await redeemTopupCode({ key: code })
-
-      if (response.success && response.data) {
-        const quotaAdded = response.data
-        toast.success(
-          i18next.t('Redemption successful! Added: {{quota}}', {
-            quota: formatQuota(quotaAdded),
-          })
-        )
-        await getSelf()
-        return true
+  const redeemCode = useCallback(
+    async (code: string): Promise<boolean> => {
+      if (!code || code.trim() === '') {
+        toast.error(t('Please enter a redemption code'))
+        return false
       }
 
-      handleServerError(response, i18next.t('Redemption failed'))
-      return false
-    } catch (_error) {
-      handleServerError(_error, i18next.t('Redemption failed'))
-      return false
-    } finally {
-      setRedeeming(false)
-    }
-  }, [])
+      try {
+        setRedeeming(true)
+        const response = await redeemTopupCode({ key: code })
+
+        if (response.success && response.data) {
+          if (typeof response.data === 'number') {
+            toast.success(
+              t('Redemption successful! Added: {{quota}}', {
+                quota: formatQuota(response.data),
+              })
+            )
+          } else if (response.data.type === 'subscription') {
+            toast.success(
+              t('Subscription redeemed: {{plan}}', {
+                plan: response.data.plan_title,
+              })
+            )
+          } else {
+            handleServerError(response, t('Redemption failed'))
+            return false
+          }
+          // A refresh failure cannot undo a successful, single-use redeem.
+          // The wallet also retries its own user/subscription refresh.
+          try {
+            await getSelf()
+          } catch {
+            // Keep the success result so the user does not retry a spent code.
+          }
+          return true
+        }
+
+        handleServerError(response, t('Redemption failed'))
+        return false
+      } catch (_error) {
+        handleServerError(_error, t('Redemption failed'))
+        return false
+      } finally {
+        setRedeeming(false)
+      }
+    },
+    [t]
+  )
 
   return {
     redeeming,

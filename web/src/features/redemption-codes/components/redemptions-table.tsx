@@ -27,6 +27,7 @@ import {
   DataTablePage,
   useDataTable,
 } from '@/components/data-table'
+import { getAdminPlans } from '@/features/subscriptions/api'
 import { useMediaQuery } from '@/hooks'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 import { createServerError } from '@/lib/server-error-message'
@@ -55,7 +56,21 @@ function isDisabledRedemptionRow(redemption: Redemption) {
 
 export function RedemptionsTable() {
   const { t } = useTranslation()
-  const columns = useRedemptionsColumns()
+  const { data: plansResponse } = useQuery({
+    queryKey: ['admin-subscription-plans'],
+    queryFn: getAdminPlans,
+  })
+  const planTitles = useMemo(
+    () =>
+      Object.fromEntries(
+        (plansResponse?.data ?? []).map((record) => [
+          record.plan.id,
+          record.plan.title,
+        ])
+      ),
+    [plansResponse]
+  )
+  const columns = useRedemptionsColumns(planTitles)
   const { refreshTrigger } = useRedemptions()
   const isMobile = useMediaQuery('(max-width: 640px)')
 
@@ -181,7 +196,13 @@ export function RedemptionsTable() {
           },
         ],
       }}
-      mobile={<RedemptionsMobileList table={table} isLoading={isLoading} />}
+      mobile={
+        <RedemptionsMobileList
+          table={table}
+          isLoading={isLoading}
+          planTitles={planTitles}
+        />
+      }
       getRowClassName={(row, { isMobile }) => {
         if (!isDisabledRedemptionRow(row.original)) return undefined
         return isMobile ? DISABLED_ROW_MOBILE : DISABLED_ROW_DESKTOP

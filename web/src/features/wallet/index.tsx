@@ -108,6 +108,7 @@ export function Wallet(props: WalletProps) {
     transferring,
   } = useAffiliate()
   const { redeeming, redeemCode } = useRedemption()
+  const [subscriptionRefresh, setSubscriptionRefresh] = useState(0)
   const { processing: creemProcessing, processCreemPayment } = useCreemPayment()
   const { processing: waffoProcessing, processWaffoPayment } = useWaffoPayment()
   const { processing: pancakeProcessing, processWaffoPancakePayment } =
@@ -222,6 +223,7 @@ export function Wallet(props: WalletProps) {
     const success = await redeemCode(redemptionCode)
     if (success) {
       setRedemptionCode('')
+      setSubscriptionRefresh((current) => current + 1)
       await fetchUser()
     }
   }
@@ -330,6 +332,7 @@ export function Wallet(props: WalletProps) {
         </div>
 
         <SubscriptionPlansCard
+          refreshTrigger={subscriptionRefresh}
           topupInfo={topupInfo}
           onAvailabilityChange={handleSubscriptionAvailabilityChange}
           userQuota={user?.quota}

@@ -35,7 +35,9 @@ import { isRedemptionExpired, isTimestampExpired } from '../lib'
 import type { Redemption } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 
-export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
+export function useRedemptionsColumns(
+  planTitles: Record<number, string> = {}
+): ColumnDef<Redemption>[] {
   const { t } = useTranslation()
   return [
     {
@@ -155,13 +157,18 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
       size: 320,
     },
     {
-      accessorKey: 'quota',
-      header: t('Quota'),
+      id: 'benefit',
+      header: t('Benefit'),
       cell: ({ row }) => {
-        const quota = row.getValue('quota') as number
+        const redemption = row.original
+        const planId = redemption.plan_id ?? 0
         return (
           <StatusBadge
-            label={formatQuota(quota)}
+            label={
+              planId > 0
+                ? `${t('Subscription plan')}: ${planTitles[planId] ?? `#${planId}`}`
+                : `${t('Wallet quota')}: ${formatQuota(redemption.quota)}`
+            }
             variant='neutral'
             copyable={false}
             className='-ml-1.5'

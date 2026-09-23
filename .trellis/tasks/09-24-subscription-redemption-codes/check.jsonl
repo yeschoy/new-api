@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "后端质量审核"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端质量审核"}
+{"file": ".agents/rules/billing.md", "reason": "核对额度与权益安全约束"}
+{"file": "web/AGENTS.md", "reason": "前端组件与测试质量门槛"}
+{"file": ".trellis/tasks/09-24-subscription-redemption-codes/research/existing-flows.md", "reason": "核对现有流程与环境验证范围"}

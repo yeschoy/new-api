@@ -28,7 +28,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 export type RedemptionExportData = {
   keys: string[]
   name: string
-  quota: string
+  quota?: string
+  entitlement?: string
+  type?: 'quota' | 'subscription'
 }
 
 type RedemptionsExportDialogProps = {
@@ -52,13 +54,21 @@ export function RedemptionsExportDialog(props: RedemptionsExportDialogProps) {
     const headers: string[] = []
     if (includeName) headers.push(t('Name'))
     headers.push(t('Code'))
-    if (includeQuota) headers.push(t('Quota'))
+    if (includeQuota) {
+      headers.push(t(props.data.type === 'subscription' ? 'Benefit' : 'Quota'))
+    }
 
     const rows = props.data.keys.map((key) => {
       const row: string[] = []
       if (includeName) row.push(props.data.name)
       row.push(key)
-      if (includeQuota) row.push(props.data.quota)
+      if (includeQuota) {
+        row.push(
+          props.data.type === 'subscription'
+            ? `${t('Subscription plan')}: ${props.data.entitlement ?? ''}`
+            : (props.data.quota ?? props.data.entitlement ?? '')
+        )
+      }
       return row.map((value) => value.replaceAll(/[\t\r\n]+/g, ' '))
     })
 
@@ -158,7 +168,13 @@ export function RedemptionsExportDialog(props: RedemptionsExportDialogProps) {
                 checked={includeQuota}
                 onCheckedChange={setIncludeQuota}
               />
-              <Label htmlFor={`${id}-quota`}>{t('Include quota')}</Label>
+              <Label htmlFor={`${id}-quota`}>
+                {t(
+                  props.data.type === 'subscription'
+                    ? 'Include benefit'
+                    : 'Include quota'
+                )}
+              </Label>
             </div>
           </div>
         </div>

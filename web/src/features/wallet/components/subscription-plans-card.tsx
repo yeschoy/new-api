@@ -64,6 +64,7 @@ import { cn } from '@/lib/utils'
 import type { PaymentMethod, TopupInfo } from '../types'
 
 interface SubscriptionPlansCardProps {
+  refreshTrigger?: number
   topupInfo: TopupInfo | null
   onAvailabilityChange?: (available: boolean) => void
   userQuota?: number
@@ -96,6 +97,7 @@ function getBillingPreferenceLabel(
 
 export function SubscriptionPlansCard({
   topupInfo,
+  refreshTrigger,
   onAvailabilityChange,
   userQuota,
   onPurchaseSuccess,
@@ -161,6 +163,10 @@ export function SubscriptionPlansCard({
     }
     init()
   }, [fetchPlans, fetchSelfSubscription])
+
+  useEffect(() => {
+    if (refreshTrigger) void fetchSelfSubscription()
+  }, [refreshTrigger, fetchSelfSubscription])
 
   const handleRefresh = async () => {
     setRefreshing(true)
