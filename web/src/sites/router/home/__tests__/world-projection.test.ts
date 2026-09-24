@@ -16,17 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { MAP_WEST, mapLon, rollColumns } from '../world-projection'
+import { rollColumns, westShift } from '../world-projection'
 
-describe('Pacific-centred projection', () => {
-  it('starts at the left edge and puts 150°E in the middle', () => {
-    expect(mapLon(MAP_WEST)).toBe(0)
-    expect(mapLon(150)).toBe(180)
-  })
-
-  it('places China left of the Pacific and the US right of it', () => {
-    expect(mapLon(116.4)).toBeLessThan(180) // Beijing
-    expect(mapLon(-122.42)).toBeGreaterThan(180) // San Francisco
+describe('Pacific-centred map', () => {
+  it('starts the map at 30°W so the Pacific sits in the middle', () => {
+    // One column per degree from 180°W: 30°W is column 150.
+    expect(westShift(360)).toBe(150)
+    expect(westShift(1440)).toBe(600)
   })
 })
 

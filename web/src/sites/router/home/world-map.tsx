@@ -23,7 +23,6 @@ import { useTheme } from '@/site/theme'
 
 import { paintLand, paintLights } from './world-map-draw'
 import { decodeLand, decodeLights, type LandGrid, type LightGrid } from './world-map-data'
-import { buildSignals, drawSignals, type SignalScene } from './world-signals-draw'
 
 // The map data loads in its own chunks after the page: the land (15 KB)
 // right away, the lights (80 KB) only once night is first shown.
@@ -59,14 +58,13 @@ function paintOnResize(canvas: HTMLCanvasElement, paint: () => void): () => void
 /**
  * Dotted world map on the home page. By day the land is a quiet grey
  * stipple; at night real city lights (NASA Black Marble) come on, sweeping in
- * from east to west. On top, relay traffic runs between cities worldwide.
+ * from east to west.
  */
 export function WorldMap(props: { className?: string }) {
   const { theme } = useTheme()
   const night = theme === 'dark'
   const landRef = useRef<HTMLCanvasElement>(null)
   const lightsRef = useRef<HTMLCanvasElement>(null)
-  const signalsRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const canvas = landRef.current
@@ -106,45 +104,6 @@ export function WorldMap(props: { className?: string }) {
     }
   }, [night])
 
-  // Relay traffic: redrawn every frame while the map is on screen; with
-  // reduced motion only the routes are shown.
-  useEffect(() => {
-    const canvas = signalsRef.current
-    if (!canvas) return
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    let scene: SignalScene | null = null
-    let frame = 0
-    let visible = true
-    const tick = (now: number) => {
-      if (!scene) return
-      drawSignals(canvas, scene, now / 1000)
-      frame = window.requestAnimationFrame(tick)
-    }
-    const run = () => {
-      if (!still && visible && scene && !frame) frame = window.requestAnimationFrame(tick)
-    }
-    const pause = () => {
-      window.cancelAnimationFrame(frame)
-      frame = 0
-    }
-    const stopResize = paintOnResize(canvas, () => {
-      scene = buildSignals(canvas)
-      drawSignals(canvas, scene, still ? null : performance.now() / 1000)
-      run()
-    })
-    const onScreen = new IntersectionObserver((entries) => {
-      visible = entries.some((entry) => entry.isIntersecting)
-      if (visible) run()
-      else pause()
-    })
-    onScreen.observe(canvas)
-    return () => {
-      pause()
-      stopResize()
-      onScreen.disconnect()
-    }
-  }, [night])
-
   return (
     <div aria-hidden='true' className={props.className}>
       <canvas ref={landRef} className='absolute inset-0 size-full' />
@@ -155,7 +114,6 @@ export function WorldMap(props: { className?: string }) {
           night ? 'opacity-100' : 'opacity-0'
         )}
       />
-      <canvas ref={signalsRef} className='absolute inset-0 size-full' />
     </div>
   )
 }

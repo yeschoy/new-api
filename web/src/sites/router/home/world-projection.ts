@@ -20,19 +20,10 @@ import type { LandGrid } from './world-map-data'
 
 /**
  * The home map is centred on the Pacific (150°E), like world maps printed in
- * China, so China sits left of the ocean, the US right of it, and the traffic
- * between them crosses the middle. The data grids start at 180°W and are
- * rolled to this left edge when drawn.
+ * China: the left edge is 30°W. The data grids start at 180°W and are rolled
+ * to this left edge when drawn.
  */
-export const MAP_WEST = -30
-/** Latitude range of the map (see world-land.ts). */
-export const LAT_TOP = 80
-export const LAT_SPAN = 138
-
-/** Degrees east of the map's left edge, 0–360. */
-export function mapLon(lon: number): number {
-  return (((lon - MAP_WEST) % 360) + 360) % 360
-}
+const MAP_WEST = -30
 
 /** Grid columns to skip so that a grid starting at 180°W begins at MAP_WEST. */
 export function westShift(cols: number): number {
