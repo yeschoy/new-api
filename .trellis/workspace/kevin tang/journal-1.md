@@ -433,3 +433,29 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 15: 核查充值返现人工审核与免审开关
+<!-- trellis-session: v=2 fp=c2b8849f5870d959 -->
+
+**Date**: 2026-09-24
+**Task**: 核查充值返现人工审核与免审开关
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+只读确认奖励创建为待审核，只有审核通过且到期才结算；当前无免审开关。业务代码未更改。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7a4016df9` | chore(task): archive cashback review switch audit |
+
+### Testing
+
+- [OK] 只读检查配置、奖励创建、审核与结算代码及运维文档；未执行测试。
+
+### Status
+
+[OK] **Completed**
