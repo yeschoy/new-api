@@ -16,117 +16,88 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { api } from '@/lib/http-client'
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
-export {
-  applyAuthBundle,
-  applyAuthRotation,
-  bootstrapAuthentication,
-  clearAuthenticatedClientState,
-  clearAuthentication,
-  getCommonHeaders,
-  getFreshAuthHeaders,
-  isAuthBundle,
-  refreshAuthentication,
-  AuthRotationError,
-} from '@/lib/auth-session'
-export type { AuthTokenRotation, RefreshOutcome } from '@/lib/auth-session'
-export { api }
-export type { ApiRequestConfig } from '@/lib/http-client'
+import { authStore, isAuthBundle, type AuthBundle } from './auth-store'
 
-// ============================================================================
-// User APIs
-// ============================================================================
-
-export async function getSelf() {
-  const res = await api.get('/api/user/self', {
-    skipErrorHandler: true,
-  })
-  return res.data
-}
-
-type UserModelsResponse = {
+/** Standard `{ success, message, data }` envelope used by every endpoint. */
+export type ApiEnvelope<T> = {
   success: boolean
   message?: string
-  data?: string[]
+  code?: string
+  data: T
 }
 
-export async function getUserModels(): Promise<UserModelsResponse> {
-  const res = await api.get('/api/user/models')
-  return res.data
+type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean }
+
+export const api = axios.create({
+  withCredentials: true,
+  headers: { 'Cache-Control': 'no-store' },
+})
+
+// Refresh uses its own client so it never re-enters the interceptors below.
+const authClient = axios.create({ withCredentials: true })
+
+let refreshing: Promise<boolean> | null = null
+
+/**
+ * Exchanges the httpOnly refresh cookie for a new access token.
+ * Resolves true when signed in, false when the visitor is anonymous.
+ */
+export function refreshSession(): Promise<boolean> {
+  if (refreshing) return refreshing
+  const sid = authStore.get().session?.sid
+  refreshing = authClient
+    .post<ApiEnvelope<AuthBundle>>('/api/user/auth/refresh', undefined, {
+      headers: sid ? { 'X-Auth-Session': sid } : undefined,
+      validateStatus: () => true,
+    })
+    .then((response) => {
+      if (response.data?.success && isAuthBundle(response.data.data)) {
+        authStore.applyBundle(response.data.data)
+        return true
+      }
+      authStore.clear()
+      return false
+    })
+    .catch(() => {
+      authStore.clear()
+      return false
+    })
+    .finally(() => {
+      refreshing = null
+    })
+  return refreshing
 }
 
-export async function getUserGroupModels(
-  group: string
-): Promise<UserModelsResponse> {
-  const res = await api.get('/api/user/models', { params: { group } })
-  return res.data
-}
+api.interceptors.request.use((config) => {
+  const token = authStore.get().accessToken
+  if (token) config.headers.set('Authorization', `Bearer ${token}`)
+  return config
+})
 
-export async function getUserGroups(): Promise<{
-  success: boolean
-  message?: string
-  data?: Record<string, { desc: string; ratio: number | string }>
-}> {
-  const res = await api.get('/api/user/self/groups')
-  return res.data
-}
+api.interceptors.response.use(undefined, async (error: AxiosError) => {
+  const config = error.config as RetriableConfig | undefined
+  const isAuthCall = config?.url?.startsWith('/api/user/auth/')
+  if (
+    error.response?.status === 401 &&
+    config &&
+    !config._retried &&
+    !isAuthCall &&
+    authStore.get().accessToken
+  ) {
+    config._retried = true
+    if (await refreshSession()) return api(config)
+  }
+  return Promise.reject(error)
+})
 
-// ============================================================================
-// System APIs
-// ============================================================================
-
-export async function getStatus() {
-  const res = await api.get('/api/status')
-  return res.data?.data as Record<string, unknown>
-}
-
-export async function getNotice(): Promise<{
-  success: boolean
-  message?: string
-  data?: string
-}> {
-  const res = await api.get('/api/notice')
-  return res.data
-}
-
-// ============================================================================
-// 2FA Management APIs
-// ============================================================================
-
-export async function get2FAStatus() {
-  const res = await api.get('/api/user/2fa/status')
-  return res.data
-}
-
-export async function setup2FA() {
-  const res = await api.post('/api/user/2fa/setup')
-  return res.data
-}
-
-export async function enable2FA(code: string) {
-  const res = await api.post(
-    '/api/user/2fa/enable',
-    { code },
-    { acceptAuthRotation: true }
-  )
-  return res.data
-}
-
-export async function disable2FA(code: string) {
-  const res = await api.post(
-    '/api/user/2fa/disable',
-    { code },
-    { acceptAuthRotation: true }
-  )
-  return res.data
-}
-
-export async function regenerate2FABackupCodes(code: string) {
-  const res = await api.post(
-    '/api/user/2fa/backup_codes',
-    { code },
-    { acceptAuthRotation: true }
-  )
-  return res.data
+/** Pulls a user-facing message out of an axios error or envelope. */
+export function errorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { message?: string } | undefined
+    return data?.message || error.message || fallback
+  }
+  if (error instanceof Error) return error.message || fallback
+  return fallback
 }
