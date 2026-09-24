@@ -36,18 +36,18 @@ export function heroStats(input: { weeklyTokens: number; modelCount: number; ven
 }
 
 /** 1440px reference: h1 at y=120 (64px below the bar), buttons 205×44. */
-export function RouterHero(props: { stats: HeroStat[] }) {
+export function RouterHero() {
   const auth = useAuth()
   const keyHref = auth.status === 'authenticated' ? '/settings/keys' : '/sign-up'
 
   return (
     <section className='px-6 pt-16 text-center'>
-      <h1 className='mx-auto max-w-[896px] text-[40px] leading-[1.2] font-bold tracking-[-1.4px] md:text-[56px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
+      <h1 className='mx-auto max-w-[896px] text-[40px] leading-[1.2] font-bold tracking-[-1.4px] md:text-[56px]'>
         一个接口
         <br />
         接入所有模型
       </h1>
-      <p className='text-or-muted mx-auto max-w-[896px] pt-2 text-[16px] leading-[21.6px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
+      <p className='text-or-muted mx-auto max-w-[896px] pt-2 text-[16px] leading-[21.6px]'>
         更低<span className='text-or-fg'>价格</span>，更高
         <span className='text-or-fg'>可用</span>，无需订阅。
       </p>
@@ -66,21 +66,21 @@ export function RouterHero(props: { stats: HeroStat[] }) {
           <Sparkles className='text-or-blue size-4' aria-hidden='true' />
         </Link>
       </div>
-
-      {props.stats.length > 0 ? (
-        <dl className='mx-auto mt-16 flex max-w-[696px] flex-wrap justify-center gap-6 py-6'>
-          {props.stats.map((stat) => (
-            <div key={stat.label} className='flex w-[156px] flex-col items-center gap-2'>
-              <dt className='text-or-muted order-2 text-[12px] leading-[16.2px]'>
-                {stat.label}
-              </dt>
-              <dd className='order-1 text-[36px] leading-[43.2px] font-bold'>
-                {stat.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
     </section>
+  )
+}
+
+/** Live figures under the world map; nothing until data has loaded. */
+export function HeroStats(props: { stats: HeroStat[] }) {
+  if (props.stats.length === 0) return null
+  return (
+    <dl className='mx-auto flex max-w-[696px] flex-wrap justify-center gap-6 px-6 py-6'>
+      {props.stats.map((stat) => (
+        <div key={stat.label} className='flex w-[156px] flex-col items-center gap-2'>
+          <dt className='text-or-muted order-2 text-[12px] leading-[16.2px]'>{stat.label}</dt>
+          <dd className='order-1 text-[36px] leading-[43.2px] font-bold'>{stat.value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }

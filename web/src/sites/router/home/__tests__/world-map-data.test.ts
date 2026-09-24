@@ -16,12 +16,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { coarsen, decodeWorld } from '../world-map-data'
+import { coarsen, decodeLand, decodeLights } from '../world-map-data'
 
-describe('decodeWorld', () => {
-  it('unpacks two cells per byte, low nibble first', () => {
-    const encoded = btoa(String.fromCharCode(0x21, 0xf0))
-    expect(Array.from(decodeWorld(encoded, 2, 2).cells)).toEqual([1, 2, 0, 15])
+const encode = (...bytes: number[]) => btoa(String.fromCharCode(...bytes))
+
+describe('decodeLand', () => {
+  it('reads one bit per cell, least significant bit first', () => {
+    const land = decodeLand(encode(0b0000_0101), 4, 2)
+    expect(Array.from(land.cells)).toEqual([1, 0, 1, 0, 0, 0, 0, 0])
+  })
+})
+
+describe('decodeLights', () => {
+  it('reads varint gaps between lit cells and their brightness', () => {
+    // gap 0 → cell 0; gap 2 → cell 3; gap 128 (two varint bytes) → cell 132
+    const lights = decodeLights(encode(0x00, 200, 0x02, 50, 0x80, 0x01, 255), 200, 1)
+    expect(Array.from(lights.index)).toEqual([0, 3, 132])
+    expect(Array.from(lights.level)).toEqual([200, 50, 255])
   })
 })
 
@@ -29,15 +40,15 @@ describe('coarsen', () => {
   const grid = {
     cols: 6,
     rows: 2,
-    // sea with one light | mostly land | one land cell in sea
-    cells: Uint8Array.from([0, 0, 1, 1, 1, 0, 0, 5, 1, 0, 0, 0]),
+    // one land cell | mostly land | sea
+    cells: Uint8Array.from([0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0]),
   }
 
-  it('keeps the brightest light, keeps mostly-land blocks and drops stray land', () => {
+  it('keeps blocks that are at least a third land', () => {
     const merged = coarsen(grid, 2)
     expect(merged.cols).toBe(3)
     expect(merged.rows).toBe(1)
-    expect(Array.from(merged.cells)).toEqual([5, 1, 0])
+    expect(Array.from(merged.cells)).toEqual([0, 1, 0])
   })
 
   it('returns the grid unchanged at full resolution', () => {

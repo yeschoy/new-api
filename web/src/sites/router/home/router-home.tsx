@@ -22,7 +22,7 @@ import { useCatalog, useRankings } from '@/lib/queries'
 
 import { RouterShell } from '../router-shell'
 import { RouterFeatures } from './router-features'
-import { RouterHero, heroStats } from './router-hero'
+import { HeroStats, RouterHero, heroStats } from './router-hero'
 import { FeaturedApps, FeaturedModels, RecentModels } from './router-sections'
 import { RouterSteps } from './router-steps'
 import { WorldMap } from './world-map'
@@ -62,26 +62,21 @@ export function RouterHome() {
 
   return (
     <RouterShell>
-      <div className='relative overflow-x-clip'>
-        <WorldMap className='pointer-events-none absolute inset-x-0 top-4 mx-auto h-[640px] w-full max-w-[1440px] [mask-image:radial-gradient(ellipse_72%_62%_at_50%_42%,black_40%,transparent_86%)]' />
-        <div className='relative'>
-          <RouterHero stats={stats} />
-        </div>
-      </div>
-      {/* Positioned so the cards paint above the map's lower fade. */}
-      <div className='relative'>
-        <RouterFeatures icons={icons} slug={slug} />
-        <FeaturedModels
-          rows={ranked}
-          catalog={models}
-          modelCount={models.length}
-          vendorCount={vendorCount}
-        />
-        <FeaturedApps />
-        <RouterSteps />
-        <RecentModels models={models} />
-        <div className='h-32' />
-      </div>
+      <RouterHero />
+      {/* Below the headline, so no text covers the map. */}
+      <WorldMap className='world-map-frame pointer-events-none relative mx-auto mt-10 aspect-[360/138] w-full max-w-[1440px]' />
+      <HeroStats stats={stats} />
+      <RouterFeatures icons={icons} slug={slug} />
+      <FeaturedModels
+        rows={ranked}
+        catalog={models}
+        modelCount={models.length}
+        vendorCount={vendorCount}
+      />
+      <FeaturedApps />
+      <RouterSteps />
+      <RecentModels models={models} />
+      <div className='h-32' />
     </RouterShell>
   )
 }
