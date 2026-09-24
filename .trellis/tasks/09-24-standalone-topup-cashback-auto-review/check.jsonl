@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/referral-recharge-cashback.md","reason":"复核返现事务、资格、风险、审核和结算不变量"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"复核三种真实数据库迁移、行锁和幂等"}
+{"file":".trellis/spec/frontend/index.md","reason":"复核前端复用、测试、七语 i18n 与类型契约"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"复核订单到支付到奖励再到 UI 的完整数据流"}
+{"file":".agents/rules/billing.md","reason":"复核额度结算与安全边界，须完整阅读"}
+{"file":".trellis/tasks/09-24-standalone-topup-cashback-auto-review/research/current-state-and-constraints.md","reason":"对照旧行为、兼容边界与矩阵验证条件"}

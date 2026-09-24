@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/referral-recharge-cashback.md","reason":"现有返现事务、状态机、风控与数据库合同；新需求需有界更新"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"跨数据库迁移与事务测试注意事项"}
+{"file":".trellis/spec/frontend/index.md","reason":"前端规范入口及返现合同索引"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"API、配置、活动、订单、奖励、前端跨层契约"}
+{"file":".agents/rules/billing.md","reason":"额度换算、结算与扣减安全约束，实施前须完整阅读"}
+{"file":".trellis/tasks/09-24-standalone-topup-cashback-auto-review/research/current-state-and-constraints.md","reason":"已核查现状、受影响文件及数据库矩阵准备情况"}
