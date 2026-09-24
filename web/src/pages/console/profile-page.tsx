@@ -25,26 +25,23 @@ import { RequireAuth } from '@/components/require-auth'
 import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
 import { updateDisplayName } from '@/lib/console-api'
-import { cn } from '@/lib/format'
 import { logout } from '@/lib/services'
 
 import { roleLabel } from './console-helpers'
 import { useSelf } from './console-hooks'
 import { ConsoleLayout } from './console-layout'
-import { Button, Notice, Panel, TextInput, useIsRouter, useMutedText } from './console-ui'
+import { Button, Notice, Panel, TextInput } from './console-ui'
 
 /** Account details, display-name editing and sign-out. */
 export function ProfilePage() {
   return (
-    <RequireAuth>
+    <RequireAuth framed>
       <ProfileContent />
     </RequireAuth>
   )
 }
 
 function ProfileContent() {
-  const router = useIsRouter()
-  const muted = useMutedText()
   const auth = useAuth()
   const self = useSelf()
   const user = self.data ?? auth.user
@@ -63,7 +60,7 @@ function ProfileContent() {
     ['用户 ID', user ? String(user.id) : '—'],
     ['用户名', user?.username || '—'],
     ['显示名称', <DisplayNameEditor value={user?.display_name ?? ''} />],
-    ['邮箱', user?.email || <span className={muted}>未绑定</span>],
+    ['邮箱', user?.email || <span className='text-or-muted'>未绑定</span>],
     ['分组', user?.group || 'default'],
     ['角色', roleLabel(user?.role)],
   ]
@@ -76,12 +73,9 @@ function ProfileContent() {
             {rows.map(([label, value]) => (
               <div
                 key={label}
-                className={cn(
-                  'flex flex-col gap-1 border-t px-5 py-3.5 first:border-t-0 sm:flex-row sm:items-center sm:gap-6',
-                  router ? 'border-or-line' : 'border-[#f0f0f0]'
-                )}
+                className='border-or-line flex flex-col gap-1 border-t px-5 py-3.5 first:border-t-0 sm:flex-row sm:items-center sm:gap-6'
               >
-                <dt className={cn('w-[120px] shrink-0 text-[14px]', muted)}>{label}</dt>
+                <dt className='text-or-muted w-[120px] shrink-0 text-[14px]'>{label}</dt>
                 <dd className='min-w-0 flex-1 text-[14px] break-all'>{value}</dd>
               </div>
             ))}
@@ -90,7 +84,7 @@ function ProfileContent() {
 
         <Panel title='退出登录'>
           <div className='flex flex-wrap items-center justify-between gap-4'>
-            <p className={cn('text-[14px]', muted)}>退出当前浏览器中的登录状态，API 密钥不受影响。</p>
+            <p className='text-or-muted text-[14px]'>退出当前浏览器中的登录状态，API 密钥不受影响。</p>
             <Button busy={signingOut} onClick={signOut}>
               <LogOut className='size-4' aria-hidden='true' />
               退出登录

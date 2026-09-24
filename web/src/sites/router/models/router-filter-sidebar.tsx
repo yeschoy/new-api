@@ -62,7 +62,7 @@ function CheckRow(props: { label: string; checked: boolean; count?: number; onTo
       <span
         className={cn(
           'flex size-4 shrink-0 items-center justify-center rounded-[4px] border',
-          props.checked ? 'border-or-lime bg-or-lime text-or-bg' : 'border-or-fg/30'
+          props.checked ? 'border-or-primary bg-or-primary text-or-bg' : 'border-or-fg/30'
         )}
       >
         {props.checked ? <Check className='size-3' strokeWidth={3} /> : null}

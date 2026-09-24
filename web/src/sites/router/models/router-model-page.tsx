@@ -104,14 +104,14 @@ export function RouterModelPage() {
               >
                 <Copy className='size-3.5' />
               </button>
-              {copied ? <span className='text-or-lime text-[12px]'>已复制</span> : null}
+              {copied ? <span className='text-or-primary text-[12px]'>已复制</span> : null}
             </div>
           </div>
           <div className='flex gap-2'>
             <a href='#api' className='border-or-line bg-or-bg hover:bg-or-fill flex h-9 items-center gap-2 rounded-[6px] border px-3 text-[14px] font-medium'>
               <Code2 className='size-4' /> API
             </a>
-            <Link to={`/chat?model=${encodeURIComponent(model.model_name)}`} className='border-or-lime/40 bg-or-lime-soft text-or-lime flex h-9 items-center gap-2 rounded-[6px] border px-3 text-[14px] font-medium'>
+            <Link to={`/chat?model=${encodeURIComponent(model.model_name)}`} className='border-or-primary/40 bg-or-primary-soft text-or-primary flex h-9 items-center gap-2 rounded-[6px] border px-3 text-[14px] font-medium'>
               试用这个模型 <ArrowRight className='size-4' />
             </Link>
           </div>
@@ -144,7 +144,7 @@ export function RouterModelPage() {
         <div className='border-or-line mt-8 flex gap-8 border-t pt-8'>
           <nav className='sticky top-20 hidden h-fit w-[180px] shrink-0 flex-col gap-0.5 md:flex'>
             {SECTIONS.map((s, i) => (
-              <a key={s.id} href={`#${s.id}`} className={cn('flex h-8 items-center gap-2 rounded-[6px] px-3 text-[14px] font-medium', i === 0 ? 'bg-or-lime-soft text-or-lime' : 'text-or-muted hover:text-or-fg')}>
+              <a key={s.id} href={`#${s.id}`} className={cn('flex h-8 items-center gap-2 rounded-[6px] px-3 text-[14px] font-medium', i === 0 ? 'bg-or-primary-soft text-or-primary' : 'text-or-muted hover:text-or-fg')}>
                 <s.icon className='size-4' />
                 {s.label}
               </a>
@@ -204,7 +204,7 @@ export function RouterModelPage() {
               <p className='text-or-muted mt-1 text-[14px]'>完全兼容 OpenAI SDK，替换接口地址和密钥即可。</p>
               <div className='mt-4 flex gap-1'>
                 {(['curl', 'python', 'typescript'] as SampleLanguage[]).map((l) => (
-                  <button key={l} type='button' onClick={() => setLang(l)} className={cn('h-7 rounded-[4px] px-2.5 text-[13px] font-medium', lang === l ? 'bg-or-lime-soft text-or-lime' : 'text-or-muted')}>
+                  <button key={l} type='button' onClick={() => setLang(l)} className={cn('h-7 rounded-[4px] px-2.5 text-[13px] font-medium', lang === l ? 'bg-or-primary-soft text-or-primary' : 'text-or-muted')}>
                     {l}
                   </button>
                 ))}

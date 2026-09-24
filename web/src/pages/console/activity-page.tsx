@@ -48,7 +48,7 @@ const COLUMNS: Column[] = [
 /** Usage: 7-day summary tiles and the paginated request log. */
 export function ActivityPage() {
   return (
-    <RequireAuth>
+    <RequireAuth framed>
       <ActivityContent />
     </RequireAuth>
   )

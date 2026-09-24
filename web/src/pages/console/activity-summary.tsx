@@ -25,7 +25,7 @@ import type { UsageLog } from '@/lib/services'
 
 import { recentWindow, sumLogs } from './console-helpers'
 import { useConsoleKey, useMoney } from './console-hooks'
-import { Panel, useIsRouter, useMutedText } from './console-ui'
+import { Panel } from './console-ui'
 
 const DAYS = 7
 
@@ -34,7 +34,6 @@ const DAYS = 7
  * Falls back to totals of the visible log page if the summary endpoint fails.
  */
 export function UsageTiles(props: { logs: UsageLog[] }) {
-  const muted = useMutedText()
   const money = useMoney()
   const [range] = useState(() => recentWindow(new Date(), DAYS))
   const summary = useQuery({
@@ -62,8 +61,8 @@ export function UsageTiles(props: { logs: UsageLog[] }) {
       {tiles.map((tile) => (
         <Panel key={tile.label}>
           <div className='flex items-baseline justify-between gap-2'>
-            <span className={cn('text-[13px] font-medium', muted)}>{tile.label}</span>
-            <span className={cn('text-[12px]', muted)}>{caption}</span>
+            <span className='text-or-muted text-[13px] font-medium'>{tile.label}</span>
+            <span className='text-or-muted text-[12px]'>{caption}</span>
           </div>
           <div className='mt-1 text-[28px] leading-9 font-semibold tabular-nums'>{tile.value}</div>
           {summary.data ? <DayBars dates={range.dates} values={tile.values} format={tile.format} /> : <div className='mt-4 h-12' />}
@@ -74,7 +73,6 @@ export function UsageTiles(props: { logs: UsageLog[] }) {
 }
 
 function DayBars(props: { dates: string[]; values: number[]; format: (value: number) => string }) {
-  const router = useIsRouter()
   const max = Math.max(0, ...props.values)
   return (
     <div className='mt-4 flex h-12 items-end gap-1'>
@@ -82,10 +80,7 @@ function DayBars(props: { dates: string[]; values: number[]; format: (value: num
         <div
           key={props.dates[index]}
           title={`${props.dates[index]}：${props.format(value)}`}
-          className={cn(
-            'flex-1 rounded-[2px]',
-            value > 0 ? (router ? 'bg-or-lime/80' : 'bg-hub-blue/80') : router ? 'bg-or-line' : 'bg-black/[0.06]'
-          )}
+          className={cn('flex-1 rounded-[2px]', value > 0 ? 'bg-or-primary/80' : 'bg-or-line')}
           style={{ height: value > 0 && max > 0 ? `${Math.max(8, (value / max) * 100)}%` : '3px' }}
         />
       ))}

@@ -19,14 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 import { useBrand } from '@/lib/queries'
 
 /**
- * Operator logo from system settings, or a neutral placeholder glyph.
- * `tone` picks the placeholder colors for the dark or light design.
+ * Operator logo from system settings, or a neutral placeholder glyph drawn
+ * in the theme's primary color (violet by day, lime by night).
  */
-export function BrandMark(props: {
-  size?: number
-  tone: 'lime' | 'blue'
-  className?: string
-}) {
+export function BrandMark(props: { size?: number; className?: string }) {
   const brand = useBrand()
   const size = props.size ?? 24
   if (brand.logo) {
@@ -41,8 +37,6 @@ export function BrandMark(props: {
       />
     )
   }
-  const fill = props.tone === 'lime' ? '#c8ff00' : '#1677ff'
-  const stroke = props.tone === 'lime' ? '#03080a' : '#ffffff'
   return (
     <svg
       width={size}
@@ -51,11 +45,11 @@ export function BrandMark(props: {
       aria-hidden='true'
       className={props.className}
     >
-      <rect width='24' height='24' rx='6' fill={fill} />
+      <rect width='24' height='24' rx='6' style={{ fill: 'var(--or-primary)' }} />
       <path
         d='M6.5 16.5v-9l5.5 5.5 5.5-5.5v9'
         fill='none'
-        stroke={stroke}
+        style={{ stroke: 'var(--or-bg)' }}
         strokeWidth='2.2'
         strokeLinecap='round'
         strokeLinejoin='round'

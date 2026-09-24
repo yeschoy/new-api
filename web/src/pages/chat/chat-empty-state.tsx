@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { Code2, Lightbulb, MapPinned, PenLine } from 'lucide-react'
 
 import { cn } from '@/lib/format'
-import type { SiteSkin } from '@/site/site-skin'
 
 const SUGGESTIONS = [
   { icon: Lightbulb, title: '解释概念', prompt: '用通俗易懂的语言解释一下什么是量子计算，控制在三段以内' },
@@ -28,33 +27,21 @@ const SUGGESTIONS = [
   { icon: MapPinned, title: '做计划', prompt: '帮我规划一个周末两天的杭州旅行行程，预算 2000 元' },
 ]
 
-const STYLES: Record<SiteSkin, Record<'title' | 'sub' | 'card' | 'cardTitle' | 'cardText' | 'icon', string>> = {
-  router: {
-    title: 'text-or-fg text-[28px] font-semibold tracking-[-0.02em]',
-    sub: 'text-or-muted',
-    card: 'border-or-line bg-or-card hover:bg-or-fill rounded-[8px] border',
-    cardTitle: 'text-or-fg',
-    cardText: 'text-or-muted',
-    icon: 'text-or-lime',
-  },
-  hub: {
-    title: 'font-serif-display text-hub-ink text-[32px] font-bold',
-    sub: 'text-hub-muted',
-    card: 'hover:border-hub-blue rounded-[12px] border border-black/10 bg-white hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)]',
-    cardTitle: 'text-hub-ink',
-    cardText: 'text-hub-muted',
-    icon: 'text-hub-blue',
-  },
+const s = {
+  title: 'text-or-fg text-[28px] font-semibold tracking-[-0.02em]',
+  sub: 'text-or-muted',
+  card: 'border-or-line bg-or-card hover:bg-or-fill rounded-[8px] border',
+  cardTitle: 'text-or-fg',
+  cardText: 'text-or-muted',
+  icon: 'text-or-primary',
 }
 
 export function ChatEmptyState(props: {
-  skin: SiteSkin
   model: string
   disabled?: boolean
   onPick: (prompt: string) => void
   className?: string
 }) {
-  const s = STYLES[props.skin]
   return (
     <div className={cn('flex flex-col items-center justify-center px-4 py-10', props.className)}>
       <h2 className={s.title}>有什么可以帮你？</h2>

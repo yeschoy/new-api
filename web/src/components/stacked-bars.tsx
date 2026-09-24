@@ -78,8 +78,8 @@ export function StackedBars(props: {
           const y = pad.t + plotH - (tick / max) * plotH
           return (
             <g key={tick}>
-              <line x1={pad.l} x2={W - pad.r} y1={y} y2={y} stroke={props.theme.grid} />
-              <text x={pad.l - 8} y={y + 3} textAnchor='end' fontSize='10' fill={props.theme.text}>
+              <line x1={pad.l} x2={W - pad.r} y1={y} y2={y} style={{ stroke: props.theme.grid }} />
+              <text x={pad.l - 8} y={y + 3} textAnchor='end' fontSize='10' style={{ fill: props.theme.text }}>
                 {compactNumber(tick)}
               </text>
             </g>
@@ -94,15 +94,15 @@ export function StackedBars(props: {
               {props.models.map((model, mi) => {
                 const h = ((row.get(model) ?? 0) / max) * plotH
                 y -= h
-                return <rect key={model} x={x} y={y} width={barW} height={h} fill={colorOf(mi)} opacity={hover === null || hover === index ? 1 : 0.55} />
+                return <rect key={model} x={x} y={y} width={barW} height={h} style={{ fill: colorOf(mi) }} opacity={hover === null || hover === index ? 1 : 0.55} />
               })}
               {props.showTotals && index % every === 0 ? (
-                <text x={x + barW / 2} y={y - 5} textAnchor='middle' fontSize='9' fill={props.theme.text}>
+                <text x={x + barW / 2} y={y - 5} textAnchor='middle' fontSize='9' style={{ fill: props.theme.text }}>
                   {compactNumber(totals[index])}
                 </text>
               ) : null}
               {index % every === 0 ? (
-                <text x={x + barW / 2} y={H - 14} textAnchor='middle' fontSize='10' fill={props.theme.text}>
+                <text x={x + barW / 2} y={H - 14} textAnchor='middle' fontSize='10' style={{ fill: props.theme.text }}>
                   {label}
                 </text>
               ) : null}
@@ -135,18 +135,11 @@ export function StackedBars(props: {
   )
 }
 
+/** Colors resolve through the day/night CSS variables. */
 export const ROUTER_CHART: ChartTheme = {
-  palette: ['#c8ff00', '#4d8dff', '#f5a524', '#e879f9', '#22d3ee', '#fb7185', '#a78bfa', '#34d399', '#f97316', '#94a3b8'],
-  grid: 'rgba(252,252,254,0.06)',
-  text: 'rgba(252,252,254,0.45)',
-  tooltipBg: '#0d1214',
-  tooltipText: '#fcfcfe',
-}
-
-export const HUB_CHART: ChartTheme = {
-  palette: ['#4096ff', '#36cfc9', '#ffa940', '#ff85c0', '#9254de', '#73d13d', '#ff7a45', '#597ef7', '#f759ab', '#bae637'],
-  grid: '#f0f0f0',
-  text: '#888888',
-  tooltipBg: '#ffffff',
-  tooltipText: '#1a1a1a',
+  palette: ['var(--or-primary)', '#4d8dff', '#f5a524', '#e879f9', '#22d3ee', '#fb7185', '#a78bfa', '#34d399', '#f97316', '#94a3b8'],
+  grid: 'var(--or-line)',
+  text: 'var(--or-dim)',
+  tooltipBg: 'var(--or-card)',
+  tooltipText: 'var(--or-fg)',
 }

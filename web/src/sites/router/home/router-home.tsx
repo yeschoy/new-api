@@ -18,14 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo } from 'react'
 
-import { compactNumber } from '@/lib/format'
 import { useCatalog, useRankings } from '@/lib/queries'
 
 import { RouterShell } from '../router-shell'
 import { RouterFeatures } from './router-features'
-import { RouterHero, type HeroStat } from './router-hero'
+import { RouterHero, heroStats } from './router-hero'
 import { FeaturedApps, FeaturedModels, RecentModels } from './router-sections'
 import { RouterSteps } from './router-steps'
+import { WorldMap } from './world-map'
 
 const FALLBACK_ICONS = [
   'OpenAI', 'Claude.Color', 'Gemini.Color', 'DeepSeek.Color', 'Qwen.Color', 'Kimi.Color',
@@ -46,17 +46,15 @@ export function RouterHome() {
     return [...fromCatalog, ...FALLBACK_ICONS.filter((i) => !fromCatalog.includes(i))]
   }, [models])
 
-  const stats = useMemo<HeroStat[]>(() => {
-    const result: HeroStat[] = []
-    const weeklyTokens = ranked.reduce((sum, row) => sum + row.total_tokens, 0)
-    if (weeklyTokens > 0) result.push({ value: `${compactNumber(weeklyTokens)}+`, label: '本周 Token' })
-    if (models.length > 0) {
-      result.push({ value: `${models.length}+`, label: '模型' })
-      result.push({ value: `${vendorCount}+`, label: '厂商' })
-    }
-    result.push({ value: '3', label: '兼容协议' })
-    return result
-  }, [models.length, ranked, vendorCount])
+  const stats = useMemo(
+    () =>
+      heroStats({
+        weeklyTokens: ranked.reduce((sum, row) => sum + row.total_tokens, 0),
+        modelCount: models.length,
+        vendorCount,
+      }),
+    [models.length, ranked, vendorCount]
+  )
 
   const slug = ranked[0]
     ? `${ranked[0].vendor.toLowerCase()}/${ranked[0].model_name}`
@@ -64,18 +62,26 @@ export function RouterHome() {
 
   return (
     <RouterShell>
-      <RouterHero stats={stats} />
-      <RouterFeatures icons={icons} slug={slug} />
-      <FeaturedModels
-        rows={ranked}
-        catalog={models}
-        modelCount={models.length}
-        vendorCount={vendorCount}
-      />
-      <FeaturedApps />
-      <RouterSteps />
-      <RecentModels models={models} />
-      <div className='h-32' />
+      <div className='relative overflow-x-clip'>
+        <WorldMap className='pointer-events-none absolute inset-x-0 top-4 mx-auto h-[640px] w-full max-w-[1440px] [mask-image:radial-gradient(ellipse_72%_62%_at_50%_42%,black_40%,transparent_86%)]' />
+        <div className='relative'>
+          <RouterHero stats={stats} />
+        </div>
+      </div>
+      {/* Positioned so the cards paint above the map's lower fade. */}
+      <div className='relative'>
+        <RouterFeatures icons={icons} slug={slug} />
+        <FeaturedModels
+          rows={ranked}
+          catalog={models}
+          modelCount={models.length}
+          vendorCount={vendorCount}
+        />
+        <FeaturedApps />
+        <RouterSteps />
+        <RecentModels models={models} />
+        <div className='h-32' />
+      </div>
     </RouterShell>
   )
 }

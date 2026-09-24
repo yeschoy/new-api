@@ -23,7 +23,6 @@ import { Navigate, useNavigate } from 'react-router'
 import { AuthCard, AuthField, AuthSubmit } from '@/components/auth-card'
 import { errorMessage } from '@/lib/api'
 import { getSetup, submitSetup } from '@/lib/services'
-import { useSiteSkin } from '@/site/site-skin'
 
 const MODES = [
   { id: 'external', label: '对外运营', hint: '面向其他用户提供服务' },
@@ -35,7 +34,6 @@ const MODES = [
 export function SetupPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { skin } = useSiteSkin()
   const setup = useQuery({ queryKey: ['setup'], queryFn: getSetup })
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -77,7 +75,6 @@ export function SetupPage() {
     }
   }
 
-  const router = skin === 'router'
   return (
     <AuthCard
       title='初始化系统'
@@ -92,23 +89,19 @@ export function SetupPage() {
           </>
         ) : null}
         <fieldset className='flex flex-col gap-2'>
-          <legend className={router ? 'text-or-muted mb-2 text-[13px]' : 'mb-2 text-[13px] text-[#555]'}>使用模式</legend>
+          <legend className='text-or-muted mb-2 text-[13px]'>使用模式</legend>
           {MODES.map((item) => (
             <label
               key={item.id}
-              className={
-                router
-                  ? 'border-or-line flex cursor-pointer items-center gap-3 rounded-[6px] border px-3 py-2 text-[14px]'
-                  : 'flex cursor-pointer items-center gap-3 rounded-[8px] border border-[#d9d9d9] px-3 py-2 text-[14px]'
-              }
+              className='border-or-line flex cursor-pointer items-center gap-3 rounded-[6px] border px-3 py-2 text-[14px]'
             >
               <input type='radio' name='mode' checked={mode === item.id} onChange={() => setMode(item.id)} />
               <span className='font-medium'>{item.label}</span>
-              <span className={router ? 'text-or-muted text-[12px]' : 'text-[12px] text-[#888]'}>{item.hint}</span>
+              <span className='text-or-muted text-[12px]'>{item.hint}</span>
             </label>
           ))}
         </fieldset>
-        {error ? <p className='text-[13px] text-[#ff4d4f]' role='alert'>{error}</p> : null}
+        {error ? <p className='text-or-red text-[13px]' role='alert'>{error}</p> : null}
         <AuthSubmit busy={busy}>完成初始化</AuthSubmit>
       </form>
     </AuthCard>

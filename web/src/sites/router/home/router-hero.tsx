@@ -20,8 +20,20 @@ import { Sparkles } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { useAuth } from '@/lib/auth-store'
+import { compactNumber } from '@/lib/format'
 
 export type HeroStat = { value: string; label: string }
+
+/** Hero figures backed by live data; empty until the catalog has loaded. */
+export function heroStats(input: { weeklyTokens: number; modelCount: number; vendorCount: number }): HeroStat[] {
+  const result: HeroStat[] = []
+  if (input.weeklyTokens > 0) result.push({ value: `${compactNumber(input.weeklyTokens)}+`, label: '本周 Token' })
+  if (input.modelCount > 0) {
+    result.push({ value: `${input.modelCount}+`, label: '模型' })
+    result.push({ value: `${input.vendorCount}+`, label: '厂商' })
+  }
+  return result
+}
 
 /** 1440px reference: h1 at y=120 (64px below the bar), buttons 205×44. */
 export function RouterHero(props: { stats: HeroStat[] }) {
@@ -30,19 +42,19 @@ export function RouterHero(props: { stats: HeroStat[] }) {
 
   return (
     <section className='px-6 pt-16 text-center'>
-      <h1 className='mx-auto max-w-[896px] text-[40px] leading-[1.2] font-bold tracking-[-1.4px] md:text-[56px]'>
+      <h1 className='mx-auto max-w-[896px] text-[40px] leading-[1.2] font-bold tracking-[-1.4px] md:text-[56px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
         一个接口
         <br />
         接入所有模型
       </h1>
-      <p className='text-or-muted mx-auto max-w-[896px] pt-2 text-[16px] leading-[21.6px]'>
+      <p className='text-or-muted mx-auto max-w-[896px] pt-2 text-[16px] leading-[21.6px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
         更低<span className='text-or-fg'>价格</span>，更高
         <span className='text-or-fg'>可用</span>，无需订阅。
       </p>
       <div className='mt-6 flex flex-wrap justify-center gap-4'>
         <Link
           to={keyHref}
-          className='bg-or-lime text-or-bg flex h-11 w-[205px] items-center justify-center gap-2 rounded-[6px] px-8 text-[14px] font-medium transition-opacity hover:opacity-90'
+          className='bg-or-primary text-or-bg flex h-11 w-[205px] items-center justify-center gap-2 rounded-[6px] px-8 text-[14px] font-medium transition-opacity hover:opacity-90'
         >
           获取 API Key
         </Link>
@@ -56,9 +68,9 @@ export function RouterHero(props: { stats: HeroStat[] }) {
       </div>
 
       {props.stats.length > 0 ? (
-        <dl className='mx-auto mt-16 grid max-w-[696px] grid-cols-2 gap-6 py-6 sm:grid-cols-4'>
+        <dl className='mx-auto mt-16 flex max-w-[696px] flex-wrap justify-center gap-6 py-6'>
           {props.stats.map((stat) => (
-            <div key={stat.label} className='flex flex-col items-center gap-2'>
+            <div key={stat.label} className='flex w-[156px] flex-col items-center gap-2'>
               <dt className='text-or-muted order-2 text-[12px] leading-[16.2px]'>
                 {stat.label}
               </dt>

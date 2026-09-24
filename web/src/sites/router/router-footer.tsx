@@ -66,7 +66,7 @@ export function RouterFooter() {
       <div className='mx-auto grid max-w-[1280px] gap-8 sm:grid-cols-2 md:grid-cols-5'>
         <div className='flex flex-col gap-4'>
           <Link to='/' className='text-or-fg flex items-center gap-2 text-[15px] font-semibold'>
-            <BrandMark tone='lime' size={20} />
+            <BrandMark size={20} />
             {brand.name}
           </Link>
           <div className='text-or-muted text-[14px]'>

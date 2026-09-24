@@ -27,12 +27,10 @@ import { createKey, revealKey, type ApiKey } from '@/lib/services'
 
 import { withKeyPrefix } from './console-helpers'
 import { useMoney } from './console-hooks'
-import { Button, Field, Notice, TextInput, useIsRouter, useMutedText } from './console-ui'
+import { Button, Field, Notice, TextInput } from './console-ui'
 
 /** Modal: name + optional credit limit; afterwards shows the new key once. */
 export function CreateKeyDialog(props: { onClose: () => void }) {
-  const router = useIsRouter()
-  const muted = useMutedText()
   const money = useMoney()
   const queryClient = useQueryClient()
   const titleId = useId()
@@ -92,7 +90,7 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
 
   return (
     <div
-      className={cn('fixed inset-0 z-[60] flex items-center justify-center p-4', router ? 'bg-black/70' : 'bg-black/45')}
+      className='fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4'
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) props.onClose()
       }}
@@ -101,14 +99,9 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
         role='dialog'
         aria-modal='true'
         aria-labelledby={titleId}
-        className={cn(
-          'relative w-full max-w-[460px] p-6',
-          router
-            ? 'border-or-line bg-or-card text-or-fg rounded-[12px] border'
-            : 'rounded-[8px] bg-white text-[rgba(0,0,0,0.88)] shadow-[0_6px_16px_rgba(0,0,0,0.08),0_3px_6px_-4px_rgba(0,0,0,0.12),0_9px_28px_8px_rgba(0,0,0,0.05)]'
-        )}
+        className='border-or-line bg-or-card text-or-fg relative w-full max-w-[460px] rounded-[12px] border p-6 shadow-2xl'
       >
-        <button type='button' onClick={props.onClose} aria-label='关闭' className={cn('absolute top-4 right-4 flex size-7 items-center justify-center rounded-[6px]', router ? 'text-or-muted hover:bg-or-fill' : 'text-black/45 hover:bg-black/[0.04]')}>
+        <button type='button' onClick={props.onClose} aria-label='关闭' className='text-or-muted hover:bg-or-fill absolute top-4 right-4 flex size-7 items-center justify-center rounded-[6px]'>
           <X className='size-4' />
         </button>
         <h2 id={titleId} className='text-[16px] font-semibold'>
@@ -129,15 +122,15 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
                   aria-checked={unlimited}
                   aria-label='不限额度'
                   onClick={() => setUnlimited(!unlimited)}
-                  className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors', unlimited ? (router ? 'bg-or-lime' : 'bg-hub-blue') : router ? 'bg-or-fg/20' : 'bg-black/25')}
+                  className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors', unlimited ? 'bg-or-primary' : 'bg-or-fg/20')}
                 >
-                  <span className={cn('absolute top-0.5 left-0.5 size-4 rounded-full transition-transform', router && unlimited ? 'bg-or-bg' : 'bg-white', unlimited && 'translate-x-4')} />
+                  <span className={cn('absolute top-0.5 left-0.5 size-4 rounded-full transition-transform', unlimited ? 'bg-or-bg translate-x-4' : 'bg-white')} />
                 </button>
                 <span>不限额度</span>
               </div>
               {unlimited ? null : (
                 <div className='relative mt-1'>
-                  <span className={cn('pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[14px]', muted)}>{money.symbol}</span>
+                  <span className='text-or-muted pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-[14px]'>{money.symbol}</span>
                   <TextInput id={limitId} value={amount} onChange={setAmount} inputMode='decimal' placeholder='10' className='pl-7' />
                 </div>
               )}
@@ -154,8 +147,8 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
           <div className='mt-4 flex flex-col gap-4'>
             {created ? (
               <>
-                <p className={cn('text-[14px]', muted)}>请复制并妥善保存该密钥。之后也可以在列表中点击“显示”再次查看。</p>
-                <div className={cn('flex items-center gap-2 p-3', router ? 'border-or-line bg-or-bg rounded-[6px] border' : 'rounded-[8px] border border-[#d9d9d9] bg-[#fafafa]')}>
+                <p className='text-or-muted text-[14px]'>请复制并妥善保存该密钥。之后也可以在列表中点击“显示”再次查看。</p>
+                <div className='border-or-line bg-or-bg flex items-center gap-2 rounded-[6px] border p-3'>
                   <code className='font-geist min-w-0 flex-1 text-[13px] break-all'>{created}</code>
                   <Button size='sm' onClick={onCopy}>
                     {copied ? <Check className='size-3.5' /> : <Copy className='size-3.5' />}
@@ -164,7 +157,7 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
                 </div>
               </>
             ) : (
-              <p className={cn('text-[14px]', muted)}>密钥已创建，可在列表中点击“显示”查看完整密钥。</p>
+              <p className='text-or-muted text-[14px]'>密钥已创建，可在列表中点击“显示”查看完整密钥。</p>
             )}
             {formError ? <Notice tone='error'>{formError}</Notice> : null}
             <div className='flex justify-end'>

@@ -13,14 +13,14 @@ This is the 2026-09 rewrite of the dashboard UI. The previous frontend was remov
 | Data | @tanstack/react-query + axios instance in `src/lib/api.ts` |
 | Tests | Vitest + Testing Library (`bun run test`), `bun run typecheck` must be clean |
 
-## Two reference designs ("skins")
+## Design and themes
 
-The site ships two complete designs that visitors can switch with the floating control in the bottom-right corner (stored in `localStorage['site-skin']`):
+One design, a replica of the openrouter.ai catalog. Components live under `src/sites/router/` (shared pieces in `src/components/`, page-level logic in `src/pages/`).
 
-- `router`: dark catalog design, components under `src/sites/router/`, tokens `or-*` (e.g. `bg-or-bg`, `text-or-muted`, `bg-or-lime`).
-- `hub`: light gateway design, components under `src/sites/hub/`, tokens `hub-*` (e.g. `bg-hub-blue`, `text-hub-link`), serif headings via `font-serif-display`.
-
-Pages pick their implementation with `<BySkin router={...} hub={...} />` from `src/site/site-skin.tsx`. Pages that are mostly logic (console, chat, auth) render one component and branch on `useSiteSkin()` for styling.
+- Colours come only from the `or-*` Tailwind tokens (`bg-or-bg`, `bg-or-card`, `text-or-fg`, `text-or-muted`, `border-or-line`, `bg-or-fill`, `bg-or-primary`, …). They are CSS variables defined in `src/styles.css` with a day palette on `:root` and a night palette on `.dark`, so never hard-code backgrounds, text, borders or the primary colour. The only literal hues are accents that read on both themes (chart palette, modality tags, the green "up" trend).
+- `src/site/theme.tsx` (`ThemeProvider`, `useTheme()`) sets the `.dark` class. Mode `auto` (default) follows the visitor's clock (06:00–18:00 day, otherwise night); the sun/moon button in the header pins light or dark.
+- The home hero has a fine dotted world map (`src/sites/router/home/world-map.tsx`, 480×184 dots). By day it is a plain grey stipple; by night the real city lights switch on from east to west. `world-night.ts` is generated data (land from Natural Earth, lights from NASA Earth Observatory's Black Marble 2016, both public domain) made by a script kept outside the repo; treat it as a data file. It loads in its own chunk.
+- Pages never force a redirect to sign-in or setup. Signed-in-only pages wrap their content in `RequireAuth` (use `framed` when the children render their own page frame), which shows an in-page sign-in notice. An uninitialised instance shows no setup notice or button anywhere; the administrator opens `/setup` by URL.
 
 Brand name and logo always come from the operator's system settings (`useBrand()` in `src/lib/queries.ts`); never hard-code a brand.
 

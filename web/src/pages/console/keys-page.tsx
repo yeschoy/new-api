@@ -22,14 +22,13 @@ import { useEffect, useState } from 'react'
 
 import { RequireAuth } from '@/components/require-auth'
 import { errorMessage } from '@/lib/api'
-import { cn } from '@/lib/format'
 import { useStatus } from '@/lib/queries'
 import { listKeys } from '@/lib/services'
 
 import { useConsoleKey } from './console-hooks'
 import { ConsoleLayout } from './console-layout'
 import { Pager, Table, TableMessage, type Column } from './console-table'
-import { Button, Panel, useIsRouter } from './console-ui'
+import { Button, Panel } from './console-ui'
 import { CreateKeyDialog } from './key-create-dialog'
 import { KeyRow } from './key-row'
 
@@ -47,14 +46,13 @@ const COLUMNS: Column[] = [
 /** API keys: list, reveal / copy, enable / disable, delete, create. */
 export function KeysPage() {
   return (
-    <RequireAuth>
+    <RequireAuth framed>
       <KeysContent />
     </RequireAuth>
   )
 }
 
 function KeysContent() {
-  const router = useIsRouter()
   const { data: status } = useStatus()
   const [page, setPage] = useState(1)
   const [creating, setCreating] = useState(false)
@@ -87,7 +85,7 @@ function KeysContent() {
       description={
         <>
           使用密钥调用本站接口，请勿泄露给他人。接口地址{' '}
-          <code className={cn('font-geist text-[13px]', router ? 'text-or-fg' : 'text-[rgba(0,0,0,0.88)]')}>{baseUrl}</code>
+          <code className='font-geist text-or-fg text-[13px]'>{baseUrl}</code>
         </>
       }
       actions={create}
@@ -97,7 +95,7 @@ function KeysContent() {
           {keys.isLoading ? <TableMessage colSpan={COLUMNS.length}>加载中…</TableMessage> : null}
           {keys.isError ? (
             <TableMessage colSpan={COLUMNS.length}>
-              <span className={router ? 'text-or-red' : 'text-[#cf1322]'}>{errorMessage(keys.error, '密钥加载失败')}</span>
+              <span className='text-or-red'>{errorMessage(keys.error, '密钥加载失败')}</span>
             </TableMessage>
           ) : null}
           {keys.isSuccess && items.length === 0 ? (

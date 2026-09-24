@@ -22,12 +22,12 @@ import { RequireAuth } from '@/components/require-auth'
 import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
 import { getTopUpInfo, listTopUps, type TopUpRecord } from '@/lib/console-api'
-import { cn, dateTime } from '@/lib/format'
+import { dateTime } from '@/lib/format'
 
 import { useConsoleKey, useMoney, useSelf } from './console-hooks'
 import { ConsoleLayout } from './console-layout'
 import { Table, TableMessage, Td, Tr, type Column } from './console-table'
-import { Panel, Tag, useIsRouter, useMutedText, type TagTone } from './console-ui'
+import { Panel, Tag, type TagTone } from './console-ui'
 import { RedeemPanel } from './credits-redeem'
 
 const TOPUP_COLUMNS: Column[] = [
@@ -59,15 +59,13 @@ const PAY_METHODS: Record<string, string> = {
 /** Balance, redeem-code top-up and recent top-up orders. */
 export function CreditsPage() {
   return (
-    <RequireAuth>
+    <RequireAuth framed>
       <CreditsContent />
     </RequireAuth>
   )
 }
 
 function CreditsContent() {
-  const router = useIsRouter()
-  const muted = useMutedText()
   const money = useMoney()
   const auth = useAuth()
   const self = useSelf()
@@ -82,13 +80,8 @@ function CreditsContent() {
         <Panel>
           <div className='flex flex-wrap items-end justify-between gap-6'>
             <div>
-              <div className={cn('text-[13px]', muted)}>可用余额</div>
-              <div
-                className={cn(
-                  'mt-1 text-[40px] leading-[48px] tabular-nums',
-                  router ? 'font-semibold tracking-[-0.02em]' : 'font-serif-display font-bold text-[rgba(0,0,0,0.88)]'
-                )}
-              >
+              <div className='text-or-muted text-[13px]'>可用余额</div>
+              <div className='mt-1 text-[40px] leading-[48px] font-semibold tracking-[-0.02em] tabular-nums'>
                 {user ? money.format(user.quota) : '—'}
               </div>
             </div>
@@ -121,10 +114,9 @@ function CreditsContent() {
 }
 
 function Stat(props: { label: string; value: string }) {
-  const muted = useMutedText()
   return (
     <div>
-      <dt className={cn('text-[13px]', muted)}>{props.label}</dt>
+      <dt className='text-or-muted text-[13px]'>{props.label}</dt>
       <dd className='mt-1 text-[18px] font-semibold tabular-nums'>{props.value}</dd>
     </div>
   )

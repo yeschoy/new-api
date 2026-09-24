@@ -22,15 +22,13 @@ import { useId, useState } from 'react'
 
 import { errorMessage } from '@/lib/api'
 import { onlineTopUpEnabled, unwrap, type TopUpInfo } from '@/lib/console-api'
-import { cn } from '@/lib/format'
 import { redeemCode } from '@/lib/services'
 
 import { useMoney } from './console-hooks'
-import { Button, Notice, Panel, TextInput, useIsRouter } from './console-ui'
+import { Button, Notice, Panel, TextInput } from './console-ui'
 
 /** "充值" card: redeem-code form plus notes derived from /api/user/topup/info. */
 export function RedeemPanel(props: { info?: TopUpInfo }) {
-  const router = useIsRouter()
   const money = useMoney()
   const queryClient = useQueryClient()
   const inputId = useId()
@@ -65,14 +63,14 @@ export function RedeemPanel(props: { info?: TopUpInfo }) {
       title='充值'
       extra={
         link ? (
-          <a href={link} target='_blank' rel='noopener noreferrer' className={cn('flex items-center gap-1 text-[13px]', router ? 'text-or-lime hover:underline' : 'text-hub-link')}>
+          <a href={link} target='_blank' rel='noopener noreferrer' className='text-or-primary flex items-center gap-1 text-[13px] hover:underline'>
             获取兑换码 <ExternalLink className='size-3.5' aria-hidden='true' />
           </a>
         ) : null
       }
     >
       <form onSubmit={onSubmit} className='flex flex-col gap-3'>
-        <label htmlFor={inputId} className={cn('text-[13px]', router ? 'text-or-muted' : 'text-[#626773]')}>
+        <label htmlFor={inputId} className='text-or-muted text-[13px]'>
           输入兑换码，额度将立即计入账户余额。
         </label>
         <div className='flex flex-col gap-2 sm:flex-row'>

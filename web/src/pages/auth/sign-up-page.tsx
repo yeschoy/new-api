@@ -22,10 +22,8 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { AuthCard, AuthField, AuthSubmit } from '@/components/auth-card'
 import { api, errorMessage, type ApiEnvelope } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
-import { cn } from '@/lib/format'
 import { useStatus } from '@/lib/queries'
 import { register } from '@/lib/services'
-import { useSiteSkin } from '@/site/site-skin'
 
 import { safeRedirect } from './sign-in-page'
 
@@ -33,7 +31,6 @@ export function SignUpPage() {
   const auth = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { skin } = useSiteSkin()
   const { data: status } = useStatus()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -45,7 +42,6 @@ export function SignUpPage() {
   const [busy, setBusy] = useState(false)
   const redirect = safeRedirect(params.get('redirect'))
   const needsEmail = Boolean(status?.email_verification)
-  const router = skin === 'router'
 
   if (auth.status === 'authenticated') return <Navigate to={redirect} replace />
 
@@ -87,7 +83,7 @@ export function SignUpPage() {
   if (status && (status.register_enabled === false || status.password_register_enabled === false)) {
     return (
       <AuthCard title='注册' subtitle='管理员已关闭新用户注册。'>
-        <Link to='/sign-in' className={router ? 'text-or-fg block text-center underline' : 'text-hub-link block text-center'}>返回登录</Link>
+        <Link to='/sign-in' className='text-or-fg block text-center underline'>返回登录</Link>
       </AuthCard>
     )
   }
@@ -98,7 +94,7 @@ export function SignUpPage() {
       footer={
         <>
           已有账号？{' '}
-          <Link to={`/sign-in?redirect=${encodeURIComponent(redirect)}`} className={router ? 'text-or-fg font-medium hover:underline' : 'text-hub-link hover:underline'}>
+          <Link to={`/sign-in?redirect=${encodeURIComponent(redirect)}`} className='text-or-fg font-medium hover:underline'>
             登录
           </Link>
         </>
@@ -116,10 +112,7 @@ export function SignUpPage() {
               <button
                 type='button'
                 onClick={sendCode}
-                className={cn(
-                  'h-10 shrink-0 px-3 text-[14px]',
-                  router ? 'border-or-line hover:bg-or-fill rounded-[6px] border' : 'rounded-[8px] border border-[#d9d9d9] bg-white hover:border-hub-link hover:text-hub-link'
-                )}
+                className='border-or-line hover:bg-or-fill h-10 shrink-0 rounded-[6px] border px-3 text-[14px]'
               >
                 发送验证码
               </button>
@@ -128,8 +121,8 @@ export function SignUpPage() {
         ) : null}
         <AuthField label='密码' type='password' value={password} onChange={setPassword} autoComplete='new-password' placeholder='至少 8 位' required />
         <AuthField label='确认密码' type='password' value={confirm} onChange={setConfirm} autoComplete='new-password' required />
-        {notice ? <p className={router ? 'text-or-lime text-[13px]' : 'text-[13px] text-[#52c41a]'}>{notice}</p> : null}
-        {error ? <p role='alert' className='text-[13px] text-[#ff4d4f]'>{error}</p> : null}
+        {notice ? <p className='text-or-primary text-[13px]'>{notice}</p> : null}
+        {error ? <p role='alert' className='text-or-red text-[13px]'>{error}</p> : null}
         <AuthSubmit busy={busy}>创建账号</AuthSubmit>
       </form>
     </AuthCard>

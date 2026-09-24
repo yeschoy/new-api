@@ -17,26 +17,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 
 import { api } from '@/lib/api'
 import { authStore } from '@/lib/auth-store'
-import { SiteSkinProvider, type SiteSkin } from '@/site/site-skin'
 
 import { ActivityPage } from '../activity-page'
 import { CreditsPage } from '../credits-page'
 import { KeysPage } from '../keys-page'
 import { ProfilePage } from '../profile-page'
 
-// The real shells pull in the icon library (not loadable under jsdom); the
-// console only needs them as frames here.
+// The real shell pulls in the icon library (not loadable under jsdom); the
+// console only needs it as a frame here.
 vi.mock('@/sites/router/router-shell', () => ({
   RouterShell: (props: { children: React.ReactNode }) => <div data-shell='router'>{props.children}</div>,
-}))
-vi.mock('@/sites/hub/hub-shell', () => ({
-  HubShell: (props: { children: React.ReactNode }) => <div data-shell='hub'>{props.children}</div>,
 }))
 
 const USER = {
@@ -83,27 +79,25 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  cleanup()
   vi.restoreAllMocks()
   authStore.clear()
   window.localStorage.clear()
 })
 
-function renderPage(skin: SiteSkin, element: React.ReactNode) {
-  window.localStorage.setItem('site-skin', skin)
-  const router = createMemoryRouter([{ path: '*', element }], { initialEntries: ['/'] })
+function renderPage(element: React.ReactNode, path = '/') {
+  const router = createMemoryRouter([{ path: '*', element }], { initialEntries: [path] })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <SiteSkinProvider>
-        <RouterProvider router={router} />
-      </SiteSkinProvider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   )
 }
 
-describe.each<SiteSkin>(['router', 'hub'])('console pages (%s skin)', (skin) => {
+describe('console pages', () => {
   it('lists keys with masked value and limits', async () => {
-    renderPage(skin, <KeysPage />)
+    renderPage(<KeysPage />)
     expect(await screen.findByText('sk-abcd**********wxyz')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'API 密钥' })).toBeInTheDocument()
     expect(screen.getByText('$1.5')).toBeInTheDocument()
@@ -112,14 +106,14 @@ describe.each<SiteSkin>(['router', 'hub'])('console pages (%s skin)', (skin) => 
   })
 
   it('shows the balance and redeem form', async () => {
-    renderPage(skin, <CreditsPage />)
+    renderPage(<CreditsPage />)
     expect(await screen.findByText('$10')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('兑换码')).toBeInTheDocument()
     expect(await screen.findByText('暂无在线充值记录')).toBeInTheDocument()
   })
 
   it('shows 7-day tiles and request rows', async () => {
-    renderPage(skin, <ActivityPage />)
+    renderPage(<ActivityPage />)
     expect(await screen.findByText('gpt-test')).toBeInTheDocument()
     expect(await screen.findByText('$3')).toBeInTheDocument()
     expect(screen.getByText('12.3K')).toBeInTheDocument()
@@ -127,10 +121,26 @@ describe.each<SiteSkin>(['router', 'hub'])('console pages (%s skin)', (skin) => 
   })
 
   it('shows account details', async () => {
-    renderPage(skin, <ProfilePage />)
+    renderPage(<ProfilePage />)
     expect(await screen.findByText('alice@example.com')).toBeInTheDocument()
     expect(screen.getByText('普通用户')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /退出登录/ })).toBeInTheDocument()
+  })
+})
+
+describe('signed-out visitors', () => {
+  it.each([
+    ['/settings/keys', <KeysPage />, '创建密钥'],
+    ['/settings/credits', <CreditsPage />, '可用余额'],
+    ['/activity', <ActivityPage />, '请求明细'],
+    ['/settings/profile', <ProfilePage />, '基本信息'],
+  ])('stay on %s and see a framed sign-in notice', (path, element, signedInText) => {
+    authStore.clear()
+    const { container } = renderPage(element, path)
+    expect(screen.getByRole('link', { name: '登录' })).toHaveAttribute('href', `/sign-in?redirect=${encodeURIComponent(path)}`)
+    expect(screen.getByRole('link', { name: '注册' })).toHaveAttribute('href', `/sign-up?redirect=${encodeURIComponent(path)}`)
+    expect(screen.queryByText(signedInText)).toBeNull()
+    expect(container.querySelector('[data-shell="router"]')).not.toBeNull()
   })
 })
 
@@ -138,7 +148,7 @@ describe('key actions', () => {
   it('asks inline before deleting', async () => {
     const remove = vi.spyOn(api, 'delete').mockResolvedValue(ok(null))
     const user = userEvent.setup()
-    renderPage('router', <KeysPage />)
+    renderPage(<KeysPage />)
     await user.click(await screen.findByRole('button', { name: '删除' }))
     expect(screen.getByText('确认删除？')).toBeInTheDocument()
     expect(remove).not.toHaveBeenCalled()
@@ -151,7 +161,7 @@ describe('key actions', () => {
       url === '/api/token/' ? ok({ id: 9, name: 'ci' }) : ok({ key: 'FULLKEY' })
     )
     const user = userEvent.setup()
-    renderPage('router', <KeysPage />)
+    renderPage(<KeysPage />)
     await user.click(await screen.findByRole('button', { name: /创建密钥/ }))
     await user.type(screen.getByPlaceholderText('例如：生产环境'), 'ci')
     await user.click(screen.getByRole('switch', { name: '不限额度' }))

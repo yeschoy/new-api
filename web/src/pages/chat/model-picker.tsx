@@ -22,37 +22,24 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ProviderIcon } from '@/components/provider-icon'
 import { cn } from '@/lib/format'
 import type { CatalogModel } from '@/lib/queries'
-import type { SiteSkin } from '@/site/site-skin'
 
-const STYLES: Record<SiteSkin, Record<'trigger' | 'panel' | 'search' | 'item' | 'active' | 'muted', string>> = {
-  router: {
-    trigger: 'border-or-line bg-or-fill text-or-fg hover:bg-or-fg/[0.06] h-9 rounded-[6px] border px-3 text-[14px] font-medium',
-    panel: 'border-or-line bg-or-card rounded-[8px] border shadow-[0_12px_32px_rgba(0,0,0,0.5)]',
-    search: 'border-or-line text-or-fg placeholder:text-or-dim border-b',
-    item: 'text-or-fg hover:bg-or-fill rounded-[6px]',
-    active: 'bg-or-fill',
-    muted: 'text-or-muted',
-  },
-  hub: {
-    trigger: 'text-hub-ink hover:border-hub-blue h-8 rounded-[6px] border border-hub-line bg-white px-[11px] text-[14px]',
-    panel: 'rounded-[8px] bg-white shadow-[0_6px_16px_rgba(0,0,0,0.08),0_3px_6px_-4px_rgba(0,0,0,0.12),0_9px_28px_8px_rgba(0,0,0,0.05)]',
-    search: 'border-hub-soft-line text-hub-ink placeholder:text-hub-muted border-b',
-    item: 'text-hub-ink hover:bg-hub-fill rounded-[4px]',
-    active: 'bg-[#e6f4ff] font-semibold',
-    muted: 'text-hub-muted',
-  },
+const s = {
+  trigger: 'border-or-line bg-or-fill text-or-fg hover:bg-or-fg/[0.06] h-9 rounded-[6px] border px-3 text-[14px] font-medium',
+  panel: 'border-or-line bg-or-card rounded-[8px] border shadow-xl',
+  search: 'border-or-line text-or-fg placeholder:text-or-dim border-b',
+  item: 'text-or-fg hover:bg-or-fill rounded-[6px]',
+  active: 'bg-or-fill',
+  muted: 'text-or-muted',
 }
 
 /** Searchable model dropdown with provider icons. */
 export function ModelPicker(props: {
-  skin: SiteSkin
   models: CatalogModel[]
   value: string
   onChange: (model: string) => void
   loading?: boolean
   className?: string
 }) {
-  const s = STYLES[props.skin]
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)

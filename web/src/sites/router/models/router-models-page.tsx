@@ -117,7 +117,7 @@ export function RouterModelsPage() {
                   type='button'
                   aria-pressed={view === id}
                   onClick={() => setView(id)}
-                  className={cn('flex h-[31px] items-center gap-1.5 rounded-[4px] px-2.5 text-[14px] font-medium', view === id ? 'bg-or-fill text-or-lime' : 'text-or-muted')}
+                  className={cn('flex h-[31px] items-center gap-1.5 rounded-[4px] px-2.5 text-[14px] font-medium', view === id ? 'bg-or-fill text-or-primary' : 'text-or-muted')}
                 >
                   {icon}
                   {label}
@@ -136,7 +136,7 @@ export function RouterModelsPage() {
                 onClick={() => setFilters({ ...filters, outputModality: tab.id })}
                 className={cn(
                   '-mb-px border-b-2 px-4 py-2 text-[14px] font-medium whitespace-nowrap',
-                  filters.outputModality === tab.id ? 'border-or-lime text-or-lime' : 'text-or-muted hover:text-or-fg border-transparent'
+                  filters.outputModality === tab.id ? 'border-or-primary text-or-primary' : 'text-or-muted hover:text-or-fg border-transparent'
                 )}
               >
                 {tab.label}

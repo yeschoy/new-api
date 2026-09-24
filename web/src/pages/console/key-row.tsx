@@ -28,13 +28,13 @@ import { deleteKey, revealKey, type ApiKey } from '@/lib/services'
 import { keyStatusLabel, withKeyPrefix } from './console-helpers'
 import { useMoney } from './console-hooks'
 import { Td, Tr } from './console-table'
-import { Button, Tag, useIsRouter, useMutedText } from './console-ui'
+import { Button, Tag } from './console-ui'
+
+const ICON_BUTTON = 'text-or-muted hover:bg-or-fill hover:text-or-fg flex size-7 shrink-0 items-center justify-center rounded-[6px] transition-colors'
 
 /** One key: masked value with reveal / copy, limits, and row actions. */
 export function KeyRow(props: { apiKey: ApiKey }) {
   const key = props.apiKey
-  const router = useIsRouter()
-  const muted = useMutedText()
   const money = useMoney()
   const queryClient = useQueryClient()
   const [fullKey, setFullKey] = useState<string | null>(null)
@@ -90,7 +90,6 @@ export function KeyRow(props: { apiKey: ApiKey }) {
   }
 
   const status = keyStatusLabel(key.status)
-  const iconButton = cn('flex size-7 shrink-0 items-center justify-center rounded-[6px] transition-colors', router ? 'text-or-muted hover:bg-or-fill hover:text-or-fg' : 'text-[#626773] hover:bg-black/[0.04] hover:text-hub-link')
 
   return (
     <Tr>
@@ -102,24 +101,24 @@ export function KeyRow(props: { apiKey: ApiKey }) {
       </Td>
       <Td>
         <div className='flex items-center gap-1'>
-          <code className={cn('font-geist mr-1 text-[13px] break-all', shown ? '' : muted)}>
+          <code className={cn('font-geist mr-1 text-[13px] break-all', !shown && 'text-or-muted')}>
             {shown && fullKey ? fullKey : withKeyPrefix(key.key)}
           </code>
-          <button type='button' onClick={onReveal} className={iconButton} aria-label={shown ? '隐藏密钥' : '显示密钥'} title={shown ? '隐藏' : '显示'}>
+          <button type='button' onClick={onReveal} className={ICON_BUTTON} aria-label={shown ? '隐藏密钥' : '显示密钥'} title={shown ? '隐藏' : '显示'}>
             {shown ? <EyeOff className='size-3.5' /> : <Eye className='size-3.5' />}
           </button>
-          <button type='button' onClick={onCopy} className={iconButton} aria-label='复制密钥' title={copied ? '已复制' : '复制'}>
-            {copied ? <Check className={cn('size-3.5', router ? 'text-or-lime' : 'text-[#52c41a]')} /> : <Copy className='size-3.5' />}
+          <button type='button' onClick={onCopy} className={ICON_BUTTON} aria-label='复制密钥' title={copied ? '已复制' : '复制'}>
+            {copied ? <Check className='text-or-primary size-3.5' /> : <Copy className='size-3.5' />}
           </button>
         </div>
       </Td>
       <Td right>
         {key.unlimited_quota ? (
-          <span className={muted}>无限制</span>
+          <span className='text-or-muted'>无限制</span>
         ) : (
           <div className='flex flex-col items-end'>
             <span>{money.format(key.remain_quota + key.used_quota)}</span>
-            <span className={cn('text-[12px]', muted)}>剩余 {money.format(key.remain_quota)}</span>
+            <span className='text-or-muted text-[12px]'>剩余 {money.format(key.remain_quota)}</span>
           </div>
         )}
       </Td>
@@ -129,7 +128,7 @@ export function KeyRow(props: { apiKey: ApiKey }) {
         <div className='flex items-center justify-end gap-1'>
           {confirming ? (
             <>
-              <span className={cn('mr-1 text-[13px] whitespace-nowrap', muted)}>确认删除？</span>
+              <span className='text-or-muted mr-1 text-[13px] whitespace-nowrap'>确认删除？</span>
               <Button size='sm' variant='danger' busy={remove.isPending} onClick={() => remove.mutate()}>
                 删除
               </Button>
@@ -145,7 +144,7 @@ export function KeyRow(props: { apiKey: ApiKey }) {
               <Button
                 size='sm'
                 variant='ghost'
-                className={router ? 'hover:text-or-red' : 'hover:text-[#ff4d4f]'}
+                className='hover:text-or-red'
                 onClick={() => {
                   setError(null)
                   setConfirming(true)
@@ -156,7 +155,7 @@ export function KeyRow(props: { apiKey: ApiKey }) {
             </>
           )}
         </div>
-        {error ? <div className={cn('mt-1 text-[12px]', router ? 'text-or-red' : 'text-[#ff4d4f]')}>{error}</div> : null}
+        {error ? <div className='text-or-red mt-1 text-[12px]'>{error}</div> : null}
       </Td>
     </Tr>
   )

@@ -22,12 +22,13 @@ import type { CatalogModel } from '@/lib/queries'
 
 import { ChatComposer } from './chat-composer'
 import { ChatEmptyState } from './chat-empty-state'
+import { ChatSettingsPopover } from './chat-settings'
 import { MessageList } from './message-list'
 import { ModelPicker } from './model-picker'
 import { RouterSidebar } from './router-sidebar'
 import type { ChatController } from './use-chat'
 
-/** Dark chat workspace: history rail, model bar, thread, composer. */
+/** Chat workspace: history rail, model + settings bar, thread, composer. */
 export function RouterChat(props: { chat: ChatController; models: CatalogModel[]; loading: boolean }) {
   const chat = props.chat
   const messages = chat.active?.messages ?? []
@@ -47,23 +48,24 @@ export function RouterChat(props: { chat: ChatController; models: CatalogModel[]
             <SquarePen className='size-4' />
           </button>
           <ModelPicker
-            skin='router'
             models={props.models}
             value={chat.model}
             onChange={chat.setModel}
             loading={props.loading}
-            className='w-[300px] max-w-full'
+            className='w-[300px] min-w-0'
           />
-          {chat.active ? (
-            <span className='text-or-muted ml-auto hidden truncate text-[13px] lg:block'>{chat.active.title}</span>
-          ) : null}
+          <div className='ml-auto flex min-w-9 items-center gap-3'>
+            {chat.active ? (
+              <span className='text-or-muted hidden truncate text-[13px] lg:block'>{chat.active.title}</span>
+            ) : null}
+            <ChatSettingsPopover settings={chat.settings} onChange={chat.setSettings} />
+          </div>
         </div>
 
         {messages.length > 0 ? (
-          <MessageList skin='router' messages={messages} streaming={chat.streaming} models={props.models} className='min-h-0 flex-1' />
+          <MessageList messages={messages} streaming={chat.streaming} models={props.models} className='min-h-0 flex-1' />
         ) : (
           <ChatEmptyState
-            skin='router'
             model={chat.model}
             disabled={!chat.model || chat.streaming}
             onPick={chat.send}
@@ -72,13 +74,7 @@ export function RouterChat(props: { chat: ChatController; models: CatalogModel[]
         )}
 
         <div className='mx-auto w-full max-w-[768px] shrink-0 px-4 pt-2 pb-3'>
-          <ChatComposer
-            skin='router'
-            streaming={chat.streaming}
-            disabled={!chat.model}
-            onSend={chat.send}
-            onStop={chat.stop}
-          />
+          <ChatComposer streaming={chat.streaming} disabled={!chat.model} onSend={chat.send} onStop={chat.stop} />
         </div>
       </section>
     </div>

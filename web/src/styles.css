@@ -18,52 +18,66 @@ For commercial licensing, please contact support@quantumnous.com
 */
 @import 'tailwindcss';
 @import '@fontsource-variable/plus-jakarta-sans';
-@import '@fontsource-variable/inter';
 @import '@fontsource-variable/geist-mono';
-@import '@fontsource/old-standard-tt/400.css';
-@import '@fontsource/old-standard-tt/700.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Values below were measured from the two reference designs at 1440px.
- *   or-*  : dark catalog design   (router skin)
- *   hub-* : light gateway design  (hub skin)
+ * One design (the catalog replica) with day and night palettes, both measured
+ * from the reference at 1440px. Components use the or-* utilities only; the
+ * values below flip when <html> gets the `.dark` class.
  */
 @theme {
   --font-jakarta:
     'Plus Jakarta Sans Variable', 'PingFang SC', 'Microsoft YaHei',
     ui-sans-serif, system-ui, sans-serif;
-  --font-hub:
-    'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Microsoft YaHei',
-    sans-serif;
-  --font-serif-display:
-    'Old Standard TT', Georgia, 'Noto Serif SC', 'Songti SC', 'STSong', serif;
   --font-geist: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo,
     Consolas, monospace;
 
-  --color-or-bg: #03080a;
-  --color-or-card: #080d0f;
-  --color-or-fg: #fcfcfe;
-  --color-or-muted: rgb(252 252 254 / 0.627);
-  --color-or-dim: rgb(252 252 254 / 0.3135);
-  --color-or-line: rgb(252 252 254 / 0.08);
-  --color-or-fill: rgb(252 252 254 / 0.031);
-  --color-or-lime: #c8ff00;
-  --color-or-lime-soft: rgb(200 255 0 / 0.078);
-  --color-or-red: #ff2d55;
+  --color-or-bg: var(--or-bg);
+  --color-or-card: var(--or-card);
+  --color-or-fg: var(--or-fg);
+  --color-or-muted: var(--or-muted);
+  --color-or-dim: var(--or-dim);
+  --color-or-line: var(--or-line);
+  --color-or-fill: var(--or-fill);
+  --color-or-primary: var(--or-primary);
+  --color-or-primary-soft: var(--or-primary-soft);
+  --color-or-thumb: var(--or-thumb);
+  --color-or-red: var(--or-red);
   --color-or-blue: #4d8dff;
+}
 
-  --color-hub-bg: #fcfcfc;
-  --color-hub-ink: rgb(0 0 0 / 0.88);
-  --color-hub-text: #353941;
-  --color-hub-muted: rgb(0 0 0 / 0.45);
-  --color-hub-line: #d9d9d9;
-  --color-hub-soft-line: #f0f0f0;
-  --color-hub-fill: #f5f5f5;
-  --color-hub-blue: #2563eb;
-  --color-hub-link: #1677ff;
+/* Day */
+:root {
+  --or-bg: #fcfcfe;
+  --or-card: #ffffff;
+  --or-fg: #03080a;
+  --or-muted: rgb(3 8 10 / 0.69);
+  --or-dim: rgb(3 8 10 / 0.42);
+  --or-line: rgb(3 8 10 / 0.078);
+  --or-fill: rgb(3 8 10 / 0.031);
+  --or-primary: #7624f4;
+  --or-primary-soft: rgb(118 36 244 / 0.078);
+  --or-thumb: #f1f1f4;
+  --or-red: #df2c5a;
+  color-scheme: light;
+}
+
+/* Night */
+.dark {
+  --or-bg: #03080a;
+  --or-card: #080d0f;
+  --or-fg: #fcfcfe;
+  --or-muted: rgb(252 252 254 / 0.627);
+  --or-dim: rgb(252 252 254 / 0.3135);
+  --or-line: rgb(252 252 254 / 0.08);
+  --or-fill: rgb(252 252 254 / 0.031);
+  --or-primary: #c8ff00;
+  --or-primary-soft: rgb(200 255 0 / 0.078);
+  --or-thumb: #0c1214;
+  --or-red: #ff2d55;
+  color-scheme: dark;
 }
 
 html,
@@ -72,21 +86,16 @@ body,
   min-height: 100%;
 }
 
-html[data-skin='router'] body {
-  background: var(--color-or-bg);
-  color: var(--color-or-fg);
+body {
+  background: var(--or-bg);
+  color: var(--or-fg);
   font-family: var(--font-jakarta);
   font-size: 14px;
   font-weight: 450;
   line-height: 1.625;
-}
-
-html[data-skin='hub'] body {
-  background: var(--color-hub-bg);
-  color: var(--color-hub-ink);
-  font-family: var(--font-hub);
-  font-size: 14px;
-  line-height: 1.5715;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 button:not(:disabled),

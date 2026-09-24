@@ -25,7 +25,7 @@ import { RouterProvider } from 'react-router'
 
 import { refreshSession } from './lib/api'
 import { router } from './router'
-import { SiteSkinProvider } from './site/site-skin'
+import { ThemeProvider } from './site/theme'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -37,9 +37,9 @@ void refreshSession()
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <SiteSkinProvider>
+      <ThemeProvider>
         <RouterProvider router={router} />
-      </SiteSkinProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </StrictMode>
 )

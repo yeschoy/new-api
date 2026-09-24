@@ -20,8 +20,6 @@ import { useQuery } from '@tanstack/react-query'
 import DOMPurify from 'dompurify'
 
 import { api, type ApiEnvelope } from '@/lib/api'
-import { useSiteSkin } from '@/site/site-skin'
-import { HubShell } from '@/sites/hub/hub-shell'
 import { RouterShell } from '@/sites/router/router-shell'
 
 type ContentSource = '/api/about' | '/api/user-agreement' | '/api/privacy-policy'
@@ -32,27 +30,26 @@ function looksLikeHtml(text: string): boolean {
 
 /** Operator-configured text page (About / agreement / privacy). */
 export function ContentPage(props: { source: ContentSource; title: string }) {
-  const { skin } = useSiteSkin()
   const query = useQuery({
     queryKey: ['content', props.source],
     queryFn: async () => (await api.get<ApiEnvelope<string>>(props.source)).data.data ?? '',
   })
   const text = query.data ?? ''
-  const router = skin === 'router'
 
   let body: React.ReactNode = <p className='whitespace-pre-wrap'>{text}</p>
-  if (!text) body = <p className={router ? 'text-or-muted' : 'text-[#888]'}>{query.isLoading ? '加载中…' : '管理员还没有填写这部分内容。'}</p>
+  if (!text) body = <p>{query.isLoading ? '加载中…' : '管理员还没有填写这部分内容。'}</p>
   else if (text.startsWith('http')) {
     body = <iframe src={text} title={props.title} className='h-[70vh] w-full rounded-[8px] border-0' />
   } else if (looksLikeHtml(text)) {
     body = <div className='[&_a]:underline [&_p]:mb-3' dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(text) }} />
   }
 
-  const content = (
-    <div className='mx-auto max-w-[860px] px-6 pt-12 pb-24'>
-      <h1 className={router ? 'text-[24px] font-bold' : 'font-serif-display text-[32px] font-bold text-[rgba(0,0,0,0.88)]'}>{props.title}</h1>
-      <div className={router ? 'text-or-muted mt-6 text-[14px] leading-[24px]' : 'mt-6 text-[14px] leading-[24px] text-[#353941]'}>{body}</div>
-    </div>
+  return (
+    <RouterShell>
+      <div className='mx-auto max-w-[860px] px-6 pt-12 pb-24'>
+        <h1 className='text-[24px] font-bold'>{props.title}</h1>
+        <div className='text-or-muted mt-6 text-[14px] leading-[24px]'>{body}</div>
+      </div>
+    </RouterShell>
   )
-  return router ? <RouterShell>{content}</RouterShell> : <HubShell solidHeader>{content}</HubShell>
 }

@@ -16,16 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import {
   Navigate,
   Outlet,
   createBrowserRouter,
   useLocation,
+  type RouteObject,
 } from 'react-router'
 
-import { getSetup } from './lib/services'
 import { SignInPage } from './pages/auth/sign-in-page'
 import { SignUpPage } from './pages/auth/sign-up-page'
 import { ChatPage } from './pages/chat/chat-page'
@@ -36,45 +35,30 @@ import { ProfilePage } from './pages/console/profile-page'
 import { ContentPage } from './pages/content-page'
 import { NotFoundPage } from './pages/not-found'
 import { SetupPage } from './pages/setup-page'
-import { BySkin } from './site/site-skin'
-import { SkinSwitcher } from './site/skin-switcher'
 import { RouterHome } from './sites/router/home/router-home'
-import { HubHome } from './sites/hub/home/hub-home'
-import { HubRankingsPage } from './sites/hub/hub-rankings-page'
-import { HubModelPage } from './sites/hub/models/hub-model-page'
-import { HubModelsPage } from './sites/hub/models/hub-models-page'
 import { RouterModelPage } from './sites/router/models/router-model-page'
 import { RouterModelsPage } from './sites/router/models/router-models-page'
 import { RouterRankingsPage } from './sites/router/rankings/router-rankings-page'
 
 function RootLayout() {
   const location = useLocation()
-  const setup = useQuery({ queryKey: ['setup'], queryFn: getSetup, staleTime: 60_000 })
 
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [location.pathname])
 
-  if (setup.data && !setup.data.status && location.pathname !== '/setup') {
-    return <Navigate to='/setup' replace />
-  }
-  return (
-    <>
-      <Outlet />
-      <SkinSwitcher />
-    </>
-  )
+  return <Outlet />
 }
 
-export const router = createBrowserRouter([
+export const routes: RouteObject[] = [
   {
     element: <RootLayout />,
     children: [
-      { path: '/', element: <BySkin router={<RouterHome />} hub={<HubHome />} /> },
-      { path: '/models', element: <BySkin router={<RouterModelsPage />} hub={<HubModelsPage />} /> },
-      { path: '/models/:name', element: <BySkin router={<RouterModelPage />} hub={<HubModelPage />} /> },
+      { path: '/', element: <RouterHome /> },
+      { path: '/models', element: <RouterModelsPage /> },
+      { path: '/models/:name', element: <RouterModelPage /> },
       { path: '/pricing', element: <Navigate to='/models' replace /> },
-      { path: '/rankings', element: <BySkin router={<RouterRankingsPage />} hub={<HubRankingsPage />} /> },
+      { path: '/rankings', element: <RouterRankingsPage /> },
       { path: '/chat', element: <ChatPage /> },
       { path: '/playground', element: <Navigate to='/chat' replace /> },
       { path: '/sign-in', element: <SignInPage /> },
@@ -97,4 +81,6 @@ export const router = createBrowserRouter([
       { path: '*', element: <NotFoundPage /> },
     ],
   },
-])
+]
+
+export const router = createBrowserRouter(routes)

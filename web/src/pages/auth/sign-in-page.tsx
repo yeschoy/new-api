@@ -24,7 +24,6 @@ import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
 import { useStatus } from '@/lib/queries'
 import { login, loginTwoFactor } from '@/lib/services'
-import { useSiteSkin } from '@/site/site-skin'
 
 /** Only same-site paths are accepted as post-login destinations. */
 export function safeRedirect(value: string | null): string {
@@ -36,7 +35,6 @@ export function SignInPage() {
   const auth = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { skin } = useSiteSkin()
   const { data: status } = useStatus()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -67,8 +65,7 @@ export function SignInPage() {
     }
   }
 
-  const router = skin === 'router'
-  const linkClass = router ? 'text-or-fg font-medium hover:underline' : 'text-hub-link hover:underline'
+  const linkClass = 'text-or-fg font-medium hover:underline'
   const canRegister = status?.register_enabled !== false && status?.password_register_enabled !== false
 
   return (
@@ -93,10 +90,10 @@ export function SignInPage() {
         ) : (
           <AuthField label='验证码' value={code} onChange={setCode} autoComplete='one-time-code' placeholder='000000' required />
         )}
-        {error ? <p role='alert' className='text-[13px] text-[#ff4d4f]'>{error}</p> : null}
+        {error ? <p role='alert' className='text-or-red text-[13px]'>{error}</p> : null}
         <AuthSubmit busy={busy}>{step === 'password' ? '继续' : '验证'}</AuthSubmit>
         {status?.turnstile_check ? (
-          <p className={router ? 'text-or-dim text-center text-[12px]' : 'text-center text-[12px] text-[#888]'}>
+          <p className='text-or-dim text-center text-[12px]'>
             本站开启了人机验证，如登录失败请联系管理员。
           </p>
         ) : null}

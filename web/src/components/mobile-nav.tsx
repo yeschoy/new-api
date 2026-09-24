@@ -20,22 +20,16 @@ import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 
-import { cn } from '@/lib/format'
-
 export type NavItem = { label: string; to: string; external?: boolean }
 
+const itemClass = 'text-or-fg hover:bg-or-fill block rounded-[6px] px-3 py-2.5 text-[15px]'
+
 /** Hamburger + drop-down link list shown below the md breakpoint. */
-export function MobileNav(props: { items: NavItem[]; tone: 'dark' | 'light' }) {
+export function MobileNav(props: { items: NavItem[] }) {
   const [open, setOpen] = useState(false)
   const location = useLocation()
-  const dark = props.tone === 'dark'
 
   useEffect(() => setOpen(false), [location.pathname])
-
-  const itemClass = cn(
-    'block rounded-[6px] px-3 py-2.5 text-[15px]',
-    dark ? 'text-or-fg hover:bg-or-fill' : 'text-hub-ink hover:bg-black/[0.04]'
-  )
 
   return (
     <div className='md:hidden'>
@@ -44,17 +38,12 @@ export function MobileNav(props: { items: NavItem[]; tone: 'dark' | 'light' }) {
         aria-label={open ? '关闭菜单' : '打开菜单'}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className={cn('flex size-9 items-center justify-center rounded-[6px]', dark ? 'text-or-fg hover:bg-or-fill' : 'text-hub-ink hover:bg-black/[0.04]')}
+        className='text-or-fg hover:bg-or-fill flex size-9 items-center justify-center rounded-[6px]'
       >
         {open ? <X className='size-5' /> : <Menu className='size-5' />}
       </button>
       {open ? (
-        <nav
-          className={cn(
-            'absolute inset-x-0 top-full z-50 border-b px-4 py-3 shadow-lg',
-            dark ? 'border-or-line bg-or-bg' : 'border-black/[0.06] bg-hub-bg'
-          )}
-        >
+        <nav className='border-or-line bg-or-bg absolute inset-x-0 top-full z-50 border-b px-4 py-3 shadow-lg'>
           {props.items.map((item) =>
             item.external ? (
               <a key={item.label} href={item.to} target='_blank' rel='noopener noreferrer' className={itemClass}>

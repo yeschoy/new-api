@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Search } from 'lucide-react'
+import { Moon, Search, Sun } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router'
 
@@ -26,6 +26,7 @@ import { UserMenu } from '@/components/user-menu'
 import { useAuth } from '@/lib/auth-store'
 import { cn } from '@/lib/format'
 import { useBrand, useStatus } from '@/lib/queries'
+import { useTheme } from '@/site/theme'
 
 import { RouterSearchDialog } from './router-search-dialog'
 
@@ -36,6 +37,7 @@ export function RouterHeader() {
   const brand = useBrand()
   const { data: status } = useStatus()
   const auth = useAuth()
+  const theme = useTheme()
   const [searchOpen, setSearchOpen] = useState(false)
 
   useEffect(() => {
@@ -68,7 +70,7 @@ export function RouterHeader() {
           to='/'
           className='text-or-fg flex h-8 items-center gap-2 rounded-[6px] px-2 text-[17px] font-semibold tracking-[-0.02em]'
         >
-          <BrandMark tone='lime' size={22} />
+          <BrandMark size={22} />
           <span>{brand.name}</span>
         </Link>
 
@@ -109,17 +111,26 @@ export function RouterHeader() {
               </NavLink>
             )
           )}
+          <button
+            type='button'
+            onClick={theme.toggle}
+            aria-label={theme.theme === 'dark' ? '切换到白天' : '切换到夜晚'}
+            title={theme.theme === 'dark' ? '切换到白天' : '切换到夜晚'}
+            className='text-or-muted hover:text-or-fg hover:bg-or-fill flex size-8 items-center justify-center rounded-[6px] transition-colors'
+          >
+            {theme.theme === 'dark' ? <Sun className='size-4' /> : <Moon className='size-4' />}
+          </button>
           {auth.status === 'authenticated' ? (
-            <UserMenu skin='router' />
+            <UserMenu />
           ) : (
             <Link
               to='/sign-up'
-              className='bg-or-lime text-or-bg ml-1 flex h-8 items-center rounded-[6px] px-3 text-[14px] font-medium transition-opacity hover:opacity-90'
+              className='bg-or-primary text-or-bg ml-1 flex h-8 items-center rounded-[6px] px-3 text-[14px] font-medium transition-opacity hover:opacity-90'
             >
               注册
             </Link>
           )}
-          <MobileNav tone='dark' items={links} />
+          <MobileNav items={links} />
         </div>
       </div>
       <RouterSearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />

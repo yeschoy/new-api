@@ -22,11 +22,8 @@ import { useSearchParams } from 'react-router'
 import { RequireAuth } from '@/components/require-auth'
 import { outputsOf } from '@/lib/model-filters'
 import { useCatalog } from '@/lib/queries'
-import { BySkin } from '@/site/site-skin'
-import { HubShell } from '@/sites/hub/hub-shell'
 import { RouterShell } from '@/sites/router/router-shell'
 
-import { HubChat } from './hub-chat'
 import { RouterChat } from './router-chat'
 import { useChat } from './use-chat'
 
@@ -41,21 +38,10 @@ export function ChatPage() {
   const chat = useChat(params.get('model')?.trim() || models[0]?.model_name || '')
 
   return (
-    <BySkin
-      router={
-        <RouterShell footer={false}>
-          <RequireAuth>
-            <RouterChat chat={chat} models={models} loading={catalog.isLoading} />
-          </RequireAuth>
-        </RouterShell>
-      }
-      hub={
-        <HubShell solidHeader>
-          <RequireAuth>
-            <HubChat chat={chat} models={models} loading={catalog.isLoading} />
-          </RequireAuth>
-        </HubShell>
-      }
-    />
+    <RouterShell footer={false}>
+      <RequireAuth>
+        <RouterChat chat={chat} models={models} loading={catalog.isLoading} />
+      </RequireAuth>
+    </RouterShell>
   )
 }

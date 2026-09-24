@@ -85,7 +85,7 @@ export function PerfPanes() {
       <Pane title='延迟' className='top-9 right-0 h-[112px] w-[170px]'>
         <svg viewBox='0 0 150 60' className='mt-3 w-full'>
           <polyline points='0,22 12,30 24,18 36,34 48,20 60,28 72,16 84,30 96,22 108,26 120,18 150,24' fill='none' stroke='#f5a524' strokeWidth='1.2' />
-          <polyline points='0,34 12,28 24,38 36,26 48,36 60,30 72,38 84,28 96,36 108,30 120,34 150,30' fill='none' stroke='#c8ff00' strokeWidth='1.2' />
+          <polyline points='0,34 12,28 24,38 36,26 48,36 60,30 72,38 84,28 96,36 108,30 120,34 150,30' fill='none' style={{ stroke: 'var(--or-primary)' }} strokeWidth='1.2' />
           <polyline points='0,42 12,40 24,44 36,38 48,43 60,40 72,45 84,39 96,44 108,41 120,43 150,40' fill='none' stroke='#4d8dff' strokeWidth='1.2' />
         </svg>
       </Pane>
@@ -99,7 +99,7 @@ export function PolicyShield() {
     <div className='relative flex h-[150px] w-[200px] items-center justify-center' aria-hidden='true'>
       <Lock className='text-or-muted absolute top-7 left-7 size-3.5' />
       <Lock className='text-or-muted absolute top-7 right-7 size-3.5' />
-      <span className='bg-or-lime/15 text-or-lime absolute top-3 flex size-7 items-center justify-center rounded-full border border-[#1d5a2a]'>
+      <span className='bg-or-primary/15 text-or-primary absolute top-3 flex size-7 items-center justify-center rounded-full border border-or-primary/30'>
         <Check className='size-4' />
       </span>
       <svg viewBox='0 0 80 90' className='text-or-fg/60 mt-8 h-[84px] w-[76px]'>

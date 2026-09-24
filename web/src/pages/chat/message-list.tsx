@@ -22,36 +22,24 @@ import { useEffect, useRef } from 'react'
 import { ProviderIcon } from '@/components/provider-icon'
 import { cn } from '@/lib/format'
 import type { CatalogModel } from '@/lib/queries'
-import type { SiteSkin } from '@/site/site-skin'
 
 import type { ChatMessage } from './use-chat'
 
-const STYLES: Record<SiteSkin, Record<'user' | 'assistant' | 'label' | 'reasoning' | 'error', string>> = {
-  router: {
-    user: 'border-or-line bg-or-fill text-or-fg rounded-[8px] border',
-    assistant: 'text-or-fg',
-    label: 'text-or-muted',
-    reasoning: 'border-or-line text-or-muted border-l-2',
-    error: 'border-or-red/30 bg-or-red/10 text-or-red rounded-[6px] border',
-  },
-  hub: {
-    user: 'bg-hub-blue rounded-[12px] rounded-br-[4px] text-white',
-    assistant: 'text-hub-text',
-    label: 'text-hub-muted',
-    reasoning: 'border-hub-line text-hub-muted border-l-2',
-    error: 'rounded-[8px] border border-[#ffccc7] bg-[#fff2f0] text-[#ff4d4f]',
-  },
+const s = {
+  user: 'border-or-line bg-or-fill text-or-fg rounded-[8px] border',
+  assistant: 'text-or-fg',
+  label: 'text-or-muted',
+  reasoning: 'border-or-line text-or-muted border-l-2',
+  error: 'border-or-red/30 bg-or-red/10 text-or-red rounded-[6px] border',
 }
 
 /** Scrollable thread; follows new tokens unless the reader scrolled up. */
 export function MessageList(props: {
-  skin: SiteSkin
   messages: ChatMessage[]
   streaming: boolean
   models: CatalogModel[]
   className?: string
 }) {
-  const s = STYLES[props.skin]
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
 

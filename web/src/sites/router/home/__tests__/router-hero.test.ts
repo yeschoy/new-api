@@ -16,20 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { HubShell } from './hub-shell'
-import { HubRankings } from './home/hub-rankings'
+import { heroStats } from '../router-hero'
 
-/** The gateway design has no separate rankings page; reuse its home block. */
-export function HubRankingsPage() {
-  return (
-    <HubShell solidHeader>
-      <div className='mx-auto max-w-[1232px] px-6 pt-12 xl:px-0'>
-        <h1 className='font-serif-display text-[32px] font-bold text-[rgba(0,0,0,0.88)]'>排行榜</h1>
-        <p className='mt-2 text-[14px] text-[#626773]'>按本站真实调用量统计的模型 Token 排行。</p>
-      </div>
-      <div className='-mt-16'>
-        <HubRankings />
-      </div>
-    </HubShell>
-  )
-}
+describe('heroStats', () => {
+  it('shows weekly tokens, models and vendors, with no protocol count', () => {
+    const stats = heroStats({ weeklyTokens: 1_234_567, modelCount: 42, vendorCount: 9 })
+    expect(stats.map((stat) => stat.label)).toEqual(['本周 Token', '模型', '厂商'])
+  })
+
+  it('shows nothing before any data has loaded', () => {
+    expect(heroStats({ weeklyTokens: 0, modelCount: 0, vendorCount: 0 })).toEqual([])
+  })
+})

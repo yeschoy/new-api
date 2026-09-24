@@ -86,7 +86,7 @@ function buildBody(model: string, settings: ChatSettings, history: ChatMessage[]
 }
 
 /**
- * Conversation state shared by both skins: history in localStorage, the
+ * Conversation state for the chat page: history in localStorage, the
  * active thread, model + sampling settings, and a cancellable stream.
  */
 export function useChat(defaultModel: string) {

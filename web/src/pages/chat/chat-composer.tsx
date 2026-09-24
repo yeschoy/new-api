@@ -20,34 +20,23 @@ import { ArrowUp, Square } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 
 import { cn } from '@/lib/format'
-import type { SiteSkin } from '@/site/site-skin'
 
 const MAX_HEIGHT = 200
 
-const STYLES: Record<SiteSkin, Record<'box' | 'input' | 'send' | 'hint', string>> = {
-  router: {
-    box: 'border-or-line bg-or-card focus-within:border-or-fg/25 rounded-[8px] border',
-    input: 'text-or-fg placeholder:text-or-dim',
-    send: 'bg-or-lime text-or-bg rounded-[6px] disabled:opacity-30',
-    hint: 'text-or-dim',
-  },
-  hub: {
-    box: 'border-hub-line focus-within:border-hub-blue rounded-[12px] border bg-white focus-within:shadow-[0_0_0_2px_rgba(37,99,235,0.1)]',
-    input: 'text-hub-ink placeholder:text-hub-muted',
-    send: 'bg-hub-blue rounded-[8px] text-white disabled:opacity-40',
-    hint: 'text-hub-muted',
-  },
+const s = {
+  box: 'border-or-line bg-or-card focus-within:border-or-fg/25 rounded-[8px] border',
+  input: 'text-or-fg placeholder:text-or-dim',
+  send: 'bg-or-primary text-or-bg rounded-[6px] disabled:opacity-30',
+  hint: 'text-or-dim',
 }
 
 /** Auto-growing prompt box: Enter sends, Shift+Enter inserts a newline. */
 export function ChatComposer(props: {
-  skin: SiteSkin
   streaming: boolean
   disabled?: boolean
   onSend: (text: string) => void
   onStop: () => void
 }) {
-  const s = STYLES[props.skin]
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const canSend = !props.disabled && !props.streaming && value.trim().length > 0

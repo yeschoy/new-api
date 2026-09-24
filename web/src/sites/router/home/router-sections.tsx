@@ -134,7 +134,7 @@ export function FeaturedApps() {
       <div className='mt-6 grid gap-6 md:grid-cols-3'>
         {TOOLS.map((tool) => (
           <article key={tool.name} className='border-or-line bg-or-card flex h-[270px] flex-col overflow-hidden rounded-[8px] border'>
-            <div className='flex flex-1 items-center justify-center bg-[#0c1214]'>
+            <div className='flex flex-1 items-center justify-center bg-or-thumb'>
               <ProviderIcon name={tool.icon} fallback={tool.name} size={56} />
             </div>
             <div className='flex items-center gap-3 px-6 py-4'>
@@ -166,7 +166,7 @@ export function RecentModels(props: { models: CatalogModel[] }) {
       <div className='mt-8 flex flex-col gap-10'>
         {recent.map((model) => (
           <Link key={model.model_name} to={`/models?q=${encodeURIComponent(model.model_name)}`} className='group flex gap-5'>
-            <span className='flex h-[90px] w-[160px] shrink-0 items-center justify-center rounded-[6px] bg-[#0c1214]'>
+            <span className='flex h-[90px] w-[160px] shrink-0 items-center justify-center rounded-[6px] bg-or-thumb'>
               <ProviderIcon name={model.vendorIcon} fallback={model.vendor} size={40} />
             </span>
             <div className='min-w-0'>

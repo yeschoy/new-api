@@ -143,9 +143,9 @@ export function RouterRankingsPage() {
               role='tab'
               aria-selected={tab === index}
               onClick={() => setTab(index)}
-              className={cn('-mb-px flex items-center gap-1.5 border-b-2 px-4 py-3 text-[14px] font-medium whitespace-nowrap', tab === index ? 'border-or-lime text-or-fg' : 'text-or-muted hover:text-or-fg border-transparent')}
+              className={cn('-mb-px flex items-center gap-1.5 border-b-2 px-4 py-3 text-[14px] font-medium whitespace-nowrap', tab === index ? 'border-or-primary text-or-fg' : 'text-or-muted hover:text-or-fg border-transparent')}
             >
-              <t.icon className={cn('size-4', tab === index && 'text-or-lime')} />
+              <t.icon className={cn('size-4', tab === index && 'text-or-primary')} />
               {t.label}
             </button>
           ))}
@@ -158,7 +158,7 @@ export function RouterRankingsPage() {
                 key={s.id}
                 type='button'
                 onClick={() => jump(s.id)}
-                className={cn('flex h-8 items-center gap-2 rounded-[6px] px-3 text-left text-[14px] font-medium', active === s.id ? 'bg-or-lime-soft text-or-lime' : 'text-or-muted hover:text-or-fg')}
+                className={cn('flex h-8 items-center gap-2 rounded-[6px] px-3 text-left text-[14px] font-medium', active === s.id ? 'bg-or-primary-soft text-or-primary' : 'text-or-muted hover:text-or-fg')}
               >
                 <s.icon className='size-4' />
                 {s.label}
