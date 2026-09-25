@@ -62,21 +62,28 @@ export function RouterHome() {
 
   return (
     <RouterShell>
-      <RouterHero />
-      {/* Below the headline, so no text covers the map. */}
-      <WorldMap className='world-map-frame pointer-events-none relative mx-auto mt-10 aspect-[360/138] w-full max-w-[1440px]' />
-      <HeroStats stats={stats} />
-      <RouterFeatures icons={icons} slug={slug} />
-      <FeaturedModels
-        rows={ranked}
-        catalog={models}
-        modelCount={models.length}
-        vendorCount={vendorCount}
-      />
-      <FeaturedApps />
-      <RouterSteps />
-      <RecentModels models={models} />
-      <div className='h-32' />
+      <div className='relative overflow-x-clip'>
+        {/* The map sits behind the headline, buttons and figures. */}
+        <WorldMap className='world-map-frame pointer-events-none absolute inset-x-0 top-4 mx-auto aspect-[360/138] w-full max-w-[1440px]' />
+        <div className='relative'>
+          <RouterHero />
+          <HeroStats stats={stats} />
+        </div>
+      </div>
+      {/* Positioned so the cards paint above the bottom of the map. */}
+      <div className='relative'>
+        <RouterFeatures icons={icons} slug={slug} />
+        <FeaturedModels
+          rows={ranked}
+          catalog={models}
+          modelCount={models.length}
+          vendorCount={vendorCount}
+        />
+        <FeaturedApps />
+        <RouterSteps />
+        <RecentModels models={models} />
+        <div className='h-32' />
+      </div>
     </RouterShell>
   )
 }
