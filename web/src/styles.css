@@ -162,7 +162,7 @@ button:not(:disabled),
    over it. Only on devices that can hover, so touch screens keep it opaque. */
 @media (hover: hover) and (pointer: fine) {
   .dark .hero-copy {
-    opacity: 0.4;
+    opacity: 0.2;
     transition: opacity 0.3s ease;
   }
 
