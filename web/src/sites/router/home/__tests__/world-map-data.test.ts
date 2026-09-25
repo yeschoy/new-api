@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { LAND_BITS, LAND_COLS, LAND_ROWS } from '../world-land'
 import { coarsen, decodeLand, decodeLights } from '../world-map-data'
 
 const encode = (...bytes: number[]) => btoa(String.fromCharCode(...bytes))
@@ -53,5 +54,17 @@ describe('coarsen', () => {
 
   it('returns the grid unchanged at full resolution', () => {
     expect(coarsen(grid, 1)).toBe(grid)
+  })
+})
+
+describe('generated land mask', () => {
+  it('has no latitude band that is land all the way round', () => {
+    // Rings crossing the 180° meridian must not be drawn as a line across the map.
+    const land = decodeLand(LAND_BITS, LAND_COLS, LAND_ROWS)
+    for (let row = 0; row < LAND_ROWS; row += 1) {
+      let count = 0
+      for (let col = 0; col < LAND_COLS; col += 1) count += land.cells[row * LAND_COLS + col]
+      expect(count / LAND_COLS).toBeLessThan(0.9)
+    }
   })
 })
