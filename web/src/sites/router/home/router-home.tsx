@@ -21,18 +21,10 @@ import { useMemo } from 'react'
 import { useCatalog, useRankings } from '@/lib/queries'
 
 import { RouterShell } from '../router-shell'
-import { RouterFeatures } from './router-features'
 import { HeroStats, RouterHero, heroStats } from './router-hero'
 import { FeaturedApps, FeaturedModels, RecentModels } from './router-sections'
 import { RouterSteps } from './router-steps'
 import { WorldMap } from './world-map'
-
-const FALLBACK_ICONS = [
-  'OpenAI', 'Claude.Color', 'Gemini.Color', 'DeepSeek.Color', 'Qwen.Color', 'Kimi.Color',
-  'Zhipu.Color', 'Grok', 'Doubao.Color', 'Mistral.Color', 'Meta.Color', 'Minimax.Color',
-  'Hunyuan.Color', 'Cohere.Color', 'Perplexity.Color', 'Nvidia.Color', 'Baichuan.Color', 'Spark.Color',
-  'Yi.Color', 'Stepfun.Color', 'Wenxin.Color', 'Ollama', 'HuggingFace.Color', 'Together.Color',
-]
 
 export function RouterHome() {
   const { models } = useCatalog()
@@ -40,11 +32,6 @@ export function RouterHome() {
   const ranked = rankings.data?.models ?? []
 
   const vendorCount = useMemo(() => new Set(models.map((m) => m.vendor)).size, [models])
-
-  const icons = useMemo(() => {
-    const fromCatalog = [...new Set(models.map((m) => m.vendorIcon).filter(Boolean))] as string[]
-    return [...fromCatalog, ...FALLBACK_ICONS.filter((i) => !fromCatalog.includes(i))]
-  }, [models])
 
   const stats = useMemo(
     () =>
@@ -55,10 +42,6 @@ export function RouterHome() {
       }),
     [models.length, ranked, vendorCount]
   )
-
-  const slug = ranked[0]
-    ? `${ranked[0].vendor.toLowerCase()}/${ranked[0].model_name}`
-    : 'openai/gpt-4o-mini'
 
   return (
     <RouterShell>
@@ -73,7 +56,6 @@ export function RouterHome() {
       </div>
       {/* Positioned so the cards paint above the bottom of the map. */}
       <div className='relative'>
-        <RouterFeatures icons={icons} slug={slug} />
         <FeaturedModels
           rows={ranked}
           catalog={models}

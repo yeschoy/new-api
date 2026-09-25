@@ -49,8 +49,8 @@ describe('i18n', () => {
   })
 
   it('fills placeholders in either language', () => {
-    expect(t('共 {count} 个模型', { count: 3 })).toBe('共 3 个模型')
+    expect(t('近 {days} 天', { days: 7 })).toBe('近 7 天')
     setLang('en')
-    expect(t('共 {count} 个模型', { count: 3 })).toBe('3 models')
+    expect(t('近 {days} 天', { days: 7 })).toBe('Last 7 days')
   })
 })
