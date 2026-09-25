@@ -18,14 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useRef } from 'react'
 
+import { cn } from '@/lib/format'
 import { useTheme } from '@/site/theme'
 
 import { paintLand, paintLights } from './world-map-draw'
 import { decodeLand, decodeLights, type LandGrid, type LightGrid } from './world-map-data'
-import { subsolarPoint } from './world-sun'
 
-// The map data loads in its own chunks after the page: the land (15 KB) and
-// the city lights (80 KB).
+// The map data loads in its own chunks after the page: the land (15 KB)
+// right away, the lights (80 KB) only once night is first shown.
 let landData: Promise<LandGrid> | null = null
 let lightData: Promise<LightGrid> | null = null
 
@@ -39,15 +39,11 @@ function loadLights(): Promise<LightGrid> {
   return lightData
 }
 
-/** Day and night move across the map by about a pixel a minute, so it repaints once a minute. */
-const REPAINT_MS = 60_000
-
 /**
- * Paints a map layer whenever its canvas gets a new, non-zero size (a page
- * opened in a hidden tab lays out at 0×0 until it is first shown) and again
- * every minute as the sun moves. Returns the cleanup.
+ * Repaints a canvas whenever it gets a new, non-zero size. A page opened in a
+ * hidden tab lays out at 0×0 and only gets its real size when first shown.
  */
-function keepPainted(canvas: HTMLCanvasElement, paint: () => void): () => void {
+function paintOnResize(canvas: HTMLCanvasElement, paint: () => void): () => void {
   let size = ''
   const observer = new ResizeObserver(() => {
     const next = `${canvas.clientWidth}x${canvas.clientHeight}`
@@ -56,23 +52,17 @@ function keepPainted(canvas: HTMLCanvasElement, paint: () => void): () => void {
     paint()
   })
   observer.observe(canvas)
-  const timer = window.setInterval(() => {
-    if (canvas.clientWidth > 0 && canvas.clientHeight > 0) paint()
-  }, REPAINT_MS)
-  return () => {
-    observer.disconnect()
-    window.clearInterval(timer)
-  }
+  return () => observer.disconnect()
 }
 
 /**
- * Dotted world map on the home page showing real day and night: wherever the
- * sun has set right now, the city lights (NASA Black Marble) are on. The page
- * theme only sets the colours.
+ * Dotted world map on the home page. By day the land is a quiet grey
+ * stipple; at night real city lights (NASA Black Marble) come on, sweeping in
+ * from east to west.
  */
 export function WorldMap(props: { className?: string }) {
   const { theme } = useTheme()
-  const pageNight = theme === 'dark'
+  const night = theme === 'dark'
   const landRef = useRef<HTMLCanvasElement>(null)
   const lightsRef = useRef<HTMLCanvasElement>(null)
 
@@ -82,37 +72,48 @@ export function WorldMap(props: { className?: string }) {
     let stop = () => {}
     let cancelled = false
     void loadLand().then((land) => {
-      if (cancelled) return
-      stop = keepPainted(canvas, () => paintLand(canvas, land, pageNight, subsolarPoint(Date.now())))
+      if (!cancelled) stop = paintOnResize(canvas, () => paintLand(canvas, land, night))
     })
     return () => {
       cancelled = true
       stop()
     }
-  }, [pageNight])
+  }, [night])
 
   useEffect(() => {
     const canvas = lightsRef.current
-    if (!canvas) return
+    if (!night || !canvas) return
     let stop = () => {}
     let cancelled = false
     void loadLights().then((lights) => {
       if (cancelled) return
-      stop = keepPainted(canvas, () => {
-        paintLights(canvas, lights, pageNight, subsolarPoint(Date.now()))
-        canvas.setAttribute('data-ready', '')
+      let first = true
+      stop = paintOnResize(canvas, () => {
+        paintLights(canvas, lights)
+        if (!first) return
+        first = false
+        // Restart the east-to-west sweep now that the lights are drawn.
+        canvas.removeAttribute('data-on')
+        void canvas.offsetWidth
+        canvas.setAttribute('data-on', '')
       })
     })
     return () => {
       cancelled = true
       stop()
     }
-  }, [pageNight])
+  }, [night])
 
   return (
     <div aria-hidden='true' className={props.className}>
       <canvas ref={landRef} className='absolute inset-0 size-full' />
-      <canvas ref={lightsRef} className='world-lights absolute inset-0 size-full' />
+      <canvas
+        ref={lightsRef}
+        className={cn(
+          'world-lights absolute inset-0 size-full transition-opacity duration-500',
+          night ? 'opacity-100' : 'opacity-0'
+        )}
+      />
     </div>
   )
 }
