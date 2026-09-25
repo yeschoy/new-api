@@ -21,8 +21,10 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router'
 
 import { BrandMark } from '@/components/brand-mark'
+import { LanguageMenu } from '@/components/language-menu'
 import { MobileNav } from '@/components/mobile-nav'
 import { UserMenu } from '@/components/user-menu'
+import { useI18n } from '@/i18n/i18n'
 import { useAuth } from '@/lib/auth-store'
 import { cn } from '@/lib/format'
 import { useBrand, useStatus } from '@/lib/queries'
@@ -33,6 +35,7 @@ import { RouterSearchDialog } from './router-search-dialog'
 // From xl (1280px) the bar and everything in it is 1.4 times the size.
 export function RouterHeader() {
   const brand = useBrand()
+  const { t } = useI18n()
   const { data: status } = useStatus()
   const auth = useAuth()
   const theme = useTheme()
@@ -50,13 +53,13 @@ export function RouterHeader() {
   }, [])
 
   const links: Array<{ label: string; to: string; external?: boolean }> = [
-    { label: '模型', to: '/models' },
-    { label: '对话', to: '/chat' },
-    { label: '排行榜', to: '/rankings' },
-    { label: '定价', to: '/settings/credits' },
+    { label: t('模型'), to: '/models' },
+    { label: t('对话'), to: '/chat' },
+    { label: t('排行榜'), to: '/rankings' },
+    { label: t('定价'), to: '/settings/credits' },
   ]
   if (status?.docs_link) {
-    links.push({ label: '文档', to: status.docs_link, external: true })
+    links.push({ label: t('文档'), to: status.docs_link, external: true })
   }
 
   const linkClass =
@@ -79,7 +82,7 @@ export function RouterHeader() {
           className='bg-or-fg/4 ml-20 hidden h-8 w-60 min-w-0 items-center gap-2 rounded-[6px] px-3 text-left md:flex xl:ml-28 xl:h-[45px] xl:w-[336px] xl:gap-[11px] xl:rounded-[8px] xl:px-[17px]'
         >
           <Search className='text-or-fg/45 size-4 shrink-0 xl:size-[22px]' aria-hidden='true' />
-          <span className='text-or-fg/45 flex-1 truncate text-[14px] xl:text-[20px]'>搜索</span>
+          <span className='text-or-fg/45 flex-1 truncate text-[14px] xl:text-[20px]'>{t('搜索')}</span>
         </button>
 
         <div className='ml-auto flex shrink-0 items-center gap-1 pl-4 xl:gap-1.5'>
@@ -106,11 +109,15 @@ export function RouterHeader() {
               </NavLink>
             )
           )}
+          <LanguageMenu
+            className='text-or-muted hover:text-or-fg hover:bg-or-fill flex size-8 items-center justify-center rounded-[6px] transition-colors xl:size-[45px] xl:rounded-[8px]'
+            iconClassName='xl:size-[22px]'
+          />
           <button
             type='button'
             onClick={theme.toggle}
-            aria-label={theme.theme === 'dark' ? '切换到白天' : '切换到夜晚'}
-            title={theme.theme === 'dark' ? '切换到白天' : '切换到夜晚'}
+            aria-label={theme.theme === 'dark' ? t('切换到白天') : t('切换到夜晚')}
+            title={theme.theme === 'dark' ? t('切换到白天') : t('切换到夜晚')}
             className='text-or-muted hover:text-or-fg hover:bg-or-fill flex size-8 items-center justify-center rounded-[6px] transition-colors xl:size-[45px] xl:rounded-[8px]'
           >
             {theme.theme === 'dark' ? <Sun className='size-4 xl:size-[22px]' /> : <Moon className='size-4 xl:size-[22px]' />}
@@ -122,7 +129,7 @@ export function RouterHeader() {
               to='/sign-up'
               className='bg-or-primary text-or-bg ml-1 flex h-8 items-center rounded-[6px] px-3 text-[14px] font-medium transition-opacity hover:opacity-90 xl:ml-1.5 xl:h-[45px] xl:rounded-[8px] xl:px-[17px] xl:text-[20px]'
             >
-              注册
+              {t('注册')}
             </Link>
           )}
           <MobileNav items={links} />

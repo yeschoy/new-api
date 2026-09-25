@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { SquarePen } from 'lucide-react'
 
+import { useI18n } from '@/i18n/i18n'
 import type { CatalogModel } from '@/lib/queries'
 
 import { ChatComposer } from './chat-composer'
@@ -30,6 +31,7 @@ import type { ChatController } from './use-chat'
 
 /** Chat workspace: history rail, model + settings bar, thread, composer. */
 export function RouterChat(props: { chat: ChatController; models: CatalogModel[]; loading: boolean }) {
+  const { t } = useI18n()
   const chat = props.chat
   const messages = chat.active?.messages ?? []
 
@@ -41,8 +43,8 @@ export function RouterChat(props: { chat: ChatController; models: CatalogModel[]
           <button
             type='button'
             onClick={chat.newChat}
-            aria-label='新对话'
-            title='新对话'
+            aria-label={t('新对话')}
+            title={t('新对话')}
             className='border-or-line text-or-muted hover:text-or-fg flex size-9 shrink-0 items-center justify-center rounded-[6px] border md:hidden'
           >
             <SquarePen className='size-4' />

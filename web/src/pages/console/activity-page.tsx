@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { tk, useI18n } from '@/i18n/i18n'
 import { RequireAuth } from '@/components/require-auth'
 import { errorMessage } from '@/lib/api'
 import { listRequestLogs } from '@/lib/console-api'
@@ -36,13 +37,13 @@ const PAGE_SIZE = 20
 const LOG_TYPE_ERROR = 5
 
 const COLUMNS: Column[] = [
-  { label: '时间' },
-  { label: '模型' },
-  { label: '密钥' },
-  { label: '输入 tokens', right: true },
-  { label: '输出 tokens', right: true },
-  { label: '费用', right: true },
-  { label: '耗时', right: true },
+  { label: tk('时间') },
+  { label: tk('模型|表头') },
+  { label: tk('密钥') },
+  { label: tk('输入 tokens'), right: true },
+  { label: tk('输出 tokens'), right: true },
+  { label: tk('费用'), right: true },
+  { label: tk('耗时'), right: true },
 ]
 
 /** Usage: 7-day summary tiles and the paginated request log. */
@@ -55,6 +56,7 @@ export function ActivityPage() {
 }
 
 function ActivityContent() {
+  const { t } = useI18n()
   const [page, setPage] = useState(1)
   const logs = useQuery({
     queryKey: useConsoleKey('logs', page),
@@ -64,16 +66,16 @@ function ActivityContent() {
   const items = logs.data?.items ?? []
 
   return (
-    <ConsoleLayout active='activity' title='使用记录' description='查看每一次 API 调用的模型、Token 用量与费用。'>
+    <ConsoleLayout active='activity' title={t('使用记录')} description={t('查看每一次 API 调用的模型、Token 用量与费用。')}>
       <UsageTiles logs={items} />
-      <Panel title='请求明细' flush className='mt-6'>
+      <Panel title={t('请求明细')} flush className='mt-6'>
         <Table columns={COLUMNS} minWidth={920}>
-          {logs.isLoading ? <TableMessage colSpan={COLUMNS.length}>加载中…</TableMessage> : null}
+          {logs.isLoading ? <TableMessage colSpan={COLUMNS.length}>{t('加载中…')}</TableMessage> : null}
           {logs.isError ? (
-            <TableMessage colSpan={COLUMNS.length}>{errorMessage(logs.error, '使用记录加载失败')}</TableMessage>
+            <TableMessage colSpan={COLUMNS.length}>{errorMessage(logs.error, t('使用记录加载失败'))}</TableMessage>
           ) : null}
           {logs.isSuccess && items.length === 0 ? (
-            <TableMessage colSpan={COLUMNS.length}>暂无调用记录，使用 API 密钥发起请求后会显示在这里。</TableMessage>
+            <TableMessage colSpan={COLUMNS.length}>{t('暂无调用记录，使用 API 密钥发起请求后会显示在这里。')}</TableMessage>
           ) : null}
           {items.map((log) => (
             <LogRow key={log.id} log={log} />
@@ -86,6 +88,7 @@ function ActivityContent() {
 }
 
 function LogRow(props: { log: UsageLog }) {
+  const { t } = useI18n()
   const log = props.log
   const money = useMoney()
   return (
@@ -94,8 +97,8 @@ function LogRow(props: { log: UsageLog }) {
       <Td>
         <div className='flex items-center gap-2'>
           <span className='font-medium break-all'>{log.model_name || '—'}</span>
-          {log.type === LOG_TYPE_ERROR ? <Tag tone='danger'>失败</Tag> : null}
-          {log.is_stream ? <Tag>流式</Tag> : null}
+          {log.type === LOG_TYPE_ERROR ? <Tag tone='danger'>{t('失败')}</Tag> : null}
+          {log.is_stream ? <Tag>{t('流式')}</Tag> : null}
         </div>
       </Td>
       <Td muted>{log.token_name || '—'}</Td>

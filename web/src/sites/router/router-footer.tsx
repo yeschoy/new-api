@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link } from 'react-router'
 
 import { BrandMark } from '@/components/brand-mark'
+import { useI18n } from '@/i18n/i18n'
 import { useBrand, useStatus } from '@/lib/queries'
 
 type FooterLink = { label: string; to: string; external?: boolean }
@@ -56,10 +57,11 @@ function FooterColumn(props: { title: string; links: FooterLink[] }) {
 
 export function RouterFooter() {
   const brand = useBrand()
+  const { t } = useI18n()
   const { data: status } = useStatus()
-  const legal: FooterLink[] = [{ label: '关于', to: '/about' }]
-  if (status?.privacy_policy_enabled) legal.push({ label: '隐私政策', to: '/privacy-policy' })
-  if (status?.user_agreement_enabled) legal.push({ label: '用户协议', to: '/user-agreement' })
+  const legal: FooterLink[] = [{ label: t('关于'), to: '/about' }]
+  if (status?.privacy_policy_enabled) legal.push({ label: t('隐私政策'), to: '/privacy-policy' })
+  if (status?.user_agreement_enabled) legal.push({ label: t('用户协议'), to: '/user-agreement' })
 
   return (
     <footer className='border-or-line bg-or-bg border-t px-6 py-16 md:px-12'>
@@ -74,27 +76,27 @@ export function RouterFooter() {
           </div>
         </div>
         <FooterColumn
-          title='产品'
+          title={t('产品')}
           links={[
-            { label: '对话', to: '/chat' },
-            { label: '排行榜', to: '/rankings' },
-            { label: '模型', to: '/models' },
-            { label: '定价', to: '/settings/credits' },
+            { label: t('对话'), to: '/chat' },
+            { label: t('排行榜'), to: '/rankings' },
+            { label: t('模型'), to: '/models' },
+            { label: t('定价'), to: '/settings/credits' },
           ]}
         />
-        <FooterColumn title='公司' links={legal} />
+        <FooterColumn title={t('公司')} links={legal} />
         <FooterColumn
-          title='开发者'
+          title={t('开发者')}
           links={[
             ...(status?.docs_link
-              ? [{ label: '文档', to: status.docs_link, external: true }]
+              ? [{ label: t('文档'), to: status.docs_link, external: true }]
               : []),
-            { label: 'API 密钥', to: '/settings/keys' },
-            { label: '使用记录', to: '/activity' },
+            { label: t('API 密钥'), to: '/settings/keys' },
+            { label: t('使用记录'), to: '/activity' },
           ]}
         />
         <FooterColumn
-          title='社区'
+          title={t('社区')}
           links={[
             {
               label: 'GitHub',

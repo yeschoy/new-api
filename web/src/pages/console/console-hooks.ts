@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
+import { t } from '@/i18n/i18n'
 import { authStore, useAuth } from '@/lib/auth-store'
 import { formatAmount } from '@/lib/pricing'
 import { useCurrency, useStatus } from '@/lib/queries'
@@ -41,7 +42,7 @@ export function useSelf() {
     queryKey: useConsoleKey('self'),
     queryFn: async () => {
       const user = await getSelf()
-      if (!user) throw new Error('获取账户信息失败')
+      if (!user) throw new Error(t('获取账户信息失败'))
       authStore.updateUser(user)
       return user
     },

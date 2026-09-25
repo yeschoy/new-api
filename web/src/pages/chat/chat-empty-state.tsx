@@ -18,13 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Code2, Lightbulb, MapPinned, PenLine } from 'lucide-react'
 
+import { tk, useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 
 const SUGGESTIONS = [
-  { icon: Lightbulb, title: '解释概念', prompt: '用通俗易懂的语言解释一下什么是量子计算，控制在三段以内' },
-  { icon: Code2, title: '写代码', prompt: '用 Python 写一个快速排序，并说明它的时间复杂度' },
-  { icon: PenLine, title: '创作', prompt: '写一首关于秋天的七言绝句，并简单赏析' },
-  { icon: MapPinned, title: '做计划', prompt: '帮我规划一个周末两天的杭州旅行行程，预算 2000 元' },
+  { icon: Lightbulb, title: tk('解释概念'), prompt: tk('用通俗易懂的语言解释一下什么是量子计算，控制在三段以内') },
+  { icon: Code2, title: tk('写代码'), prompt: tk('用 Python 写一个快速排序，并说明它的时间复杂度') },
+  { icon: PenLine, title: tk('创作'), prompt: tk('写一首关于秋天的七言绝句，并简单赏析') },
+  { icon: MapPinned, title: tk('做计划'), prompt: tk('帮我规划一个周末两天的杭州旅行行程，预算 2000 元') },
 ]
 
 const s = {
@@ -42,11 +43,12 @@ export function ChatEmptyState(props: {
   onPick: (prompt: string) => void
   className?: string
 }) {
+  const { t } = useI18n()
   return (
     <div className={cn('flex flex-col items-center justify-center px-4 py-10', props.className)}>
-      <h2 className={s.title}>有什么可以帮你？</h2>
+      <h2 className={s.title}>{t('有什么可以帮你？')}</h2>
       <p className={cn('mt-2 text-center text-[14px]', s.sub)}>
-        {props.model ? `正在使用 ${props.model}，选择一个示例或直接输入问题` : '请先选择一个模型'}
+        {props.model ? t('正在使用 {model}，选择一个示例或直接输入问题', { model: props.model }) : t('请先选择一个模型')}
       </p>
       <div className='mt-8 grid w-full max-w-[640px] gap-3 sm:grid-cols-2'>
         {SUGGESTIONS.map((item) => (
@@ -54,14 +56,14 @@ export function ChatEmptyState(props: {
             key={item.title}
             type='button'
             disabled={props.disabled}
-            onClick={() => props.onPick(item.prompt)}
+            onClick={() => props.onPick(t(item.prompt))}
             className={cn('flex flex-col gap-1.5 p-4 text-left transition-colors disabled:opacity-50', s.card)}
           >
             <span className={cn('flex items-center gap-2 text-[14px] font-medium', s.cardTitle)}>
               <item.icon className={cn('size-4', s.icon)} aria-hidden='true' />
-              {item.title}
+              {t(item.title)}
             </span>
-            <span className={cn('text-[13px] leading-5', s.cardText)}>{item.prompt}</span>
+            <span className={cn('text-[13px] leading-5', s.cardText)}>{t(item.prompt)}</span>
           </button>
         ))}
       </div>

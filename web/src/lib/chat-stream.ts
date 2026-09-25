@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { t } from '@/i18n/i18n'
+
 import { refreshSession } from './api'
 import { authStore } from './auth-store'
 
@@ -46,7 +48,7 @@ type ChunkPayload = {
 function eventsFromPayload(payload: ChunkPayload): StreamEvent[] {
   if (payload.error) {
     const message = typeof payload.error === 'string' ? payload.error : payload.error.message
-    return [{ type: 'error', message: message || '请求失败' }]
+    return [{ type: 'error', message: message || t('请求失败') }]
   }
   const delta = payload.choices?.[0]?.delta
   const events: StreamEvent[] = []
@@ -91,7 +93,7 @@ export function readErrorMessage(body: string, status: number): string {
   } catch {
     // Fall through to the generic message.
   }
-  return `请求失败（HTTP ${status}）`
+  return t('请求失败（HTTP {status}）', { status })
 }
 
 function post(body: ChatCompletionBody, signal: AbortSignal): Promise<Response> {
@@ -124,7 +126,7 @@ export async function streamChatCompletion(options: {
     response = await post(options.body, options.signal)
   }
   if (!response.ok) throw new Error(readErrorMessage(await response.text(), response.status))
-  if (!response.body) throw new Error('当前浏览器不支持流式响应')
+  if (!response.body) throw new Error(t('当前浏览器不支持流式响应'))
 
   const reader = response.body.getReader()
   const decoder = new TextDecoder()

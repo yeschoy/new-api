@@ -24,6 +24,17 @@ One design, a replica of the openrouter.ai catalog. Components live under `src/s
 
 Brand name and logo always come from the operator's system settings (`useBrand()` in `src/lib/queries.ts`); never hard-code a brand.
 
+## Languages
+
+The site opens in Simplified Chinese; the globe button in the header (`src/components/language-menu.tsx`) switches to English. The choice is kept in `localStorage` under `lang` and sets `<html lang>`.
+
+- Write UI text in Chinese and pass it through `t()` from `src/i18n/i18n.ts`, e.g. `t('创建密钥')`. The Chinese is the key into the English table `src/i18n/en.ts`. Components that show text call `const { t } = useI18n()` so they re-render when the language changes.
+- Placeholders use braces, in both languages: `t('共 {count} 个模型', { count })` → `'{count} models'`. Always pass a single-quoted literal, never a template string, so the checks can find it.
+- Text kept at module level (option lists, table columns) is marked with `tk('…')` and passed through `t()` where it is shown. A `t()` call at module level would freeze the language at load time.
+- When the same Chinese needs different English in another role, add a `|tag`: `t('模型|表头')` shows 模型 in Chinese and uses its own entry (`'Model'`) in English.
+- Dates follow the language (`shortDate` and `bucketLabel` in `src/lib/format.ts`). Backend data, such as model descriptions and names users typed, is shown as is.
+- `src/i18n/__tests__/coverage.test.ts` fails when a `t()`/`tk()` text has no English entry, or when Chinese appears outside `t()`/`tk()` (comments and tests excepted).
+
 ## Backend contract
 
 The frontend only uses existing endpoints; do not change Go code for UI work. Key modules:
@@ -43,7 +54,7 @@ Login passwords are RSA-encrypted when `status.password_login_encryption_enabled
 - Single quotes, no semicolons, 2-space indent; function components; read props as `props.x` instead of destructuring.
 - Merge class names with `cn` from `src/lib/format.ts`.
 - No nested ternaries; use early returns or `if` chains.
-- UI copy is Simplified Chinese.
+- UI copy is written in Simplified Chinese inside `t()`/`tk()`, with English in `src/i18n/en.ts` (see Languages).
 - Keep files focused (roughly under 250 lines); split subcomponents into sibling files.
 - Put tests in a `__tests__/` folder next to the code they cover, and assert user-visible behaviour.
 

@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { ArrowUp, Square } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 
+import { useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 
 const MAX_HEIGHT = 200
@@ -37,6 +38,7 @@ export function ChatComposer(props: {
   onSend: (text: string) => void
   onStop: () => void
 }) {
+  const { t } = useI18n()
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const canSend = !props.disabled && !props.streaming && value.trim().length > 0
@@ -69,16 +71,16 @@ export function ChatComposer(props: {
               submit()
             }
           }}
-          placeholder={props.disabled ? '请先选择模型' : '输入消息，Enter 发送，Shift + Enter 换行'}
-          aria-label='消息'
+          placeholder={props.disabled ? t('请先选择模型') : t('输入消息，Enter 发送，Shift + Enter 换行')}
+          aria-label={t('消息')}
           className={cn('min-h-8 flex-1 resize-none bg-transparent py-1 text-[14px] leading-6 outline-none', s.input)}
         />
         {props.streaming ? (
           <button
             type='button'
             onClick={props.onStop}
-            aria-label='停止生成'
-            title='停止生成'
+            aria-label={t('停止生成')}
+            title={t('停止生成')}
             className={cn('flex size-8 shrink-0 items-center justify-center', s.send)}
           >
             <Square className='size-3.5 fill-current' />
@@ -88,15 +90,15 @@ export function ChatComposer(props: {
             type='button'
             onClick={submit}
             disabled={!canSend}
-            aria-label='发送'
-            title='发送'
+            aria-label={t('发送')}
+            title={t('发送')}
             className={cn('flex size-8 shrink-0 items-center justify-center transition-opacity', s.send)}
           >
             <ArrowUp className='size-4' strokeWidth={2.5} />
           </button>
         )}
       </div>
-      <p className={cn('mt-1.5 text-center text-[12px]', s.hint)}>AI 生成的内容可能不准确，请注意甄别</p>
+      <p className={cn('mt-1.5 text-center text-[12px]', s.hint)}>{t('AI 生成的内容可能不准确，请注意甄别')}</p>
     </div>
   )
 }

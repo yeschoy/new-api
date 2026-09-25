@@ -21,6 +21,7 @@ import { LogOut, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { useI18n } from '@/i18n/i18n'
 import { RequireAuth } from '@/components/require-auth'
 import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
@@ -42,6 +43,7 @@ export function ProfilePage() {
 }
 
 function ProfileContent() {
+  const { t } = useI18n()
   const auth = useAuth()
   const self = useSelf()
   const user = self.data ?? auth.user
@@ -57,18 +59,18 @@ function ProfileContent() {
   }
 
   const rows: Array<[string, React.ReactNode]> = [
-    ['用户 ID', user ? String(user.id) : '—'],
-    ['用户名', user?.username || '—'],
-    ['显示名称', <DisplayNameEditor value={user?.display_name ?? ''} />],
-    ['邮箱', user?.email || <span className='text-or-muted'>未绑定</span>],
-    ['分组', user?.group || 'default'],
-    ['角色', roleLabel(user?.role)],
+    [t('用户 ID'), user ? String(user.id) : '—'],
+    [t('用户名'), user?.username || '—'],
+    [t('显示名称'), <DisplayNameEditor value={user?.display_name ?? ''} />],
+    [t('邮箱'), user?.email || <span className='text-or-muted'>{t('未绑定')}</span>],
+    [t('分组'), user?.group || 'default'],
+    [t('角色'), roleLabel(user?.role)],
   ]
 
   return (
-    <ConsoleLayout active='profile' title='账户设置' description='管理账户资料与登录状态。'>
+    <ConsoleLayout active='profile' title={t('账户设置')} description={t('管理账户资料与登录状态。')}>
       <div className='flex flex-col gap-4'>
-        <Panel title='基本信息' flush>
+        <Panel title={t('基本信息')} flush>
           <dl>
             {rows.map(([label, value]) => (
               <div
@@ -82,12 +84,12 @@ function ProfileContent() {
           </dl>
         </Panel>
 
-        <Panel title='退出登录'>
+        <Panel title={t('退出登录')}>
           <div className='flex flex-wrap items-center justify-between gap-4'>
-            <p className='text-or-muted text-[14px]'>退出当前浏览器中的登录状态，API 密钥不受影响。</p>
+            <p className='text-or-muted text-[14px]'>{t('退出当前浏览器中的登录状态，API 密钥不受影响。')}</p>
             <Button busy={signingOut} onClick={signOut}>
               <LogOut className='size-4' aria-hidden='true' />
-              退出登录
+              {t('退出登录')}
             </Button>
           </div>
         </Panel>
@@ -98,6 +100,7 @@ function ProfileContent() {
 
 /** Inline editor; PUT /api/user/self only applies a non-empty display_name (max 20). */
 function DisplayNameEditor(props: { value: string }) {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -108,13 +111,13 @@ function DisplayNameEditor(props: { value: string }) {
       await queryClient.invalidateQueries({ queryKey: ['console'] })
       setEditing(false)
     },
-    onError: (err) => setError(errorMessage(err, '保存失败')),
+    onError: (err) => setError(errorMessage(err, t('保存失败'))),
   })
 
   if (!editing) {
     return (
       <div className='flex items-center gap-2'>
-        <span>{props.value || '未设置'}</span>
+        <span>{props.value || t('未设置')}</span>
         <Button
           size='sm'
           variant='ghost'
@@ -125,7 +128,7 @@ function DisplayNameEditor(props: { value: string }) {
           }}
         >
           <Pencil className='size-3.5' aria-hidden='true' />
-          编辑
+          {t('编辑')}
         </Button>
       </div>
     )
@@ -135,7 +138,7 @@ function DisplayNameEditor(props: { value: string }) {
     event.preventDefault()
     const name = draft.trim()
     if (!name) {
-      setError('显示名称不能为空')
+      setError(t('显示名称不能为空'))
       return
     }
     if (name === props.value) {
@@ -149,12 +152,12 @@ function DisplayNameEditor(props: { value: string }) {
   return (
     <form onSubmit={onSubmit} className='flex max-w-[460px] flex-col gap-2'>
       <div className='flex gap-2'>
-        <TextInput value={draft} onChange={setDraft} maxLength={20} autoFocus ariaLabel='显示名称' />
+        <TextInput value={draft} onChange={setDraft} maxLength={20} autoFocus ariaLabel={t('显示名称')} />
         <Button type='submit' variant='primary' busy={save.isPending}>
-          保存
+          {t('保存')}
         </Button>
         <Button variant='ghost' onClick={() => setEditing(false)}>
-          取消
+          {t('取消')}
         </Button>
       </div>
       {error ? <Notice tone='error'>{error}</Notice> : null}

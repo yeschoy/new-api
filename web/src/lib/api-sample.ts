@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { t } from '@/i18n/i18n'
+
 export type SampleLanguage = 'curl' | 'python' | 'typescript'
 
 /** Ready-to-run request snippets against this gateway's OpenAI endpoint. */
@@ -31,7 +33,7 @@ export function apiSample(lang: SampleLanguage, baseUrl: string, model: string):
       '',
       'completion = client.chat.completions.create(',
       `    model="${model}",`,
-      '    messages=[{"role": "user", "content": "你好"}],',
+      `    messages=[{"role": "user", "content": "${t('你好')}"}],`,
       ')',
       'print(completion.choices[0].message.content)',
     ].join('\n')
@@ -47,7 +49,7 @@ export function apiSample(lang: SampleLanguage, baseUrl: string, model: string):
       '',
       'const completion = await client.chat.completions.create({',
       `  model: '${model}',`,
-      "  messages: [{ role: 'user', content: '你好' }],",
+      `  messages: [{ role: 'user', content: '${t('你好')}' }],`,
       '})',
       'console.log(completion.choices[0].message.content)',
     ].join('\n')
@@ -58,7 +60,7 @@ export function apiSample(lang: SampleLanguage, baseUrl: string, model: string):
     '  -H "Authorization: Bearer <API_KEY>" \\',
     "  -d '{",
     `    "model": "${model}",`,
-    '    "messages": [{"role": "user", "content": "你好"}]',
+    `    "messages": [{"role": "user", "content": "${t('你好')}"}]`,
     "  }'",
   ].join('\n')
 }

@@ -18,16 +18,18 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from 'react-router'
 
+import { useI18n } from '@/i18n/i18n'
 import { RouterShell } from '@/sites/router/router-shell'
 
 export function NotFoundPage() {
+  const { t } = useI18n()
   return (
     <RouterShell>
       <div className='flex flex-col items-center px-6 py-32 text-center'>
         <div className='text-[56px] font-bold tracking-[-1.4px]'>404</div>
-        <p className='text-or-muted mt-2 text-[16px]'>页面不存在</p>
+        <p className='text-or-muted mt-2 text-[16px]'>{t('页面不存在')}</p>
         <Link to='/' className='bg-or-primary text-or-bg mt-8 flex h-11 items-center rounded-[6px] px-8 text-[14px] font-medium'>
-          返回首页
+          {t('返回首页')}
         </Link>
       </div>
     </RouterShell>

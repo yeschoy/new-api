@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Check, ChevronDown, Code2, DollarSign, Layers, MessageSquareText, Ruler, Users } from 'lucide-react'
 import { useState } from 'react'
 
+import { tk, useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 import {
   CAPABILITY_LABELS,
@@ -74,17 +75,17 @@ function CheckRow(props: { label: string; checked: boolean; count?: number; onTo
 }
 
 const CONTEXTS = [
-  { label: '不限', value: 0 },
+  { label: tk('不限'), value: 0 },
   { label: '≥ 32K', value: 32_000 },
   { label: '≥ 128K', value: 128_000 },
   { label: '≥ 1M', value: 1_000_000 },
 ]
 
 const PRICES: Array<{ label: string; value: number | null }> = [
-  { label: '不限', value: null },
-  { label: '免费', value: 0 },
-  { label: '≤ $1 / 百万 tokens', value: 1 },
-  { label: '≤ $5 / 百万 tokens', value: 5 },
+  { label: tk('不限'), value: null },
+  { label: tk('免费'), value: 0 },
+  { label: tk('≤ $1 / 百万 tokens'), value: 1 },
+  { label: tk('≤ $5 / 百万 tokens'), value: 5 },
 ]
 
 /** Left rail: 219px of collapsible filter groups, checkbox rows 32px tall. */
@@ -93,6 +94,7 @@ export function RouterFilterSidebar(props: {
   filters: ModelFilters
   onChange: (next: ModelFilters) => void
 }) {
+  const { t } = useI18n()
   const f = props.filters
   const set = (patch: Partial<ModelFilters>) => props.onChange({ ...f, ...patch })
   const vendorCounts = countBy(props.models, (m) => [m.vendor])
@@ -102,45 +104,45 @@ export function RouterFilterSidebar(props: {
 
   return (
     <div className='flex flex-col'>
-      <Group icon={<MessageSquareText className='size-4' />} title='输入模态' defaultOpen>
+      <Group icon={<MessageSquareText className='size-4' />} title={t('输入模态')} defaultOpen>
         {(Object.keys(MODALITY_LABELS) as Modality[]).map((m) => (
           <CheckRow
             key={m}
-            label={MODALITY_LABELS[m]}
+            label={t(MODALITY_LABELS[m])}
             count={inputCounts.get(m) ?? 0}
             checked={f.inputModalities.includes(m)}
             onToggle={() => set({ inputModalities: toggle(f.inputModalities, m) })}
           />
         ))}
       </Group>
-      <Group icon={<Ruler className='size-4' />} title='上下文长度'>
+      <Group icon={<Ruler className='size-4' />} title={t('上下文长度')}>
         {CONTEXTS.map((c) => (
-          <CheckRow key={c.label} label={c.label} checked={f.minContext === c.value} onToggle={() => set({ minContext: c.value })} />
+          <CheckRow key={c.label} label={t(c.label)} checked={f.minContext === c.value} onToggle={() => set({ minContext: c.value })} />
         ))}
       </Group>
-      <Group icon={<DollarSign className='size-4' />} title='输入价格'>
+      <Group icon={<DollarSign className='size-4' />} title={t('输入价格')}>
         {PRICES.map((p) => (
-          <CheckRow key={p.label} label={p.label} checked={f.maxInputUsd === p.value} onToggle={() => set({ maxInputUsd: p.value })} />
+          <CheckRow key={p.label} label={t(p.label)} checked={f.maxInputUsd === p.value} onToggle={() => set({ maxInputUsd: p.value })} />
         ))}
       </Group>
-      <Group icon={<Code2 className='size-4' />} title='支持的功能'>
+      <Group icon={<Code2 className='size-4' />} title={t('支持的功能')}>
         {Object.entries(CAPABILITY_LABELS).map(([key, label]) => (
           <CheckRow
             key={key}
-            label={label}
+            label={t(label)}
             count={capCounts.get(key) ?? 0}
             checked={f.capabilities.includes(key)}
             onToggle={() => set({ capabilities: toggle(f.capabilities, key) })}
           />
         ))}
       </Group>
-      <Group icon={<Users className='size-4' />} title='模型厂商' defaultOpen>
+      <Group icon={<Users className='size-4' />} title={t('模型厂商')} defaultOpen>
         {vendors.map(([vendor, count]) => (
           <CheckRow key={vendor} label={vendor} count={count} checked={f.vendors.includes(vendor)} onToggle={() => set({ vendors: toggle(f.vendors, vendor) })} />
         ))}
       </Group>
-      <Group icon={<Layers className='size-4' />} title='系列'>
-        <p className='text-or-dim px-2 py-1 text-[13px]'>按厂商筛选即可查看同系列模型。</p>
+      <Group icon={<Layers className='size-4' />} title={t('系列')}>
+        <p className='text-or-dim px-2 py-1 text-[13px]'>{t('按厂商筛选即可查看同系列模型。')}</p>
       </Group>
     </div>
   )

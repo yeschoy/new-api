@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { tk } from '@/i18n/i18n'
+
 import type { CatalogModel } from './queries'
 import type { Modality } from './services'
 
@@ -44,19 +46,19 @@ export const EMPTY_FILTERS: ModelFilters = {
 }
 
 export const MODALITY_LABELS: Record<Modality, string> = {
-  text: '文本',
-  image: '图像',
-  file: '文件',
-  audio: '音频',
-  video: '视频',
+  text: tk('文本'),
+  image: tk('图像'),
+  file: tk('文件'),
+  audio: tk('音频'),
+  video: tk('视频'),
 }
 
 export const CAPABILITY_LABELS: Record<string, string> = {
-  tool_calling: '工具调用',
-  reasoning: '推理',
-  vision: '视觉',
-  structured_output: '结构化输出',
-  streaming: '流式输出',
+  tool_calling: tk('工具调用'),
+  reasoning: tk('推理'),
+  vision: tk('视觉'),
+  structured_output: tk('结构化输出'),
+  streaming: tk('流式输出'),
 }
 
 export function outputsOf(model: CatalogModel): Modality[] {

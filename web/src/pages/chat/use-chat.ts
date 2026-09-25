@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { t } from '@/i18n/i18n'
 import { streamChatCompletion, type ChatCompletionBody } from '@/lib/chat-stream'
 
 export type ChatMessage = {
@@ -180,12 +181,12 @@ export function useChat(defaultModel: string) {
             if (event.type === 'error') patchReply((r) => ({ ...r, error: event.message }))
           },
         })
-        if (!received) patchReply((r) => (r.error ? r : { ...r, error: '模型没有返回任何内容' }))
+        if (!received) patchReply((r) => (r.error ? r : { ...r, error: t('模型没有返回任何内容') }))
       } catch (error) {
         if (controller.signal.aborted) {
-          if (!received) patchReply((r) => ({ ...r, error: '已停止生成' }))
+          if (!received) patchReply((r) => ({ ...r, error: t('已停止生成') }))
         } else {
-          const message = error instanceof Error && error.message ? error.message : '网络异常，请稍后重试'
+          const message = error instanceof Error && error.message ? error.message : t('网络异常，请稍后重试')
           patchReply((r) => ({ ...r, error: message }))
         }
       } finally {

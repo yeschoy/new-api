@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { CreditCard, KeyRound, Mail, MessageCircle, User } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { useI18n } from '@/i18n/i18n'
 import { ProviderIcon } from '@/components/provider-icon'
 
 const bar = 'bg-or-fg/15 h-1 rounded-full'
@@ -36,12 +37,13 @@ function StepHead(props: { index: number; title: string }) {
 
 /** Three columns (≈253px) under a 856px wrapper, 48px apart. */
 export function RouterSteps() {
+  const { t } = useI18n()
   return (
     <section className='mx-auto mt-24 grid max-w-[856px] gap-12 px-6 md:grid-cols-3 md:px-0'>
       <div>
-        <StepHead index={1} title='注册' />
+        <StepHead index={1} title={t('注册')} />
         <p className='text-or-muted mt-4 text-[14px] leading-[22.75px]'>
-          创建账号即可开始，之后也可以为团队单独开组织。
+          {t('创建账号即可开始，之后也可以为团队单独开组织。')}
         </p>
         <div className='mt-6 flex items-center gap-2' aria-hidden='true'>
           <User className='text-or-muted size-4' />
@@ -56,7 +58,7 @@ export function RouterSteps() {
             <Link
               key={icon.key}
               to='/sign-up'
-              aria-label='注册'
+              aria-label={t('注册')}
               className='border-or-line bg-or-fill hover:border-or-fg/20 flex size-8 items-center justify-center rounded-[6px] border'
             >
               {icon}
@@ -65,9 +67,9 @@ export function RouterSteps() {
         </div>
       </div>
       <div>
-        <StepHead index={2} title='充值额度' />
+        <StepHead index={2} title={t('充值额度')} />
         <p className='text-or-muted mt-4 text-[14px] leading-[22.75px]'>
-          额度可用于任意模型和任意渠道。
+          {t('额度可用于任意模型和任意渠道。')}
         </p>
         <div className='mt-6 flex items-center gap-2' aria-hidden='true'>
           <CreditCard className='text-or-muted size-4' />
@@ -77,8 +79,8 @@ export function RouterSteps() {
         </div>
         <div className='mt-3 flex flex-col gap-1.5' aria-hidden='true'>
           {[
-            ['9月1日', '¥99'],
-            ['8月30日', '¥10'],
+            [t('9月1日'), '¥99'],
+            [t('8月30日'), '¥10'],
           ].map(([date, amount]) => (
             <div key={amount} className='bg-or-fill flex items-center gap-3 rounded-[4px] px-2 py-1 text-[11px]'>
               <span className='text-or-muted w-12'>{date}</span>
@@ -89,10 +91,11 @@ export function RouterSteps() {
         </div>
       </div>
       <div>
-        <StepHead index={3} title='获取 API Key' />
+        <StepHead index={3} title={t('获取 API Key')} />
         <p className='text-or-muted mt-4 text-[14px] leading-[22.75px]'>
-          创建密钥即可发起请求，
-          <span className='text-or-fg underline underline-offset-2'>完全兼容 OpenAI</span>。
+          {t('创建密钥即可发起请求，')}
+          <span className='text-or-fg underline underline-offset-2'>{t('完全兼容 OpenAI')}</span>
+          {t('。')}
         </p>
         <div className='mt-6 flex items-center gap-2' aria-hidden='true'>
           <KeyRound className='text-or-muted size-4' />

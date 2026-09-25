@@ -25,6 +25,7 @@ import {
   type RouteObject,
 } from 'react-router'
 
+import { tk } from './i18n/i18n'
 import { SignInPage } from './pages/auth/sign-in-page'
 import { SignUpPage } from './pages/auth/sign-up-page'
 import { ChatPage } from './pages/chat/chat-page'
@@ -74,9 +75,9 @@ export const routes: RouteObject[] = [
       { path: '/settings/profile', element: <ProfilePage /> },
       { path: '/settings', element: <Navigate to='/settings/keys' replace /> },
       { path: '/dashboard', element: <Navigate to='/settings/keys' replace /> },
-      { path: '/about', element: <ContentPage source='/api/about' title='关于' /> },
-      { path: '/user-agreement', element: <ContentPage source='/api/user-agreement' title='用户协议' /> },
-      { path: '/privacy-policy', element: <ContentPage source='/api/privacy-policy' title='隐私政策' /> },
+      { path: '/about', element: <ContentPage source='/api/about' title={tk('关于')} /> },
+      { path: '/user-agreement', element: <ContentPage source='/api/user-agreement' title={tk('用户协议')} /> },
+      { path: '/privacy-policy', element: <ContentPage source='/api/privacy-policy' title={tk('隐私政策')} /> },
       { path: '/setup', element: <SetupPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],

@@ -19,11 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 import { Lock } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 
+import { useI18n } from '@/i18n/i18n'
 import { useAuth } from '@/lib/auth-store'
 import { RouterShell } from '@/sites/router/router-shell'
 
 /** In-page notice for signed-out visitors; never navigates on its own. */
 function SignInNotice() {
+  const { t } = useI18n()
   const location = useLocation()
   const redirect = encodeURIComponent(location.pathname + location.search)
   return (
@@ -32,20 +34,20 @@ function SignInNotice() {
         <span className='bg-or-fill mx-auto flex size-10 items-center justify-center rounded-full'>
           <Lock className='text-or-muted size-4' aria-hidden='true' />
         </span>
-        <h1 className='mt-4 text-[20px] leading-6 font-semibold'>登录后即可使用</h1>
-        <p className='text-or-muted mt-2 text-[14px] leading-[22.75px]'>这个页面需要账号。你可以先随便逛逛模型和排行榜。</p>
+        <h1 className='mt-4 text-[20px] leading-6 font-semibold'>{t('登录后即可使用')}</h1>
+        <p className='text-or-muted mt-2 text-[14px] leading-[22.75px]'>{t('这个页面需要账号。你可以先随便逛逛模型和排行榜。')}</p>
         <div className='mt-6 flex flex-col gap-2'>
           <Link
             to={`/sign-in?redirect=${redirect}`}
             className='bg-or-primary text-or-bg flex h-10 items-center justify-center rounded-[6px] text-[14px] font-medium transition-opacity hover:opacity-90'
           >
-            登录
+            {t('登录')}
           </Link>
           <Link
             to={`/sign-up?redirect=${redirect}`}
             className='border-or-line hover:bg-or-fill flex h-10 items-center justify-center rounded-[6px] border text-[14px] font-medium'
           >
-            注册
+            {t('注册')}
           </Link>
         </div>
       </div>

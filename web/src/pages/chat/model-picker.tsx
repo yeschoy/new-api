@@ -20,6 +20,7 @@ import { Check, ChevronDown, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ProviderIcon } from '@/components/provider-icon'
+import { useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 import type { CatalogModel } from '@/lib/queries'
 
@@ -40,6 +41,7 @@ export function ModelPicker(props: {
   loading?: boolean
   className?: string
 }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
@@ -86,7 +88,7 @@ export function ModelPicker(props: {
           <ProviderIcon name={current?.vendorIcon} fallback={current?.vendor ?? props.value} size={16} />
         ) : null}
         <span className={cn('min-w-0 flex-1 truncate text-left', !props.value && s.muted)}>
-          {props.value || (props.loading ? '加载模型中…' : '选择模型')}
+          {props.value || (props.loading ? t('加载模型中…') : t('选择模型'))}
         </span>
         <ChevronDown className={cn('size-4 shrink-0', s.muted)} aria-hidden='true' />
       </button>
@@ -102,14 +104,14 @@ export function ModelPicker(props: {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && filtered[0]) choose(filtered[0].model_name)
               }}
-              placeholder='搜索模型或厂商'
-              aria-label='搜索模型'
+              placeholder={t('搜索模型或厂商')}
+              aria-label={t('搜索模型')}
               className='w-full bg-transparent text-[14px] outline-none'
             />
           </label>
-          <ul role='listbox' aria-label='模型' className='max-h-[320px] overflow-y-auto p-1'>
+          <ul role='listbox' aria-label={t('模型')} className='max-h-[320px] overflow-y-auto p-1'>
             {filtered.length === 0 ? (
-              <li className={cn('px-3 py-6 text-center text-[13px]', s.muted)}>没有匹配的模型</li>
+              <li className={cn('px-3 py-6 text-center text-[13px]', s.muted)}>{t('没有匹配的模型')}</li>
             ) : null}
             {filtered.map((m) => {
               const selected = m.model_name === props.value

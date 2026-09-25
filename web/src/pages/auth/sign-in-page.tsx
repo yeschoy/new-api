@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 
 import { AuthCard, AuthField, AuthSubmit } from '@/components/auth-card'
+import { useI18n } from '@/i18n/i18n'
 import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
 import { useStatus } from '@/lib/queries'
@@ -32,6 +33,7 @@ export function safeRedirect(value: string | null): string {
 }
 
 export function SignInPage() {
+  const { t } = useI18n()
   const auth = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -59,7 +61,7 @@ export function SignInPage() {
       else if (result.kind === 'two-factor') setStep('two-factor')
       else setError(result.message)
     } catch (err) {
-      setError(errorMessage(err, '登录失败'))
+      setError(errorMessage(err, t('登录失败')))
     } finally {
       setBusy(false)
     }
@@ -70,13 +72,13 @@ export function SignInPage() {
 
   return (
     <AuthCard
-      title={step === 'password' ? '登录' : '两步验证'}
-      subtitle={step === 'two-factor' ? '请输入验证器 App 中的 6 位验证码' : undefined}
+      title={step === 'password' ? t('登录') : t('两步验证')}
+      subtitle={step === 'two-factor' ? t('请输入验证器 App 中的 6 位验证码') : undefined}
       footer={
         canRegister ? (
           <>
-            还没有账号？{' '}
-            <Link to={`/sign-up?redirect=${encodeURIComponent(redirect)}`} className={linkClass}>注册</Link>
+            {t('还没有账号？')}{' '}
+            <Link to={`/sign-up?redirect=${encodeURIComponent(redirect)}`} className={linkClass}>{t('注册')}</Link>
           </>
         ) : null
       }
@@ -84,17 +86,17 @@ export function SignInPage() {
       <form onSubmit={onSubmit} className='flex flex-col gap-4'>
         {step === 'password' ? (
           <>
-            <AuthField label='用户名或邮箱' value={username} onChange={setUsername} autoComplete='username' placeholder='请输入用户名或邮箱' required />
-            <AuthField label='密码' type='password' value={password} onChange={setPassword} autoComplete='current-password' placeholder='请输入密码' required />
+            <AuthField label={t('用户名或邮箱')} value={username} onChange={setUsername} autoComplete='username' placeholder={t('请输入用户名或邮箱')} required />
+            <AuthField label={t('密码')} type='password' value={password} onChange={setPassword} autoComplete='current-password' placeholder={t('请输入密码')} required />
           </>
         ) : (
-          <AuthField label='验证码' value={code} onChange={setCode} autoComplete='one-time-code' placeholder='000000' required />
+          <AuthField label={t('验证码')} value={code} onChange={setCode} autoComplete='one-time-code' placeholder='000000' required />
         )}
         {error ? <p role='alert' className='text-or-red text-[13px]'>{error}</p> : null}
-        <AuthSubmit busy={busy}>{step === 'password' ? '继续' : '验证'}</AuthSubmit>
+        <AuthSubmit busy={busy}>{step === 'password' ? t('继续') : t('验证')}</AuthSubmit>
         {status?.turnstile_check ? (
           <p className='text-or-dim text-center text-[12px]'>
-            本站开启了人机验证，如登录失败请联系管理员。
+            {t('本站开启了人机验证，如登录失败请联系管理员。')}
           </p>
         ) : null}
       </form>

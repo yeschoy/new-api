@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { ProviderIcon } from '@/components/provider-icon'
+import { tk, useI18n } from '@/i18n/i18n'
 import { apiSample, type SampleLanguage } from '@/lib/api-sample'
 import { cn, compactNumber, contextLabel, shortDate } from '@/lib/format'
 import { inputsOf } from '@/lib/model-filters'
@@ -31,10 +32,10 @@ import { RouterShell } from '../router-shell'
 import { ModalityBadges } from './router-model-row'
 
 const SECTIONS = [
-  { id: 'providers', label: '分组价格', icon: Server },
-  { id: 'pricing', label: '定价', icon: DollarSign },
+  { id: 'providers', label: tk('分组价格'), icon: Server },
+  { id: 'pricing', label: tk('定价'), icon: DollarSign },
   { id: 'api', label: 'API', icon: Code2 },
-  { id: 'activity', label: '用量', icon: Activity },
+  { id: 'activity', label: tk('用量'), icon: Activity },
 ]
 
 function Stat(props: { label: string; children: React.ReactNode }) {
@@ -47,6 +48,7 @@ function Stat(props: { label: string; children: React.ReactNode }) {
 }
 
 export function RouterModelPage() {
+  const { t } = useI18n()
   const { name = '' } = useParams()
   const modelName = decodeURIComponent(name)
   const { models, groupRatio, isLoading } = useCatalog()
@@ -62,10 +64,10 @@ export function RouterModelPage() {
     return (
       <RouterShell>
         <div className='text-or-muted px-6 py-32 text-center text-[14px]'>
-          {isLoading ? '加载中…' : '找不到这个模型'}
+          {isLoading ? t('加载中…') : t('找不到这个模型')}
           {!isLoading ? (
             <div className='mt-6'>
-              <Link to='/models' className='text-or-fg underline underline-offset-2'>返回模型列表</Link>
+              <Link to='/models' className='text-or-fg underline underline-offset-2'>{t('返回模型列表')}</Link>
             </div>
           ) : null}
         </div>
@@ -94,7 +96,7 @@ export function RouterModelPage() {
               <span className='text-or-fg underline underline-offset-2'>{slug}</span>
               <button
                 type='button'
-                aria-label='复制模型 ID'
+                aria-label={t('复制模型 ID')}
                 onClick={() => {
                   void navigator.clipboard?.writeText(model.model_name)
                   setCopied(true)
@@ -104,7 +106,7 @@ export function RouterModelPage() {
               >
                 <Copy className='size-3.5' />
               </button>
-              {copied ? <span className='text-or-primary text-[12px]'>已复制</span> : null}
+              {copied ? <span className='text-or-primary text-[12px]'>{t('已复制')}</span> : null}
             </div>
           </div>
           <div className='flex gap-2'>
@@ -112,33 +114,33 @@ export function RouterModelPage() {
               <Code2 className='size-4' /> API
             </a>
             <Link to={`/chat?model=${encodeURIComponent(model.model_name)}`} className='border-or-primary/40 bg-or-primary-soft text-or-primary flex h-9 items-center gap-2 rounded-[6px] border px-3 text-[14px] font-medium'>
-              试用这个模型 <ArrowRight className='size-4' />
+              {t('试用这个模型')} <ArrowRight className='size-4' />
             </Link>
           </div>
         </div>
 
-        <p className={cn('mt-5 max-w-[1100px] text-[16px] leading-[26px]', !expanded && 'line-clamp-2')}>{model.description || '暂无介绍'}</p>
+        <p className={cn('mt-5 max-w-[1100px] text-[16px] leading-[26px]', !expanded && 'line-clamp-2')}>{model.description || t('暂无介绍')}</p>
         {model.description && model.description.length > 120 ? (
           <button type='button' onClick={() => setExpanded((v) => !v)} className='text-or-muted hover:text-or-fg mt-1 text-[13px]'>
-            {expanded ? '收起' : '显示更多'}
+            {expanded ? t('收起') : t('显示更多')}
           </button>
         ) : null}
 
         <div className='mt-6 flex flex-wrap gap-3'>
-          <Stat label='模态'>
+          <Stat label={t('模态')}>
             <span className='flex items-center gap-2 text-[13px]'>
               {inputsOf(model).join(' · ')} <ArrowRight className='text-or-muted size-3.5' /> <ModalityBadges model={model} />
             </span>
           </Stat>
-          <Stat label='输入 / 输出价格'>
-            {price.perRequest ? `${price.perRequest} / 次` : (
+          <Stat label={t('输入 / 输出价格')}>
+            {price.perRequest ? t('{price} / 次', { price: price.perRequest }) : (
               <>
-                {price.input} / {price.output} <span className='text-or-muted text-[12px] font-normal'>每百万 tokens</span>
+                {price.input} / {price.output} <span className='text-or-muted text-[12px] font-normal'>{t('每百万 tokens')}</span>
               </>
             )}
           </Stat>
-          <Stat label='上下文'>{contextLabel(model.context_length) ?? '—'}</Stat>
-          <Stat label='发布时间'>{shortDate(model.release_date) || '—'}</Stat>
+          <Stat label={t('上下文')}>{contextLabel(model.context_length) ?? '—'}</Stat>
+          <Stat label={t('发布时间')}>{shortDate(model.release_date) || '—'}</Stat>
         </div>
 
         <div className='border-or-line mt-8 flex gap-8 border-t pt-8'>
@@ -146,20 +148,20 @@ export function RouterModelPage() {
             {SECTIONS.map((s, i) => (
               <a key={s.id} href={`#${s.id}`} className={cn('flex h-8 items-center gap-2 rounded-[6px] px-3 text-[14px] font-medium', i === 0 ? 'bg-or-primary-soft text-or-primary' : 'text-or-muted hover:text-or-fg')}>
                 <s.icon className='size-4' />
-                {s.label}
+                {t(s.label)}
               </a>
             ))}
           </nav>
 
           <main className='min-w-0 flex-1 space-y-14'>
             <section id='providers' className='scroll-mt-20 xl:scroll-mt-[102px]'>
-              <h2 className='flex items-center gap-2 text-[18px] font-bold'><Server className='size-4' /> 分组价格</h2>
-              <p className='text-or-muted mt-1 max-w-[560px] text-[14px]'>同一个模型可以通过不同分组调用，各分组倍率不同，请求会按你的密钥所在分组计费。</p>
+              <h2 className='flex items-center gap-2 text-[18px] font-bold'><Server className='size-4' /> {t('分组价格')}</h2>
+              <p className='text-or-muted mt-1 max-w-[560px] text-[14px]'>{t('同一个模型可以通过不同分组调用，各分组倍率不同，请求会按你的密钥所在分组计费。')}</p>
               <div className='border-or-line mt-4 overflow-x-auto rounded-[8px] border'>
                 <table className='w-full min-w-[560px] text-[14px]'>
                   <thead className='text-or-muted border-or-line border-b text-left'>
                     <tr>
-                      {['分组', '倍率', '输入 /M', '输出 /M', '缓存读取 /M'].map((h) => (
+                      {[t('分组'), t('倍率'), t('输入 /M'), t('输出 /M'), t('缓存读取 /M')].map((h) => (
                         <th key={h} className='px-4 py-3 font-medium'>{h}</th>
                       ))}
                     </tr>
@@ -184,11 +186,11 @@ export function RouterModelPage() {
             </section>
 
             <section id='pricing' className='scroll-mt-20 xl:scroll-mt-[102px]'>
-              <h2 className='flex items-center gap-2 text-[18px] font-bold'><DollarSign className='size-4' /> 定价</h2>
+              <h2 className='flex items-center gap-2 text-[18px] font-bold'><DollarSign className='size-4' /> {t('定价')}</h2>
               <div className='mt-4 grid gap-4 md:grid-cols-2'>
                 {[
-                  ['输入价格', price.perRequest ?? price.input, price.perRequest ? '/次' : '/M tokens'],
-                  ['输出价格', price.perRequest ? '—' : price.output, price.perRequest ? '' : '/M tokens'],
+                  [t('输入价格'), price.perRequest ?? price.input, price.perRequest ? t('/次') : '/M tokens'],
+                  [t('输出价格'), price.perRequest ? '—' : price.output, price.perRequest ? '' : '/M tokens'],
                 ].map(([label, value, unit]) => (
                   <div key={label} className='border-or-line bg-or-card rounded-[8px] border p-4'>
                     <div className='text-or-muted text-[13px]'>{label}</div>
@@ -201,7 +203,7 @@ export function RouterModelPage() {
 
             <section id='api' className='scroll-mt-20 xl:scroll-mt-[102px]'>
               <h2 className='flex items-center gap-2 text-[18px] font-bold'><Code2 className='size-4' /> API</h2>
-              <p className='text-or-muted mt-1 text-[14px]'>完全兼容 OpenAI SDK，替换接口地址和密钥即可。</p>
+              <p className='text-or-muted mt-1 text-[14px]'>{t('完全兼容 OpenAI SDK，替换接口地址和密钥即可。')}</p>
               <div className='mt-4 flex gap-1'>
                 {(['curl', 'python', 'typescript'] as SampleLanguage[]).map((l) => (
                   <button key={l} type='button' onClick={() => setLang(l)} className={cn('h-7 rounded-[4px] px-2.5 text-[13px] font-medium', lang === l ? 'bg-or-primary-soft text-or-primary' : 'text-or-muted')}>
@@ -213,11 +215,11 @@ export function RouterModelPage() {
             </section>
 
             <section id='activity' className='scroll-mt-20 xl:scroll-mt-[102px]'>
-              <h2 className='flex items-center gap-2 text-[18px] font-bold'><Layers className='size-4' /> 用量</h2>
+              <h2 className='flex items-center gap-2 text-[18px] font-bold'><Layers className='size-4' /> {t('用量')}</h2>
               <div className='border-or-line bg-or-card mt-4 rounded-[8px] border p-4'>
-                <div className='text-or-muted text-[13px]'>本周 Token 用量</div>
+                <div className='text-or-muted text-[13px]'>{t('本周 Token 用量')}</div>
                 <div className='mt-1 text-[24px] font-bold'>{weekly ? compactNumber(weekly.total_tokens) : '—'}</div>
-                {weekly ? <div className='text-or-muted text-[12px]'>本周排名第 {weekly.rank} 位</div> : null}
+                {weekly ? <div className='text-or-muted text-[12px]'>{t('本周排名第 {rank} 位', { rank: weekly.rank })}</div> : null}
               </div>
             </section>
           </main>

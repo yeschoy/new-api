@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Check, Lock, Maximize2, Users } from 'lucide-react'
 
 import { ProviderIcon } from '@/components/provider-icon'
+import { useI18n } from '@/i18n/i18n'
 
 /** Scattered provider marks, as in the "every modality" card. */
 export function IconScatter(props: { icons: string[] }) {
@@ -75,14 +76,15 @@ function Pane(props: { title: string; className: string; children: React.ReactNo
 
 /** Overlapping throughput / latency panes. */
 export function PerfPanes() {
+  const { t } = useI18n()
   return (
     <div className='relative h-[150px] w-[250px]' aria-hidden='true'>
-      <Pane title='吞吐量' className='top-2 left-0 h-[112px] w-[150px]'>
+      <Pane title={t('吞吐量')} className='top-2 left-0 h-[112px] w-[150px]'>
         <svg viewBox='0 0 130 60' className='mt-4 w-full'>
           <polyline points='0,32 14,30 26,36 40,28 54,34 68,30 82,33 96,27 110,31 130,29' fill='none' stroke='#4d8dff' strokeWidth='1.2' />
         </svg>
       </Pane>
-      <Pane title='延迟' className='top-9 right-0 h-[112px] w-[170px]'>
+      <Pane title={t('延迟')} className='top-9 right-0 h-[112px] w-[170px]'>
         <svg viewBox='0 0 150 60' className='mt-3 w-full'>
           <polyline points='0,22 12,30 24,18 36,34 48,20 60,28 72,16 84,30 96,22 108,26 120,18 150,24' fill='none' stroke='#f5a524' strokeWidth='1.2' />
           <polyline points='0,34 12,28 24,38 36,26 48,36 60,30 72,38 84,28 96,36 108,30 120,34 150,30' fill='none' style={{ stroke: 'var(--or-primary)' }} strokeWidth='1.2' />

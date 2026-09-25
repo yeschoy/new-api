@@ -21,10 +21,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { ProviderIcon } from '@/components/provider-icon'
+import { useI18n } from '@/i18n/i18n'
 import { useCatalog } from '@/lib/queries'
 
 /** ⌘K palette: type to filter the catalog, Enter opens the model list. */
 export function RouterSearchDialog(props: { open: boolean; onClose: () => void }) {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const { models } = useCatalog()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -72,7 +74,7 @@ export function RouterSearchDialog(props: { open: boolean; onClose: () => void }
     >
       <div
         role='dialog'
-        aria-label='搜索模型'
+        aria-label={t('搜索模型')}
         className='border-or-line bg-or-card w-full max-w-[560px] overflow-hidden rounded-[8px] border shadow-2xl'
       >
         <form
@@ -87,7 +89,7 @@ export function RouterSearchDialog(props: { open: boolean; onClose: () => void }
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder='搜索模型、厂商…'
+            placeholder={t('搜索模型、厂商…')}
             className='text-or-fg placeholder:text-or-dim h-12 flex-1 bg-transparent text-[14px] outline-none'
           />
         </form>
@@ -108,7 +110,7 @@ export function RouterSearchDialog(props: { open: boolean; onClose: () => void }
           ))}
           {results.length === 0 ? (
             <li className='text-or-muted px-3 py-6 text-center text-[14px]'>
-              没有匹配的模型
+              {t('没有匹配的模型')}
             </li>
           ) : null}
         </ul>

@@ -18,7 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo, useState } from 'react'
 
-import { compactNumber } from '@/lib/format'
+import { useI18n } from '@/i18n/i18n'
+import { bucketLabel, compactNumber } from '@/lib/format'
 import type { ModelHistoryPoint } from '@/lib/services'
 
 export type ChartTheme = {
@@ -37,6 +38,7 @@ export function StackedBars(props: {
   height?: number
   showTotals?: boolean
 }) {
+  const { t, lang } = useI18n()
   const W = 1232
   const H = props.height ?? 300
   const pad = { l: 56, r: 12, t: 24, b: 36 }
@@ -46,17 +48,18 @@ export function StackedBars(props: {
     const map = new Map<string, Map<string, number>>()
     for (const p of props.points) {
       if (!props.models.includes(p.model)) continue
-      const row = map.get(p.label) ?? new Map<string, number>()
+      const label = bucketLabel(p.ts, p.label, lang)
+      const row = map.get(label) ?? new Map<string, number>()
       row.set(p.model, (row.get(p.model) ?? 0) + p.tokens)
-      map.set(p.label, row)
+      map.set(label, row)
     }
     return [...map.entries()]
-  }, [props.points, props.models])
+  }, [props.points, props.models, lang])
 
   if (buckets.length === 0) {
     return (
       <div className='flex h-[220px] items-center justify-center text-[13px]' style={{ color: props.theme.text }}>
-        暂无数据
+        {t('暂无数据')}
       </div>
     )
   }
@@ -73,7 +76,7 @@ export function StackedBars(props: {
 
   return (
     <div className='relative'>
-      <svg viewBox={`0 0 ${W} ${H}`} className='w-full' role='img' aria-label='模型 Token 用量走势' onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} className='w-full' role='img' aria-label={t('模型 Token 用量走势')} onMouseLeave={() => setHover(null)}>
         {ticks.map((tick) => {
           const y = pad.t + plotH - (tick / max) * plotH
           return (

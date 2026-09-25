@@ -20,6 +20,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, X } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 
+import { useI18n } from '@/i18n/i18n'
 import { errorMessage } from '@/lib/api'
 import { unwrap } from '@/lib/console-api'
 import { cn } from '@/lib/format'
@@ -31,6 +32,7 @@ import { Button, Field, Notice, TextInput } from './console-ui'
 
 /** Modal: name + optional credit limit; afterwards shows the new key once. */
 export function CreateKeyDialog(props: { onClose: () => void }) {
+  const { t } = useI18n()
   const money = useMoney()
   const queryClient = useQueryClient()
   const titleId = useId()
@@ -55,7 +57,7 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
   const create = useMutation({
     mutationFn: async (remainQuota: number) => {
       const body = await createKey({ name: name.trim(), remain_quota: remainQuota, unlimited_quota: unlimited, expired_time: -1 })
-      const key = unwrap(body, '创建失败') as ApiKey | null
+      const key = unwrap(body, t('创建失败')) as ApiKey | null
       void queryClient.invalidateQueries({ queryKey: ['console'] })
       if (!key?.id) return ''
       try {
@@ -65,15 +67,15 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
       }
     },
     onSuccess: (fullKey) => setCreated(fullKey),
-    onError: (err) => setFormError(errorMessage(err, '创建失败')),
+    onError: (err) => setFormError(errorMessage(err, t('创建失败'))),
   })
 
   function onSubmit(event: React.FormEvent) {
     event.preventDefault()
     setFormError(null)
-    if (!name.trim()) return setFormError('请输入密钥名称')
+    if (!name.trim()) return setFormError(t('请输入密钥名称'))
     const remainQuota = unlimited ? 0 : money.toQuota(Number(amount))
-    if (!unlimited && remainQuota <= 0) return setFormError('请输入大于 0 的额度上限')
+    if (!unlimited && remainQuota <= 0) return setFormError(t('请输入大于 0 的额度上限'))
     create.mutate(remainQuota)
   }
 
@@ -84,7 +86,7 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch {
-      setFormError('复制失败，请手动选择密钥复制')
+      setFormError(t('复制失败，请手动选择密钥复制'))
     }
   }
 
@@ -101,32 +103,32 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
         aria-labelledby={titleId}
         className='border-or-line bg-or-card text-or-fg relative w-full max-w-[460px] rounded-[12px] border p-6 shadow-2xl'
       >
-        <button type='button' onClick={props.onClose} aria-label='关闭' className='text-or-muted hover:bg-or-fill absolute top-4 right-4 flex size-7 items-center justify-center rounded-[6px]'>
+        <button type='button' onClick={props.onClose} aria-label={t('关闭')} className='text-or-muted hover:bg-or-fill absolute top-4 right-4 flex size-7 items-center justify-center rounded-[6px]'>
           <X className='size-4' />
         </button>
         <h2 id={titleId} className='text-[16px] font-semibold'>
-          {created === null ? '创建 API 密钥' : '密钥已创建'}
+          {created === null ? t('创建 API 密钥') : t('密钥已创建')}
         </h2>
 
         {created === null ? (
           <form onSubmit={onSubmit} className='mt-5 flex flex-col gap-4'>
-            <Field label='名称' htmlFor={nameId}>
-              <TextInput id={nameId} value={name} onChange={setName} placeholder='例如：生产环境' maxLength={50} autoFocus />
+            <Field label={t('名称')} htmlFor={nameId}>
+              <TextInput id={nameId} value={name} onChange={setName} placeholder={t('例如：生产环境')} maxLength={50} autoFocus />
             </Field>
-            <Field label='额度上限' htmlFor={limitId} hint={unlimited ? '该密钥可使用账户的全部余额。' : '用完后该密钥将停止工作，账户余额不受影响。'}>
+            <Field label={t('额度上限')} htmlFor={limitId} hint={unlimited ? t('该密钥可使用账户的全部余额。') : t('用完后该密钥将停止工作，账户余额不受影响。')}>
               <div className='flex items-center gap-2 text-[14px]'>
                 <button
                   id={unlimited ? limitId : undefined}
                   type='button'
                   role='switch'
                   aria-checked={unlimited}
-                  aria-label='不限额度'
+                  aria-label={t('不限额度')}
                   onClick={() => setUnlimited(!unlimited)}
                   className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors', unlimited ? 'bg-or-primary' : 'bg-or-fg/20')}
                 >
                   <span className={cn('absolute top-0.5 left-0.5 size-4 rounded-full transition-transform', unlimited ? 'bg-or-bg translate-x-4' : 'bg-white')} />
                 </button>
-                <span>不限额度</span>
+                <span>{t('不限额度')}</span>
               </div>
               {unlimited ? null : (
                 <div className='relative mt-1'>
@@ -137,9 +139,9 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
             </Field>
             {formError ? <Notice tone='error'>{formError}</Notice> : null}
             <div className='mt-1 flex justify-end gap-2'>
-              <Button onClick={props.onClose}>取消</Button>
+              <Button onClick={props.onClose}>{t('取消')}</Button>
               <Button type='submit' variant='primary' busy={create.isPending}>
-                创建
+                {t('创建')}
               </Button>
             </div>
           </form>
@@ -147,22 +149,22 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
           <div className='mt-4 flex flex-col gap-4'>
             {created ? (
               <>
-                <p className='text-or-muted text-[14px]'>请复制并妥善保存该密钥。之后也可以在列表中点击“显示”再次查看。</p>
+                <p className='text-or-muted text-[14px]'>{t('请复制并妥善保存该密钥。之后也可以在列表中点击“显示”再次查看。')}</p>
                 <div className='border-or-line bg-or-bg flex items-center gap-2 rounded-[6px] border p-3'>
                   <code className='font-geist min-w-0 flex-1 text-[13px] break-all'>{created}</code>
                   <Button size='sm' onClick={onCopy}>
                     {copied ? <Check className='size-3.5' /> : <Copy className='size-3.5' />}
-                    {copied ? '已复制' : '复制'}
+                    {copied ? t('已复制') : t('复制')}
                   </Button>
                 </div>
               </>
             ) : (
-              <p className='text-or-muted text-[14px]'>密钥已创建，可在列表中点击“显示”查看完整密钥。</p>
+              <p className='text-or-muted text-[14px]'>{t('密钥已创建，可在列表中点击“显示”查看完整密钥。')}</p>
             )}
             {formError ? <Notice tone='error'>{formError}</Notice> : null}
             <div className='flex justify-end'>
               <Button variant='primary' onClick={props.onClose}>
-                完成
+                {t('完成')}
               </Button>
             </div>
           </div>

@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 
+import { tk, useI18n } from '@/i18n/i18n'
 import { RequireAuth } from '@/components/require-auth'
 import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
@@ -31,29 +32,29 @@ import { Panel, Tag, type TagTone } from './console-ui'
 import { RedeemPanel } from './credits-redeem'
 
 const TOPUP_COLUMNS: Column[] = [
-  { label: '时间' },
-  { label: '订单号' },
-  { label: '支付方式' },
-  { label: '充值额度', right: true },
-  { label: '支付金额', right: true },
-  { label: '状态', right: true },
+  { label: tk('时间') },
+  { label: tk('订单号') },
+  { label: tk('支付方式') },
+  { label: tk('充值额度'), right: true },
+  { label: tk('支付金额'), right: true },
+  { label: tk('状态'), right: true },
 ]
 
 const TOPUP_STATUS: Record<string, { label: string; tone: TagTone }> = {
-  success: { label: '成功', tone: 'success' },
-  pending: { label: '待支付', tone: 'warning' },
-  failed: { label: '失败', tone: 'danger' },
-  expired: { label: '已过期', tone: 'neutral' },
+  success: { label: tk('成功'), tone: 'success' },
+  pending: { label: tk('待支付'), tone: 'warning' },
+  failed: { label: tk('失败'), tone: 'danger' },
+  expired: { label: tk('已过期'), tone: 'neutral' },
 }
 
 const PAY_METHODS: Record<string, string> = {
-  alipay: '支付宝',
-  wxpay: '微信支付',
+  alipay: tk('支付宝'),
+  wxpay: tk('微信支付'),
   stripe: 'Stripe',
   creem: 'Creem',
   waffo: 'Waffo',
   waffo_pancake: 'Waffo Pancake',
-  balance: '余额',
+  balance: tk('余额'),
 }
 
 /** Balance, redeem-code top-up and recent top-up orders. */
@@ -66,6 +67,7 @@ export function CreditsPage() {
 }
 
 function CreditsContent() {
+  const { t } = useI18n()
   const money = useMoney()
   const auth = useAuth()
   const self = useSelf()
@@ -75,33 +77,33 @@ function CreditsContent() {
   const records = topups.data?.items ?? []
 
   return (
-    <ConsoleLayout active='credits' title='充值额度' description='余额用于支付模型调用费用，按实际用量实时扣除。'>
+    <ConsoleLayout active='credits' title={t('充值额度')} description={t('余额用于支付模型调用费用，按实际用量实时扣除。')}>
       <div className='flex flex-col gap-4'>
         <Panel>
           <div className='flex flex-wrap items-end justify-between gap-6'>
             <div>
-              <div className='text-or-muted text-[13px]'>可用余额</div>
+              <div className='text-or-muted text-[13px]'>{t('可用余额')}</div>
               <div className='mt-1 text-[40px] leading-[48px] font-semibold tracking-[-0.02em] tabular-nums'>
                 {user ? money.format(user.quota) : '—'}
               </div>
             </div>
             <dl className='flex gap-10'>
-              <Stat label='已用额度' value={user ? money.format(user.used_quota) : '—'} />
-              <Stat label='请求次数' value={user ? (user.request_count ?? 0).toLocaleString('zh-CN') : '—'} />
+              <Stat label={t('已用额度')} value={user ? money.format(user.used_quota) : '—'} />
+              <Stat label={t('请求次数')} value={user ? (user.request_count ?? 0).toLocaleString('zh-CN') : '—'} />
             </dl>
           </div>
         </Panel>
 
         <RedeemPanel info={info.data} />
 
-        <Panel title='充值记录' flush>
+        <Panel title={t('充值记录')} flush>
           <Table columns={TOPUP_COLUMNS} minWidth={760}>
-            {topups.isLoading ? <TableMessage colSpan={TOPUP_COLUMNS.length}>加载中…</TableMessage> : null}
+            {topups.isLoading ? <TableMessage colSpan={TOPUP_COLUMNS.length}>{t('加载中…')}</TableMessage> : null}
             {topups.isError ? (
-              <TableMessage colSpan={TOPUP_COLUMNS.length}>{errorMessage(topups.error, '充值记录加载失败')}</TableMessage>
+              <TableMessage colSpan={TOPUP_COLUMNS.length}>{errorMessage(topups.error, t('充值记录加载失败'))}</TableMessage>
             ) : null}
             {topups.isSuccess && records.length === 0 ? (
-              <TableMessage colSpan={TOPUP_COLUMNS.length}>暂无在线充值记录</TableMessage>
+              <TableMessage colSpan={TOPUP_COLUMNS.length}>{t('暂无在线充值记录')}</TableMessage>
             ) : null}
             {records.map((record) => (
               <TopUpRow key={record.id} record={record} format={money.formatUsd} />
@@ -123,17 +125,18 @@ function Stat(props: { label: string; value: string }) {
 }
 
 function TopUpRow(props: { record: TopUpRecord; format: (usd: number) => string }) {
+  const { t } = useI18n()
   const record = props.record
-  const status = TOPUP_STATUS[record.status] ?? { label: record.status || '未知', tone: 'neutral' as const }
+  const status = TOPUP_STATUS[record.status] ?? { label: record.status || tk('未知'), tone: 'neutral' as const }
   return (
     <Tr>
       <Td muted className='whitespace-nowrap'>{dateTime(record.create_time)}</Td>
       <Td mono>{record.trade_no || '—'}</Td>
-      <Td>{PAY_METHODS[record.payment_method] ?? (record.payment_method || '—')}</Td>
+      <Td>{t(PAY_METHODS[record.payment_method] ?? (record.payment_method || '—'))}</Td>
       <Td right>{props.format(record.amount)}</Td>
       <Td right>{Number(record.money || 0).toFixed(2)}</Td>
       <Td right>
-        <Tag tone={status.tone}>{status.label}</Tag>
+        <Tag tone={status.tone}>{t(status.label)}</Tag>
       </Td>
     </Tr>
   )

@@ -20,6 +20,7 @@ import { AlertCircle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 
 import { ProviderIcon } from '@/components/provider-icon'
+import { useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 import type { CatalogModel } from '@/lib/queries'
 
@@ -40,6 +41,7 @@ export function MessageList(props: {
   models: CatalogModel[]
   className?: string
 }) {
+  const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
 
@@ -75,12 +77,12 @@ export function MessageList(props: {
             <div key={index} className='flex flex-col gap-2'>
               <div className={cn('flex items-center gap-2 text-[13px] font-medium', s.label)}>
                 <ProviderIcon name={info?.vendorIcon} fallback={info?.vendor ?? name} size={16} />
-                <span className='truncate'>{name || '助手'}</span>
+                <span className='truncate'>{name || t('助手')}</span>
               </div>
               {m.reasoning ? (
                 <details open={live && !m.content} className='text-[13px]'>
                   <summary className={cn('cursor-pointer select-none', s.label)}>
-                    {live && !m.content ? '思考中…' : '思考过程'}
+                    {live && !m.content ? t('思考中…') : t('思考过程')}
                   </summary>
                   <div className={cn('mt-2 pl-3 leading-6 whitespace-pre-wrap', s.reasoning)}>{m.reasoning}</div>
                 </details>

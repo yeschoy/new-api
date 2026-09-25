@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { t } from '@/i18n/i18n'
+
 import { api, type ApiEnvelope } from './api'
 import type { UsageLog } from './services'
 
@@ -38,7 +40,7 @@ export type TopUpInfo = {
 
 export async function getTopUpInfo(): Promise<TopUpInfo> {
   const res = await api.get<ApiEnvelope<TopUpInfo>>('/api/user/topup/info')
-  return unwrap(res.data, '获取充值信息失败')
+  return unwrap(res.data, t('获取充值信息失败'))
 }
 
 export function onlineTopUpEnabled(info: TopUpInfo | undefined): boolean {
@@ -69,7 +71,7 @@ export async function listTopUps(page = 1, size = 10) {
     '/api/user/topup/self',
     { params: { p: page, page_size: size } }
   )
-  const data = unwrap(res.data, '获取充值记录失败')
+  const data = unwrap(res.data, t('获取充值记录失败'))
   return { items: data.items ?? [], total: data.total }
 }
 
@@ -83,7 +85,7 @@ export async function setKeyStatus(id: number, status: number): Promise<void> {
     { id, status },
     { params: { status_only: true } }
   )
-  unwrap(res.data, '更新密钥状态失败')
+  unwrap(res.data, t('更新密钥状态失败'))
 }
 
 // ── Profile (controller/user.go UpdateSelf) ───────────────────────────────
@@ -92,7 +94,7 @@ export async function updateDisplayName(displayName: string): Promise<void> {
   const res = await api.put<ApiEnvelope<unknown>>('/api/user/self', {
     display_name: displayName,
   })
-  unwrap(res.data, '保存失败')
+  unwrap(res.data, t('保存失败'))
 }
 
 // ── Usage (controller/log.go GetUserLogs, controller/log_summary.go) ──────
@@ -104,7 +106,7 @@ export async function listRequestLogs(page = 1, size = 20) {
     '/api/log/self',
     { params: { p: page, page_size: size, types: REQUEST_LOG_TYPES } }
   )
-  const data = unwrap(res.data, '获取使用记录失败')
+  const data = unwrap(res.data, t('获取使用记录失败'))
   return { items: data.items ?? [], total: data.total }
 }
 
@@ -132,5 +134,5 @@ export async function getUsageSummary(start: number, end: number): Promise<Usage
       timezone_offset: -new Date().getTimezoneOffset(),
     },
   })
-  return unwrap(res.data, '获取用量统计失败')
+  return unwrap(res.data, t('获取用量统计失败'))
 }

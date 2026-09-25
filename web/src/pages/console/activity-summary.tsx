@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { useI18n } from '@/i18n/i18n'
 import { getUsageSummary, type DailyUsage } from '@/lib/console-api'
 import { cn, compactNumber } from '@/lib/format'
 import type { UsageLog } from '@/lib/services'
@@ -34,6 +35,7 @@ const DAYS = 7
  * Falls back to totals of the visible log page if the summary endpoint fails.
  */
 export function UsageTiles(props: { logs: UsageLog[] }) {
+  const { t } = useI18n()
   const money = useMoney()
   const [range] = useState(() => recentWindow(new Date(), DAYS))
   const summary = useQuery({
@@ -42,7 +44,7 @@ export function UsageTiles(props: { logs: UsageLog[] }) {
     retry: false,
   })
   const totals = summary.data ?? (summary.isError ? sumLogs(props.logs) : null)
-  const caption = summary.isError ? '当前页' : `近 ${DAYS} 天`
+  const caption = summary.isError ? t('当前页') : t('近 {days} 天', { days: DAYS })
   const byDate = new Map((summary.data?.daily ?? []).map((day) => [day.date, day]))
   const series = (pick: (day: DailyUsage) => number) => range.dates.map((date) => {
     const day = byDate.get(date)
@@ -51,9 +53,9 @@ export function UsageTiles(props: { logs: UsageLog[] }) {
   const count = (value: number) => value.toLocaleString('zh-CN')
 
   const tiles = [
-    { label: '消费', value: totals ? money.format(totals.quota) : '—', values: series((day) => day.quota), format: money.format },
+    { label: t('消费'), value: totals ? money.format(totals.quota) : '—', values: series((day) => day.quota), format: money.format },
     { label: 'Token', value: totals ? compactNumber(totals.tokens) : '—', values: series((day) => day.tokens), format: count },
-    { label: '请求数', value: totals ? count(totals.requests) : '—', values: series((day) => day.requests), format: count },
+    { label: t('请求数'), value: totals ? count(totals.requests) : '—', values: series((day) => day.requests), format: count },
   ]
 
   return (

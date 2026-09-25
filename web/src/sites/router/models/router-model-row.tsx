@@ -20,6 +20,7 @@ import { AudioLines, FileText, Image, Info, Type, Video } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { ProviderIcon } from '@/components/provider-icon'
+import { useI18n } from '@/i18n/i18n'
 import { compactNumber, contextLabel, shortDate } from '@/lib/format'
 import { outputsOf } from '@/lib/model-filters'
 import { priceSummary, type CurrencyDisplay } from '@/lib/pricing'
@@ -48,6 +49,7 @@ export function ModalityBadges(props: { model: CatalogModel }) {
 
 /** One catalog entry: title row, two-line summary, metadata line. */
 export function RouterModelRow(props: { model: CatalogModel; tokens?: number; currency: CurrencyDisplay }) {
+  const { t } = useI18n()
   const m = props.model
   const price = priceSummary(m, props.currency)
   const context = contextLabel(m.context_length)
@@ -67,19 +69,19 @@ export function RouterModelRow(props: { model: CatalogModel; tokens?: number; cu
           <Info className='size-3.5' aria-hidden='true' />
         </span>
       </div>
-      <p className='text-or-muted mt-2 line-clamp-2 text-[14px] leading-[22.75px]'>{m.description || '暂无介绍'}</p>
+      <p className='text-or-muted mt-2 line-clamp-2 text-[14px] leading-[22.75px]'>{m.description || t('暂无介绍')}</p>
       <div className='text-or-muted mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[14px] leading-[22.75px]'>
         <span>
-          来自 <span className='underline underline-offset-2'>{m.vendor.toLowerCase()}</span>
+          {t('来自')} <span className='underline underline-offset-2'>{m.vendor.toLowerCase()}</span>
         </span>
         {m.release_date ? <span>{shortDate(m.release_date)}</span> : null}
-        {context ? <span>{context} 上下文</span> : null}
+        {context ? <span>{t('{context} 上下文', { context })}</span> : null}
         {price.perRequest ? (
-          <span>{price.perRequest}/次</span>
+          <span>{t('{price}/次', { price: price.perRequest })}</span>
         ) : (
           <>
-            <span>{price.input}/M 输入 tokens</span>
-            <span>{price.output}/M 输出 tokens</span>
+            <span>{t('{price}/M 输入 tokens', { price: price.input })}</span>
+            <span>{t('{price}/M 输出 tokens', { price: price.output })}</span>
           </>
         )}
       </div>
@@ -88,12 +90,13 @@ export function RouterModelRow(props: { model: CatalogModel; tokens?: number; cu
 }
 
 export function RouterModelTable(props: { models: CatalogModel[]; tokens: Map<string, number>; currency: CurrencyDisplay }) {
+  const { t } = useI18n()
   return (
     <div className='border-or-line overflow-x-auto rounded-[8px] border'>
       <table className='w-full min-w-[760px] text-left text-[14px]'>
         <thead className='text-or-muted border-or-line border-b'>
           <tr>
-            {['模型', '输入价格', '输出价格', '上下文', '本周 tokens'].map((h) => (
+            {[t('模型|表头'), t('输入价格'), t('输出价格'), t('上下文'), t('本周 tokens')].map((h) => (
               <th key={h} className='px-4 py-3 font-medium'>{h}</th>
             ))}
           </tr>
@@ -109,7 +112,7 @@ export function RouterModelTable(props: { models: CatalogModel[]; tokens: Map<st
                     {m.vendor}: {m.model_name}
                   </Link>
                 </td>
-                <td className='text-or-muted px-4 py-3'>{price.perRequest ? `${price.perRequest}/次` : `${price.input}/M`}</td>
+                <td className='text-or-muted px-4 py-3'>{price.perRequest ? t('{price}/次', { price: price.perRequest }) : `${price.input}/M`}</td>
                 <td className='text-or-muted px-4 py-3'>{price.perRequest ? '—' : `${price.output}/M`}</td>
                 <td className='text-or-muted px-4 py-3'>{contextLabel(m.context_length) ?? '—'}</td>
                 <td className='text-or-muted px-4 py-3'>{props.tokens.get(m.model_name) ? compactNumber(props.tokens.get(m.model_name) ?? 0) : '—'}</td>

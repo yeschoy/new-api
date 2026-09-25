@@ -18,12 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { MessageSquare, Plus, Trash2 } from 'lucide-react'
 
+import { useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 
 import type { ChatController } from './use-chat'
 
 /** Left rail: "new chat" plus the locally stored conversation history. */
 export function RouterSidebar(props: { chat: ChatController; className?: string }) {
+  const { t } = useI18n()
   const chat = props.chat
   return (
     <aside className={cn('border-or-line w-[260px] shrink-0 flex-col border-r', props.className)}>
@@ -34,13 +36,13 @@ export function RouterSidebar(props: { chat: ChatController; className?: string 
           className='border-or-line text-or-fg hover:bg-or-fill flex h-9 w-full items-center gap-2 rounded-[6px] border px-3 text-[14px] font-medium transition-colors'
         >
           <Plus className='size-4' aria-hidden='true' />
-          新对话
+          {t('新对话')}
         </button>
       </div>
-      <div className='text-or-dim px-5 pt-1 pb-1.5 text-[12px] font-medium'>历史对话</div>
+      <div className='text-or-dim px-5 pt-1 pb-1.5 text-[12px] font-medium'>{t('历史对话')}</div>
       <ul className='min-h-0 flex-1 overflow-y-auto px-2 pb-3'>
         {chat.conversations.length === 0 ? (
-          <li className='text-or-dim px-3 py-4 text-[13px]'>暂无对话记录</li>
+          <li className='text-or-dim px-3 py-4 text-[13px]'>{t('暂无对话记录')}</li>
         ) : null}
         {chat.conversations.map((c) => {
           const active = c.id === chat.activeId
@@ -56,13 +58,13 @@ export function RouterSidebar(props: { chat: ChatController; className?: string 
                 )}
               >
                 <MessageSquare className='size-3.5 shrink-0 opacity-70' aria-hidden='true' />
-                <span className='truncate'>{c.title || '新对话'}</span>
+                <span className='truncate'>{c.title || t('新对话')}</span>
               </button>
               <button
                 type='button'
                 onClick={() => chat.remove(c.id)}
-                aria-label={`删除对话：${c.title}`}
-                title='删除对话'
+                aria-label={t('删除对话：{title}', { title: c.title })}
+                title={t('删除对话')}
                 className={cn(
                   'text-or-muted hover:text-or-red absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-[4px] transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
                   active ? 'opacity-100' : 'opacity-0'

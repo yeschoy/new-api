@@ -19,18 +19,20 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
+import { tk, useI18n } from '@/i18n/i18n'
 import { useAuth } from '@/lib/auth-store'
 import { logout } from '@/lib/services'
 
 const ITEMS = [
-  { label: '充值额度', to: '/settings/credits' },
-  { label: 'API 密钥', to: '/settings/keys' },
-  { label: '使用记录', to: '/activity' },
-  { label: '账户设置', to: '/settings/profile' },
+  { label: tk('充值额度'), to: '/settings/credits' },
+  { label: tk('API 密钥'), to: '/settings/keys' },
+  { label: tk('使用记录'), to: '/activity' },
+  { label: tk('账户设置'), to: '/settings/profile' },
 ]
 
 /** Avatar button with the account menu. */
 export function UserMenu() {
+  const { t } = useI18n()
   const auth = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -53,7 +55,7 @@ export function UserMenu() {
         type='button'
         aria-haspopup='menu'
         aria-expanded={open}
-        aria-label='账户菜单'
+        aria-label={t('账户菜单')}
         onClick={() => setOpen((value) => !value)}
         className='bg-or-primary text-or-bg flex size-8 items-center justify-center rounded-full text-[13px] font-semibold xl:size-[45px] xl:text-[18px]'
       >
@@ -70,7 +72,7 @@ export function UserMenu() {
               onClick={() => setOpen(false)}
               className='text-or-fg hover:bg-or-fill block rounded-[6px] px-3 py-2 text-[14px]'
             >
-              {item.label}
+              {t(item.label)}
             </Link>
           ))}
           <button
@@ -83,7 +85,7 @@ export function UserMenu() {
             }}
             className='text-or-muted hover:bg-or-fill block w-full rounded-[6px] px-3 py-2 text-left text-[14px]'
           >
-            退出登录
+            {t('退出登录')}
           </button>
         </div>
       ) : null}

@@ -20,6 +20,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 
 import { AuthCard, AuthField, AuthSubmit } from '@/components/auth-card'
+import { useI18n } from '@/i18n/i18n'
 import { api, errorMessage, type ApiEnvelope } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
 import { useStatus } from '@/lib/queries'
@@ -28,6 +29,7 @@ import { register } from '@/lib/services'
 import { safeRedirect } from './sign-in-page'
 
 export function SignUpPage() {
+  const { t } = useI18n()
   const auth = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -48,21 +50,21 @@ export function SignUpPage() {
   const sendCode = async () => {
     setError('')
     setNotice('')
-    if (!email) return setError('请先填写邮箱')
+    if (!email) return setError(t('请先填写邮箱'))
     try {
       const res = await api.get<ApiEnvelope<unknown>>('/api/verification', { params: { email } })
-      if (res.data.success) setNotice('验证码已发送，请查收邮件')
-      else setError(res.data.message || '发送失败')
+      if (res.data.success) setNotice(t('验证码已发送，请查收邮件'))
+      else setError(res.data.message || t('发送失败'))
     } catch (err) {
-      setError(errorMessage(err, '发送失败'))
+      setError(errorMessage(err, t('发送失败')))
     }
   }
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError('')
-    if (password.length < 8) return setError('密码至少 8 位')
-    if (password !== confirm) return setError('两次输入的密码不一致')
+    if (password.length < 8) return setError(t('密码至少 8 位'))
+    if (password !== confirm) return setError(t('两次输入的密码不一致'))
     setBusy(true)
     try {
       const result = await register({
@@ -74,7 +76,7 @@ export function SignUpPage() {
       else if (result.kind === 'registered') navigate(`/sign-in?redirect=${encodeURIComponent(redirect)}`, { replace: true })
       else if (result.kind === 'error') setError(result.message)
     } catch (err) {
-      setError(errorMessage(err, '注册失败'))
+      setError(errorMessage(err, t('注册失败')))
     } finally {
       setBusy(false)
     }
@@ -82,48 +84,48 @@ export function SignUpPage() {
 
   if (status && (status.register_enabled === false || status.password_register_enabled === false)) {
     return (
-      <AuthCard title='注册' subtitle='管理员已关闭新用户注册。'>
-        <Link to='/sign-in' className='text-or-fg block text-center underline'>返回登录</Link>
+      <AuthCard title={t('注册')} subtitle={t('管理员已关闭新用户注册。')}>
+        <Link to='/sign-in' className='text-or-fg block text-center underline'>{t('返回登录')}</Link>
       </AuthCard>
     )
   }
 
   return (
     <AuthCard
-      title='注册'
+      title={t('注册')}
       footer={
         <>
-          已有账号？{' '}
+          {t('已有账号？')}{' '}
           <Link to={`/sign-in?redirect=${encodeURIComponent(redirect)}`} className='text-or-fg font-medium hover:underline'>
-            登录
+            {t('登录')}
           </Link>
         </>
       }
     >
       <form onSubmit={onSubmit} className='flex flex-col gap-4'>
-        <AuthField label='用户名' value={username} onChange={setUsername} autoComplete='username' placeholder='3–20 个字符' required />
+        <AuthField label={t('用户名')} value={username} onChange={setUsername} autoComplete='username' placeholder={t('3–20 个字符')} required />
         {needsEmail ? (
           <>
-            <AuthField label='邮箱' type='email' value={email} onChange={setEmail} autoComplete='email' placeholder='name@example.com' required />
+            <AuthField label={t('邮箱')} type='email' value={email} onChange={setEmail} autoComplete='email' placeholder='name@example.com' required />
             <div className='flex items-end gap-2'>
               <div className='flex-1'>
-                <AuthField label='邮箱验证码' value={code} onChange={setCode} autoComplete='one-time-code' required />
+                <AuthField label={t('邮箱验证码')} value={code} onChange={setCode} autoComplete='one-time-code' required />
               </div>
               <button
                 type='button'
                 onClick={sendCode}
                 className='border-or-line hover:bg-or-fill h-10 shrink-0 rounded-[6px] border px-3 text-[14px]'
               >
-                发送验证码
+                {t('发送验证码')}
               </button>
             </div>
           </>
         ) : null}
-        <AuthField label='密码' type='password' value={password} onChange={setPassword} autoComplete='new-password' placeholder='至少 8 位' required />
-        <AuthField label='确认密码' type='password' value={confirm} onChange={setConfirm} autoComplete='new-password' required />
+        <AuthField label={t('密码')} type='password' value={password} onChange={setPassword} autoComplete='new-password' placeholder={t('至少 8 位')} required />
+        <AuthField label={t('确认密码')} type='password' value={confirm} onChange={setConfirm} autoComplete='new-password' required />
         {notice ? <p className='text-or-primary text-[13px]'>{notice}</p> : null}
         {error ? <p role='alert' className='text-or-red text-[13px]'>{error}</p> : null}
-        <AuthSubmit busy={busy}>创建账号</AuthSubmit>
+        <AuthSubmit busy={busy}>{t('创建账号')}</AuthSubmit>
       </form>
     </AuthCard>
   )

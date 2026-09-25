@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { ExternalLink } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { useI18n } from '@/i18n/i18n'
+
 import { FanOut, IconScatter, PerfPanes, PolicyShield } from './router-feature-visuals'
 
 type Card = {
@@ -30,29 +32,30 @@ type Card = {
 
 /** Four 302×377 cards, 24px gap, 8px radius, visual band then copy. */
 export function RouterFeatures(props: { icons: string[]; slug: string }) {
+  const { t } = useI18n()
   const cards: Card[] = [
     {
-      title: '文本、图像、视频与音频',
-      body: '一个统一接口生成一切，主流模型尽在一处。',
-      link: { label: '查看全部', to: '/models' },
+      title: t('文本、图像、视频与音频'),
+      body: t('一个统一接口生成一切，主流模型尽在一处。'),
+      link: { label: t('查看全部'), to: '/models' },
       visual: <IconScatter icons={props.icons} />,
     },
     {
-      title: '更高可用性',
-      body: '分布式渠道调度，单个渠道故障时自动切换到其他渠道。',
-      link: { label: '了解更多', to: '/rankings' },
+      title: t('更高可用性'),
+      body: t('分布式渠道调度，单个渠道故障时自动切换到其他渠道。'),
+      link: { label: t('了解更多'), to: '/rankings' },
       visual: <FanOut slug={props.slug} icons={props.icons} />,
     },
     {
-      title: '价格与性能',
-      body: '控制成本的同时不牺牲速度，按 Token 透明计价，用多少付多少。',
-      link: { label: '了解更多', to: '/models' },
+      title: t('价格与性能'),
+      body: t('控制成本的同时不牺牲速度，按 Token 透明计价，用多少付多少。'),
+      link: { label: t('了解更多'), to: '/models' },
       visual: <PerfPanes />,
     },
     {
-      title: '自定义访问策略',
-      body: '为每个密钥限定可用模型、分组与 IP，请求只发往你信任的渠道。',
-      link: { label: '查看密钥', to: '/settings/keys' },
+      title: t('自定义访问策略'),
+      body: t('为每个密钥限定可用模型、分组与 IP，请求只发往你信任的渠道。'),
+      link: { label: t('查看密钥'), to: '/settings/keys' },
       visual: <PolicyShield />,
     },
   ]

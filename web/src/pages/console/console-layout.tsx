@@ -19,16 +19,17 @@ For commercial licensing, please contact support@quantumnous.com
 import { Activity, CreditCard, KeyRound, UserRound } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { tk, useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 import { RouterShell } from '@/sites/router/router-shell'
 
 export type ConsoleSection = 'credits' | 'keys' | 'activity' | 'profile'
 
 const NAV: Array<{ id: ConsoleSection; label: string; to: string; icon: typeof CreditCard }> = [
-  { id: 'credits', label: '充值额度', to: '/settings/credits', icon: CreditCard },
-  { id: 'keys', label: 'API 密钥', to: '/settings/keys', icon: KeyRound },
-  { id: 'activity', label: '使用记录', to: '/activity', icon: Activity },
-  { id: 'profile', label: '账户设置', to: '/settings/profile', icon: UserRound },
+  { id: 'credits', label: tk('充值额度'), to: '/settings/credits', icon: CreditCard },
+  { id: 'keys', label: tk('API 密钥'), to: '/settings/keys', icon: KeyRound },
+  { id: 'activity', label: tk('使用记录'), to: '/activity', icon: Activity },
+  { id: 'profile', label: tk('账户设置'), to: '/settings/profile', icon: UserRound },
 ]
 
 type LayoutProps = {
@@ -41,10 +42,11 @@ type LayoutProps = {
 
 /** Signed-in settings frame: page shell + left settings nav + page heading. */
 export function ConsoleLayout(props: LayoutProps) {
+  const { t } = useI18n()
   return (
     <RouterShell footer={false}>
       <div className='mx-auto flex w-full max-w-[1348px] flex-col gap-6 px-6 py-8 md:flex-row md:gap-10'>
-        <nav aria-label='设置导航' className='flex shrink-0 gap-1 overflow-x-auto md:sticky md:top-[88px] xl:top-[110px] md:w-[200px] md:flex-col md:self-start'>
+        <nav aria-label={t('设置导航')} className='flex shrink-0 gap-1 overflow-x-auto md:sticky md:top-[88px] xl:top-[110px] md:w-[200px] md:flex-col md:self-start'>
           {NAV.map((item) => {
             const Icon = item.icon
             const active = item.id === props.active
@@ -59,7 +61,7 @@ export function ConsoleLayout(props: LayoutProps) {
                 )}
               >
                 <Icon className='size-4' aria-hidden='true' />
-                {item.label}
+                {t(item.label)}
               </Link>
             )
           })}

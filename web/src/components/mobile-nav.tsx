@@ -20,12 +20,15 @@ import { Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 
+import { useI18n } from '@/i18n/i18n'
+
 export type NavItem = { label: string; to: string; external?: boolean }
 
 const itemClass = 'text-or-fg hover:bg-or-fill block rounded-[6px] px-3 py-2.5 text-[15px]'
 
 /** Hamburger + drop-down link list shown below the md breakpoint. */
 export function MobileNav(props: { items: NavItem[] }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const location = useLocation()
 
@@ -35,7 +38,7 @@ export function MobileNav(props: { items: NavItem[] }) {
     <div className='md:hidden'>
       <button
         type='button'
-        aria-label={open ? '关闭菜单' : '打开菜单'}
+        aria-label={open ? t('关闭菜单') : t('打开菜单')}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         className='text-or-fg hover:bg-or-fill flex size-9 items-center justify-center rounded-[6px]'

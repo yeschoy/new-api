@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { t, tk } from '@/i18n/i18n'
 import { formatAmount, type CurrencyDisplay } from '@/lib/pricing'
 import type { UsageLog } from '@/lib/services'
 
@@ -48,19 +49,20 @@ export function withKeyPrefix(key: string): string {
   return key.startsWith('sk-') ? key : `sk-${key}`
 }
 
-const KEY_STATUS_LABELS: Record<number, string> = { 2: '已禁用', 3: '已过期', 4: '已耗尽' }
+const KEY_STATUS_LABELS: Record<number, string> = { 2: tk('已禁用'), 3: tk('已过期'), 4: tk('已耗尽') }
 
 /** Badge text for a non-enabled key, or null when the key is usable. */
 export function keyStatusLabel(status: number): string | null {
-  return KEY_STATUS_LABELS[status] ?? null
+  const label = KEY_STATUS_LABELS[status]
+  return label ? t(label) : null
 }
 
 export function roleLabel(role: number | undefined): string {
   if (role === undefined) return '—'
-  if (role >= 100) return '超级管理员'
-  if (role >= 10) return '管理员'
-  if (role >= 1) return '普通用户'
-  return '访客'
+  if (role >= 100) return t('超级管理员')
+  if (role >= 10) return t('管理员')
+  if (role >= 1) return t('普通用户')
+  return t('访客')
 }
 
 export function pageCount(total: number, size: number): number {

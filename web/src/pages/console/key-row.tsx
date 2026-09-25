@@ -20,6 +20,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 
+import { useI18n } from '@/i18n/i18n'
 import { errorMessage } from '@/lib/api'
 import { KEY_STATUS_DISABLED, KEY_STATUS_ENABLED, setKeyStatus, unwrap } from '@/lib/console-api'
 import { cn, dateTime } from '@/lib/format'
@@ -34,6 +35,7 @@ const ICON_BUTTON = 'text-or-muted hover:bg-or-fill hover:text-or-fg flex size-7
 
 /** One key: masked value with reveal / copy, limits, and row actions. */
 export function KeyRow(props: { apiKey: ApiKey }) {
+  const { t } = useI18n()
   const key = props.apiKey
   const money = useMoney()
   const queryClient = useQueryClient()
@@ -45,21 +47,21 @@ export function KeyRow(props: { apiKey: ApiKey }) {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['console'] })
   const remove = useMutation({
-    mutationFn: async () => unwrap(await deleteKey(key.id), '删除失败'),
+    mutationFn: async () => unwrap(await deleteKey(key.id), t('删除失败')),
     onSuccess: refresh,
-    onError: (err) => setError(errorMessage(err, '删除失败')),
+    onError: (err) => setError(errorMessage(err, t('删除失败'))),
   })
   const enabled = key.status === KEY_STATUS_ENABLED
   const toggle = useMutation({
     mutationFn: () => setKeyStatus(key.id, enabled ? KEY_STATUS_DISABLED : KEY_STATUS_ENABLED),
     onSuccess: refresh,
-    onError: (err) => setError(errorMessage(err, '操作失败')),
+    onError: (err) => setError(errorMessage(err, t('操作失败'))),
   })
 
   async function loadFullKey(): Promise<string> {
     if (fullKey) return fullKey
     const value = withKeyPrefix(await revealKey(key.id))
-    if (!value) throw new Error('获取密钥失败')
+    if (!value) throw new Error(t('获取密钥失败'))
     setFullKey(value)
     return value
   }
@@ -74,7 +76,7 @@ export function KeyRow(props: { apiKey: ApiKey }) {
       await loadFullKey()
       setShown(true)
     } catch (err) {
-      setError(errorMessage(err, '获取密钥失败'))
+      setError(errorMessage(err, t('获取密钥失败')))
     }
   }
 
@@ -85,7 +87,7 @@ export function KeyRow(props: { apiKey: ApiKey }) {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch (err) {
-      setError(errorMessage(err, '复制失败'))
+      setError(errorMessage(err, t('复制失败')))
     }
   }
 
@@ -95,7 +97,7 @@ export function KeyRow(props: { apiKey: ApiKey }) {
     <Tr>
       <Td>
         <div className='flex items-center gap-2'>
-          <span className='max-w-[200px] truncate font-medium'>{key.name || '未命名'}</span>
+          <span className='max-w-[200px] truncate font-medium'>{key.name || t('未命名')}</span>
           {status ? <Tag tone={key.status === KEY_STATUS_DISABLED ? 'neutral' : 'danger'}>{status}</Tag> : null}
         </div>
       </Td>
@@ -104,21 +106,21 @@ export function KeyRow(props: { apiKey: ApiKey }) {
           <code className={cn('font-geist mr-1 text-[13px] break-all', !shown && 'text-or-muted')}>
             {shown && fullKey ? fullKey : withKeyPrefix(key.key)}
           </code>
-          <button type='button' onClick={onReveal} className={ICON_BUTTON} aria-label={shown ? '隐藏密钥' : '显示密钥'} title={shown ? '隐藏' : '显示'}>
+          <button type='button' onClick={onReveal} className={ICON_BUTTON} aria-label={shown ? t('隐藏密钥') : t('显示密钥')} title={shown ? t('隐藏') : t('显示')}>
             {shown ? <EyeOff className='size-3.5' /> : <Eye className='size-3.5' />}
           </button>
-          <button type='button' onClick={onCopy} className={ICON_BUTTON} aria-label='复制密钥' title={copied ? '已复制' : '复制'}>
+          <button type='button' onClick={onCopy} className={ICON_BUTTON} aria-label={t('复制密钥')} title={copied ? t('已复制') : t('复制')}>
             {copied ? <Check className='text-or-primary size-3.5' /> : <Copy className='size-3.5' />}
           </button>
         </div>
       </Td>
       <Td right>
         {key.unlimited_quota ? (
-          <span className='text-or-muted'>无限制</span>
+          <span className='text-or-muted'>{t('无限制')}</span>
         ) : (
           <div className='flex flex-col items-end'>
             <span>{money.format(key.remain_quota + key.used_quota)}</span>
-            <span className='text-or-muted text-[12px]'>剩余 {money.format(key.remain_quota)}</span>
+            <span className='text-or-muted text-[12px]'>{t('剩余 {amount}', { amount: money.format(key.remain_quota) })}</span>
           </div>
         )}
       </Td>
@@ -128,18 +130,18 @@ export function KeyRow(props: { apiKey: ApiKey }) {
         <div className='flex items-center justify-end gap-1'>
           {confirming ? (
             <>
-              <span className='text-or-muted mr-1 text-[13px] whitespace-nowrap'>确认删除？</span>
+              <span className='text-or-muted mr-1 text-[13px] whitespace-nowrap'>{t('确认删除？')}</span>
               <Button size='sm' variant='danger' busy={remove.isPending} onClick={() => remove.mutate()}>
-                删除
+                {t('删除')}
               </Button>
               <Button size='sm' variant='ghost' onClick={() => setConfirming(false)}>
-                取消
+                {t('取消')}
               </Button>
             </>
           ) : (
             <>
               <Button size='sm' variant='ghost' busy={toggle.isPending} onClick={() => toggle.mutate()}>
-                {enabled ? '禁用' : '启用'}
+                {enabled ? t('禁用') : t('启用')}
               </Button>
               <Button
                 size='sm'
@@ -150,7 +152,7 @@ export function KeyRow(props: { apiKey: ApiKey }) {
                   setConfirming(true)
                 }}
               >
-                删除
+                {t('删除')}
               </Button>
             </>
           )}

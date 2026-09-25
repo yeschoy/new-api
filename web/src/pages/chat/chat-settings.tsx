@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 
+import { useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
 
 import { DEFAULT_SETTINGS, type ChatSettings } from './use-chat'
@@ -40,6 +41,7 @@ export function ChatSettingsPopover(props: {
   onChange: (settings: ChatSettings) => void
   className?: string
 }) {
+  const { t } = useI18n()
   const settings = props.settings
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -69,8 +71,8 @@ export function ChatSettingsPopover(props: {
     <div ref={rootRef} className={cn('relative', props.className)}>
       <button
         type='button'
-        aria-label='对话设置'
-        title='对话设置'
+        aria-label={t('对话设置')}
+        title={t('对话设置')}
         aria-haspopup='dialog'
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -93,7 +95,7 @@ export function ChatSettingsPopover(props: {
         >
           <div className='mb-4 flex items-center justify-between'>
             <h2 id={titleId} className='text-or-fg text-[14px] font-semibold'>
-              对话设置
+              {t('对话设置')}
             </h2>
             <button
               type='button'
@@ -101,7 +103,7 @@ export function ChatSettingsPopover(props: {
               className='text-or-muted hover:text-or-fg flex items-center gap-1 text-[13px] transition-colors'
             >
               <RotateCcw className='size-3.5' aria-hidden='true' />
-              重置
+              {t('重置')}
             </button>
           </div>
 
@@ -109,7 +111,7 @@ export function ChatSettingsPopover(props: {
             <div>
               <div className='mb-1.5 flex items-center justify-between'>
                 <label htmlFor={temperatureId} className='text-or-fg text-[13px] font-medium'>
-                  温度（Temperature）
+                  {t('温度（Temperature）')}
                 </label>
                 <span className='font-geist text-or-muted text-[13px]'>{settings.temperature.toFixed(1)}</span>
               </div>
@@ -124,14 +126,14 @@ export function ChatSettingsPopover(props: {
                 className='accent-or-primary h-4 w-full'
               />
               <div className='text-or-dim mt-0.5 flex justify-between text-[12px]'>
-                <span>精确</span>
-                <span>发散</span>
+                <span>{t('精确')}</span>
+                <span>{t('发散')}</span>
               </div>
             </div>
 
             <div>
               <label htmlFor={maxTokensId} className='text-or-fg mb-1.5 block text-[13px] font-medium'>
-                最大输出 Tokens
+                {t('最大输出 Tokens')}
               </label>
               <input
                 id={maxTokensId}
@@ -144,21 +146,21 @@ export function ChatSettingsPopover(props: {
                   const value = Math.floor(Number(e.target.value))
                   update({ maxTokens: e.target.value === '' || !(value > 0) ? null : value })
                 }}
-                placeholder='不限制'
+                placeholder={t('不限制')}
                 className={cn(FIELD, 'h-9')}
               />
             </div>
 
             <div>
               <label htmlFor={systemPromptId} className='text-or-fg mb-1.5 block text-[13px] font-medium'>
-                系统提示词
+                {t('系统提示词')}
               </label>
               <textarea
                 id={systemPromptId}
                 rows={4}
                 value={settings.systemPrompt}
                 onChange={(e) => update({ systemPrompt: e.target.value })}
-                placeholder='例如：你是一名资深的前端工程师，回答要简洁'
+                placeholder={t('例如：你是一名资深的前端工程师，回答要简洁')}
                 className={cn(FIELD, 'resize-y py-2 leading-[22px]')}
               />
             </div>

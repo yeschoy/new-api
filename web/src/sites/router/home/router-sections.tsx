@@ -20,6 +20,7 @@ import { ArrowRight, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { ProviderIcon } from '@/components/provider-icon'
+import { tk, useI18n } from '@/i18n/i18n'
 import { cn, compactNumber, shortDate } from '@/lib/format'
 import type { CatalogModel } from '@/lib/queries'
 import type { ModelRanking } from '@/lib/services'
@@ -30,6 +31,7 @@ export function SectionHeader(props: {
   to?: string
   chevron?: boolean
 }) {
+  const { t } = useI18n()
   return (
     <div className='flex items-end justify-between gap-4'>
       <div>
@@ -43,7 +45,7 @@ export function SectionHeader(props: {
       </div>
       {props.to ? (
         <Link to={props.to} className='text-or-muted hover:text-or-fg flex items-center gap-1 text-[14px]'>
-          查看全部 <ArrowRight className='size-3.5' />
+          {t('查看全部')} <ArrowRight className='size-3.5' />
         </Link>
       ) : null}
     </div>
@@ -51,9 +53,10 @@ export function SectionHeader(props: {
 }
 
 export function NewBadge() {
+  const { t } = useI18n()
   return (
     <span className='rounded-full border border-[#4d8dff]/15 bg-[#4d8dff]/12 px-2.5 py-0.5 text-[12px] leading-[19.5px] font-medium text-[#4d8dff]'>
-      新
+      {t('新')}
     </span>
   )
 }
@@ -65,12 +68,13 @@ export function FeaturedModels(props: {
   modelCount: number
   vendorCount: number
 }) {
+  const { t } = useI18n()
   if (props.rows.length === 0) return null
   return (
     <section className='mx-auto mt-20 max-w-[1280px] px-6 xl:px-0'>
       <SectionHeader
-        title='精选模型'
-        subtitle={`${props.modelCount}+ 个在线模型，来自 ${props.vendorCount}+ 家厂商`}
+        title={t('精选模型')}
+        subtitle={t('{models}+ 个在线模型，来自 {vendors}+ 家厂商', { models: props.modelCount, vendors: props.vendorCount })}
         to='/models'
       />
       <div className='mt-6 grid gap-6 md:grid-cols-3'>
@@ -96,17 +100,17 @@ export function FeaturedModels(props: {
                     {row.previous_rank === undefined ? <NewBadge /> : null}
                   </div>
                   <p className='text-or-muted text-[14px]'>
-                    来自 <span className='underline underline-offset-2'>{row.vendor.toLowerCase()}</span>
+                    {t('来自')} <span className='underline underline-offset-2'>{row.vendor.toLowerCase()}</span>
                   </p>
                 </div>
               </div>
               <div className='flex justify-between text-[14px]'>
                 <div>
-                  <div className='text-or-muted'>Token 用量</div>
+                  <div className='text-or-muted'>{t('Token 用量')}</div>
                   <div className='font-medium'>{compactNumber(row.total_tokens)}</div>
                 </div>
                 <div className='text-right'>
-                  <div className='text-or-muted'>周趋势</div>
+                  <div className='text-or-muted'>{t('周趋势')}</div>
                   <div className={cn('font-medium', trendClass)}>
                     {trend === 0 ? '--' : `${trend > 0 ? '+' : ''}${Math.round(trend)}%`}
                   </div>
@@ -121,16 +125,17 @@ export function FeaturedModels(props: {
 }
 
 const TOOLS = [
-  { name: 'Claude Code', icon: 'ClaudeCode', body: '在终端里写代码的智能体' },
-  { name: 'Cursor', icon: 'Cursor', body: '为 AI 结对编程打造的编辑器' },
-  { name: 'Cherry Studio', icon: 'CherryStudio', body: '多模型桌面对话客户端' },
+  { name: 'Claude Code', icon: 'ClaudeCode', body: tk('在终端里写代码的智能体') },
+  { name: 'Cursor', icon: 'Cursor', body: tk('为 AI 结对编程打造的编辑器') },
+  { name: 'Cherry Studio', icon: 'CherryStudio', body: tk('多模型桌面对话客户端') },
 ]
 
 /** Three 411×270 cards: preview band, then icon + name + one-liner. */
 export function FeaturedApps() {
+  const { t } = useI18n()
   return (
     <section className='mx-auto mt-20 max-w-[1280px] px-6 xl:px-0'>
-      <SectionHeader title='常用应用' subtitle='这些工具都能直接接入本站接口' chevron />
+      <SectionHeader title={t('常用应用')} subtitle={t('这些工具都能直接接入本站接口')} chevron />
       <div className='mt-6 grid gap-6 md:grid-cols-3'>
         {TOOLS.map((tool) => (
           <article key={tool.name} className='border-or-line bg-or-card flex h-[270px] flex-col overflow-hidden rounded-[8px] border'>
@@ -143,7 +148,7 @@ export function FeaturedApps() {
               </span>
               <div>
                 <div className='text-[14px] font-medium'>{tool.name}</div>
-                <div className='text-or-muted text-[13px]'>{tool.body}</div>
+                <div className='text-or-muted text-[13px]'>{t(tool.body)}</div>
               </div>
             </div>
           </article>
@@ -155,6 +160,7 @@ export function FeaturedApps() {
 
 /** Newest catalog entries laid out like the reference's post list. */
 export function RecentModels(props: { models: CatalogModel[] }) {
+  const { t } = useI18n()
   const recent = [...props.models]
     .filter((m) => m.release_date)
     .sort((a, b) => (b.release_date ?? '').localeCompare(a.release_date ?? ''))
@@ -162,7 +168,7 @@ export function RecentModels(props: { models: CatalogModel[] }) {
   if (recent.length === 0) return null
   return (
     <section className='mx-auto mt-24 max-w-[768px] px-6 md:px-0'>
-      <SectionHeader title='最新上线' to='/models' />
+      <SectionHeader title={t('最新上线')} to='/models' />
       <div className='mt-8 flex flex-col gap-10'>
         {recent.map((model) => (
           <Link key={model.model_name} to={`/models?q=${encodeURIComponent(model.model_name)}`} className='group flex gap-5'>
@@ -174,11 +180,11 @@ export function RecentModels(props: { models: CatalogModel[] }) {
                 {model.vendor}: {model.model_name}
               </h3>
               <p className='text-or-muted mt-2 line-clamp-4 text-[14px] leading-[22.75px]'>
-                {model.description || '暂无介绍'}
+                {model.description || t('暂无介绍')}
               </p>
               <div className='mt-2 flex items-center gap-2'>
                 <time className='text-or-dim text-[12px] font-medium'>
-                  {shortDate(model.release_date, 'zh-CN')}
+                  {shortDate(model.release_date)}
                 </time>
                 <NewBadge />
               </div>
