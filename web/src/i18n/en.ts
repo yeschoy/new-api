@@ -70,7 +70,6 @@ export const EN: Record<string, string> = {
   可用: 'availability',
   '，无需订阅。': ', no subscription.',
   '获取 API Key': 'Get API key',
-  探索模型: 'Explore models',
   '文本、图像、视频与音频': 'Text, images, video and audio',
   '一个统一接口生成一切，主流模型尽在一处。': 'Generate anything through one unified API, with the leading models in one place.',
   查看全部: 'View all',
@@ -395,4 +394,5 @@ export const EN: Record<string, string> = {
   '删除对话：{title}': 'Delete chat: {title}',
   删除对话: 'Delete chat',
   '模型|表头': 'Model',
+  下载客户端: 'Download the app',
 }

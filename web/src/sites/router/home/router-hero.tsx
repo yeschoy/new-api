@@ -65,10 +65,10 @@ export function RouterHero() {
         </Link>
         <Link
           to='/models'
-          className='border-or-line bg-or-bg text-or-fg hover:bg-or-fill flex h-11 w-[205px] items-center justify-center gap-2 rounded-[6px] border px-8 text-[14px] font-medium transition-colors'
+          className='bg-or-primary text-or-bg flex h-11 w-[205px] items-center justify-center gap-2 rounded-[6px] px-8 text-[14px] font-medium transition-opacity hover:opacity-90'
         >
-          {t('探索模型')}
-          <Sparkles className='text-or-blue size-4' aria-hidden='true' />
+          {t('下载客户端')}
+          <Sparkles className='size-4' aria-hidden='true' />
         </Link>
       </div>
     </section>
