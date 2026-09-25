@@ -31,9 +31,6 @@ import { useTheme } from '@/site/theme'
 import { RouterSearchDialog } from './router-search-dialog'
 
 // From xl (1280px) the bar and everything in it is 1.4 times the size.
-const kbd =
-  'rounded-[4px] bg-or-fill px-1.5 py-0.5 font-geist text-[12px] leading-3 font-medium text-or-muted xl:rounded-[6px] xl:px-2 xl:py-[3px] xl:text-[17px] xl:leading-[17px]'
-
 export function RouterHeader() {
   const brand = useBrand()
   const { data: status } = useStatus()
@@ -83,10 +80,6 @@ export function RouterHeader() {
         >
           <Search className='text-or-fg/45 size-4 shrink-0 xl:size-[22px]' aria-hidden='true' />
           <span className='text-or-fg/45 flex-1 truncate text-[14px] xl:text-[20px]'>搜索</span>
-          <span className='flex shrink-0 gap-0.5 xl:gap-[3px]'>
-            <kbd className={kbd}>⌘</kbd>
-            <kbd className={kbd}>K</kbd>
-          </span>
         </button>
 
         <div className='ml-auto flex shrink-0 items-center gap-1 pl-4 xl:gap-1.5'>
