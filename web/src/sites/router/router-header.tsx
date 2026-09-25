@@ -30,8 +30,9 @@ import { useTheme } from '@/site/theme'
 
 import { RouterSearchDialog } from './router-search-dialog'
 
+// From xl (1280px) the bar and everything in it is 1.4 times the size.
 const kbd =
-  'rounded-[4px] bg-or-fill px-1.5 py-0.5 font-geist text-[12px] leading-3 font-medium text-or-muted'
+  'rounded-[4px] bg-or-fill px-1.5 py-0.5 font-geist text-[12px] leading-3 font-medium text-or-muted xl:rounded-[6px] xl:px-2 xl:py-[3px] xl:text-[17px] xl:leading-[17px]'
 
 export function RouterHeader() {
   const brand = useBrand()
@@ -61,33 +62,34 @@ export function RouterHeader() {
     links.push({ label: '文档', to: status.docs_link, external: true })
   }
 
-  const linkClass = 'flex h-8 items-center rounded-[6px] px-2 text-[14px] font-medium text-or-muted transition-colors hover:text-or-fg'
+  const linkClass =
+    'flex h-8 items-center rounded-[6px] px-2 text-[14px] font-medium text-or-muted transition-colors hover:text-or-fg xl:h-[45px] xl:rounded-[8px] xl:px-[11px] xl:text-[20px]'
 
   return (
     <nav className='border-or-line bg-or-bg sticky top-0 z-50 border-b'>
-      <div className='relative flex h-[55px] items-center px-4 md:px-6'>
+      <div className='relative flex h-[55px] items-center px-4 md:px-6 xl:h-[77px] xl:px-[34px]'>
         <Link
           to='/'
-          className='text-or-fg flex h-8 items-center gap-2 rounded-[6px] px-2 text-[17px] font-semibold tracking-[-0.02em]'
+          className='text-or-fg flex h-8 shrink-0 items-center gap-2 rounded-[6px] px-2 text-[17px] font-semibold tracking-[-0.02em] xl:h-[45px] xl:gap-[11px] xl:rounded-[8px] xl:px-[11px] xl:text-[24px]'
         >
-          <BrandMark size={22} />
+          <BrandMark size={31} className='size-[22px] xl:size-[31px]' />
           <span>{brand.name}</span>
         </Link>
 
         <button
           type='button'
           onClick={() => setSearchOpen(true)}
-          className='bg-or-fg/4 ml-20 hidden h-8 w-60 items-center gap-2 rounded-[6px] px-3 text-left md:flex'
+          className='bg-or-fg/4 ml-20 hidden h-8 w-60 min-w-0 items-center gap-2 rounded-[6px] px-3 text-left md:flex xl:ml-28 xl:h-[45px] xl:w-[336px] xl:gap-[11px] xl:rounded-[8px] xl:px-[17px]'
         >
-          <Search className='text-or-fg/45 size-4' aria-hidden='true' />
-          <span className='text-or-fg/45 flex-1 text-[14px]'>搜索</span>
-          <span className='flex gap-0.5'>
+          <Search className='text-or-fg/45 size-4 shrink-0 xl:size-[22px]' aria-hidden='true' />
+          <span className='text-or-fg/45 flex-1 truncate text-[14px] xl:text-[20px]'>搜索</span>
+          <span className='flex shrink-0 gap-0.5 xl:gap-[3px]'>
             <kbd className={kbd}>⌘</kbd>
             <kbd className={kbd}>K</kbd>
           </span>
         </button>
 
-        <div className='ml-auto flex items-center gap-1'>
+        <div className='ml-auto flex shrink-0 items-center gap-1 pl-4 xl:gap-1.5'>
           {links.map((link) =>
             link.external ? (
               <a
@@ -116,16 +118,16 @@ export function RouterHeader() {
             onClick={theme.toggle}
             aria-label={theme.theme === 'dark' ? '切换到白天' : '切换到夜晚'}
             title={theme.theme === 'dark' ? '切换到白天' : '切换到夜晚'}
-            className='text-or-muted hover:text-or-fg hover:bg-or-fill flex size-8 items-center justify-center rounded-[6px] transition-colors'
+            className='text-or-muted hover:text-or-fg hover:bg-or-fill flex size-8 items-center justify-center rounded-[6px] transition-colors xl:size-[45px] xl:rounded-[8px]'
           >
-            {theme.theme === 'dark' ? <Sun className='size-4' /> : <Moon className='size-4' />}
+            {theme.theme === 'dark' ? <Sun className='size-4 xl:size-[22px]' /> : <Moon className='size-4 xl:size-[22px]' />}
           </button>
           {auth.status === 'authenticated' ? (
             <UserMenu />
           ) : (
             <Link
               to='/sign-up'
-              className='bg-or-primary text-or-bg ml-1 flex h-8 items-center rounded-[6px] px-3 text-[14px] font-medium transition-opacity hover:opacity-90'
+              className='bg-or-primary text-or-bg ml-1 flex h-8 items-center rounded-[6px] px-3 text-[14px] font-medium transition-opacity hover:opacity-90 xl:ml-1.5 xl:h-[45px] xl:rounded-[8px] xl:px-[17px] xl:text-[20px]'
             >
               注册
             </Link>

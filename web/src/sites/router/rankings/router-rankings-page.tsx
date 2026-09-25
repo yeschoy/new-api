@@ -152,7 +152,7 @@ export function RouterRankingsPage() {
         </div>
 
         <div className='flex gap-8 pt-6'>
-          <nav className='sticky top-20 hidden h-fit w-[200px] shrink-0 flex-col gap-0.5 md:flex'>
+          <nav className='sticky top-20 hidden xl:top-[102px] h-fit w-[200px] shrink-0 flex-col gap-0.5 md:flex'>
             {SECTIONS.map((s) => (
               <button
                 key={s.id}
@@ -178,14 +178,14 @@ export function RouterRankingsPage() {
               <div className='border-or-line text-or-muted mt-10 rounded-[8px] border px-6 py-16 text-center text-[14px]'>该类别暂无排行数据</div>
             ) : (
               <>
-                <section id='top-models' className='mt-10 scroll-mt-20'>
+                <section id='top-models' className='mt-10 scroll-mt-20 xl:scroll-mt-[102px]'>
                   <SectionTitle icon={<BarChart3 className='size-4' />} title='热门模型' subtitle='各模型每天在本站的 Token 用量' />
                   <div className='mt-4'>
                     <StackedBars points={history.data?.models_history.points ?? []} models={chartModels} theme={ROUTER_CHART} height={300} />
                   </div>
                 </section>
 
-                <section id='leaderboard' className='mt-14 scroll-mt-20'>
+                <section id='leaderboard' className='mt-14 scroll-mt-20 xl:scroll-mt-[102px]'>
                   <SectionTitle
                     icon={<Trophy className='size-4' />}
                     title='模型排行榜'
@@ -218,7 +218,7 @@ export function RouterRankingsPage() {
                   ) : null}
                 </section>
 
-                <section id='market-share' className='mt-14 scroll-mt-20'>
+                <section id='market-share' className='mt-14 scroll-mt-20 xl:scroll-mt-[102px]'>
                   <SectionTitle icon={<PieChart className='size-4' />} title='市场份额' subtitle='各厂商模型在本站的 Token 占比' />
                   <div className='mt-5 flex flex-col gap-3'>
                     {(data?.vendors ?? []).map((v, index) => (
@@ -236,7 +236,7 @@ export function RouterRankingsPage() {
                   </div>
                 </section>
 
-                <section id='movers' className='mt-14 scroll-mt-20'>
+                <section id='movers' className='mt-14 scroll-mt-20 xl:scroll-mt-[102px]'>
                   <SectionTitle icon={<LineChart className='size-4' />} title='涨跌榜' subtitle='排名变化最大的模型' />
                   <div className='mt-5 grid gap-6 md:grid-cols-2'>
                     {[

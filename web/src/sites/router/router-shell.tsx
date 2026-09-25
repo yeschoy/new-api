@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { RouterFooter } from './router-footer'
 import { RouterHeader } from './router-header'
 
-/** Dark design frame: sticky 56px bar, page body, five-column footer. */
+/** Design frame: sticky bar (56px, 78px from xl), page body, five-column footer. */
 export function RouterShell(props: { children: React.ReactNode; footer?: boolean }) {
   return (
     <div className='bg-or-bg text-or-fg flex min-h-screen flex-col'>

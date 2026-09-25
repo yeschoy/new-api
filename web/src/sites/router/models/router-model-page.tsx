@@ -142,7 +142,7 @@ export function RouterModelPage() {
         </div>
 
         <div className='border-or-line mt-8 flex gap-8 border-t pt-8'>
-          <nav className='sticky top-20 hidden h-fit w-[180px] shrink-0 flex-col gap-0.5 md:flex'>
+          <nav className='sticky top-20 hidden xl:top-[102px] h-fit w-[180px] shrink-0 flex-col gap-0.5 md:flex'>
             {SECTIONS.map((s, i) => (
               <a key={s.id} href={`#${s.id}`} className={cn('flex h-8 items-center gap-2 rounded-[6px] px-3 text-[14px] font-medium', i === 0 ? 'bg-or-primary-soft text-or-primary' : 'text-or-muted hover:text-or-fg')}>
                 <s.icon className='size-4' />
@@ -152,7 +152,7 @@ export function RouterModelPage() {
           </nav>
 
           <main className='min-w-0 flex-1 space-y-14'>
-            <section id='providers' className='scroll-mt-20'>
+            <section id='providers' className='scroll-mt-20 xl:scroll-mt-[102px]'>
               <h2 className='flex items-center gap-2 text-[18px] font-bold'><Server className='size-4' /> 分组价格</h2>
               <p className='text-or-muted mt-1 max-w-[560px] text-[14px]'>同一个模型可以通过不同分组调用，各分组倍率不同，请求会按你的密钥所在分组计费。</p>
               <div className='border-or-line mt-4 overflow-x-auto rounded-[8px] border'>
@@ -183,7 +183,7 @@ export function RouterModelPage() {
               </div>
             </section>
 
-            <section id='pricing' className='scroll-mt-20'>
+            <section id='pricing' className='scroll-mt-20 xl:scroll-mt-[102px]'>
               <h2 className='flex items-center gap-2 text-[18px] font-bold'><DollarSign className='size-4' /> 定价</h2>
               <div className='mt-4 grid gap-4 md:grid-cols-2'>
                 {[
@@ -199,7 +199,7 @@ export function RouterModelPage() {
               </div>
             </section>
 
-            <section id='api' className='scroll-mt-20'>
+            <section id='api' className='scroll-mt-20 xl:scroll-mt-[102px]'>
               <h2 className='flex items-center gap-2 text-[18px] font-bold'><Code2 className='size-4' /> API</h2>
               <p className='text-or-muted mt-1 text-[14px]'>完全兼容 OpenAI SDK，替换接口地址和密钥即可。</p>
               <div className='mt-4 flex gap-1'>
@@ -212,7 +212,7 @@ export function RouterModelPage() {
               <pre className='border-or-line bg-or-card mt-2 overflow-x-auto rounded-[8px] border p-4 font-geist text-[13px] leading-6'>{code}</pre>
             </section>
 
-            <section id='activity' className='scroll-mt-20'>
+            <section id='activity' className='scroll-mt-20 xl:scroll-mt-[102px]'>
               <h2 className='flex items-center gap-2 text-[18px] font-bold'><Layers className='size-4' /> 用量</h2>
               <div className='border-or-line bg-or-card mt-4 rounded-[8px] border p-4'>
                 <div className='text-or-muted text-[13px]'>本周 Token 用量</div>

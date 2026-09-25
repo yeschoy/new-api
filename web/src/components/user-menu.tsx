@@ -48,14 +48,14 @@ export function UserMenu() {
   const name = auth.user?.display_name || auth.user?.username || '?'
 
   return (
-    <div ref={rootRef} className='relative ml-1'>
+    <div ref={rootRef} className='relative ml-1 xl:ml-1.5'>
       <button
         type='button'
         aria-haspopup='menu'
         aria-expanded={open}
         aria-label='账户菜单'
         onClick={() => setOpen((value) => !value)}
-        className='bg-or-primary text-or-bg flex size-8 items-center justify-center rounded-full text-[13px] font-semibold'
+        className='bg-or-primary text-or-bg flex size-8 items-center justify-center rounded-full text-[13px] font-semibold xl:size-[45px] xl:text-[18px]'
       >
         {name.charAt(0).toUpperCase()}
       </button>

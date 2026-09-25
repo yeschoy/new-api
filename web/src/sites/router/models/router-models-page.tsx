@@ -67,7 +67,7 @@ export function RouterModelsPage() {
   return (
     <RouterShell footer={false}>
       <div className='flex'>
-        <aside className='border-or-line sticky top-14 hidden h-[calc(100vh-56px)] w-[267px] shrink-0 overflow-y-auto border-r px-6 py-3 lg:block'>
+        <aside className='border-or-line sticky top-14 hidden h-[calc(100vh-56px)] xl:top-[78px] xl:h-[calc(100vh-78px)] w-[267px] shrink-0 overflow-y-auto border-r px-6 py-3 lg:block'>
           <RouterFilterSidebar models={models} filters={filters} onChange={setFilters} />
         </aside>
         <div className='min-w-0 flex-1 px-6 py-3 lg:pl-[21px] lg:pr-6'>

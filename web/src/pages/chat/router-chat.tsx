@@ -34,7 +34,7 @@ export function RouterChat(props: { chat: ChatController; models: CatalogModel[]
   const messages = chat.active?.messages ?? []
 
   return (
-    <div className='flex h-[calc(100dvh-56px)]'>
+    <div className='flex h-[calc(100dvh-56px)] xl:h-[calc(100dvh-78px)]'>
       <RouterSidebar chat={chat} className='hidden md:flex' />
       <section className='flex min-w-0 flex-1 flex-col'>
         <div className='border-or-line flex h-14 shrink-0 items-center gap-2 border-b px-4'>

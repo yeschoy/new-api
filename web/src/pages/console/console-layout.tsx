@@ -44,7 +44,7 @@ export function ConsoleLayout(props: LayoutProps) {
   return (
     <RouterShell footer={false}>
       <div className='mx-auto flex w-full max-w-[1348px] flex-col gap-6 px-6 py-8 md:flex-row md:gap-10'>
-        <nav aria-label='设置导航' className='flex shrink-0 gap-1 overflow-x-auto md:sticky md:top-[88px] md:w-[200px] md:flex-col md:self-start'>
+        <nav aria-label='设置导航' className='flex shrink-0 gap-1 overflow-x-auto md:sticky md:top-[88px] xl:top-[110px] md:w-[200px] md:flex-col md:self-start'>
           {NAV.map((item) => {
             const Icon = item.icon
             const active = item.id === props.active
