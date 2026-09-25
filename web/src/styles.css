@@ -156,17 +156,3 @@ button:not(:disabled),
     linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
   mask-composite: intersect;
 }
-
-/* Home hero block (headline, buttons and figures in router-home.tsx): at night
-   it lets the city lights behind it show through until the pointer is anywhere
-   over it. Only on devices that can hover, so touch screens keep it opaque. */
-@media (hover: hover) and (pointer: fine) {
-  .dark .hero-copy {
-    opacity: 0.2;
-    transition: opacity 0.3s ease;
-  }
-
-  .dark .hero-copy:hover {
-    opacity: 1;
-  }
-}

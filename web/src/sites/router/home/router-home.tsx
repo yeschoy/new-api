@@ -65,8 +65,8 @@ export function RouterHome() {
       <div className='relative overflow-x-clip'>
         {/* The map sits behind the headline, buttons and figures. */}
         <WorldMap className='world-map-frame pointer-events-none absolute inset-x-0 top-4 mx-auto aspect-[360/138] w-full max-w-[1440px]' />
-        {/* One block: at night it lets the map's lights show through until pointed at (styles.css). */}
-        <div className='hero-copy relative mx-auto w-fit'>
+        {/* On wide screens the block sits over the Pacific: 10% of the map's width right of centre. */}
+        <div className='relative mx-auto w-fit lg:left-[min(10%,144px)]'>
           <RouterHero />
           <HeroStats stats={stats} />
         </div>
