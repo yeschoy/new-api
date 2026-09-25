@@ -114,34 +114,19 @@ button:not(:disabled),
   }
 }
 
-/* Home hero city lights (src/sites/router/home/world-map.tsx) come on from
-   east to west each time night starts. */
-.world-lights[data-on] {
-  -webkit-mask-image: linear-gradient(to left, #000 45%, transparent 55%);
-  mask-image: linear-gradient(to left, #000 45%, transparent 55%);
-  -webkit-mask-size: 250% 100%;
-  mask-size: 250% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  animation: world-nightfall 1.8s ease-in-out both;
+/* Home map city lights (src/sites/router/home/world-map.tsx) fade in once drawn. */
+.world-lights {
+  opacity: 0;
+  transition: opacity 0.8s ease;
 }
 
-@keyframes world-nightfall {
-  from {
-    -webkit-mask-position: 0% 0;
-    mask-position: 0% 0;
-  }
-  to {
-    -webkit-mask-position: 100% 0;
-    mask-position: 100% 0;
-  }
+.world-lights[data-ready] {
+  opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .world-lights[data-on] {
-    animation: none;
-    -webkit-mask-image: none;
-    mask-image: none;
+  .world-lights {
+    transition: none;
   }
 }
 

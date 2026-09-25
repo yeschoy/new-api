@@ -24,6 +24,14 @@ import type { LandGrid } from './world-map-data'
  * to this left edge when drawn.
  */
 const MAP_WEST = -30
+/** Latitude range of the map (see world-land.ts). */
+const LAT_TOP = 80
+const LAT_SPAN = 138
+
+/** Longitude and latitude at the middle of a cell of a map grid (already rolled to MAP_WEST). */
+export function cellCenter(col: number, row: number, cols: number, rows: number): readonly [number, number] {
+  return [MAP_WEST + ((col + 0.5) * 360) / cols, LAT_TOP - ((row + 0.5) * LAT_SPAN) / rows]
+}
 
 /** Grid columns to skip so that a grid starting at 180°W begins at MAP_WEST. */
 export function westShift(cols: number): number {

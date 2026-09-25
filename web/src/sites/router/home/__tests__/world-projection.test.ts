@@ -16,13 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { rollColumns, westShift } from '../world-projection'
+import { cellCenter, rollColumns, westShift } from '../world-projection'
 
 describe('Pacific-centred map', () => {
   it('starts the map at 30°W so the Pacific sits in the middle', () => {
     // One column per degree from 180°W: 30°W is column 150.
     expect(westShift(360)).toBe(150)
     expect(westShift(1440)).toBe(600)
+  })
+})
+
+describe('cellCenter', () => {
+  it('gives the longitude and latitude at the middle of a map cell', () => {
+    // A 1° grid over 30°W eastwards and 80°N to 58°S.
+    expect(cellCenter(0, 0, 360, 138)).toEqual([-29.5, 79.5])
+    expect(cellCenter(179, 137, 360, 138)).toEqual([149.5, -57.5])
   })
 })
 
