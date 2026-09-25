@@ -157,12 +157,12 @@ button:not(:disabled),
   mask-composite: intersect;
 }
 
-/* Home hero headline (src/sites/router/home/router-hero.tsx): at night it lets
-   the city lights behind it show through until the pointer is over it. Only on
-   devices that can hover, so touch screens keep it fully opaque. */
+/* Home hero block (headline, buttons and figures in router-home.tsx): at night
+   it lets the city lights behind it show through until the pointer is anywhere
+   over it. Only on devices that can hover, so touch screens keep it opaque. */
 @media (hover: hover) and (pointer: fine) {
   .dark .hero-copy {
-    opacity: 0.6;
+    opacity: 0.4;
     transition: opacity 0.3s ease;
   }
 

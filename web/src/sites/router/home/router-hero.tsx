@@ -42,18 +42,15 @@ export function RouterHero() {
 
   return (
     <section className='px-6 pt-16 text-center'>
-      {/* hero-copy: at night it lets the map's lights show through until pointed at (styles.css). */}
-      <div className='hero-copy mx-auto w-fit'>
-        <h1 className='mx-auto max-w-[896px] text-[40px] leading-[1.2] font-bold tracking-[-1.4px] md:text-[56px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
-          一个接口
-          <br />
-          接入所有模型
-        </h1>
-        <p className='text-or-muted mx-auto max-w-[896px] pt-2 text-[16px] leading-[21.6px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
-          更低<span className='text-or-fg'>价格</span>，更高
-          <span className='text-or-fg'>可用</span>，无需订阅。
-        </p>
-      </div>
+      <h1 className='mx-auto max-w-[896px] text-[40px] leading-[1.2] font-bold tracking-[-1.4px] md:text-[56px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
+        一个接口
+        <br />
+        接入所有模型
+      </h1>
+      <p className='text-or-muted mx-auto max-w-[896px] pt-2 text-[16px] leading-[21.6px] dark:[text-shadow:0_0_14px_var(--or-bg),0_0_4px_var(--or-bg)]'>
+        更低<span className='text-or-fg'>价格</span>，更高
+        <span className='text-or-fg'>可用</span>，无需订阅。
+      </p>
       <div className='mt-6 flex flex-wrap justify-center gap-4'>
         <Link
           to={keyHref}
