@@ -76,8 +76,6 @@ const TABLE: Record<string, string> = {
   'Token 用量': 'Tokens',
   周趋势: 'Tendencia semanal',
   在终端里写代码的智能体: 'Un agente que escribe código en tu terminal',
-  '为 AI 结对编程打造的编辑器': 'El editor creado para la programación en pareja con IA',
-  多模型桌面对话客户端: 'Cliente de escritorio de chat para múltiples modelos',
   常用应用: 'Apps populares',
   这些工具都能直接接入本站接口: 'Estas herramientas se conectan a esta API directamente',
   最新上线: 'Modelos nuevos',
@@ -347,6 +345,10 @@ const TABLE: Record<string, string> = {
   下载客户端: 'Descargar app',
   展开: 'Ver más',
   其他: 'Otro',
+  'OpenAI 出品的编程智能体': 'El agente de programación de OpenAI',
+  'DeepSeek 浏览器工作台': 'Un espacio de trabajo de DeepSeek en el navegador',
+  '腾讯 AI 办公与开发助手': 'El asistente de IA de Tencent para trabajo y desarrollo',
+  轻巧的编程助手: 'Un asistente de programación ligero',
 }
 
 export default TABLE

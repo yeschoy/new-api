@@ -45,7 +45,7 @@ export function ChatEmptyState(props: {
 }) {
   const { t } = useI18n()
   return (
-    <div className={cn('flex flex-col items-center justify-center px-4 py-10', props.className)}>
+    <div className={cn('flex flex-col items-center justify-center-safe px-4 py-10', props.className)}>
       <h2 className={s.title}>{t('有什么可以帮你？')}</h2>
       <p className={cn('mt-2 text-center text-[14px]', s.sub)}>
         {props.model ? t('正在使用 {model}，选择一个示例或直接输入问题', { model: props.model }) : t('请先选择一个模型')}

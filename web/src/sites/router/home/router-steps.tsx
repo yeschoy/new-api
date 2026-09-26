@@ -39,7 +39,7 @@ function StepHead(props: { index: number; title: string }) {
 export function RouterSteps() {
   const { t } = useI18n()
   return (
-    <section className='mx-auto mt-24 grid max-w-[856px] gap-12 px-6 md:grid-cols-3 md:px-0'>
+    <section className='mx-auto mt-24 grid max-w-[904px] gap-12 px-6 md:grid-cols-3'>
       <div>
         <StepHead index={1} title={t('注册')} />
         <p className='text-or-muted mt-4 text-[14px] leading-[22.75px]'>

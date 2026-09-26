@@ -76,8 +76,6 @@ export const EN: Record<string, string> = {
   'Token 用量': 'Tokens',
   周趋势: 'Weekly trend',
   在终端里写代码的智能体: 'An agent that writes code in your terminal',
-  '为 AI 结对编程打造的编辑器': 'The editor built for pair programming with AI',
-  多模型桌面对话客户端: 'Desktop chat client for many models',
   常用应用: 'Popular apps',
   这些工具都能直接接入本站接口: 'These tools connect to this API out of the box',
   最新上线: 'New models',
@@ -347,4 +345,8 @@ export const EN: Record<string, string> = {
   下载客户端: 'Download the app',
   展开: 'Show more',
   其他: 'Other',
+  'OpenAI 出品的编程智能体': 'OpenAI\'s coding agent',
+  'DeepSeek 浏览器工作台': 'A DeepSeek workspace in your browser',
+  '腾讯 AI 办公与开发助手': 'Tencent\'s AI assistant for work and coding',
+  轻巧的编程助手: 'A lightweight coding assistant',
 }

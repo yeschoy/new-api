@@ -107,7 +107,7 @@ export function FeaturedModels(props: {
   const entries = featuredEntries(props.catalog, props.rows)
   if (entries.length === 0) return null
   return (
-    <section className='mx-auto mt-20 max-w-[1280px] px-6 xl:px-0'>
+    <section className='mx-auto mt-20 max-w-[1328px] px-6'>
       <SectionHeader
         title={t('精选模型')}
         subtitle={t('{models}+ 个在线模型，来自 {vendors}+ 家厂商', { models: props.modelCount, vendors: props.vendorCount })}
@@ -169,31 +169,34 @@ function UsageFigures(props: { ranking?: ModelRanking }) {
   )
 }
 
+// WorkBuddy has no icon in @lobehub/icons yet; CodeBuddy is its sibling in Tencent's Buddy family.
 const TOOLS = [
   { name: 'Claude Code', icon: 'ClaudeCode', body: tk('在终端里写代码的智能体') },
-  { name: 'Cursor', icon: 'Cursor', body: tk('为 AI 结对编程打造的编辑器') },
-  { name: 'Cherry Studio', icon: 'CherryStudio', body: tk('多模型桌面对话客户端') },
+  { name: 'Codex', icon: 'Codex', body: tk('OpenAI 出品的编程智能体') },
+  { name: 'DSH', icon: 'DeepSeek', body: tk('DeepSeek 浏览器工作台') },
+  { name: 'WorkBuddy', icon: 'CodeBuddy', body: tk('腾讯 AI 办公与开发助手') },
+  { name: 'Pi', icon: 'Pi', body: tk('轻巧的编程助手') },
 ]
 
-/** Three 411×270 cards: preview band, then icon + name + one-liner. */
+/** Five apps: compact rows on phones; from md 270px cards with a preview band (one row from xl). */
 export function FeaturedApps() {
   const { t } = useI18n()
   return (
-    <section className='mx-auto mt-20 max-w-[1280px] px-6 xl:px-0'>
+    <section className='mx-auto mt-20 max-w-[1328px] px-6'>
       <SectionHeader title={t('常用应用')} subtitle={t('这些工具都能直接接入本站接口')} chevron />
-      <div className='mt-6 grid gap-6 md:grid-cols-3'>
+      <div className='mt-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-5'>
         {TOOLS.map((tool) => (
-          <article key={tool.name} className='border-or-line bg-or-card flex h-[270px] flex-col overflow-hidden rounded-[8px] border'>
-            <div className='flex flex-1 items-center justify-center bg-or-thumb'>
+          <article key={tool.name} className='border-or-line bg-or-card flex flex-col overflow-hidden rounded-[8px] border md:h-[270px]'>
+            <div className='bg-or-thumb hidden flex-1 items-center justify-center md:flex'>
               <ProviderIcon name={tool.icon} fallback={tool.name} size={56} />
             </div>
-            <div className='flex items-center gap-3 px-6 py-4'>
+            <div className='flex items-center gap-3 px-4 py-3 md:px-6 md:py-4'>
               <span className='border-or-line flex size-8 items-center justify-center rounded-[6px] border'>
                 <ProviderIcon name={tool.icon} fallback={tool.name} size={18} />
               </span>
               <div>
                 <div className='text-[14px] font-medium'>{tool.name}</div>
-                <div className='text-or-muted text-[13px]'>{t(tool.body)}</div>
+                <div className='text-or-muted text-[13px] text-balance'>{t(tool.body)}</div>
               </div>
             </div>
           </article>
@@ -212,7 +215,7 @@ export function RecentModels(props: { models: CatalogModel[] }) {
     .sort((a, b) => (b.release_date ?? '').localeCompare(a.release_date ?? ''))
   if (recent.length === 0) return null
   return (
-    <section className='mx-auto mt-24 max-w-[768px] px-6 md:px-0'>
+    <section className='mx-auto mt-24 max-w-[816px] px-6'>
       <SectionHeader
         title={t('最新上线')}
         toggle={recent.length > 3 ? { expanded, onToggle: () => setExpanded((value) => !value) } : undefined}

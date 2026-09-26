@@ -81,11 +81,11 @@ export function HeroStats(props: { stats: HeroStat[] }) {
   const { t } = useI18n()
   if (props.stats.length === 0) return null
   return (
-    <dl className='mx-auto mt-16 flex max-w-[696px] flex-wrap justify-center gap-6 px-6 py-6'>
+    <dl className='mx-auto mt-16 flex max-w-[696px] justify-center gap-2 px-6 py-6 sm:gap-6'>
       {props.stats.map((stat) => (
-        <div key={stat.label} className='flex w-[156px] flex-col items-center gap-2'>
+        <div key={stat.label} className='flex min-w-0 flex-1 basis-0 flex-col items-center gap-2 text-center sm:w-[156px] sm:flex-none sm:basis-auto'>
           <dt className='text-or-muted order-2 text-[12px] leading-[16.2px]'>{t(stat.label)}</dt>
-          <dd className='order-1 text-[36px] leading-[43.2px] font-bold'>{stat.value}</dd>
+          <dd className='order-1 text-[28px] leading-[34px] font-bold sm:text-[36px] sm:leading-[43.2px]'>{stat.value}</dd>
         </div>
       ))}
     </dl>
