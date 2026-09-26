@@ -22,8 +22,7 @@ import { useState } from 'react'
 import { ProviderIcon } from '@/components/provider-icon'
 import { tk, useI18n } from '@/i18n/i18n'
 import { cn, compactNumber, shortDate } from '@/lib/format'
-import { guessIcon } from '@/lib/model-icons'
-import { PINNED_MODELS } from '@/lib/pinned-models'
+import { PINNED_MODELS, withPinned } from '@/lib/pinned-models'
 import type { CatalogModel } from '@/lib/queries'
 import type { ModelRanking } from '@/lib/services'
 
@@ -81,12 +80,7 @@ export type FeaturedEntry = { model: CatalogModel; ranking?: ModelRanking }
  * get a card from their name and vendor alone.
  */
 export function featuredEntries(catalog: CatalogModel[], rows: ModelRanking[], pinned = PINNED_MODELS): FeaturedEntry[] {
-  const byName = new Map(catalog.map((model) => [model.model_name, model]))
-  for (const pin of pinned) {
-    if (!byName.has(pin.name)) {
-      byName.set(pin.name, { model_name: pin.name, vendor: pin.vendor, vendorIcon: guessIcon(pin.name, pin.vendor) } as CatalogModel)
-    }
-  }
+  const byName = new Map(withPinned(catalog, pinned).map((model) => [model.model_name, model]))
   const rankingOf = new Map(rows.map((row) => [row.model_name, row]))
   const order = [...pinned.map((pin) => pin.name), ...rows.map((row) => row.model_name), ...catalog.map((model) => model.model_name)]
   const listed = new Set<string>()

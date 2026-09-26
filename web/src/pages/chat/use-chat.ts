@@ -39,13 +39,14 @@ export type Conversation = {
 }
 
 export type ChatSettings = {
-  temperature: number
+  /** null = let the model decide. */
+  temperature: number | null
   /** null = let the model decide. */
   maxTokens: number | null
   systemPrompt: string
 }
 
-export const DEFAULT_SETTINGS: ChatSettings = { temperature: 1, maxTokens: null, systemPrompt: '' }
+export const DEFAULT_SETTINGS: ChatSettings = { temperature: null, maxTokens: null, systemPrompt: '' }
 
 const STORAGE_KEY = 'chat-conversations'
 
@@ -81,7 +82,9 @@ function buildBody(model: string, settings: ChatSettings, history: ChatMessage[]
     if (m.error || !m.content) continue
     messages.push({ role: m.role, content: m.content })
   }
-  const body: ChatCompletionBody = { model, messages, stream: true, temperature: settings.temperature }
+  const body: ChatCompletionBody = { model, messages, stream: true }
+  // Only what the user chose is sent; otherwise each model keeps its own default.
+  if (settings.temperature !== null) body.temperature = settings.temperature
   if (settings.maxTokens && settings.maxTokens > 0) body.max_tokens = settings.maxTokens
   return body
 }

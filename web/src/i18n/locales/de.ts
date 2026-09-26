@@ -346,6 +346,7 @@ const TABLE: Record<string, string> = {
   停止语音输入: 'Spracheingabe beenden',
   '无法使用麦克风，请检查浏览器权限': 'Das Mikrofon ist nicht verfügbar. Prüfen Sie die Browserberechtigungen.',
   '共 {count} 个模型': '{count} Modelle',
+  默认: 'Standard',
 }
 
 export default TABLE

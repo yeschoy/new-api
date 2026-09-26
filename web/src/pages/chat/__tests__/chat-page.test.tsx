@@ -142,6 +142,19 @@ describe('ChatPage', () => {
     expect(await within(box).findByRole('button', { name: /deepseek-v4\.1-flash/ })).toBeInTheDocument()
   })
 
+  it('lists Claude Opus 5.5 before the server offers it, without opening on it', async () => {
+    signIn()
+    const price = { quota_type: 0, model_ratio: 1, completion_ratio: 1 }
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) => ({
+      data: url === '/api/pricing' ? { success: true, data: [{ model_name: 'gpt-5.5', ...price }] } : { success: true, data: [] },
+    }))
+    const user = userEvent.setup()
+    renderChat('/chat')
+    const box = screen.getByRole('group', { name: '对话' })
+    await user.click(await within(box).findByRole('button', { name: /gpt-5\.5/ }))
+    expect(within(screen.getByRole('group', { name: 'Anthropic' })).getByRole('option', { name: /claude-opus-5-5/ })).toBeInTheDocument()
+  })
+
   it('copies a reply', async () => {
     signIn()
     fetchMock.mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n']))
@@ -168,6 +181,21 @@ describe('ChatPage', () => {
     await user.click(within(panel).getByRole('button', { name: /重置/ }))
     expect(within(panel).getByLabelText('系统提示词')).toHaveValue('')
     expect(within(panel).getByLabelText('最大输出 Tokens')).toHaveValue(null)
-    expect(within(panel).getByText('1.0')).toBeInTheDocument()
+    expect(within(panel).getByText('默认')).toBeInTheDocument()
+  })
+
+  it('leaves the temperature to the model until you set one', async () => {
+    signIn()
+    fetchMock.mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n']))
+    const user = userEvent.setup()
+    renderChat('/chat?model=gpt-test')
+
+    await user.type(screen.getByRole('textbox', { name: '消息' }), 'hi{Enter}')
+    expect(await screen.findByText('好')).toBeInTheDocument()
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+      model: 'gpt-test',
+      messages: [{ role: 'user', content: 'hi' }],
+      stream: true,
+    })
   })
 })

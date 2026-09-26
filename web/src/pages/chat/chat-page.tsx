@@ -21,7 +21,7 @@ import { useSearchParams } from 'react-router'
 
 import { RequireAuth } from '@/components/require-auth'
 import { outputsOf } from '@/lib/model-filters'
-import { defaultModel } from '@/lib/pinned-models'
+import { defaultModel, withPinned } from '@/lib/pinned-models'
 import { useCatalog } from '@/lib/queries'
 import { RouterShell } from '@/sites/router/router-shell'
 
@@ -35,8 +35,10 @@ import { useChat } from './use-chat'
 export function ChatPage() {
   const [params] = useSearchParams()
   const catalog = useCatalog()
-  const models = useMemo(() => catalog.models.filter((m) => outputsOf(m).includes('text')), [catalog.models])
-  const chat = useChat(params.get('model')?.trim() || defaultModel(models))
+  const offered = useMemo(() => catalog.models.filter((m) => outputsOf(m).includes('text')), [catalog.models])
+  // Pinned models are listed even before the server offers them; the chat still opens on one it has.
+  const models = useMemo(() => withPinned(offered), [offered])
+  const chat = useChat(params.get('model')?.trim() || defaultModel(offered))
 
   return (
     <RouterShell footer={false}>

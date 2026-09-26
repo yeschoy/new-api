@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { guessIcon } from './model-icons'
 import type { CatalogModel } from './queries'
 
 /** The site's favourite models, in order: first on the home page, and the chat's default. */
@@ -24,6 +25,15 @@ export const PINNED_MODELS: ReadonlyArray<{ name: string; vendor: string }> = [
   { name: 'gpt-6-sol', vendor: 'OpenAI' },
   { name: 'claude-opus-5-5', vendor: 'Anthropic' },
 ]
+
+/** The catalog plus the pinned models it does not list yet, each a stand-in with its vendor and family icon. */
+export function withPinned(models: CatalogModel[], pinned = PINNED_MODELS): CatalogModel[] {
+  const listed = new Set(models.map((model) => model.model_name))
+  const missing = pinned
+    .filter((pin) => !listed.has(pin.name))
+    .map((pin) => ({ model_name: pin.name, vendor: pin.vendor, vendorIcon: guessIcon(pin.name, pin.vendor) }) as CatalogModel)
+  return [...models, ...missing]
+}
 
 /** The first pinned model the catalog has, else the first by name; the catalog's own order is not stable. */
 export function defaultModel(models: CatalogModel[]): string {

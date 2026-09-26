@@ -346,4 +346,5 @@ export const EN: Record<string, string> = {
   停止语音输入: 'Stop voice input',
   '无法使用麦克风，请检查浏览器权限': 'Can\'t use the microphone. Check your browser\'s permissions.',
   '共 {count} 个模型': '{count} models',
+  默认: 'Default',
 }

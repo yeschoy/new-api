@@ -35,7 +35,7 @@ function isCustomized(settings: ChatSettings): boolean {
   )
 }
 
-/** Top-bar popover for the sampling temperature, output cap and system prompt. */
+/** Popover at the bottom left of the message box: temperature, output cap and system prompt, all left to the model until set. */
 export function ChatSettingsPopover(props: {
   settings: ChatSettings
   onChange: (settings: ChatSettings) => void
@@ -113,7 +113,7 @@ export function ChatSettingsPopover(props: {
                 <label htmlFor={temperatureId} className='text-or-fg text-[13px] font-medium'>
                   {t('温度（Temperature）')}
                 </label>
-                <span className='font-geist text-or-muted text-[13px]'>{settings.temperature.toFixed(1)}</span>
+                <span className='font-geist text-or-muted text-[13px]'>{settings.temperature === null ? t('默认') : settings.temperature.toFixed(1)}</span>
               </div>
               <input
                 id={temperatureId}
@@ -121,7 +121,7 @@ export function ChatSettingsPopover(props: {
                 min={0}
                 max={2}
                 step={0.1}
-                value={settings.temperature}
+                value={settings.temperature ?? 1}
                 onChange={(e) => update({ temperature: Number(e.target.value) })}
                 className='accent-or-primary h-4 w-full'
               />
