@@ -438,6 +438,7 @@ wallet quota; floating-point money arithmetic is forbidden.
 | Security mutation commits while quota cache refresh is deferred | Publish/retain the auth-version fence, complete required session revocation, log cache refresh failure, and do not report a false database rollback |
 | Invalid review transition on an approved mature reward | Return the transition error without writing settlement failure metadata or delaying the scheduler |
 | One of several user debts is resolved | Keep the user blocked until every open reward/principal debt is closed |
+| Separate `LOG_DB` unavailable or recorded-spend query fails | Return `log_status=unavailable` and no interval totals; never fabricate zero or clear independent, evidence-qualified main-DB FIFO/CNY references |
 
 ## 5. Good / Base / Bad Cases
 
@@ -492,6 +493,11 @@ wallet quota; floating-point money arithmetic is forbidden.
   equals `sum(grants)-wallet_quota` **and** exact per-batch remaining quota for
   35/125, delayed-gift and final-net-reservation cases; separate main/log DB
   must not alter FIFO, and unavailable logs must never masquerade as zero.
+  Exercise a real, separately configured ClickHouse `LOG_DB` through
+  `InitLogDB` twice and `GetCashbackRecordedSpendReport`: interval SUM/COUNT
+  are log observations only; missing log table/DB yields `unavailable` without
+  changing the main-DB wallet or a qualified FIFO amount. Record the actual
+  ClickHouse version and do not infer results for other versions.
 - Shared auth/billing blast radius: identity reads remain available during a
   quota fence, quota getters above the trust threshold remain fail-closed,
   committed auth changes publish/retain their floor and revoke sessions even

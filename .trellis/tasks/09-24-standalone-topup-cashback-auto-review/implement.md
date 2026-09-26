@@ -1,30 +1,30 @@
-# 执行计划（实施中）
+# 执行计划（代码已提交，待归档；上线另有运维门禁）
 
-本任务的返现资格、逐场活动、四档审核及即时发放已有部分未提交实现，继续验证并收尾。退款需求已收敛为**只读参考报表**：区间消费为已记录日志汇总；最终 FIFO 剩余独立用完整有序入账与可信余额计算，不依赖消费日志完整性。仅新增一张已批准的低频有序入账侧表；不加四张旧退款确认/生命周期表或 CNY 绑定列，不增日常消费写入，不实现系统确认、扣钱包、给付或返现追回。旧的复杂退款结构草案仅为已撤销研究材料。
+本任务的返现资格、逐场活动、四档审核及即时发放已在 `8669e76a6` 提交；FIFO 净消费显示修复在 `efabd53fd`，规范与会话记录另有提交。退款需求已收敛为**只读参考报表**：区间消费为已记录日志汇总；最终 FIFO 剩余独立用完整有序入账与可信余额计算，不依赖消费日志完整性。仅新增一张已批准的低频有序入账侧表；不加四张旧退款确认/生命周期表或 CNY 绑定列，不增日常消费写入，不实现系统确认、扣钱包、给付或返现追回。旧的复杂退款结构草案仅为已撤销研究材料。
 
 ## 0. 范围与既有状态
 
 - [x] 任务处于 `in_progress`；用户已授权返现主线实施，退款随后收窄。保留工作区全部既有业务/任务变更及未跟踪的 `.pi/npm/node_modules/`，不因改范围重置他人的成果。
-- [ ] 开发前复核 `trellis-before-dev`、backend/frontend 指南及完整 `.agents/rules/billing.md`；前端修改还须先读 `web/AGENTS.md`、`shadcn-ui`、`i18n-translate`、React 最佳实践，检索已有业务组件。
-- [ ] 当前新增 `CashbackCampaign`、`EpayPaymentEvidence` 两张主库表及 `CashbackOrderContext.campaign_id`、`CashbackReward.review_source` 两列是返现活动/验签部分的未提交变更，不是只读报表新增的四张旧退款表；迁移仍需三库验证。
-- [ ] 对只读报表先做数据可观测性门禁：现有 `LOG_DB` 消费日志可能关闭/丢失，余额订阅等支出不必出现在日志；相同总余额不能证明各充值区间完整。但完整有序入账和可信已结清余额足以在无特殊变动的普通 FIFO 情况下推得最终购买额度剩余，不需要逐区间消费日志。不能由只读查询保证线下给付单次性。
+- [x] 开发前复核 `trellis-before-dev`、backend/frontend 指南及完整 `.agents/rules/billing.md`；前端修改还须先读 `web/AGENTS.md`、`shadcn-ui`、`i18n-translate`、React 最佳实践，检索已有业务组件。
+- [x] 三张返现/支付/管理员证据表和一张有序入账表、两处返现列已纳入主库迁移；未引入撤销的四张退款确认/生命周期表。三方受支持版本的新建、真实发布版代表数据升级及重复迁移已验证，版本和限制见第 4 节。
+- [x] 对只读报表先做数据可观测性门禁：现有 `LOG_DB` 消费日志可能关闭/丢失，余额订阅等支出不必出现在日志；相同总余额不能证明各充值区间完整。但完整有序入账和可信已结清余额足以在无特殊变动的普通 FIFO 情况下推得最终购买额度剩余，不需要逐区间消费日志。不能由只读查询保证线下给付单次性。
 
 ## 1. 返现主线后端
 
-- [ ] 对照现有 `model/cashback_test.go`、`model/cashback_integration_test.go`、`controller/cashback_config_test.go` 检查已写回归：无邀请人可领充值方向；有关系至多两方向；无活动/次数已满不妨碍邀请人；四档审核、自动批准后立即发放开/关与 T+N；验签失败/资金失败回滚、同订单幂等、充值与返现同事务。
-- [ ] 核对活动时间依据数据库时间及早停锁序，正额奖励计次与零额例外、旧奖励/旧配置兼容；对竞态保护、额度 fence 结束校验及对账分页做聚焦复查。不因用户希望简化退款报表而削弱真实充值与返现的资金安全。
-- [ ] 核对两张主库表、两列及常规/快速迁移；对已存在返现数据的升级和重复迁移作检查，保留支付成功时易支付签名金额、商户及订单号证据，明确它不证明币种。
+- [x] 对照现有 `model/cashback_test.go`、`model/cashback_integration_test.go`、`controller/cashback_config_test.go` 检查已写回归：无邀请人可领充值方向；有关系至多两方向；无活动/次数已满不妨碍邀请人；四档审核、自动批准后立即发放开/关与 T+N；验签失败/资金失败回滚、同订单幂等、充值与返现同事务。
+- [x] 核对活动时间依据数据库时间及早停锁序，正额奖励计次与零额例外、旧奖励/旧配置兼容；对竞态保护、额度 fence 结束校验及对账分页做聚焦复查。不因用户希望简化退款报表而削弱真实充值与返现的资金安全。
+- [x] 核对返现/支付/入账侧表、两列及主库迁移；对已存在返现数据的升级和重复迁移作检查，保留支付成功时易支付签名金额、商户及订单号证据，明确它不证明币种。
 
 ## 2. 只读报表的证据门禁与实现边界
 
-- [ ] 列明可从现有 `TopUp`/`CashbackOrderContext`/`CashbackReward`/`CashbackQuotaMutation`/`EpayPaymentEvidence`、管理员 `AdjustUserQuota(add)`/人工补单、其他入账记录、`LOG_DB`、余额订阅与钱包余额获得的事实；管理员正向入账按可退购买额度段参与 FIFO；额度兑换码（`plan_id=0`）作为**不可退款批次**按实际到账时间参与 FIFO，不能报价现金；套餐兑换码（`plan_id>0`）只开通订阅、不动钱包，套餐用量不算钱包消费，余额购买套餐才算钱包支出。管理员入账 CNY 参考以原输入为准；按 CNY-only 范围以管理员入账时录入的人民币金额作为 1:1 面额；现 UI 输入经可变汇率转内部 quota，须对旧批次缺当时面额转人工，新批次的最小持久证据结构需另行经用户确认，不能以当前汇率倒推。`subtract/override` 特别处理。不补造历史快照。确定查询上限与旧余额边界。
-- [ ] 设计只读 Admin 接口和页面：各充值节点间的**已记录消费合计**单独展示；最终 FIFO **推算**用全部可核实有序真实入账、钱包可信余额求累计净消费，再分配购买/赠送批次，不以区间日志 SUM 为资金输入。展示不可退赠送、每单实付比例参考额、资金依据与 `需人工核对` / `稍后重试`。不展示逐次消费明细；易支付的实付与 CNY 来源经核实时才可作为 CNY 参考；管理员加额只能按已确认的 1:1 业务约定作参考，不能标为验签实付，以入账时人民币面额为基准，历史缺证据者人工核对；新持久证据方案需先通过数据库结构确认门禁。
-- [ ] 普通预扣/退还按最终净消费、迟发赠送按实际到账时加入；管理员查询前负责确认相关业务结清、批量余额已落库，报表以最终钱包余额为假设，不新增在途生命周期证明或假称系统已验证。管理员余额覆盖或减额、旧混合余额、欠额、旧退款/来源指定追回、**缺入账或特殊扣减证据**时不得报准确金额；管理员正向入账及额度码兑换不可直接视为未知扣款或无批次，但额度码批次始终不可退款，订阅套餐兑换则不产生钱包段；仅缺消费日志不应阻断普通 FIFO 的最终余额推算。即使日志合计与余额碰巧相等，仍不得声称区间日志完整；无法证明钱包或来源时只展示日志参考及提示，不做伪准确现金总额。
-- [ ] 报表本次**仅**新增用户批准的 `wallet_refund_credit_events` 有序低频入账表；**不**新建旧提案的 `wallet_refund_proofs`、`wallet_refund_events`、`wallet_manual_cash_refunds`、`epay_cny_attestations`，不添加 `checkout_cny_attestation_id`、`payment_cny_attestation_id` 或 merchant epoch Option 行，不修改普通消费写入、不执行退款或追返现。管理员加额 CNY 面额留证的 `design.md` §7 **一张主库侧表**已获用户在明确「每笔消费不写入」后授权。第一阶段已实现 `add` 事务内写额度事件（`cny_cents=NULL`）。用户最终澄清金额只需记录原输入，**不得改动旧加额额度换算及默认表单语义**：CNY 展示时将原输入按正整数分送到服务端，原有 `parseQuotaFromDollars` 仍负责原有 `value` 与预览；服务端只校验声明 CNY 分的范围与 `add` 关系，不重新计算/替换实际入账额度，并与额度同事务写证据。旧客户端及非 CNY 展示仍按原逻辑加额，面额 NULL；不把管理员声明当支付凭据。不改 Option 写路径、不新增表/消费写入；这一张表本身仍不解决其它入账和钱包结清证明，不得声称完整退款报价已完成。若要求自动确认准确且防重复给付，需重新提出完整 schema/性能/迁移方案供用户确认。
+- [x] 列明可从现有 `TopUp`/`CashbackOrderContext`/`CashbackReward`/`CashbackQuotaMutation`/`EpayPaymentEvidence`、管理员 `AdjustUserQuota(add)`/人工补单、其他入账记录、`LOG_DB`、余额订阅与钱包余额获得的事实；管理员正向入账按可退购买额度段参与 FIFO；额度兑换码（`plan_id=0`）作为**不可退款批次**按实际到账时间参与 FIFO，不能报价现金；套餐兑换码（`plan_id>0`）只开通订阅、不动钱包，套餐用量不算钱包消费，余额购买套餐才算钱包支出。管理员入账 CNY 参考以原输入为准；按 CNY-only 范围以管理员入账时录入的人民币金额作为 1:1 面额；现 UI 输入经可变汇率转内部 quota，须对旧批次缺当时面额转人工，新批次只写入用户已批准的管理员入账证据与统一有序入账侧表，不能以当前汇率倒推。`subtract/override` 特别处理。不补造历史快照。确定查询上限与旧余额边界。
+- [x] 设计并实现只读 Admin 接口和页面：各充值节点间的**已记录消费合计**单独展示；最终 FIFO **推算**用全部可核实有序真实入账、钱包可信余额求累计净消费，再分配购买/赠送批次，不以区间日志 SUM 为资金输入。展示不可退赠送、每单实付比例参考额、资金依据与 `需人工核对` / `稍后重试`。不展示逐次消费明细；易支付的实付与 CNY 来源经核实时才可作为 CNY 参考；管理员加额只能按已确认的 1:1 业务约定作参考，不能标为验签实付，以入账时人民币面额为基准，历史缺证据者人工核对；新增持久证据已按用户逐表确认并实施，不追认历史。
+- [x] 普通预扣/退还按最终净消费、迟发赠送按实际到账时加入；管理员查询前负责确认相关业务结清、批量余额已落库，报表以最终钱包余额为假设，不新增在途生命周期证明或假称系统已验证。管理员余额覆盖或减额、旧混合余额、欠额、旧退款/来源指定追回、**缺入账或特殊扣减证据**时不得报准确金额；管理员正向入账及额度码兑换不可直接视为未知扣款或无批次，但额度码批次始终不可退款，订阅套餐兑换则不产生钱包段；仅缺消费日志不应阻断普通 FIFO 的最终余额推算。即使日志合计与余额碰巧相等，仍不得声称区间日志完整；无法证明钱包或来源时只展示日志参考及提示，不做伪准确现金总额。
+- [x] 报表本次**仅**新增用户批准的 `wallet_refund_credit_events` 有序低频入账表；**不**新建旧提案的 `wallet_refund_proofs`、`wallet_refund_events`、`wallet_manual_cash_refunds`、`epay_cny_attestations`，不添加 `checkout_cny_attestation_id`、`payment_cny_attestation_id` 或 merchant epoch Option 行，不修改普通消费写入、不执行退款或追返现。管理员加额 CNY 面额留证的 `design.md` §7 **一张主库侧表**已获用户在明确「每笔消费不写入」后授权。第一阶段已实现 `add` 事务内写额度事件（`cny_cents=NULL`）。用户最终澄清金额只需记录原输入，**不得改动旧加额额度换算及默认表单语义**：CNY 展示时将原输入按正整数分送到服务端，原有 `parseQuotaFromDollars` 仍负责原有 `value` 与预览；服务端只校验声明 CNY 分的范围与 `add` 关系，不重新计算/替换实际入账额度，并与额度同事务写证据。旧客户端及非 CNY 展示仍按原逻辑加额，面额 NULL；不把管理员声明当支付凭据。不改 Option 写路径、不新增表/消费写入；这一张表本身仍不解决其它入账和钱包结清证明，不得声称完整退款报价已完成。若要求自动确认准确且防重复给付，需重新提出完整 schema/性能/迁移方案供用户确认。
 - [x] 撤回未提交的固定 CNY→额度 1:1 换算，恢复原 `parseQuotaFromDollars` 加额/预览。仅页面明确 CNY 且输入精确可表述为正整数分时传原金额；如原表单允许的子分/科学计数输入不能精确记录金额，照旧加额但 CNY 面额 NULL，绝不伪造四舍五入分。展示币种切换清空输入，避免误标。旧 API/非 CNY 输入仍 NULL；后端金额只是管理员声明，额度计算不变。前端17项和后端聚焦测试、类型检查/构建/定向 lint/diff check 通过；当时完整管理额度测试曾被既有 Redis 极值缓存差1阻断，后续已在 `model/quota_reserve.go` 用整数参数修复并复测通过；三库迁移另在后续轮次验证。
-- [ ] 在既有合适测试文件集中覆盖 35/125、迟发赠送 45、预扣净额、90 实付/100 额度/剩 50→45 参考分、赠送不退款；构造「两段消费分布不同而余额总额相同」与漏日志场景，断言区间汇总不同/不完整但最终普通 FIFO 剩余相同；另测缺入账、来源指定扣款、订阅扣款、未核实币种、旧余额、在途预扣等，保证不返回貌似准确的现金总额。先验证可观测性是否足以满足用户认可的**参考报表**；无法满足则停在规划门禁，不扩大结构或隐性替用户承担风险。
+- [x] 在既有合适测试文件集中覆盖 35/125、迟发赠送 45、预扣净额、90 实付/100 额度/剩 50→45 参考分、赠送不退款；构造「两段消费分布不同而余额总额相同」与漏日志场景，断言区间汇总不同/不完整但最终普通 FIFO 剩余相同；另测缺入账、来源指定扣款、订阅扣款、未核实币种、旧余额、在途预扣等，保证不返回貌似准确的现金总额。先验证可观测性是否足以满足用户认可的**参考报表**；无法满足则停在规划门禁，不扩大结构或隐性替用户承担风险。
 
-### 本轮证据门禁结论（2026-09-25）
+### 早期只读证据门禁结论（2026-09-25；后续有序入账实施已取代当时的限制）
 
 - 从 `TopUp` 成功记录及可选的 `LOG_DB` 消费日志可安全提供限时、限单的**已记录消费（参考）**区间汇总；日志关闭、失败或独立库不可用不能视作实际零消费；查询错误不能伪装为零。新增 Admin 只读查询与现有 `/cashback` 页面入口，固定提示需人工对账，不返回可退款购买额度或现金金额。
 - 当前主库没有覆盖注册/兑换/签到/邀请额度转入/管理员加减额等全部入账的用户序列；`CashbackQuotaMutation` 只覆盖返现发行和追回，充值完成时间精度为秒，不能证明同秒与迟发赠送先后。现有 Redis/内存批量余额可能滞后或丢失，`BillingSession` 异步退款与任务路径没有持久结清证据；旧混合余额与来源指定追回也不能自动归属。`EpayPaymentEvidence.PaidCents` 虽已验签但未证明币种，商户 CNY 确认无持久绑定。故本轮**不计算 FIFO 余额与现金报价**，不能宣称满足退款报价验收，待产品确认额外资金证据方案（任何新 schema 先征询用户）。
@@ -51,20 +51,21 @@
 
 - [x] 复用现有 Root 配置/活动组件与 Admin 风险列表、详情及共享 UI，完成分级策略、活动创建/早停、方向标签和审核来源；不新增 CNY 收款确认配置或退款确认按钮。全链复查后已局部修复：活动早停进行中允许 Esc/Close/Cancel，mutation 自身负责 toast/失效；新增查询兜底文案七语；`model/cashback_test.go` 对 low/medium/high/severe 的自动/人工策略、主开关关闭、邀请人始终人工补充紧凑测试。相关 Go/前端聚焦、typecheck、定向 lint/构建及 diff check 通过，整体检查仍待做。
 - [x] 在既有 Admin 区域完成只读区间汇总与有序来源/FIFO 依据、参考/人工核对状态，并通过前端类型、校验、七种语言的已有 i18n 流程对齐接口。数值与时间格式遵循 `web/AGENTS.md`。
-- [ ] 只修改现有 `.trellis/spec/backend/referral-recharge-cashback.md` 中返现已实施合同；旧退款自动确认合同不得作为新增规范。项目不新增 `docs/` 文件。
+- [x] 已更新现有 `.trellis/spec/backend/referral-recharge-cashback.md`、数据库隔离规范和既有 `docs/referral-cashback-operations.md`；旧退款自动确认合同不作为新增规范，未创建 `docs/` 文件。
 
 ## 4. 验证与审查
 
 - [x] 既有管理额度缓存边界 `TestManageUserQuotaCacheUsesCommittedIntegerDifference/large_odd_difference` 曾因 Redis Lua `tonumber(ARGV[1])` 丢 1；已改用原始整数参数传 `HINCRBY`，先复现失败、后复测该测试及完整管理额度聚焦通过。仅修复 User quota delta，不顺带更改其它 token quota Lua 路径。
-- [ ] `gofmt` 后运行 `go test ./model -run 'TestCashback' -count=1`、`go test ./controller -run 'TestCashback|TestUpdateCashbackConfig' -count=1`、涉及支付渠道聚焦测试、必要时 `-race`、`go build ./...`、`go test ./...`、`git diff --check`；区分已有失败与本次回归。2026-09-26 全量 `go test ./... -count=1` 失败：controller 的 OAuth/domain handoff、注册、账户删除及 `TestManageUserQuotaCacheUsesCommittedIntegerDifference`，middleware 的过期 JWT 断言；其他包多数通过。完整输出保留 `/tmp/cashback-full-go-test-0926.log`，不能声称全量后端通过；这些失败尚未逐项归因本任务或基线。
-- [ ] 真实 SQLite/MySQL/PostgreSQL 分别进行新库、代表发布版/旧返现数据升级、重复迁移和索引唯一性验证；记录确切版本与命令。2026-09-26 使用隔离本地 SQLite 3.50.4、MySQL 8.0.46、PostgreSQL 16.15：`TEST_MYSQL_DSN`/`TEST_POSTGRES_DSN` 下 `go test ./model -run '^TestCashbackProductionDatabaseIntegration$' -count=1` 的两方 integration 通过（新建、模拟旧返现结构升级、重复迁移、支付及索引）；`TEST_MANAGE_USER_DIALECT={sqlite,mysql,postgres}` 配合隔离 DSN 和 `TEST_MANAGE_USER_SEPARATE_LOG_DB=1` 下 controller 管理加额聚焦测试通过（新建、模拟旧钱包升级、重复迁移、CNY 原输入/旧客户端 NULL、唯一约束、事务回滚、并发快照）。日志与隔离数据保留于 `/tmp/cashback-dbcheck-lCWf7h/`，服务已停止。**尚未**验证最低 MySQL 5.7.8/PostgreSQL 9.6、完整应用启动与 ClickHouse 独立日志库；因此此项不能勾选为完整数据库兼容。
+- [x] 已运行 gofmt、`go test ./model -count=1`、`go test -race ./model -run TestCashback -count=1`、受影响 controller 聚焦、`go build ./...`、`go vet ./...`、`git diff --check`，均通过；全量 `go test ./... -count=1` 已执行但 controller 11 项 OAuth/会话及 middleware 2 项认证测试失败，分别在隔离 `git archive HEAD` 同环境复现，不能写作“全量通过”，也不是本任务引入的缺表回归（缺表已修复）。日志 `/tmp/cashback-full-go-latest.log` 及 `/tmp/cashback-head-auth-HT0H4t/`。
+- [x] 真实 SQLite/MySQL/PostgreSQL 分别进行新库、代表发布版/旧返现数据升级、重复迁移和索引唯一性验证；记录确切版本与命令。2026-09-26 使用隔离本地 SQLite 3.50.4、MySQL 8.0.46、PostgreSQL 16.15：`TEST_MYSQL_DSN`/`TEST_POSTGRES_DSN` 下 `go test ./model -run '^TestCashbackProductionDatabaseIntegration$' -count=1` 的两方 integration 通过（新建、模拟旧返现结构升级、重复迁移、支付及索引）；`TEST_MANAGE_USER_DIALECT={sqlite,mysql,postgres}` 配合隔离 DSN 和 `TEST_MANAGE_USER_SEPARATE_LOG_DB=1` 下 controller 管理加额聚焦测试通过（新建、模拟旧钱包升级、重复迁移、CNY 原输入/旧客户端 NULL、唯一约束、事务回滚、并发快照）。日志与隔离数据保留于 `/tmp/cashback-dbcheck-lCWf7h/`，服务已停止。本轮该记录当时尚未覆盖最低 MySQL 5.7.8/PostgreSQL 9.6、完整应用启动与 ClickHouse 独立日志库；后续已补独立 ClickHouse 26.9 验证，最低版本/生产数据仍未实测，见下方保留限制。
 
   2026-09-26 另以真实 `v1.0.0-rc.40` tag 完成隔离代表数据升级：`git archive v1.0.0-rc.40 | tar -xf - -C /tmp/cashback-release-upgrade-Se6yQI/release`，从 tag 源码执行 `env -i HOME="$HOME" PATH="$PATH" SQL_DSN=<隔离 DSN> GOWORK=off go run /tmp/cashback-release-upgrade-Se6yQI/seed.go`（`model.InitDB` 后插入旧 User/TopUp/额度 Redemption）；再从当前工作区对**同一库**执行 `env -i HOME="$HOME" PATH="$PATH" SQL_DSN=<同一隔离 DSN> GOWORK=off go run /tmp/cashback-release-upgrade-Se6yQI/upgrade.go` 两次（各自独立进程调用实际 `model.InitDB`）。SQLite DSN 为 `local`，runner 显式指定该目录下 `legacy.sqlite`；MySQL 使用仅此任务初始化的 `mysql-data`、TCP `127.0.0.1:55176`、库 `cashback_release_Se6yQI`；PostgreSQL 使用仅此任务 `initdb -A trust` 的 `pg-data`、TCP `127.0.0.1:55177`、同名库。连接前后查询服务器 `@@datadir` / `SHOW data_directory` 确认目标确为该目录；MySQL `mysqld --no-defaults --initialize-insecure` 后 `--daemonize --datadir=... --socket=... --pid-file=... --port=55176 --bind-address=127.0.0.1`，PG 用 `pg_ctl -D ... -o '-h 127.0.0.1 -p 55177 -k ...' -w start`。实际 SQLite 库 `sqlite_version()=3.50.4`（宿主 sqlite3 CLI 3.43.2，不代表驱动）；MySQL 服务端 8.0.46；PostgreSQL 服务端 16.15。三方 tag 建库/插入及当前迁移两次均成功；每次验证旧用户 ID/余额/已用额度、成功 topup ID/金额/实付、额度码 ID/额度及新增默认 `plan_id=0` 未改，旧用户/订单/额度码唯一键通过故意重复插入报错确认；七张新增返现/易支付/管理员证据表、活动列与审核来源列均存在，新表的关键唯一索引经数据库元信息确认为 unique，无历史活动或虚构支付/管理员证据回填。tag 中**尚无 cashback 表**，本验证只覆盖无返现发布版升级；此前当前分支旧返现结构升级由上述 integration 另测。完整日志、runner、数据库文件保留在 `/tmp/cashback-release-upgrade-Se6yQI/`，仅本次启动的 MySQL/PG 已用 `mysqladmin --socket=<新实例 socket> shutdown`、`pg_ctl -D <新实例目录> -m fast -w stop` 停止且状态已核查。未运行 MySQL 5.7.8/PG 9.6 最低版本、真实生产数据或完整应用启动；不据此声称全量数据库兼容。
-- [ ] 前端执行聚焦 Vitest、`bun run typecheck`、`bun run lint`、`bun run build` 和七语键核查。2026-09-26 全量 `cd web && bun run lint` 因未修改文件中多处已有规则错误退出 1，见 `/tmp/cashback-full-web-lint-0926.log`；本任务涉及文件的定向 lint 已通过。最终 `trellis-check` 已做跨层复核，Go model/race/构建、前端 59 项 Vitest/typecheck/构建/定向 lint、`git diff --check` 通过。2026-09-27 再执行 `go vet ./...` 退出 0。全量 controller/middleware 失败已在隔离 HEAD 源码复现，不误报为本任务新回归。
+- [x] 前端执行聚焦 Vitest、`bun run typecheck`、定向 lint、`bun run build` 和七语键核查。2026-09-26 全量 `cd web && bun run lint` 因未修改文件中多处已有规则错误退出 1，见 `/tmp/cashback-full-web-lint-0926.log`；本任务涉及文件的定向 lint 已通过。最终 `trellis-check` 已做跨层复核，Go model/race/构建、前端 59 项 Vitest/typecheck/构建/定向 lint、`git diff --check` 通过。2026-09-27 再执行 `go vet ./...` 退出 0。全量 controller/middleware 失败已在隔离 HEAD 源码复现，不误报为本任务新回归。
 - [x] 补充独立 SQLite 主库和日志库（各单连接）的只读报表回归：日志区间与资金净消费不相等时，FIFO/CNY 仍从主库算；日志库缺表返回 unavailable，不会把零消费伪造成已记录。该测试发现 `NetSpentQuota` 错误指向随后递减的 FIFO 游标：五组真实净消费断言修复前失败、改用独立游标后聚焦及完整 model 测试、构建通过；再次用任务私有 MySQL 8.0.46/PG 16.15 runner 测现有集成通过。独立 ClickHouse 仍未验证，不能以分离 SQLite 替代。
-- [ ] 独立 ClickHouse 日志库未运行：本机无 `clickhouse`/`clickhouse-server`、`colima`/`podman`，Docker daemon 不可连接；此次未启动或连接任何生产实例。`LOG_DB` 不可用时接口返回 `log_status=unavailable`，不会伪造零区间，但 ClickHouse 真实 SQL/驱动行为仍缺验证。最低 MySQL 5.7.8/PG9.6 二进制亦不存在，本次只验证受支持的 MySQL 8.0.46/PG16.15；若需最低版本/ClickHouse 精确签收，须提供隔离实例或另行准备测试运行环境，数字报价部署开关仍保持关闭。
+- [x] 2026-09-27 已在 `/tmp/cashback-clickhouse-xdSv8i/` 下载官方 macOS ARM ClickHouse **26.9.2.8** zip（SHA-256 `b514dcf0e81a55b2e4a87640b29d661d2278b09e0528bc81b4db9788e125b3e4`），只在 `127.0.0.1` 的 49534/49535/49536 端口、该目录下的专用配置/数据/日志启动；匿名查询返回 401，`SELECT version(), currentDatabase()` 核查为私有 `cashback_log`。临时 `/tmp/cashback-clickhouse-xdSv8i/verify.go` 使用本项目真实 GORM ClickHouse 方言、独立 SQLite 主库 `model.InitDB`、重复两次 `model.InitLogDB` 和 `GetCashbackRecordedSpendReport`：已记录区间额度 3/30/20，主库两批购买余 25/50、净消费 75、逐单确认 CNY 后总人工参考 7250 分；断开 LOG_DB 或删除测试库日志表均返回 unavailable/无伪零区间，主库 FIFO 不受影响，主库余额不变。验证输出 `/tmp/cashback-clickhouse-xdSv8i/verify.out`；恢复测试日志表，仅停止自建进程，临时数据保留待用户同意清理。此为真实 ClickHouse 一版本验证，不代表 `docker-compose.yml` 示例 24.8 或所有版本，更未测试生产数据。
+- **保留的环境/上线限制（非此次归档的强制阻断）**：最低 MySQL 5.7.8/PG9.6 二进制不在当前环境；已运行受支持的 MySQL 8.0.46/PG16.15 隔离新建/升级/重复迁移，未引入依赖最低版本特殊行为的特性。ClickHouse 仅实际验证 26.9.2.8，不推断 compose 示例 24.8；若真实部署目标为 24.8，应在该版本补测。生产历史数据、完整应用启动及商户 CNY 实收均未验证；数字报价部署开关保持默认关闭，直至所有写入节点升级、历史资金核对且管理员确认结算。
 
 ## 5. 提交与收尾
 
-- [ ] 若只读现有数据无法满足用户要求的区间准确度，明确现状、风险与最小决策，**先停止报表实施并回规划**；不自作主张增加表/字段或在每次消费写入。与用户确认实际需求后再推进。
-- [ ] 检查只提交本任务文件，更新适用 Trellis spec 并提交相关变更；不要提交 `.pi/npm/node_modules/`。质量门禁通过再归档、记录 journal；完成后征得用户同意才清理非业务临时文件，Trellis 日志保留。
+- [x] 现有数据不足以证明跨表入账顺序；已在用户同意的一张低频有序入账侧表范围内实施，没有增加每次消费写入，也没有自动退款/返现追回。
+- [x] 已仅提交本任务产品/测试/规范文件（`8669e76a6`、`efabd53fd`、`3ba69cad7` 等）；`.pi/npm/node_modules/` 未提交。质量门禁确认可归档但不等于可上线；归档与最终 session journal 仍待执行。任务完成后先征得用户同意才清理非业务临时文件；Trellis 日志保留。
