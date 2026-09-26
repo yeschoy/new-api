@@ -22,8 +22,7 @@ import { useState } from 'react'
 import { ProviderIcon } from '@/components/provider-icon'
 import { tk, useI18n } from '@/i18n/i18n'
 import { cn, compactNumber, shortDate } from '@/lib/format'
-import { priceSummary } from '@/lib/pricing'
-import { useCurrency, type CatalogModel } from '@/lib/queries'
+import type { CatalogModel } from '@/lib/queries'
 import type { ModelRanking } from '@/lib/services'
 
 /** Opens and closes the rest of a section's cards in place. */
@@ -112,7 +111,7 @@ export function FeaturedModels(props: {
   )
 }
 
-/** Icon tile, name + author, then usage and weekly trend, or prices for a model without usage. */
+/** Icon tile, name + author, then token usage and weekly trend (-- when there are no usage figures). */
 function FeaturedCard(props: { entry: FeaturedEntry }) {
   const { t } = useI18n()
   const { model, ranking } = props.entry
@@ -132,14 +131,14 @@ function FeaturedCard(props: { entry: FeaturedEntry }) {
           </p>
         </div>
       </div>
-      {ranking ? <UsageFigures ranking={ranking} /> : <PriceFigures model={model} />}
+      <UsageFigures ranking={ranking} />
     </article>
   )
 }
 
-function UsageFigures(props: { ranking: ModelRanking }) {
+function UsageFigures(props: { ranking?: ModelRanking }) {
   const { t } = useI18n()
-  const trend = props.ranking.growth_pct
+  const trend = props.ranking?.growth_pct ?? 0
   let trendClass = 'text-or-muted'
   if (trend < 0) trendClass = 'text-or-red'
   if (trend > 0) trendClass = 'text-[#22c55e]'
@@ -147,7 +146,7 @@ function UsageFigures(props: { ranking: ModelRanking }) {
     <div className='flex justify-between text-[14px]'>
       <div>
         <div className='text-or-muted'>{t('Token 用量')}</div>
-        <div className='font-medium'>{compactNumber(props.ranking.total_tokens)}</div>
+        <div className='font-medium'>{props.ranking ? compactNumber(props.ranking.total_tokens) : '--'}</div>
       </div>
       <div className='text-right'>
         <div className='text-or-muted'>{t('周趋势')}</div>
@@ -155,33 +154,6 @@ function UsageFigures(props: { ranking: ModelRanking }) {
           {trend === 0 ? '--' : `${trend > 0 ? '+' : ''}${Math.round(trend)}%`}
         </div>
       </div>
-    </div>
-  )
-}
-
-/** Input and output price per 1M tokens, or the price per request, as on the model page. */
-function PriceFigures(props: { model: CatalogModel }) {
-  const { t } = useI18n()
-  const price = priceSummary(props.model, useCurrency())
-  const unit = price.perRequest ? t('/次') : '/M'
-  return (
-    <div className='flex justify-between text-[14px]'>
-      <div>
-        <div className='text-or-muted'>{t('输入价格')}</div>
-        <div className='font-medium'>
-          {price.perRequest ?? price.input}
-          <span className='text-or-muted text-[12px] font-normal'> {unit}</span>
-        </div>
-      </div>
-      {price.perRequest ? null : (
-        <div className='text-right'>
-          <div className='text-or-muted'>{t('输出价格')}</div>
-          <div className='font-medium'>
-            {price.output}
-            <span className='text-or-muted text-[12px] font-normal'> {unit}</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
