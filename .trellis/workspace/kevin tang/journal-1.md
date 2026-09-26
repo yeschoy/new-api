@@ -496,3 +496,38 @@
 ### Next Steps
 
 - 保持 CASHBACK_REFUND_REFERENCE_ENABLED 默认关闭；部署前确认所有钱包写入实例已升级、历史余额及线下退款人工核对；如需完整签收，提供 MySQL 5.7.8/PG 9.6 与独立 ClickHouse 隔离测试环境。
+
+
+## Session 17: 充值返现参考报表验收与归档
+<!-- trellis-session: v=2 fp=cf1deccc279397f2 -->
+
+**Date**: 2026-09-27
+**Task**: 充值返现参考报表验收与归档
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+修正退款报表净消费显示，验证独立 ClickHouse 日志库，并完成返现任务的质量核查与归档；未部署或开启数字报价。
+
+### Main Changes
+
+- 补独立主库/日志库回归及 FIFO 净消费不变量，更新操作合同，归档已完成任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `efabd53fd` | fix(cashback): preserve net spend in refund reference |
+| `6cf6d9f25` | docs(cashback): record ClickHouse verification and acceptance |
+
+### Testing
+
+- [OK] 真实 ClickHouse 26.9.2.8 日志库 InitLogDB 两次、区间 3/30/20、主库 FIFO 25/50 与 CNY 7250 分、日志失败降级均通过；Go model/build/vet 与三主库矩阵已通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 部署前保持 CASHBACK_REFUND_REFERENCE_ENABLED=false；核对所有写入节点、历史余额/线下退款与管理员结清假设。若目标为 ClickHouse 24.8 或最低 MySQL/PG 版本，在实际版本上补测。获得用户同意后再清理本任务非业务 /tmp 产物，Trellis 日志保留。
