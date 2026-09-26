@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
-- **Last Active**: 2026-09-24
+- **Total Sessions**: 16
+- **Last Active**: 2026-09-27
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~461 | Active |
+| `journal-1.md` | ~498 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-09-27 | 独立充值返现与只读退款参考阶段交付 | `8669e76a6`, `3ba69cad7` | `feat/recharge-cashback` |
 | 15 | 2026-09-24 | 核查充值返现人工审核与免审开关 | `7a4016df9` | `feat/recharge-cashback` |
 | 14 | 2026-09-24 | 订阅套餐兑换码实现与三数据库验证 | `2956c0b18` | `feat/recharge-cashback` |
 | 13 | 2026-09-17 | 返现对抗审查与修复 | `61e09540c`, `84648697d`, `a6f7db904` | `feat/recharge-cashback` |

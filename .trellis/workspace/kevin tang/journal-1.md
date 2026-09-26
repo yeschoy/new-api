@@ -459,3 +459,40 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 16: 独立充值返现与只读退款参考阶段交付
+<!-- trellis-session: v=2 fp=5770772a36a58b7d -->
+
+**Date**: 2026-09-27
+**Task**: 独立充值返现与只读退款参考阶段交付
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+完成无邀请人充值返现、逐场活动、分级审核与即时发放，新增低频有序入账及管理员只读 FIFO/CNY 参考报表；记录验证与上线门禁，任务保持进行中。
+
+### Main Changes
+
+- 按实际入账顺序记录购买、赠送、不可退批次与异常，不在普通消费时写账；CNY 易支付订单需管理员逐单确认。
+- 修复 Redis 大整数缓存差1和签到/邀请额度转入边界；补充返现合同与数据库隔离规范。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8669e76a6` | feat(cashback): add payer campaigns and read-only refund references |
+| `3ba69cad7` | docs(cashback): record quota evidence and validation limits |
+
+### Testing
+
+- [OK] go vet ./...、go build ./...、model 测试及 race 聚焦通过；SQLite 3.50.4/MySQL 8.0.46/PostgreSQL 16.15 隔离新建和代表旧库重复升级通过。
+- [OK] 前端 typecheck、构建、定向 lint 与 59 项聚焦测试通过；全量 controller/middleware 失败在 HEAD 同环境复现。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 保持 CASHBACK_REFUND_REFERENCE_ENABLED 默认关闭；部署前确认所有钱包写入实例已升级、历史余额及线下退款人工核对；如需完整签收，提供 MySQL 5.7.8/PG 9.6 与独立 ClickHouse 隔离测试环境。
