@@ -19,10 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 import { useBrand } from '@/lib/queries'
 
 /**
- * The yeschoy mark: a bold lowercase y cut out of a slanted block in the
- * theme's primary color (violet by day, lime by night). The block's right edge
- * follows the y's long stroke and its bottom-left corner is cut along the short
- * one. A logo set in the system settings replaces it.
+ * The yeschoy mark: a bold lowercase y on a rounded square with its
+ * bottom-left corner cut off, in the theme's primary color (violet by day,
+ * lime by night). A logo set in the system settings replaces it.
  */
 export function BrandMark(props: { size?: number; className?: string }) {
   const brand = useBrand()
@@ -48,7 +47,7 @@ export function BrandMark(props: { size?: number; className?: string }) {
       className={props.className}
     >
       <path
-        d='M2.2 1.2h19.6q1.8 0 1 1.7l-7.3 18.4q-.9 1.9-2.9 1.9H7.47q-1 0-1.59-.81L1.99 17.01q-.59-.81-.59-1.81V2.4q0-1.2.8-1.2z'
+        d='M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H8.5q-1 0-1.71-.71L.71 17.21Q0 16.5 0 15.5V6a6 6 0 0 1 6-6z'
         style={{ fill: 'var(--or-primary)' }}
       />
       <path
