@@ -94,14 +94,14 @@ function LogRow(props: { log: UsageLog }) {
   return (
     <Tr>
       <Td muted className='whitespace-nowrap'>{dateTime(log.created_at)}</Td>
-      <Td>
+      <Td className='whitespace-nowrap'>
         <div className='flex items-center gap-2'>
-          <span className='font-medium break-all'>{log.model_name || '—'}</span>
+          <span className='font-medium'>{log.model_name || '—'}</span>
           {log.type === LOG_TYPE_ERROR ? <Tag tone='danger'>{t('失败')}</Tag> : null}
           {log.is_stream ? <Tag>{t('流式')}</Tag> : null}
         </div>
       </Td>
-      <Td muted>{log.token_name || '—'}</Td>
+      <Td muted className='whitespace-nowrap'>{log.token_name || '—'}</Td>
       <Td right>{(log.prompt_tokens || 0).toLocaleString('zh-CN')}</Td>
       <Td right>{(log.completion_tokens || 0).toLocaleString('zh-CN')}</Td>
       <Td right>{money.format(log.quota)}</Td>

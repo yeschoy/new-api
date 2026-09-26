@@ -38,7 +38,6 @@ import { NotFoundPage } from './pages/not-found'
 import { SetupPage } from './pages/setup-page'
 import { RouterHome } from './sites/router/home/router-home'
 import { RouterModelPage } from './sites/router/models/router-model-page'
-import { RouterModelsPage } from './sites/router/models/router-models-page'
 import { RouterRankingsPage } from './sites/router/rankings/router-rankings-page'
 
 function RootLayout() {
@@ -56,9 +55,8 @@ export const routes: RouteObject[] = [
     element: <RootLayout />,
     children: [
       { path: '/', element: <RouterHome /> },
-      { path: '/models', element: <RouterModelsPage /> },
       { path: '/models/:name', element: <RouterModelPage /> },
-      { path: '/pricing', element: <Navigate to='/models' replace /> },
+      { path: '/pricing', element: <Navigate to='/settings/credits' replace /> },
       { path: '/rankings', element: <RouterRankingsPage /> },
       { path: '/chat', element: <ChatPage /> },
       { path: '/playground', element: <Navigate to='/chat' replace /> },

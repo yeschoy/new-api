@@ -23,6 +23,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 
+import { i18nReady } from './i18n/i18n'
 import { refreshSession } from './lib/api'
 import { router } from './router'
 import { ThemeProvider } from './site/theme'
@@ -33,6 +34,9 @@ const queryClient = new QueryClient({
 
 // Restore a signed-in session from the refresh cookie before routes need it.
 void refreshSession()
+
+// The first screen waits for the visitor's language instead of flashing Chinese.
+await i18nReady
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

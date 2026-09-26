@@ -172,8 +172,7 @@ export function RouterRankingsPage() {
           <main className='min-w-0 flex-1'>
             <h1 className='text-[20px] leading-7 font-bold'>{t('AI 模型排行')}</h1>
             <p className='text-or-muted mt-1 max-w-[760px] text-[14px] leading-[22.75px]'>
-              {t('基于真实调用量的实时排行，按本站接口处理的 Token 数排序。')}{' '}
-              <Link to='/models' className='text-or-fg underline underline-offset-2'>{t('查看全部模型')}</Link>
+              {t('基于真实调用量的实时排行，按本站接口处理的 Token 数排序。')}
             </p>
             <p className='text-or-muted mt-2 text-[13px]'>{t('数据统计周期：{period}', { period: t(PERIOD_LABEL[period]) })}</p>
 

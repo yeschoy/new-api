@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { getLang, type Lang } from '@/i18n/i18n'
+import { getLang, localeOf, type Lang } from '@/i18n/i18n'
 
 export { clsx as cn } from 'clsx'
 
@@ -45,8 +45,8 @@ export function contextLabel(tokens?: number): string | null {
   return compactNumber(tokens)
 }
 
-/** "2026-09-23" → "Sep 23, 2026" in English, "2026年9月23日" in Chinese. */
-export function shortDate(value?: string | number, locale = getLang() === 'en' ? 'en-US' : 'zh-CN'): string {
+/** "2026-09-23" → "Sep 23, 2026", "2026年9月23日", … in the current language. */
+export function shortDate(value?: string | number, locale = localeOf(getLang())): string {
   if (!value) return ''
   const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value)
   if (Number.isNaN(date.getTime())) return ''
@@ -57,13 +57,13 @@ export function shortDate(value?: string | number, locale = getLang() === 'en' ?
   })
 }
 
-/** Rankings chart buckets: hours stay as the server wrote them ("15:00"), days read "9月17日" or "Sep 17". */
+/** Rankings chart buckets: hours stay as the server wrote them ("15:00"), days follow the language ("Sep 17", "9月17日"). */
 export function bucketLabel(ts: string, label: string, lang: Lang = getLang()): string {
   if (/^\d{1,2}:\d{2}$/.test(label)) return label
   const date = new Date(ts)
   if (Number.isNaN(date.getTime())) return label
   // Day buckets start at midnight UTC, the same day the server's label names.
-  return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+  return date.toLocaleDateString(localeOf(lang), { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
 export function dateTime(seconds: number): string {

@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { EN } from '../en'
+import { LANGUAGES } from '../i18n'
 
 // Every app source file except tests and the i18n module itself.
 const sources = import.meta.glob(['../../**/*.{ts,tsx}', '!../../**/__tests__/**', '!../**'], {
@@ -24,6 +25,11 @@ const sources = import.meta.glob(['../../**/*.{ts,tsx}', '!../../**/__tests__/**
   import: 'default',
   eager: true,
 }) as Record<string, string>
+
+// Every language's table by id: English ships with the page, the others live in ../locales.
+const locales = import.meta.glob<Record<string, string>>('../locales/*.ts', { import: 'default', eager: true })
+const TABLES: Record<string, Record<string, string>> = { en: EN }
+for (const [path, table] of Object.entries(locales)) TABLES[path.replace(/^.*\/|\.ts$/g, '')] = table
 
 // t('…') translates where it is shown; tk('…') marks text stored for later.
 const CALL = /\btk?\(\s*'((?:[^'\\]|\\.)*)'/g
@@ -41,15 +47,31 @@ describe('translations', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(40)
   })
 
-  it('has English for every text passed to t() or tk()', () => {
+  it('has a table for every language but Chinese, the source', () => {
+    const wanted = LANGUAGES.map((item) => item.id).filter((id) => id !== 'zh')
+    expect(Object.keys(TABLES).sort()).toEqual([...wanted].sort())
+  })
+
+  it('has every text passed to t() or tk() in every language', () => {
     const missing = new Set<string>()
     for (const code of Object.values(sources)) {
       for (const match of code.matchAll(CALL)) {
         const text = match[1].replace(/\\'/g, "'")
-        if (!(text in EN)) missing.add(text)
+        for (const [lang, table] of Object.entries(TABLES)) if (!(text in table)) missing.add(`${lang}: ${text}`)
       }
     }
     expect([...missing]).toEqual([])
+  })
+
+  it('keeps the {placeholders} of every text', () => {
+    const placeholders = (text: string) => (text.match(/\{\w+\}/g) ?? []).sort().join(' ')
+    const broken: string[] = []
+    for (const [lang, table] of Object.entries(TABLES)) {
+      for (const [text, value] of Object.entries(table)) {
+        if (placeholders(text) !== placeholders(value)) broken.push(`${lang}: ${text} → ${value}`)
+      }
+    }
+    expect(broken).toEqual([])
   })
 
   it('leaves no Chinese UI text outside t() or tk()', () => {

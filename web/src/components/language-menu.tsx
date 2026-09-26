@@ -60,7 +60,7 @@ export function LanguageMenu(props: { className?: string; iconClassName?: string
       {open ? (
         <div
           role='menu'
-          className='border-or-line bg-or-card absolute right-0 z-50 mt-2 w-40 overflow-hidden rounded-[8px] border p-1 shadow-xl'
+          className='border-or-line bg-or-card absolute right-0 z-50 mt-2 max-h-[70vh] w-48 overflow-y-auto rounded-[8px] border p-1 shadow-xl'
         >
           {LANGUAGES.map((option) => (
             <button
@@ -69,7 +69,7 @@ export function LanguageMenu(props: { className?: string; iconClassName?: string
               role='menuitemradio'
               aria-checked={lang === option.id}
               onClick={() => {
-                setLang(option.id)
+                void setLang(option.id)
                 setOpen(false)
               }}
               className='text-or-fg hover:bg-or-fill flex w-full items-center justify-between rounded-[6px] px-3 py-2 text-left text-[14px]'

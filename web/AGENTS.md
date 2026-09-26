@@ -20,20 +20,22 @@ One design, a replica of the openrouter.ai catalog. Components live under `src/s
 - Colours come only from the `or-*` Tailwind tokens (`bg-or-bg`, `bg-or-card`, `text-or-fg`, `text-or-muted`, `border-or-line`, `bg-or-fill`, `bg-or-primary`, …). They are CSS variables defined in `src/styles.css` with a day palette on `:root` and a night palette on `.dark`, so never hard-code backgrounds, text, borders or the primary colour. The only literal hues are accents that read on both themes (chart palette, modality tags, the green "up" trend).
 - `src/site/theme.tsx` (`ThemeProvider`, `useTheme()`) sets the `.dark` class. The theme follows the visitor's clock (06:00–18:00 day, otherwise night) and re-checks it every minute. The sun/moon button in the header flips the theme only until the next 06:00 or 18:00; then the clock takes over again, so one click never switches the automatic change off for good.
 - The home hero sits on a dotted world map (`src/sites/router/home/world-map.tsx`): the headline, buttons and figures are laid over it. From the lg breakpoint that block sits over the Pacific, 10% of the map's width right of centre. The map is centred on the Pacific like world maps printed in China (`world-projection.ts`), so China sits left of the ocean and the US right of it. By day the land is a grey stipple; at night real city lights come on. `world-land.ts` and `world-lights.ts` are generated data (land from Natural Earth, lights from NASA Earth Observatory's Black Marble 2016, both public domain) made by a script kept outside the repo; treat them as data files. They load in their own chunks, the lights only once night is shown.
+- There is no model list page. The home page's 精选模型 and 最新上线 sections show three cards and expand in place (展开 / 收起); their cards do not link anywhere. Model detail pages (`/models/:name`) remain, reached from the rankings and the header search.
 - Pages never force a redirect to sign-in or setup. Signed-in-only pages wrap their content in `RequireAuth` (use `framed` when the children render their own page frame), which shows an in-page sign-in notice. An uninitialised instance shows no setup notice or button anywhere; the administrator opens `/setup` by URL.
 
 Brand name and logo always come from the operator's system settings (`useBrand()` in `src/lib/queries.ts`); never hard-code a brand.
 
 ## Languages
 
-The site opens in Simplified Chinese; the globe button in the header (`src/components/language-menu.tsx`) switches to English. The choice is kept in `localStorage` under `lang` and sets `<html lang>`.
+The site speaks 12 languages (`LANGUAGES` in `src/i18n/i18n.ts`): 简体中文, 繁體中文, English, 日本語, 한국어, Español, Português (Brazil), Français, Deutsch, Русский, Tiếng Việt and Bahasa Indonesia. A visitor gets the language they picked in the header's globe menu (`src/components/language-menu.tsx`, kept in `localStorage` under `lang`); without a pick, the first of their browser's languages the site speaks; failing that, English. The language sets `<html lang>`, which also puts Japanese, Korean or Traditional Chinese fonts first (`src/styles.css`).
 
-- Write UI text in Chinese and pass it through `t()` from `src/i18n/i18n.ts`, e.g. `t('创建密钥')`. The Chinese is the key into the English table `src/i18n/en.ts`. Components that show text call `const { t } = useI18n()` so they re-render when the language changes.
-- Placeholders use braces, in both languages: `t('共 {count} 个模型', { count })` → `'{count} models'`. Always pass a single-quoted literal, never a template string, so the checks can find it.
+- Write UI text in Chinese and pass it through `t()` from `src/i18n/i18n.ts`, e.g. `t('创建密钥')`. The Chinese is the key into each language's table: English in `src/i18n/en.ts` ships with the page, the others in `src/i18n/locales/<id>.ts` load only when that language is used. `main.tsx` waits for the first table, so the page never flashes Chinese. Components that show text call `const { t } = useI18n()` so they re-render when the language changes.
+- Placeholders use braces, the same in every language: `t('近 {days} 天', { days })` → `'Last {days} days'`. Always pass a single-quoted literal, never a template string, so the checks can find it.
 - Text kept at module level (option lists, table columns) is marked with `tk('…')` and passed through `t()` where it is shown. A `t()` call at module level would freeze the language at load time.
-- When the same Chinese needs different English in another role, add a `|tag`: `t('模型|表头')` shows 模型 in Chinese and uses its own entry (`'Model'`) in English.
+- When the same Chinese needs a different translation in another role, add a `|tag`: `t('模型|表头')` shows 模型 in Chinese and uses its own entries (`'Model'`) elsewhere.
+- A new text needs an entry in every table. `src/i18n/__tests__/coverage.test.ts` fails when a language has no table, when a `t()`/`tk()` text is missing from one, when `{placeholders}` differ, or when Chinese appears outside `t()`/`tk()` (comments and tests excepted).
 - Dates follow the language (`shortDate` and `bucketLabel` in `src/lib/format.ts`). Backend data, such as model descriptions and names users typed, is shown as is.
-- `src/i18n/__tests__/coverage.test.ts` fails when a `t()`/`tk()` text has no English entry, or when Chinese appears outside `t()`/`tk()` (comments and tests excepted).
+- No right-to-left languages yet: the layout is not mirrored.
 
 ## Backend contract
 

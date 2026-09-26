@@ -59,17 +59,18 @@ export function RouterHero() {
       <div className='mt-6 flex flex-wrap justify-center gap-4'>
         <Link
           to={keyHref}
-          className='bg-or-primary text-or-bg flex h-11 w-[205px] items-center justify-center gap-2 rounded-[6px] px-8 text-[14px] font-medium transition-opacity hover:opacity-90'
+          className='bg-or-primary text-or-bg flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-[6px] px-4 text-[14px] whitespace-nowrap font-medium transition-opacity hover:opacity-90'
         >
           {t('获取 API Key')}
         </Link>
-        <Link
-          to='/models'
-          className='bg-or-primary text-or-bg flex h-11 w-[205px] items-center justify-center gap-2 rounded-[6px] px-8 text-[14px] font-medium transition-opacity hover:opacity-90'
+        {/* No download address yet, so the button goes nowhere for now. */}
+        <button
+          type='button'
+          className='bg-or-primary text-or-bg flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-[6px] px-4 text-[14px] whitespace-nowrap font-medium transition-opacity hover:opacity-90'
         >
           {t('下载客户端')}
           <Sparkles className='size-4' aria-hidden='true' />
-        </Link>
+        </button>
       </div>
     </section>
   )

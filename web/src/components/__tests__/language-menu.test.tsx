@@ -23,6 +23,8 @@ import { getLang, setLang, useI18n } from '@/i18n/i18n'
 
 import { LanguageMenu } from '../language-menu'
 
+const TABLES = import.meta.glob<Record<string, string>>('../../i18n/locales/*.ts', { import: 'default', eager: true })
+
 function Probe() {
   const { t } = useI18n()
   return <span>{t('模型')}</span>
@@ -53,5 +55,19 @@ describe('LanguageMenu', () => {
     expect(screen.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true')
     await user.click(screen.getByRole('menuitemradio', { name: '简体中文' }))
     expect(screen.getByText('模型')).toBeInTheDocument()
+  })
+
+  it('offers every language and loads one on demand', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <LanguageMenu />
+        <Probe />
+      </>
+    )
+    await user.click(screen.getByRole('button', { name: '切换语言' }))
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(12)
+    await user.click(screen.getByRole('menuitemradio', { name: '日本語' }))
+    expect(await screen.findByText(TABLES['../../i18n/locales/ja.ts']['模型'])).toBeInTheDocument()
   })
 })

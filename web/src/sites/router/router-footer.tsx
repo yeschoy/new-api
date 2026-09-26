@@ -80,7 +80,6 @@ export function RouterFooter() {
           links={[
             { label: t('对话'), to: '/chat' },
             { label: t('排行榜'), to: '/rankings' },
-            { label: t('模型'), to: '/models' },
             { label: t('定价'), to: '/settings/credits' },
           ]}
         />

@@ -29,7 +29,7 @@ import { formatAmount, isTokenPriced, priceSummary, usdPerMillion } from '@/lib/
 import { useCatalog, useCurrency, useRankings, useStatus } from '@/lib/queries'
 
 import { RouterShell } from '../router-shell'
-import { ModalityBadges } from './router-model-row'
+import { ModalityBadges } from './modality-badges'
 
 const SECTIONS = [
   { id: 'providers', label: tk('分组价格'), icon: Server },
@@ -67,7 +67,7 @@ export function RouterModelPage() {
           {isLoading ? t('加载中…') : t('找不到这个模型')}
           {!isLoading ? (
             <div className='mt-6'>
-              <Link to='/models' className='text-or-fg underline underline-offset-2'>{t('返回模型列表')}</Link>
+              <Link to='/' className='text-or-fg underline underline-offset-2'>{t('返回首页')}</Link>
             </div>
           ) : null}
         </div>

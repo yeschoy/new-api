@@ -24,7 +24,7 @@ import { ProviderIcon } from '@/components/provider-icon'
 import { useI18n } from '@/i18n/i18n'
 import { useCatalog } from '@/lib/queries'
 
-/** ⌘K palette: type to filter the catalog, Enter opens the model list. */
+/** ⌘K palette: type to filter the catalog; a result, or Enter for the first one, opens that model's page. */
 export function RouterSearchDialog(props: { open: boolean; onClose: () => void }) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -60,9 +60,9 @@ export function RouterSearchDialog(props: { open: boolean; onClose: () => void }
 
   if (!props.open) return null
 
-  const go = (q: string) => {
+  const open = (name?: string) => {
     props.onClose()
-    navigate(q ? `/models?q=${encodeURIComponent(q)}` : '/models')
+    if (name) navigate(`/models/${encodeURIComponent(name)}`)
   }
 
   return (
@@ -80,7 +80,7 @@ export function RouterSearchDialog(props: { open: boolean; onClose: () => void }
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            go(query.trim())
+            open(results[0]?.model_name)
           }}
           className='border-or-line flex items-center gap-2 border-b px-4'
         >
@@ -98,7 +98,7 @@ export function RouterSearchDialog(props: { open: boolean; onClose: () => void }
             <li key={model.model_name}>
               <button
                 type='button'
-                onClick={() => go(model.model_name)}
+                onClick={() => open(model.model_name)}
                 className='hover:bg-or-fill flex w-full items-center gap-3 rounded-[6px] px-3 py-2 text-left'
               >
                 <ProviderIcon name={model.vendorIcon} fallback={model.vendor} size={18} />

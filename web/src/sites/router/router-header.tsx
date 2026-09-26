@@ -53,7 +53,6 @@ export function RouterHeader() {
   }, [])
 
   const links: Array<{ label: string; to: string; external?: boolean }> = [
-    { label: t('模型'), to: '/models' },
     { label: t('对话'), to: '/chat' },
     { label: t('排行榜'), to: '/rankings' },
     { label: t('定价'), to: '/settings/credits' },

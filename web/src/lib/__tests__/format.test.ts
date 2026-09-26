@@ -37,6 +37,11 @@ describe('shortDate', () => {
     setLang('en')
     expect(shortDate(noon)).toBe('Sep 23, 2026')
   })
+
+  it('writes dates in any other language the site speaks', async () => {
+    await setLang('ko')
+    expect(shortDate(noon)).toBe('2026년 9월 23일')
+  })
 })
 
 describe('bucketLabel', () => {
@@ -47,6 +52,11 @@ describe('bucketLabel', () => {
     expect(bucketLabel(day, 'Sep 17')).toBe('9月17日')
     setLang('en')
     expect(bucketLabel(day, 'Sep 17')).toBe('Sep 17')
+  })
+
+  it('writes day buckets in any other language the site speaks', async () => {
+    await setLang('ko')
+    expect(bucketLabel(day, 'Sep 17')).toBe('9월 17일')
   })
 
   it('keeps hourly labels as the server wrote them', () => {

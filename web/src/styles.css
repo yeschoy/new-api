@@ -86,6 +86,23 @@ body,
   min-height: 100%;
 }
 
+/* Han characters take each language's own shapes, so Japanese, Korean and Traditional Chinese fonts come first. */
+:root:lang(ja) {
+  --font-jakarta:
+    'Plus Jakarta Sans Variable', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', Meiryo,
+    ui-sans-serif, system-ui, sans-serif;
+}
+
+:root:lang(ko) {
+  --font-jakarta:
+    'Plus Jakarta Sans Variable', 'Apple SD Gothic Neo', 'Malgun Gothic', ui-sans-serif, system-ui, sans-serif;
+}
+
+:root:lang(zh-TW) {
+  --font-jakarta:
+    'Plus Jakarta Sans Variable', 'PingFang TC', 'Microsoft JhengHei', ui-sans-serif, system-ui, sans-serif;
+}
+
 body {
   background: var(--or-bg);
   color: var(--or-fg);
