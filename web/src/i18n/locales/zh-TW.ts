@@ -346,6 +346,7 @@ const TABLE: Record<string, string> = {
   '模型|表头': '模型',
   下载客户端: '下載客戶端',
   展开: '展開',
+  其他: '其他',
 }
 
 export default TABLE

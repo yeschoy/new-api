@@ -346,6 +346,7 @@ const TABLE: Record<string, string> = {
   '模型|表头': 'Модель',
   下载客户端: 'Скачать приложение',
   展开: 'Развернуть',
+  其他: 'Другое',
 }
 
 export default TABLE

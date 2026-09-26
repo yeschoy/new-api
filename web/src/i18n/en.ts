@@ -346,4 +346,5 @@ export const EN: Record<string, string> = {
   '模型|表头': 'Model',
   下载客户端: 'Download the app',
   展开: 'Show more',
+  其他: 'Other',
 }

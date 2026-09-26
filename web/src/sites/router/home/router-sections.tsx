@@ -22,7 +22,8 @@ import { useState } from 'react'
 import { ProviderIcon } from '@/components/provider-icon'
 import { tk, useI18n } from '@/i18n/i18n'
 import { cn, compactNumber, shortDate } from '@/lib/format'
-import type { CatalogModel } from '@/lib/queries'
+import { priceSummary } from '@/lib/pricing'
+import { useCurrency, type CatalogModel } from '@/lib/queries'
 import type { ModelRanking } from '@/lib/services'
 
 /** Opens and closes the rest of a section's cards in place. */
@@ -70,7 +71,21 @@ export function NewBadge() {
   )
 }
 
-/** Three 411×181 cards: icon tile, name + author, tokens and weekly trend. */
+/** A home-page model: every catalog entry, with its usage when rankings are on. */
+export type FeaturedEntry = { model: CatalogModel; ranking?: ModelRanking }
+
+/** Ranked models first, in rank order, then the rest of the catalog; rankings of models no longer listed are dropped. */
+export function featuredEntries(catalog: CatalogModel[], rows: ModelRanking[]): FeaturedEntry[] {
+  const byName = new Map(catalog.map((model) => [model.model_name, model]))
+  const ranked = rows.flatMap((row) => {
+    const model = byName.get(row.model_name)
+    return model ? [{ model, ranking: row }] : []
+  })
+  const listed = new Set(ranked.map((entry) => entry.model.model_name))
+  return [...ranked, ...catalog.filter((model) => !listed.has(model.model_name)).map((model) => ({ model }))]
+}
+
+/** 411×181 cards for every model, three until expanded. */
 export function FeaturedModels(props: {
   rows: ModelRanking[]
   catalog: CatalogModel[]
@@ -79,57 +94,95 @@ export function FeaturedModels(props: {
 }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
-  if (props.rows.length === 0) return null
+  const entries = featuredEntries(props.catalog, props.rows)
+  if (entries.length === 0) return null
   return (
     <section className='mx-auto mt-20 max-w-[1280px] px-6 xl:px-0'>
       <SectionHeader
         title={t('精选模型')}
         subtitle={t('{models}+ 个在线模型，来自 {vendors}+ 家厂商', { models: props.modelCount, vendors: props.vendorCount })}
-        toggle={props.rows.length > 3 ? { expanded, onToggle: () => setExpanded((value) => !value) } : undefined}
+        toggle={entries.length > 3 ? { expanded, onToggle: () => setExpanded((value) => !value) } : undefined}
       />
       <div className='mt-6 grid gap-6 md:grid-cols-3'>
-        {(expanded ? props.rows : props.rows.slice(0, 3)).map((row) => {
-          const model = props.catalog.find((m) => m.model_name === row.model_name)
-          const trend = row.growth_pct
-          let trendClass = 'text-or-muted'
-          if (trend < 0) trendClass = 'text-or-red'
-          if (trend > 0) trendClass = 'text-[#22c55e]'
-          return (
-            <article
-              key={row.model_name}
-              className='border-or-line bg-or-card flex h-[181px] flex-col justify-between rounded-[8px] border p-6'
-            >
-              <div className='flex items-start gap-3'>
-                <span className='flex size-10 shrink-0 items-center justify-center rounded-[6px] bg-white text-black'>
-                  <ProviderIcon name={row.vendor_icon || model?.vendorIcon} fallback={row.vendor} size={22} />
-                </span>
-                <div className='min-w-0'>
-                  <div className='flex items-center gap-2 text-[14px] font-medium'>
-                    <span className='truncate'>{row.model_name}</span>
-                    {row.previous_rank === undefined ? <NewBadge /> : null}
-                  </div>
-                  <p className='text-or-muted text-[14px]'>
-                    {t('来自')} <span className='underline underline-offset-2'>{row.vendor.toLowerCase()}</span>
-                  </p>
-                </div>
-              </div>
-              <div className='flex justify-between text-[14px]'>
-                <div>
-                  <div className='text-or-muted'>{t('Token 用量')}</div>
-                  <div className='font-medium'>{compactNumber(row.total_tokens)}</div>
-                </div>
-                <div className='text-right'>
-                  <div className='text-or-muted'>{t('周趋势')}</div>
-                  <div className={cn('font-medium', trendClass)}>
-                    {trend === 0 ? '--' : `${trend > 0 ? '+' : ''}${Math.round(trend)}%`}
-                  </div>
-                </div>
-              </div>
-            </article>
-          )
-        })}
+        {(expanded ? entries : entries.slice(0, 3)).map((entry) => (
+          <FeaturedCard key={entry.model.model_name} entry={entry} />
+        ))}
       </div>
     </section>
+  )
+}
+
+/** Icon tile, name + author, then usage and weekly trend, or prices for a model without usage. */
+function FeaturedCard(props: { entry: FeaturedEntry }) {
+  const { t } = useI18n()
+  const { model, ranking } = props.entry
+  return (
+    <article className='border-or-line bg-or-card flex h-[181px] flex-col justify-between rounded-[8px] border p-6'>
+      <div className='flex items-start gap-3'>
+        <span className='flex size-10 shrink-0 items-center justify-center rounded-[6px] bg-white text-black'>
+          <ProviderIcon name={ranking?.vendor_icon || model.vendorIcon} fallback={model.vendor} size={22} />
+        </span>
+        <div className='min-w-0'>
+          <div className='flex items-center gap-2 text-[14px] font-medium'>
+            <span className='truncate'>{model.model_name}</span>
+            {ranking && ranking.previous_rank === undefined ? <NewBadge /> : null}
+          </div>
+          <p className='text-or-muted text-[14px]'>
+            {t('来自')} <span className='underline underline-offset-2'>{model.vendor.toLowerCase()}</span>
+          </p>
+        </div>
+      </div>
+      {ranking ? <UsageFigures ranking={ranking} /> : <PriceFigures model={model} />}
+    </article>
+  )
+}
+
+function UsageFigures(props: { ranking: ModelRanking }) {
+  const { t } = useI18n()
+  const trend = props.ranking.growth_pct
+  let trendClass = 'text-or-muted'
+  if (trend < 0) trendClass = 'text-or-red'
+  if (trend > 0) trendClass = 'text-[#22c55e]'
+  return (
+    <div className='flex justify-between text-[14px]'>
+      <div>
+        <div className='text-or-muted'>{t('Token 用量')}</div>
+        <div className='font-medium'>{compactNumber(props.ranking.total_tokens)}</div>
+      </div>
+      <div className='text-right'>
+        <div className='text-or-muted'>{t('周趋势')}</div>
+        <div className={cn('font-medium', trendClass)}>
+          {trend === 0 ? '--' : `${trend > 0 ? '+' : ''}${Math.round(trend)}%`}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Input and output price per 1M tokens, or the price per request, as on the model page. */
+function PriceFigures(props: { model: CatalogModel }) {
+  const { t } = useI18n()
+  const price = priceSummary(props.model, useCurrency())
+  const unit = price.perRequest ? t('/次') : '/M'
+  return (
+    <div className='flex justify-between text-[14px]'>
+      <div>
+        <div className='text-or-muted'>{t('输入价格')}</div>
+        <div className='font-medium'>
+          {price.perRequest ?? price.input}
+          <span className='text-or-muted text-[12px] font-normal'> {unit}</span>
+        </div>
+      </div>
+      {price.perRequest ? null : (
+        <div className='text-right'>
+          <div className='text-or-muted'>{t('输出价格')}</div>
+          <div className='font-medium'>
+            {price.output}
+            <span className='text-or-muted text-[12px] font-normal'> {unit}</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

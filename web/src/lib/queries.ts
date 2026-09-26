@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
+import { useI18n } from '@/i18n/i18n'
+
 import { currencyDisplay } from './pricing'
 import {
   getPricing,
@@ -56,6 +58,7 @@ export type CatalogModel = PricingModel & {
 }
 
 export function useCatalog() {
+  const { lang, t } = useI18n()
   const query = useQuery({
     queryKey: ['pricing'],
     queryFn: getPricing,
@@ -70,11 +73,12 @@ export function useCatalog() {
       const vendor = model.vendor_id ? vendors.get(model.vendor_id) : undefined
       return {
         ...model,
-        vendor: vendor?.name || model.vendor_name || 'Other',
+        // Models the operator left without a vendor are filed under 其他.
+        vendor: vendor?.name || model.vendor_name || t('其他'),
         vendorIcon: vendor?.icon || model.vendor_icon || model.icon,
       }
     })
-  }, [query.data])
+  }, [query.data, lang, t])
   const groupRatio = query.data?.group_ratio ?? {}
   return { ...query, models, groupRatio }
 }
