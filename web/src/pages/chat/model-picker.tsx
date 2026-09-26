@@ -33,7 +33,30 @@ const s = {
   muted: 'text-or-muted',
 }
 
-/** Searchable model menu shown at the bottom right of the message box; it opens upwards. */
+type VendorGroup = { vendor: string; icon?: string; models: CatalogModel[] }
+
+const byName = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+
+/** Models under their vendor: vendors A–Z with `other` last, model names in natural order. */
+export function groupByVendor(models: CatalogModel[], other: string): VendorGroup[] {
+  const lists = new Map<string, CatalogModel[]>()
+  for (const model of models) lists.set(model.vendor, [...(lists.get(model.vendor) ?? []), model])
+  const vendors = [...lists.keys()].sort((a, b) => {
+    if (a === other) return 1
+    if (b === other) return -1
+    return byName(a, b)
+  })
+  return vendors.map((vendor) => {
+    const list = lists.get(vendor) ?? []
+    return {
+      vendor,
+      icon: list.find((model) => model.vendorIcon)?.vendorIcon,
+      models: [...list].sort((a, b) => byName(a.model_name, b.model_name)),
+    }
+  })
+}
+
+/** Searchable model menu at the bottom right of the message box, grouped by vendor; it opens upwards. */
 export function ModelPicker(props: {
   models: CatalogModel[]
   value: string
@@ -52,6 +75,8 @@ export function ModelPicker(props: {
     if (!q) return props.models
     return props.models.filter((m) => m.model_name.toLowerCase().includes(q) || m.vendor.toLowerCase().includes(q))
   }, [props.models, query])
+  const groups = useMemo(() => groupByVendor(filtered, t('其他')), [filtered, t])
+  const first = groups[0]?.models[0]
 
   useEffect(() => {
     if (!open) return
@@ -94,7 +119,7 @@ export function ModelPicker(props: {
       </button>
 
       {open ? (
-        <div className={cn('absolute right-0 bottom-full z-50 mb-2 w-[340px] max-w-[calc(100vw-32px)]', s.panel)}>
+        <div className={cn('absolute right-0 bottom-full z-50 mb-2 w-[360px] max-w-[calc(100vw-32px)]', s.panel)}>
           <label className={cn('flex h-10 items-center gap-2 px-3', s.search)}>
             <Search className={cn('size-4 shrink-0', s.muted)} aria-hidden='true' />
             <input
@@ -102,34 +127,48 @@ export function ModelPicker(props: {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && filtered[0]) choose(filtered[0].model_name)
+                if (e.key === 'Enter' && first) choose(first.model_name)
               }}
               placeholder={t('搜索模型或厂商')}
               aria-label={t('搜索模型')}
               className='w-full bg-transparent text-[14px] outline-none'
             />
           </label>
-          <ul role='listbox' aria-label={t('模型')} className='max-h-[min(320px,40vh)] overflow-y-auto p-1'>
+          <div className={cn('px-3 pt-2 text-[12px]', s.muted)}>{t('共 {count} 个模型', { count: filtered.length })}</div>
+          <ul role='listbox' aria-label={t('模型')} className='max-h-[min(460px,55vh)] overflow-y-auto px-1 pb-1'>
             {filtered.length === 0 ? (
               <li className={cn('px-3 py-6 text-center text-[13px]', s.muted)}>{t('没有匹配的模型')}</li>
             ) : null}
-            {filtered.map((m) => {
-              const selected = m.model_name === props.value
-              return (
-                <li key={m.model_name} role='option' aria-selected={selected}>
-                  <button
-                    type='button'
-                    onClick={() => choose(m.model_name)}
-                    className={cn('flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-[14px]', s.item, selected && s.active)}
-                  >
-                    <ProviderIcon name={m.vendorIcon} fallback={m.vendor} size={16} />
-                    <span className='min-w-0 flex-1 truncate'>{m.model_name}</span>
-                    <span className={cn('shrink-0 text-[12px]', s.muted)}>{m.vendor}</span>
-                    {selected ? <Check className='size-4 shrink-0' aria-hidden='true' /> : null}
-                  </button>
-                </li>
-              )
-            })}
+            {groups.map((group) => (
+              <li key={group.vendor} role='group' aria-label={group.vendor}>
+                <div
+                  aria-hidden='true'
+                  className={cn('bg-or-card sticky top-0 z-10 flex items-center gap-2 px-2.5 pt-2.5 pb-1 text-[12px] font-medium', s.muted)}
+                >
+                  <ProviderIcon name={group.icon} fallback={group.vendor} size={14} />
+                  <span className='truncate'>{group.vendor}</span>
+                  <span className='text-or-dim'>{group.models.length}</span>
+                </div>
+                <ul role='presentation'>
+                  {group.models.map((m) => {
+                    const selected = m.model_name === props.value
+                    return (
+                      <li key={m.model_name} role='option' aria-selected={selected}>
+                        <button
+                          type='button'
+                          onClick={() => choose(m.model_name)}
+                          className={cn('flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-[14px]', s.item, selected && s.active)}
+                        >
+                          <ProviderIcon name={m.vendorIcon} fallback={m.vendor} size={16} />
+                          <span className='min-w-0 flex-1 truncate'>{m.model_name}</span>
+                          {selected ? <Check className='size-4 shrink-0' aria-hidden='true' /> : null}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </li>
+            ))}
           </ul>
         </div>
       ) : null}

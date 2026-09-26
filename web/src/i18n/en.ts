@@ -342,4 +342,8 @@ export const EN: Record<string, string> = {
   轻巧的编程助手: 'A lightweight coding assistant',
   下载客户端一键接入: 'Get the app: one-click setup',
   'Anthropic 出品的桌面 AI 助手': 'Anthropic\'s desktop AI assistant',
+  语音输入: 'Voice input',
+  停止语音输入: 'Stop voice input',
+  '无法使用麦克风，请检查浏览器权限': 'Can\'t use the microphone. Check your browser\'s permissions.',
+  '共 {count} 个模型': '{count} models',
 }

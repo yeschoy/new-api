@@ -342,6 +342,10 @@ const TABLE: Record<string, string> = {
   轻巧的编程助手: 'Asisten pemrograman yang ringan',
   下载客户端一键接入: 'Aplikasi sambung sekali klik',
   'Anthropic 出品的桌面 AI 助手': 'Asisten AI desktop dari Anthropic',
+  语音输入: 'Input suara',
+  停止语音输入: 'Hentikan input suara',
+  '无法使用麦克风，请检查浏览器权限': 'Mikrofon tidak dapat digunakan. Periksa izin browser.',
+  '共 {count} 个模型': '{count} model',
 }
 
 export default TABLE

@@ -23,6 +23,7 @@ import { ProviderIcon } from '@/components/provider-icon'
 import { tk, useI18n } from '@/i18n/i18n'
 import { cn, compactNumber, shortDate } from '@/lib/format'
 import { guessIcon } from '@/lib/model-icons'
+import { PINNED_MODELS } from '@/lib/pinned-models'
 import type { CatalogModel } from '@/lib/queries'
 import type { ModelRanking } from '@/lib/services'
 
@@ -73,13 +74,6 @@ export function NewBadge() {
 
 /** A home-page model: every catalog entry, with its usage when rankings are on. */
 export type FeaturedEntry = { model: CatalogModel; ranking?: ModelRanking }
-
-/** The first cards on the home page, in this order; shown even before the catalog lists them. */
-export const PINNED_MODELS: ReadonlyArray<{ name: string; vendor: string }> = [
-  { name: 'deepseek-v4.1-flash', vendor: 'DeepSeek' },
-  { name: 'gpt-6-sol', vendor: 'OpenAI' },
-  { name: 'claude-opus-5-5', vendor: 'Anthropic' },
-]
 
 /**
  * Pinned models first, then ranked models in rank order, then the rest of the

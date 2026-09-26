@@ -128,6 +128,20 @@ describe('ChatPage', () => {
     expect(within(box).getByRole('button', { name: /gpt-test/ })).toBeInTheDocument()
   })
 
+  it('opens with the home page favourite, whatever order the catalog comes in', async () => {
+    signIn()
+    const price = { quota_type: 0, model_ratio: 1, completion_ratio: 1 }
+    vi.spyOn(api, 'get').mockImplementation(async (url: string) => ({
+      data:
+        url === '/api/pricing'
+          ? { success: true, data: [{ model_name: 'gpt-5.5', ...price }, { model_name: 'deepseek-v4.1-flash', ...price }] }
+          : { success: true, data: [] },
+    }))
+    renderChat('/chat')
+    const box = screen.getByRole('group', { name: '对话' })
+    expect(await within(box).findByRole('button', { name: /deepseek-v4\.1-flash/ })).toBeInTheDocument()
+  })
+
   it('copies a reply', async () => {
     signIn()
     fetchMock.mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n']))

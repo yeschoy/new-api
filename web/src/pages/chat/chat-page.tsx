@@ -21,6 +21,7 @@ import { useSearchParams } from 'react-router'
 
 import { RequireAuth } from '@/components/require-auth'
 import { outputsOf } from '@/lib/model-filters'
+import { defaultModel } from '@/lib/pinned-models'
 import { useCatalog } from '@/lib/queries'
 import { RouterShell } from '@/sites/router/router-shell'
 
@@ -29,13 +30,13 @@ import { useChat } from './use-chat'
 
 /**
  * /chat — playground for signed-in users. `?model=` preselects a model;
- * otherwise the first text-output model in the catalog is used.
+ * otherwise the site's favourite (see pinned-models.ts).
  */
 export function ChatPage() {
   const [params] = useSearchParams()
   const catalog = useCatalog()
   const models = useMemo(() => catalog.models.filter((m) => outputsOf(m).includes('text')), [catalog.models])
-  const chat = useChat(params.get('model')?.trim() || models[0]?.model_name || '')
+  const chat = useChat(params.get('model')?.trim() || defaultModel(models))
 
   return (
     <RouterShell footer={false}>
