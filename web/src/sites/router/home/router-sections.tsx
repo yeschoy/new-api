@@ -182,7 +182,7 @@ function UsageFigures(props: { ranking?: ModelRanking }) {
 
 // WorkBuddy has no icon in @lobehub/icons yet; CodeBuddy is its sibling in Tencent's Buddy family.
 const TOOLS = [
-  { name: 'Claude Code', icon: 'ClaudeCode', body: tk('在终端里写代码的智能体') },
+  { name: 'Claude', icon: 'Claude', body: tk('Anthropic 出品的桌面 AI 助手') },
   { name: 'Codex', icon: 'Codex', body: tk('OpenAI 出品的编程智能体') },
   { name: 'DSH', icon: 'DeepSeek', body: tk('DeepSeek 浏览器工作台') },
   { name: 'WorkBuddy', icon: 'CodeBuddy', body: tk('腾讯 AI 办公与开发助手') },

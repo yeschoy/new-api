@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Sparkles } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { tk, useI18n } from '@/i18n/i18n'
@@ -68,8 +67,7 @@ export function RouterHero() {
           type='button'
           className='bg-or-primary text-or-bg flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-[6px] px-4 text-[14px] whitespace-nowrap font-medium transition-opacity hover:opacity-90'
         >
-          {t('下载客户端')}
-          <Sparkles className='size-4' aria-hidden='true' />
+          {t('下载客户端一键接入')}
         </button>
       </div>
     </section>

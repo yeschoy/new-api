@@ -21,9 +21,9 @@ import { render, screen } from '@testing-library/react'
 import { FeaturedApps } from '../router-sections'
 
 describe('FeaturedApps', () => {
-  it('shows Claude Code, Codex, DSH, WorkBuddy and Pi, in that order', () => {
+  it('shows Claude, Codex, DSH, WorkBuddy and Pi, in that order', () => {
     render(<FeaturedApps />)
     const names = screen.getAllByRole('article').map((card) => card.querySelector('.font-medium')?.textContent)
-    expect(names).toEqual(['Claude Code', 'Codex', 'DSH', 'WorkBuddy', 'Pi'])
+    expect(names).toEqual(['Claude', 'Codex', 'DSH', 'WorkBuddy', 'Pi'])
   })
 })

@@ -23,7 +23,6 @@ import { useCatalog, useRankings } from '@/lib/queries'
 import { RouterShell } from '../router-shell'
 import { HeroStats, RouterHero, heroStats } from './router-hero'
 import { FeaturedApps, FeaturedModels, RecentModels } from './router-sections'
-import { RouterSteps } from './router-steps'
 import { WorldMap } from './world-map'
 
 export function RouterHome() {
@@ -63,7 +62,6 @@ export function RouterHome() {
           vendorCount={vendorCount}
         />
         <FeaturedApps />
-        <RouterSteps />
         <RecentModels models={models} />
         <div className='h-32' />
       </div>
