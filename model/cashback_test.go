@@ -203,19 +203,95 @@ func TestCashbackRecordedSpendBoundsAmbiguousAndExcessiveTopUps(t *testing.T) {
 }
 
 func TestCashbackRecordedSpendFailsClosedWhenLogDBUnavailable(t *testing.T) {
-	setupCashbackTestDB(t)
-	user := User{Username: "report-no-logs", Password: "password"}
-	require.NoError(t, DB.Create(&user).Error)
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	db := setupCashbackTestDB(t)
+	mainSQL, err := db.DB()
+	require.NoError(t, err)
+	mainSQL.SetMaxOpenConns(1)
+	user := User{Username: "report-separate-logs", Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&user).Error)
+	// These main-DB rows stand for an atomic registration opening, two verified
+	// online credits and their signed Epay evidence; only ordinary net spending
+	// is represented by the final settled wallet balance (150 granted, 75 left).
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return recordWalletRefundCreditTx(tx, user, walletRefundOpening, "registration", 0, 0, "")
+	}))
+	for _, item := range []struct {
+		tradeNo     string
+		completedAt int64
+		quota       int64
+		paidCents   int64
+	}{
+		{"report-old", 110, 100, 9000},
+		{"report-new", 150, 50, 5000},
+	} {
+		order := TopUp{UserId: user.Id, Amount: item.quota, TradeNo: item.tradeNo, CompleteTime: item.completedAt, Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay}
+		require.NoError(t, db.Create(&order).Error)
+		require.NoError(t, db.Create(&CashbackOrderContext{TopUpID: order.Id, TradeNo: order.TradeNo, UserID: user.Id, PaymentProvider: PaymentProviderEpay, BaseQuota: int(item.quota), CreditedQuota: int(item.quota), DeviceSignalStatus: CashbackDeviceSignalMissing, CompletionSource: CashbackCompletionProviderCallback, CompletionProvider: PaymentProviderEpay}).Error)
+		require.NoError(t, db.Create(&EpayPaymentEvidence{TopUpID: order.Id, TradeNo: order.TradeNo, GatewayTradeNo: "gateway-" + order.TradeNo, MerchantID: "merchant", PaidCents: item.paidCents, Source: CashbackCompletionProviderCallback, VerifiedAt: item.completedAt}).Error)
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			return recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "topup", int64(order.Id), item.quota, "")
+		}))
+	}
+	require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", 75).Error)
+
+	// A distinct in-memory SQLite database contains only Log. A conflicting
+	// main-DB log makes accidental reads from DB observable.
+	other, err := gorm.Open(sqlite.Open("file:"+t.Name()+"-logs?mode=memory&cache=shared"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, other.AutoMigrate(&Log{}))
+	assert.False(t, other.Migrator().HasTable(&User{}))
+	logSQL, err := other.DB()
+	require.NoError(t, err)
+	logSQL.SetMaxOpenConns(1)
 	logDB := LOG_DB
-	// A missing log table must not be interpreted as a zero-consumption interval.
-	other, err := gorm.Open(sqlite.Open("file:"+t.Name()+"-missing?mode=memory&cache=shared"), &gorm.Config{})
-	require.NoError(t, err)
 	LOG_DB = other
-	t.Cleanup(func() { LOG_DB = logDB })
-	report, err := GetCashbackRecordedSpendReport(user.Id, 100, 200)
+	t.Cleanup(func() {
+		LOG_DB = logDB
+		_ = logSQL.Close()
+	})
+	require.NoError(t, db.Create(&Log{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 120, Quota: 777}).Error)
+	for _, log := range []Log{
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 109, Quota: 3},
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 110, Quota: 25},
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 149, Quota: 5},
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 150, Quota: 20},
+		{UserId: user.Id, Type: LogTypeTopup, CreatedAt: 150, Quota: 999},
+	} {
+		require.NoError(t, other.Create(&log).Error)
+	}
+	var orders []TopUp
+	require.NoError(t, db.Where("user_id = ? AND amount > 0", user.Id).Order("id").Find(&orders).Error)
+	require.Len(t, orders, 2)
+	report, err := GetCashbackRecordedSpendReport(user.Id, 100, 200, orders[0].Id, orders[1].Id)
+	require.NoError(t, err) // Also proves no single-connection SQLite transaction deadlock.
+	assert.Equal(t, "available", report.LogStatus)
+	assert.Equal(t, []CashbackRecordedSpendInterval{
+		{StartAt: 100, EndAt: 110, RecordedAllConsumeLogQuota: 3, RecordedConsumeCount: 1},
+		{StartAt: 110, EndAt: 150, RecordedAllConsumeLogQuota: 30, RecordedConsumeCount: 2},
+		{StartAt: 150, EndAt: 200, RecordedAllConsumeLogQuota: 20, RecordedConsumeCount: 1},
+	}, report.Intervals)
+	assert.Equal(t, "reference", report.RefundStatus)
+	require.NotNil(t, report.WalletQuota)
+	assert.EqualValues(t, 75, *report.WalletQuota) // Not the 53 logged units.
+	require.NotNil(t, report.TotalReferenceCNYCents)
+	assert.EqualValues(t, 7250, *report.TotalReferenceCNYCents)
+	require.Len(t, report.TopUps, 2)
+	require.NotNil(t, report.TopUps[0].RemainingPurchaseQuota)
+	require.NotNil(t, report.TopUps[1].RemainingPurchaseQuota)
+	assert.EqualValues(t, 25, *report.TopUps[0].RemainingPurchaseQuota)
+	assert.EqualValues(t, 50, *report.TopUps[1].RemainingPurchaseQuota)
+
+	// A failed independent LOG_DB query cannot become a zero-consumption
+	// interval or erase the independently sourced FIFO/CNY reference.
+	require.NoError(t, other.Migrator().DropTable(&Log{}))
+	unavailable, err := GetCashbackRecordedSpendReport(user.Id, 100, 200, orders[0].Id, orders[1].Id)
 	require.NoError(t, err)
-	assert.Equal(t, "unavailable", report.LogStatus)
-	assert.Empty(t, report.Intervals)
+	assert.Equal(t, "unavailable", unavailable.LogStatus)
+	assert.Empty(t, unavailable.Intervals)
+	assert.Equal(t, report.RefundStatus, unavailable.RefundStatus)
+	assert.Equal(t, report.Credits, unavailable.Credits)
+	assert.Equal(t, report.TotalReferenceCNYCents, unavailable.TotalReferenceCNYCents)
 	_, err = GetCashbackRecordedSpendReport(user.Id, 100, 100)
 	assert.ErrorIs(t, err, ErrCashbackReportRange)
 }
@@ -232,15 +308,16 @@ func TestCashbackRefundReferenceFIFO(t *testing.T) {
 		name         string
 		grants       []grant
 		balance      int64
+		wantNetSpent int64
 		wantPurchase []int64
 		wantGift     []int64
 		wantCents    int64
 	}{
-		{"old gift before new purchase", []grant{{"purchase", 100, 10000, 0}, {"gift", 10, 0, 0}, {"purchase", 50, 5000, 0}, {"gift", 5, 0, 1}}, 40, []int64{0, 35}, []int64{0, 5}, 3500},
-		{"both purchases remain", []grant{{"purchase", 100, 10000, 0}, {"gift", 10, 0, 0}, {"purchase", 50, 5000, 0}, {"gift", 5, 0, 1}}, 140, []int64{75, 50}, []int64{10, 5}, 12500},
-		{"gift credited late", []grant{{"purchase", 100, 10000, 0}, {"purchase", 50, 5000, 0}, {"gift", 10, 0, 0}}, 55, []int64{0, 45}, []int64{10}, 4500},
-		{"settled reservation netted", []grant{{"purchase", 100, 10000, 0}, {"purchase", 50, 5000, 0}}, 110, []int64{60, 50}, nil, 11000},
-		{"signed paid proration", []grant{{"purchase", 100, 9000, 0}}, 50, []int64{50}, nil, 4500},
+		{"old gift before new purchase", []grant{{"purchase", 100, 10000, 0}, {"gift", 10, 0, 0}, {"purchase", 50, 5000, 0}, {"gift", 5, 0, 1}}, 40, 125, []int64{0, 35}, []int64{0, 5}, 3500},
+		{"both purchases remain", []grant{{"purchase", 100, 10000, 0}, {"gift", 10, 0, 0}, {"purchase", 50, 5000, 0}, {"gift", 5, 0, 1}}, 140, 25, []int64{75, 50}, []int64{10, 5}, 12500},
+		{"gift credited late", []grant{{"purchase", 100, 10000, 0}, {"purchase", 50, 5000, 0}, {"gift", 10, 0, 0}}, 55, 105, []int64{0, 45}, []int64{10}, 4500},
+		{"settled reservation netted", []grant{{"purchase", 100, 10000, 0}, {"purchase", 50, 5000, 0}}, 110, 40, []int64{60, 50}, nil, 11000},
+		{"signed paid proration", []grant{{"purchase", 100, 9000, 0}}, 50, 50, []int64{50}, nil, 4500},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := setupCashbackTestDB(t)
@@ -274,6 +351,8 @@ func TestCashbackRefundReferenceFIFO(t *testing.T) {
 			report, err := GetCashbackRecordedSpendReport(user.Id, now-50, now+1, confirmed...)
 			require.NoError(t, err)
 			assert.Equal(t, "reference", report.RefundStatus)
+			require.NotNil(t, report.NetSpentQuota)
+			assert.Equal(t, tc.wantNetSpent, *report.NetSpentQuota)
 			require.NotNil(t, report.TotalReferenceCNYCents)
 			assert.Equal(t, tc.wantCents, *report.TotalReferenceCNYCents)
 			var gotPurchase, gotGift []int64

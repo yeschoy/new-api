@@ -510,15 +510,16 @@ func cashbackRecordedSpendSnapshot(tx *gorm.DB, userID int, startAt, endAt int64
 		}
 	}
 
-	spent := grants - int64(user.Quota)
-	if spent > common.MaxWalletQuota {
+	netSpent := grants - int64(user.Quota)
+	if netSpent > common.MaxWalletQuota {
 		report.ManualReason = "javascript_precision_limit"
 		return report, nil
 	}
 	wallet := int64(user.Quota)
-	report.WalletQuota, report.NetSpentQuota = &wallet, &spent
+	report.WalletQuota, report.NetSpentQuota = &wallet, &netSpent
 	report.RefundStatus, report.ManualReason = "reference", ""
 	total := int64(0)
+	spent := netSpent
 	for _, event := range events {
 		remaining := event.Quota - min(event.Quota, spent)
 		spent -= event.Quota - remaining

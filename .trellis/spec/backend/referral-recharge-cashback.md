@@ -117,8 +117,12 @@ scan reads all credit events from a nonrefundable zero wallet opening or a
 new-registration opening (including its nonrefundable welcome grant),
 independently of the display window (over 1000 events => manual), validates
 known source records and exceptional changes, then consumes
-`sum(grants)-User.quota` from oldest to newest. A historical nonzero/missing
-opening, negative or excessive balance, missing evidence, debt, incident,
+`sum(grants)-User.quota` from oldest to newest. Response
+`net_spent_quota` must retain that original total; use a separate mutable
+allocation cursor while walking FIFO. Returning the cursor after allocation
+silently reports zero consumption even when purchased quota was spent. A
+historical nonzero/missing opening, negative or excessive balance, missing
+evidence, debt, incident,
 admin subtract/override or unknown grant requires manual reconciliation;
 optional consume logs never certify a particular interval. Gift credits enter
 only at actual issuance and are never cash. New admin add batches use their
@@ -484,6 +488,10 @@ wallet quota; floating-point money arithmetic is forbidden.
   batch deltas with warm/cold caches, fence-protected cache expiry/rehydration,
   ownership loss on commit/rollback/panic, durable mutation evidence, and
   all-debts-closed unblocking.
+- Read-only refund report: on known ordered grants, assert `net_spent_quota`
+  equals `sum(grants)-wallet_quota` **and** exact per-batch remaining quota for
+  35/125, delayed-gift and final-net-reservation cases; separate main/log DB
+  must not alter FIFO, and unavailable logs must never masquerade as zero.
 - Shared auth/billing blast radius: identity reads remain available during a
   quota fence, quota getters above the trust threshold remain fail-closed,
   committed auth changes publish/retain their floor and revoke sessions even
