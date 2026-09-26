@@ -19,8 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 import { useBrand } from '@/lib/queries'
 
 /**
- * Operator logo from system settings, or a neutral placeholder glyph drawn
- * in the theme's primary color (violet by day, lime by night).
+ * The yeschoy mark: a bold lowercase y cut out of a slanted block in the
+ * theme's primary color (violet by day, lime by night). The block's right edge
+ * follows the y's long stroke and its bottom-left corner is cut along the short
+ * one. A logo set in the system settings replaces it.
  */
 export function BrandMark(props: { size?: number; className?: string }) {
   const brand = useBrand()
@@ -45,14 +47,16 @@ export function BrandMark(props: { size?: number; className?: string }) {
       aria-hidden='true'
       className={props.className}
     >
-      <rect width='24' height='24' rx='6' style={{ fill: 'var(--or-primary)' }} />
       <path
-        d='M6.5 16.5v-9l5.5 5.5 5.5-5.5v9'
+        d='M2.2 1.2h19.6q1.8 0 1 1.7l-7.3 18.4q-.9 1.9-2.9 1.9H7.47q-1 0-1.59-.81L1.99 17.01q-.59-.81-.59-1.81V2.4q0-1.2.8-1.2z'
+        style={{ fill: 'var(--or-primary)' }}
+      />
+      <path
+        d='M7.4 6.4l4.2 5.8M16.6 6.4l-6.4 11.2'
         fill='none'
         style={{ stroke: 'var(--or-bg)' }}
-        strokeWidth='2.2'
+        strokeWidth='3.3'
         strokeLinecap='round'
-        strokeLinejoin='round'
       />
     </svg>
   )
