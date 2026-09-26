@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 import { getCashbackConfig } from '../api'
 import { SettingsSection } from '../components/settings-section'
+import { CashbackCampaigns } from './cashback-campaigns'
 import { CashbackSettingsForm } from './cashback-settings-form'
 
 export function CashbackSettingsSection() {
@@ -42,7 +43,7 @@ export function CashbackSettingsSection() {
 
   if (query.isPending) {
     return (
-      <SettingsSection title={t('Referral Cashback')}>
+      <SettingsSection title={t('Top-up and inviter cashback')}>
         <div aria-label={t('Loading cashback settings')} className='space-y-4'>
           <Skeleton className='h-24 w-full' />
           <Skeleton className='h-40 w-full' />
@@ -53,7 +54,7 @@ export function CashbackSettingsSection() {
 
   if (query.isError || !query.data) {
     return (
-      <SettingsSection title={t('Referral Cashback')}>
+      <SettingsSection title={t('Top-up and inviter cashback')}>
         <Alert variant='destructive'>
           <AlertTitle>{t('Unable to load cashback settings')}</AlertTitle>
           <AlertDescription className='flex flex-wrap items-center justify-between gap-3'>
@@ -71,5 +72,10 @@ export function CashbackSettingsSection() {
     )
   }
 
-  return <CashbackSettingsForm key={query.data.version} config={query.data} />
+  return (
+    <div className='space-y-6'>
+      <CashbackSettingsForm key={query.data.version} config={query.data} />
+      <CashbackCampaigns />
+    </div>
+  )
 }

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"gorm.io/gorm"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,6 +33,7 @@ type cashbackRewardListItem struct {
 	AvailableAt             int64                          `json:"available_at"`
 	ReviewStatus            model.CashbackReviewStatus     `json:"review_status"`
 	ReviewedBy              int                            `json:"reviewed_by"`
+	ReviewSource            model.CashbackReviewSource     `json:"review_source"`
 	ReviewedAt              int64                          `json:"reviewed_at"`
 	ReviewReason            string                         `json:"review_reason"`
 	SettlementStatus        model.CashbackSettlementStatus `json:"settlement_status"`
@@ -53,6 +55,7 @@ type cashbackRewardListItem struct {
 type cashbackOrderContextDTO struct {
 	ID                            int64                          `json:"id"`
 	TopUpID                       int                            `json:"top_up_id"`
+	CampaignID                    int64                          `json:"campaign_id"`
 	TradeNo                       string                         `json:"trade_no"`
 	UserID                        int                            `json:"user_id"`
 	PaymentProvider               string                         `json:"payment_provider"`
@@ -118,9 +121,18 @@ func ListCashbackRewards(c *gin.Context) {
 		cashbackAPIError(c, http.StatusBadRequest, err)
 		return
 	}
+	campaignID := int64(0)
+	if raw := c.Query("campaign_id"); raw != "" {
+		campaignID, err = parseCashbackPathID(raw)
+		if err != nil {
+			cashbackAPIError(c, http.StatusBadRequest, err)
+			return
+		}
+	}
 	filter := model.CashbackRewardFilter{
 		TradeNo:          c.Query("trade_no"),
 		UserID:           userID,
+		CampaignID:       campaignID,
 		Direction:        model.CashbackDirection(c.Query("direction")),
 		ReviewStatus:     model.CashbackReviewStatus(c.Query("review_status")),
 		SettlementStatus: model.CashbackSettlementStatus(c.Query("settlement_status")),
@@ -138,6 +150,51 @@ func ListCashbackRewards(c *gin.Context) {
 	pageInfo.Total = int(total)
 	pageInfo.Items = items
 	common.ApiSuccess(c, pageInfo)
+}
+
+// GetCashbackRecordedSpend returns observed log intervals separately from a
+// conditional, read-only FIFO reference. Currency confirmation is per query.
+func GetCashbackRecordedSpend(c *gin.Context) {
+	userID, err := parseCashbackIntPathID(c.Param("id"))
+	if err != nil {
+		cashbackAPIError(c, http.StatusBadRequest, err)
+		return
+	}
+	startAt, startErr := strconv.ParseInt(c.Query("start_at"), 10, 64)
+	endAt, endErr := strconv.ParseInt(c.Query("end_at"), 10, 64)
+	if startErr != nil || endErr != nil {
+		cashbackAPIError(c, http.StatusBadRequest, model.ErrCashbackReportRange)
+		return
+	}
+	// Repeated query parameters may name any successful Epay order belonging
+	// to this user, including orders outside the display window.
+	// No persistent merchant currency assertion is inferred from a callback.
+	var confirmedIDs []int
+	for _, raw := range c.Request.URL.Query()["confirm_cny_top_up_id"] {
+		if len(confirmedIDs) >= 50 {
+			cashbackAPIError(c, http.StatusBadRequest, model.ErrCashbackReportRange)
+			return
+		}
+		id, parseErr := parseCashbackIntPathID(raw)
+		if parseErr != nil {
+			cashbackAPIError(c, http.StatusBadRequest, model.ErrCashbackReportRange)
+			return
+		}
+		confirmedIDs = append(confirmedIDs, id)
+	}
+	report, err := model.GetCashbackRecordedSpendReport(userID, startAt, endAt, confirmedIDs...)
+	if err != nil {
+		status := http.StatusInternalServerError
+		if errors.Is(err, model.ErrCashbackReportRange) {
+			status = http.StatusBadRequest
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusNotFound
+		}
+		cashbackAPIError(c, status, err)
+		return
+	}
+	recordManageAudit(c, "cashback.recorded_spend_view", map[string]any{"user_id": userID, "confirmed_cny_top_up_ids": confirmedIDs})
+	common.ApiSuccess(c, report)
 }
 
 func GetCashbackReward(c *gin.Context) {
@@ -320,13 +377,17 @@ func cashbackRewardToListItem(reward *model.CashbackReward) cashbackRewardListIt
 	if reward.RiskSnapshot != "" && common.UnmarshalJsonStr(reward.RiskSnapshot, &riskSnapshot) == nil {
 		flags = riskSnapshot.Flags
 	}
+	source := reward.ReviewSource
+	if source == "" && reward.ReviewedBy > 0 {
+		source = model.CashbackReviewManual
+	}
 	return cashbackRewardListItem{
 		ID: reward.ID, TopUpID: reward.TopUpID, TradeNo: reward.TradeNo, Direction: reward.Direction,
 		InviteeID: reward.InviteeID, InviterID: reward.InviterID, BeneficiaryID: reward.BeneficiaryID,
 		BaseQuota: reward.BaseQuota, RateBPS: reward.RateBPS, CalculatedQuota: reward.CalculatedQuota,
 		RewardQuota: reward.RewardQuota, CapReason: reward.CapReason, SettlementDays: reward.SettlementDays,
 		ConfigVersion: reward.ConfigVersion, PaidAt: reward.PaidAt, AvailableAt: reward.AvailableAt,
-		ReviewStatus: reward.ReviewStatus, ReviewedBy: reward.ReviewedBy, ReviewedAt: reward.ReviewedAt,
+		ReviewStatus: reward.ReviewStatus, ReviewedBy: reward.ReviewedBy, ReviewSource: source, ReviewedAt: reward.ReviewedAt,
 		ReviewReason: reward.ReviewReason, SettlementStatus: reward.SettlementStatus, IssuedAt: reward.IssuedAt,
 		RiskLevel: reward.RiskLevel, RiskFlags: flags, BlockingReason: reward.BlockingReason,
 		RecoveredQuota: reward.RecoveredQuota, OutstandingDebtQuota: reward.OutstandingDebtQuota,
@@ -339,7 +400,7 @@ func cashbackRewardToListItem(reward *model.CashbackReward) cashbackRewardListIt
 
 func cashbackOrderContextToDTO(order *model.CashbackOrderContext) cashbackOrderContextDTO {
 	return cashbackOrderContextDTO{
-		ID: order.ID, TopUpID: order.TopUpID, TradeNo: order.TradeNo, UserID: order.UserID,
+		ID: order.ID, TopUpID: order.TopUpID, CampaignID: order.CampaignID, TradeNo: order.TradeNo, UserID: order.UserID,
 		PaymentProvider: order.PaymentProvider, BaseQuota: order.BaseQuota, CreditedQuota: order.CreditedQuota,
 		RequestIP: order.RequestIP, RequestUserAgentHash: order.RequestUserAgentHash,
 		DeviceFingerprintHash: order.DeviceFingerprintHash, DeviceHashShort: model.CashbackDeviceHashShort(order.DeviceFingerprintHash),

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/Calcium-Ion/go-epay/epay"
@@ -296,7 +297,7 @@ func TestEpayBrowserReturnVerifiesSettlesOnceAndReturnsToTheStoredDomain(t *test
 	previousEpayKey := operation_setting.EpayKey
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.CustomDomain{}, &model.TopUp{}, &model.CashbackOrderContext{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.CustomDomain{}, &model.TopUp{}, &model.EpayPaymentEvidence{}, &model.CashbackOrderContext{}, &model.WalletRefundCreditEvent{}, &model.Log{}))
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	common.RedisEnabled = false
@@ -344,6 +345,7 @@ func TestEpayBrowserReturnVerifiesSettlesOnceAndReturnsToTheStoredDomain(t *test
 	router := gin.New()
 	router.Use(middleware.CustomDomainContextWithResolver(resolver, true))
 	router.GET("/api/user/epay/return", EpayBrowserReturn)
+	router.POST("/api/user/epay/notify", EpayNotify)
 
 	params := epay.GenerateParams(map[string]string{
 		"pid": "merchant-id", "type": "alipay", "out_trade_no": "epay-return-order",
@@ -361,6 +363,56 @@ func TestEpayBrowserReturnVerifiesSettlesOnceAndReturnsToTheStoredDomain(t *test
 		return response
 	}
 
+	for _, money := range []string{"0.99", "1.001"} {
+		badParams := epay.GenerateParams(map[string]string{
+			"pid": "merchant-id", "type": "alipay", "out_trade_no": "epay-return-order",
+			"trade_no": "provider-order", "trade_status": epay.StatusTradeSuccess, "money": money,
+		}, "merchant-secret")
+		badQuery := url.Values{}
+		for key, value := range badParams {
+			badQuery.Set(key, value)
+		}
+		response := requestReturn(badQuery.Encode())
+		assert.Equal(t, http.StatusServiceUnavailable, response.Code)
+		request := httptest.NewRequest(http.MethodPost, "https://yeschoy.com/api/user/epay/notify", strings.NewReader(badQuery.Encode()))
+		request.Host = "yeschoy.com"
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		notifyResponse := httptest.NewRecorder()
+		router.ServeHTTP(notifyResponse, request)
+		assert.Equal(t, "fail", notifyResponse.Body.String())
+		var pending model.TopUp
+		require.NoError(t, db.First(&pending, "trade_no = ?", "epay-return-order").Error)
+		assert.Equal(t, common.TopUpStatusPending, pending.Status)
+		var unchanged model.User
+		require.NoError(t, db.First(&unchanged, payer.Id).Error)
+		assert.Zero(t, unchanged.Quota)
+	}
+
+	for _, tc := range []struct {
+		name, pid, gatewayTradeNo string
+	}{
+		{name: "other merchant", pid: "other-merchant", gatewayTradeNo: "provider-order"},
+		{name: "missing gateway trade", pid: "merchant-id", gatewayTradeNo: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			invalid := epay.GenerateParams(map[string]string{
+				"pid": tc.pid, "type": "alipay", "out_trade_no": "epay-return-order",
+				"trade_no": tc.gatewayTradeNo, "trade_status": epay.StatusTradeSuccess, "money": "1.00",
+			}, "merchant-secret")
+			invalidQuery := url.Values{}
+			for key, value := range invalid {
+				invalidQuery.Set(key, value)
+			}
+			assert.Equal(t, http.StatusBadRequest, requestReturn(invalidQuery.Encode()).Code)
+			var evidenceCount int64
+			require.NoError(t, db.Model(&model.EpayPaymentEvidence{}).Count(&evidenceCount).Error)
+			assert.Zero(t, evidenceCount)
+			var pending model.TopUp
+			require.NoError(t, db.First(&pending, "trade_no = ?", "epay-return-order").Error)
+			assert.Equal(t, common.TopUpStatusPending, pending.Status)
+		})
+	}
+
 	response := requestReturn(query.Encode())
 	require.Equal(t, http.StatusFound, response.Code)
 	assert.Equal(t, "https://alpha.yeschoy.io/usage-logs", response.Header().Get("Location"))
@@ -370,6 +422,36 @@ func TestEpayBrowserReturnVerifiesSettlesOnceAndReturnsToTheStoredDomain(t *test
 	var updated model.User
 	require.NoError(t, db.First(&updated, payer.Id).Error)
 	assert.Equal(t, 100, updated.Quota)
+	var evidence model.EpayPaymentEvidence
+	require.NoError(t, db.First(&evidence, "trade_no = ?", "epay-return-order").Error)
+	assert.Equal(t, int64(100), evidence.PaidCents)
+	assert.Equal(t, "provider-order", evidence.GatewayTradeNo)
+	assert.Equal(t, "merchant-id", evidence.MerchantID)
+	assert.Equal(t, model.CashbackCompletionVerifiedReturn, evidence.Source)
+	assert.Positive(t, evidence.VerifiedAt)
+
+	require.NoError(t, db.Create(&model.TopUp{
+		UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "epay-notify-order",
+		PaymentProvider: model.PaymentProviderEpay, PaymentMethod: "alipay", Status: common.TopUpStatusPending,
+	}).Error)
+	notifyParams := epay.GenerateParams(map[string]string{
+		"pid": "merchant-id", "type": "alipay", "out_trade_no": "epay-notify-order",
+		"trade_no": "provider-notify", "trade_status": epay.StatusTradeSuccess, "money": "1.00",
+	}, "merchant-secret")
+	notifyQuery := url.Values{}
+	for key, value := range notifyParams {
+		notifyQuery.Set(key, value)
+	}
+	request := httptest.NewRequest(http.MethodPost, "https://yeschoy.com/api/user/epay/notify", strings.NewReader(notifyQuery.Encode()))
+	request.Host = "yeschoy.com"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	notifyResponse := httptest.NewRecorder()
+	router.ServeHTTP(notifyResponse, request)
+	assert.Equal(t, "success", notifyResponse.Body.String())
+	var notifyEvidence model.EpayPaymentEvidence
+	require.NoError(t, db.First(&notifyEvidence, "trade_no = ?", "epay-notify-order").Error)
+	assert.Equal(t, "provider-notify", notifyEvidence.GatewayTradeNo)
+	assert.Equal(t, model.CashbackCompletionProviderCallback, notifyEvidence.Source)
 
 	query.Set("sign", "forged")
 	response = requestReturn(query.Encode())

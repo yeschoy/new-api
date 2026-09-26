@@ -22,7 +22,7 @@ func loadCashbackSettingTx(tx *gorm.DB) (operation_setting.CashbackSetting, erro
 	}
 
 	var options []Option
-	if err := tx.Where("key IN ?", operation_setting.CashbackSettingOptionKeys()).Find(&options).Error; err != nil {
+	if err := tx.Where(map[string]any{"key": operation_setting.CashbackSettingOptionKeys()}).Find(&options).Error; err != nil {
 		return operation_setting.CashbackSetting{}, err
 	}
 	values := make(map[string]string, len(options))
@@ -36,7 +36,7 @@ func SaveCashbackSetting(setting operation_setting.CashbackSetting) error {
 	return UpdateOptionsBulk(operation_setting.CashbackSettingOptionValues(setting))
 }
 
-func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, complianceConfirmed bool, now int64) (operation_setting.CashbackSetting, operation_setting.CashbackSetting, error) {
+func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, complianceConfirmed bool, now int64, policy ...operation_setting.CashbackReviewPolicyUpdate) (operation_setting.CashbackSetting, operation_setting.CashbackSetting, error) {
 	var current operation_setting.CashbackSetting
 	var stored operation_setting.CashbackSetting
 	var values map[string]string
@@ -46,7 +46,7 @@ func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, co
 			return err
 		}
 		var versionOption Option
-		if err := lockForUpdate(tx).Where("key = ?", versionKey).First(&versionOption).Error; err != nil {
+		if err := lockForUpdate(tx).Where(map[string]any{"key": versionKey}).First(&versionOption).Error; err != nil {
 			return err
 		}
 
@@ -61,6 +61,15 @@ func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, co
 			}
 		}
 		stored = candidate
+		stored.AutoReviewEnabled = current.AutoReviewEnabled
+		stored.LowReviewRequired = current.LowReviewRequired
+		stored.MediumReviewRequired = current.MediumReviewRequired
+		stored.HighReviewRequired = current.HighReviewRequired
+		stored.SevereReviewRequired = current.SevereReviewRequired
+		stored.AutoReviewImmediateIssue = current.AutoReviewImmediateIssue
+		if len(policy) > 0 {
+			policy[0].Apply(&stored)
+		}
 		stored.FirstEnabledAt = current.FirstEnabledAt
 		stored.Version = current.Version + 1
 		if stored.AnyDirectionEnabled() && stored.FirstEnabledAt == 0 {

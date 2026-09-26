@@ -129,7 +129,7 @@ export function CashbackTable(props: CashbackTableProps) {
                   <TableCell>
                     {reward.direction === 'inviter'
                       ? t('Inviter')
-                      : t('Invited user')}
+                      : t('Top-up payer')}
                   </TableCell>
                   <TableCell>#{reward.beneficiary_id}</TableCell>
                   <TableCell>
@@ -155,6 +155,11 @@ export function CashbackTable(props: CashbackTableProps) {
                       kind='review'
                       value={reward.review_status}
                     />
+                    {reward.review_source === 'automatic' && (
+                      <div className='text-muted-foreground text-xs'>
+                        {t('Automatic review')}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <CashbackStatusBadge

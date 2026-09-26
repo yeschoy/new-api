@@ -35,6 +35,43 @@ type CashbackSetting struct {
 	DailyTopUpCountThreshold int   `json:"daily_topup_count_threshold"`
 	FirstEnabledAt           int64 `json:"first_enabled_at"`
 	Version                  int64 `json:"version"`
+	AutoReviewEnabled        bool  `json:"auto_review_enabled"`
+	LowReviewRequired        bool  `json:"low_review_required"`
+	MediumReviewRequired     bool  `json:"medium_review_required"`
+	HighReviewRequired       bool  `json:"high_review_required"`
+	SevereReviewRequired     bool  `json:"severe_review_required"`
+	AutoReviewImmediateIssue bool  `json:"auto_review_immediate_issue"`
+}
+
+// Nil fields preserve the stored policy when an older client replaces the configuration.
+type CashbackReviewPolicyUpdate struct {
+	AutoReviewEnabled        *bool
+	LowReviewRequired        *bool
+	MediumReviewRequired     *bool
+	HighReviewRequired       *bool
+	SevereReviewRequired     *bool
+	AutoReviewImmediateIssue *bool
+}
+
+func (u CashbackReviewPolicyUpdate) Apply(current *CashbackSetting) {
+	if u.AutoReviewEnabled != nil {
+		current.AutoReviewEnabled = *u.AutoReviewEnabled
+	}
+	if u.LowReviewRequired != nil {
+		current.LowReviewRequired = *u.LowReviewRequired
+	}
+	if u.MediumReviewRequired != nil {
+		current.MediumReviewRequired = *u.MediumReviewRequired
+	}
+	if u.HighReviewRequired != nil {
+		current.HighReviewRequired = *u.HighReviewRequired
+	}
+	if u.SevereReviewRequired != nil {
+		current.SevereReviewRequired = *u.SevereReviewRequired
+	}
+	if u.AutoReviewImmediateIssue != nil {
+		current.AutoReviewImmediateIssue = *u.AutoReviewImmediateIssue
+	}
 }
 
 type CashbackSettingValidationError struct {
@@ -58,6 +95,9 @@ func DefaultCashbackSetting() CashbackSetting {
 		IPAccountThreshold:       CashbackDefaultIPThreshold,
 		DeviceAccountThreshold:   CashbackDefaultDeviceLimit,
 		DailyTopUpCountThreshold: CashbackDefaultTopUpCount,
+		HighReviewRequired:       true,
+		SevereReviewRequired:     true,
+		AutoReviewImmediateIssue: true,
 	}
 }
 
@@ -145,6 +185,12 @@ func CashbackSettingOptionValues(s CashbackSetting) map[string]string {
 		prefix + "daily_topup_count_threshold": strconv.Itoa(s.DailyTopUpCountThreshold),
 		prefix + "first_enabled_at":            strconv.FormatInt(s.FirstEnabledAt, 10),
 		prefix + "version":                     strconv.FormatInt(s.Version, 10),
+		prefix + "auto_review_enabled":         strconv.FormatBool(s.AutoReviewEnabled),
+		prefix + "low_review_required":         strconv.FormatBool(s.LowReviewRequired),
+		prefix + "medium_review_required":      strconv.FormatBool(s.MediumReviewRequired),
+		prefix + "high_review_required":        strconv.FormatBool(s.HighReviewRequired),
+		prefix + "severe_review_required":      strconv.FormatBool(s.SevereReviewRequired),
+		prefix + "auto_review_immediate_issue": strconv.FormatBool(s.AutoReviewImmediateIssue),
 	}
 }
 
@@ -221,6 +267,12 @@ func ParseCashbackSettingOptions(values map[string]string) (CashbackSetting, err
 		func() error { return parseInt("daily_topup_count_threshold", &setting.DailyTopUpCountThreshold) },
 		func() error { return parseInt64("first_enabled_at", &setting.FirstEnabledAt) },
 		func() error { return parseInt64("version", &setting.Version) },
+		func() error { return parseBool("auto_review_enabled", &setting.AutoReviewEnabled) },
+		func() error { return parseBool("low_review_required", &setting.LowReviewRequired) },
+		func() error { return parseBool("medium_review_required", &setting.MediumReviewRequired) },
+		func() error { return parseBool("high_review_required", &setting.HighReviewRequired) },
+		func() error { return parseBool("severe_review_required", &setting.SevereReviewRequired) },
+		func() error { return parseBool("auto_review_immediate_issue", &setting.AutoReviewImmediateIssue) },
 	}
 	for _, parse := range parsers {
 		if err := parse(); err != nil {

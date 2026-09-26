@@ -80,7 +80,7 @@ export function CashbackFilters(props: CashbackFiltersProps) {
   const directionOptions = [
     { value: 'all', label: t('All directions') },
     { value: 'inviter', label: t('Inviter') },
-    { value: 'invitee', label: t('Invited user') },
+    { value: 'invitee', label: t('Top-up payer') },
   ]
   const reviewOptions = [
     { value: 'all', label: t('All review states') },
@@ -132,7 +132,19 @@ export function CashbackFilters(props: CashbackFiltersProps) {
           onChange={(event) =>
             props.onChange({ ...props.value, userId: event.target.value })
           }
-          placeholder={t('Invitee, inviter, or beneficiary')}
+          placeholder={t('Payer, inviter, or beneficiary')}
+        />
+      </div>
+      <div className='space-y-1.5'>
+        <Label htmlFor='cashback-campaign-id'>{t('Campaign ID')}</Label>
+        <Input
+          id='cashback-campaign-id'
+          inputMode='numeric'
+          value={props.value.campaignId}
+          onChange={(event) =>
+            props.onChange({ ...props.value, campaignId: event.target.value })
+          }
+          placeholder={t('Filter by campaign ID')}
         />
       </div>
       <FilterSelect

@@ -87,6 +87,12 @@ export type CashbackConfig = {
   ip_account_threshold: number
   device_account_threshold: number
   daily_topup_count_threshold: number
+  auto_review_enabled: boolean
+  low_review_required: boolean
+  medium_review_required: boolean
+  high_review_required: boolean
+  severe_review_required: boolean
+  auto_review_immediate_issue: boolean
   first_enabled_at: number
   version: number
   compliance_confirmed: boolean
@@ -96,6 +102,35 @@ export type CashbackConfigUpdate = Omit<
   CashbackConfig,
   'first_enabled_at' | 'version' | 'compliance_confirmed'
 >
+
+export type CashbackCampaign = {
+  id: number
+  start_at: number
+  end_at: number
+  stopped_at: number
+  max_rewards_per_user: number
+  created_by: number
+  stopped_by: number
+  created_at: number
+  status: 'planned' | 'active' | 'ended'
+}
+
+export type CashbackCampaignCreate = Pick<
+  CashbackCampaign,
+  'start_at' | 'end_at' | 'max_rewards_per_user'
+>
+
+export type CashbackCampaignResponse = {
+  success: boolean
+  message: string
+  data?: CashbackCampaign
+}
+
+export type CashbackCampaignListResponse = {
+  success: boolean
+  message: string
+  data?: CashbackCampaign[]
+}
 
 export type CashbackConfigResponse = {
   success: boolean

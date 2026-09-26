@@ -30,6 +30,10 @@ func userQuotaRedisContext() (context.Context, context.CancelFunc) {
 // reachable after the fence disappears.
 type userQuotaMutationFences struct {
 	tokens map[int]string
+	// Payment with same-transaction cashback cannot publish purchase-only delta.
+	cashbackIssued   bool
+	cashbackRewardID int64
+	cashbackQuota    int
 }
 
 func getUserQuotaMutationFenceKey(userID int) string {

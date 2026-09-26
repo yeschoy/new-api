@@ -168,7 +168,7 @@ func Redeem(key string, userId int) (data any, err error) {
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		// Serialize grants for this user, including purchases with a per-user limit.
 		var user User
-		if err := lockForUpdate(tx).Select("id").Where("id = ?", userId).First(&user).Error; err != nil {
+		if err := lockForUpdate(tx).Select("id", "quota").Where("id = ?", userId).First(&user).Error; err != nil {
 			return err
 		}
 		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
@@ -209,6 +209,9 @@ func Redeem(key string, userId int) (data any, err error) {
 		}
 		if subscriptionPlan != nil {
 			_, err := CreateUserSubscriptionFromPlanTx(tx, userId, subscriptionPlan, "redemption")
+			return err
+		}
+		if err := recordWalletRefundCreditTx(tx, user, walletRefundNonrefundable, "redemption", int64(redemption.Id), int64(redemption.Quota), ""); err != nil {
 			return err
 		}
 		return creditTopUpQuotaProtected(tx, userId, redemption.Quota, nil, creditFences)

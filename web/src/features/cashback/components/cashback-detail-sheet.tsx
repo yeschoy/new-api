@@ -109,6 +109,15 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
   const query = useCashbackReward(props.open ? props.rewardId : null)
   const [action, setAction] = useState<CashbackDialogAction | null>(null)
   const detail = query.data
+  let reviewSource = '—'
+  if (detail?.reward.review_source === 'automatic') {
+    reviewSource = t('Automatic review')
+  } else if (
+    detail?.reward.review_source === 'manual' ||
+    (detail?.reward.reviewed_by ?? 0) > 0
+  ) {
+    reviewSource = t('Manual review')
+  }
 
   return (
     <>
@@ -189,8 +198,16 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                       value={t(
                         detail.reward.direction === 'inviter'
                           ? 'Inviter'
-                          : 'Invited user'
+                          : 'Top-up payer'
                       )}
+                    />
+                    <DetailRow
+                      label={t('Campaign ID')}
+                      value={
+                        detail.order.campaign_id > 0
+                          ? `#${detail.order.campaign_id}`
+                          : '—'
+                      }
                     />
                     <DetailRow
                       label={t('Face value quota')}
@@ -233,7 +250,7 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                   </h3>
                   <dl className='divide-y'>
                     <DetailRow
-                      label={t('Invited user')}
+                      label={t('Top-up payer')}
                       value={`${detail.invitee_username || '—'} (#${detail.reward.invitee_id})`}
                     />
                     <DetailRow
@@ -392,6 +409,10 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                     <DetailRow
                       label={t('Paid at')}
                       value={formatTime(detail.reward.paid_at)}
+                    />
+                    <DetailRow
+                      label={t('Review source')}
+                      value={reviewSource}
                     />
                     {detail.reward.reviewed_at > 0 && (
                       <DetailRow

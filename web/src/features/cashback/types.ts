@@ -46,6 +46,7 @@ export type CashbackReward = {
   available_at: number
   review_status: CashbackReviewStatus
   reviewed_by: number
+  review_source: 'automatic' | 'manual' | ''
   reviewed_at: number
   review_reason: string
   settlement_status: CashbackSettlementStatus
@@ -67,6 +68,7 @@ export type CashbackReward = {
 export type CashbackOrderContext = {
   id: number
   top_up_id: number
+  campaign_id: number
   trade_no: string
   user_id: number
   payment_provider: string
@@ -111,6 +113,7 @@ export type CashbackRewardFilters = {
   pageSize: number
   tradeNo: string
   userId: string
+  campaignId: string
   direction: CashbackDirection | ''
   reviewStatus: CashbackReviewStatus | ''
   settlementStatus: CashbackSettlementStatus | ''
@@ -150,6 +153,51 @@ export type CashbackSummary = {
   risk_counts: Partial<Record<CashbackRiskLevel, number>>
   inviter_clusters: CashbackInviterCluster[]
   device_clusters: CashbackDeviceCluster[]
+}
+
+export type CashbackRecordedSpendReport = {
+  user_id: number
+  start_at: number
+  end_at: number
+  calculated_at: number
+  source: 'optional_log_db_consume'
+  log_status: 'available' | 'unavailable'
+  refund_status: 'reference' | 'manual_reconciliation'
+  manual_reason?: string
+  settlement_assumed: boolean
+  wallet_quota?: number
+  net_spent_quota?: number
+  total_reference_cny_cents?: number
+  credits: {
+    event_id: number
+    kind: 'opening' | 'purchase' | 'gift' | 'nonrefundable' | 'exception'
+    source_type: string
+    source_id: number
+    quota: number
+    remaining_quota: number
+    trade_no?: string
+    payment_provider?: string
+    signed_amount_available: boolean // Amount is signed; Epay does NOT attest currency.
+    reference_cny_cents?: number
+  }[]
+  top_ups: {
+    id: number
+    trade_no: string
+    complete_time: number
+    payment_provider: string
+    purchased_quota?: number
+    remaining_purchase_quota?: number
+    remaining_gift_quota?: number
+    reference_cny_cents?: number
+  }[]
+  intervals: {
+    start_at: number
+    end_at: number
+    // Sum of all observed consume-log quota, including subscription-funded usage;
+    // not wallet spend or FIFO evidence.
+    recorded_all_consume_log_quota: number
+    recorded_consume_count: number
+  }[]
 }
 
 export type ApiResponse<T> = {

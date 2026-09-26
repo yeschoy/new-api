@@ -73,6 +73,12 @@ const fieldMap = {
   ip_account_threshold: 'ipAccountThreshold',
   device_account_threshold: 'deviceAccountThreshold',
   daily_topup_count_threshold: 'dailyTopUpCountThreshold',
+  auto_review_enabled: 'autoReviewEnabled',
+  low_review_required: 'lowReviewRequired',
+  medium_review_required: 'mediumReviewRequired',
+  high_review_required: 'highReviewRequired',
+  severe_review_required: 'severeReviewRequired',
+  auto_review_immediate_issue: 'autoReviewImmediateIssue',
 } as const
 
 type Values = {
@@ -86,6 +92,12 @@ type Values = {
   ipAccountThreshold: number
   deviceAccountThreshold: number
   dailyTopUpCountThreshold: number
+  autoReviewEnabled: boolean
+  lowReviewRequired: boolean
+  mediumReviewRequired: boolean
+  highReviewRequired: boolean
+  severeReviewRequired: boolean
+  autoReviewImmediateIssue: boolean
 }
 
 type CashbackSettingsFormProps = {
@@ -104,6 +116,12 @@ function configToValues(config: CashbackConfig): Values {
     ipAccountThreshold: config.ip_account_threshold,
     deviceAccountThreshold: config.device_account_threshold,
     dailyTopUpCountThreshold: config.daily_topup_count_threshold,
+    autoReviewEnabled: config.auto_review_enabled,
+    lowReviewRequired: config.low_review_required,
+    mediumReviewRequired: config.medium_review_required,
+    highReviewRequired: config.high_review_required,
+    severeReviewRequired: config.severe_review_required,
+    autoReviewImmediateIssue: config.auto_review_immediate_issue,
   }
 }
 
@@ -119,6 +137,12 @@ function valuesToRequest(values: Values): CashbackConfigUpdate {
     ip_account_threshold: values.ipAccountThreshold,
     device_account_threshold: values.deviceAccountThreshold,
     daily_topup_count_threshold: values.dailyTopUpCountThreshold,
+    auto_review_enabled: values.autoReviewEnabled,
+    low_review_required: values.lowReviewRequired,
+    medium_review_required: values.mediumReviewRequired,
+    high_review_required: values.highReviewRequired,
+    severe_review_required: values.severeReviewRequired,
+    auto_review_immediate_issue: values.autoReviewImmediateIssue,
   }
 }
 
@@ -157,6 +181,12 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       ipAccountThreshold: z.coerce.number().int().min(2).max(100000),
       deviceAccountThreshold: z.coerce.number().int().min(2).max(100000),
       dailyTopUpCountThreshold: z.coerce.number().int().min(1).max(100000),
+      autoReviewEnabled: z.boolean(),
+      lowReviewRequired: z.boolean(),
+      mediumReviewRequired: z.boolean(),
+      highReviewRequired: z.boolean(),
+      severeReviewRequired: z.boolean(),
+      autoReviewImmediateIssue: z.boolean(),
     })
     .superRefine((values, context) => {
       if (values.inviterEnabled && values.inviterRatePercent <= 0) {
@@ -170,7 +200,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
         context.addIssue({
           code: 'custom',
           path: ['inviteeRatePercent'],
-          message: t('Enabled invitee cashback requires a positive rate'),
+          message: t('Enabled top-up payer cashback requires a positive rate'),
         })
       }
       if (values.inviterRatePercent + values.inviteeRatePercent > 100) {
@@ -264,7 +294,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
   }
 
   return (
-    <SettingsSection title={t('Referral Cashback')}>
+    <SettingsSection title={t('Top-up and inviter cashback')}>
       <Form {...form}>
         <SettingsForm onSubmit={form.handleSubmit(onSubmit)} autoComplete='off'>
           <SettingsPageFormActions
@@ -322,7 +352,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
               render={({ field }) => (
                 <SettingsSwitchItem>
                   <SettingsSwitchContent>
-                    <FormLabel>{t('Reward the invited user')}</FormLabel>
+                    <FormLabel>{t('Reward the top-up payer')}</FormLabel>
                     <FormDescription>
                       {t('Create a separate reward for the user who tops up.')}
                     </FormDescription>
@@ -368,7 +398,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
               name='inviteeRatePercent'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('Invited user cashback rate (%)')}</FormLabel>
+                  <FormLabel>{t('Top-up payer cashback rate (%)')}</FormLabel>
                   <FormControl>
                     <Input
                       type='number'
@@ -533,14 +563,104 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
             />
           </div>
 
+          <div className='space-y-2'>
+            <h3 className='font-semibold'>{t('Top-up payer review policy')}</h3>
+            <p className='text-muted-foreground text-sm'>
+              {t(
+                'Inviter rewards always require manual review. Payer rewards require an active campaign as well as the direction switch.'
+              )}
+            </p>
+            <FormField
+              control={form.control}
+              name='autoReviewEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Enable automatic payer review')}</FormLabel>
+                    <FormDescription>
+                      {t('When off, all payer rewards require manual review.')}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={mutation.isPending}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+            <div className='grid gap-x-6 sm:grid-cols-2'>
+              {(
+                [
+                  ['lowReviewRequired', t('Manual review: low risk')],
+                  ['mediumReviewRequired', t('Manual review: medium risk')],
+                  ['highReviewRequired', t('Manual review: high risk')],
+                  ['severeReviewRequired', t('Manual review: severe risk')],
+                ] as const
+              ).map(([name, label]) => (
+                <FormField
+                  key={name}
+                  control={form.control}
+                  name={name}
+                  render={({ field }) => (
+                    <SettingsSwitchItem>
+                      <SettingsSwitchContent>
+                        <FormLabel>{label}</FormLabel>
+                      </SettingsSwitchContent>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={
+                            mutation.isPending ||
+                            !form.watch('autoReviewEnabled')
+                          }
+                        />
+                      </FormControl>
+                    </SettingsSwitchItem>
+                  )}
+                />
+              ))}
+            </div>
+            <FormField
+              control={form.control}
+              name='autoReviewImmediateIssue'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>
+                      {t(
+                        'Issue automatically approved payer rewards immediately'
+                      )}
+                    </FormLabel>
+                    <FormDescription>
+                      {t(
+                        'When off, automatically approved rewards still wait for the configured settlement delay. Manual reviews always wait; payment and wallet checks still apply.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={
+                        mutation.isPending || !form.watch('autoReviewEnabled')
+                      }
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+          </div>
+
           {enabled && (
             <Alert>
-              <AlertTitle>
-                {t('Every reward requires manual review')}
-              </AlertTitle>
+              <AlertTitle>{t('Cashback review and settlement')}</AlertTitle>
               <AlertDescription>
                 {t(
-                  'Approval never shortens the configured hold, and issued rewards enter the site-only quota balance.'
+                  'Manually reviewed rewards wait for the configured hold. Only automatically approved payer rewards may be issued immediately after verified payment and wallet checks.'
                 )}
               </AlertDescription>
             </Alert>

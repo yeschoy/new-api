@@ -28,6 +28,7 @@ import { CashbackDetailSheet } from './components/cashback-detail-sheet'
 import { CashbackFilters } from './components/cashback-filters'
 import { CashbackSummary } from './components/cashback-summary'
 import { CashbackTable } from './components/cashback-table'
+import { RecordedSpendReport } from './components/recorded-spend-report'
 import { cashbackQueryKeys, useCashbackRewards } from './hooks/use-cashback'
 import type { CashbackRewardFilters } from './types'
 
@@ -37,6 +38,7 @@ function defaultFilters(): CashbackRewardFilters {
     pageSize: 20,
     tradeNo: '',
     userId: '',
+    campaignId: '',
     direction: '',
     reviewStatus: '',
     settlementStatus: '',
@@ -56,7 +58,7 @@ export function Cashback() {
     <>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>
-          {t('Referral Cashback Review')}
+          {t('Cashback Review')}
         </SectionPageLayout.Title>
         <SectionPageLayout.Actions>
           <Button
@@ -75,6 +77,7 @@ export function Cashback() {
         <SectionPageLayout.Content>
           <div className='space-y-4 pb-6'>
             <CashbackSummary />
+            <RecordedSpendReport />
             <CashbackFilters
               value={draftFilters}
               onChange={setDraftFilters}
@@ -83,6 +86,7 @@ export function Cashback() {
                   ...draftFilters,
                   page: 1,
                   userId: draftFilters.userId.trim(),
+                  campaignId: draftFilters.campaignId.trim(),
                   tradeNo: draftFilters.tradeNo.trim(),
                 })
               }

@@ -19,6 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import type {
+  CashbackCampaignCreate,
+  CashbackCampaignListResponse,
+  CashbackCampaignResponse,
   CashbackConfigResponse,
   CashbackConfigUpdate,
   ConfirmPaymentComplianceResponse,
@@ -79,6 +82,35 @@ export async function updateCashbackConfig(
   const res = await api.put<CashbackConfigResponse>(
     '/api/cashback/config',
     request,
+    { skipErrorHandler: true }
+  )
+  return res.data
+}
+
+export async function listCashbackCampaigns(): Promise<CashbackCampaignListResponse> {
+  const res = await api.get<CashbackCampaignListResponse>(
+    '/api/cashback/campaigns'
+  )
+  return res.data
+}
+
+export async function createCashbackCampaign(
+  request: CashbackCampaignCreate
+): Promise<CashbackCampaignResponse> {
+  const res = await api.post<CashbackCampaignResponse>(
+    '/api/cashback/campaigns',
+    request,
+    { skipErrorHandler: true }
+  )
+  return res.data
+}
+
+export async function stopCashbackCampaign(
+  id: number
+): Promise<CashbackCampaignResponse> {
+  const res = await api.post<CashbackCampaignResponse>(
+    `/api/cashback/campaigns/${id}/stop`,
+    null,
     { skipErrorHandler: true }
   )
   return res.data

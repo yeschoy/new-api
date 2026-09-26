@@ -27,6 +27,7 @@ type CashbackRiskLevel string
 type CashbackCompletionSource string
 type CashbackIncidentKind string
 type CashbackDeviceSource string
+type CashbackReviewSource string
 
 const (
 	CashbackDirectionInviter CashbackDirection = "inviter"
@@ -35,6 +36,9 @@ const (
 	CashbackReviewPending  CashbackReviewStatus = "pending"
 	CashbackReviewApproved CashbackReviewStatus = "approved"
 	CashbackReviewRejected CashbackReviewStatus = "rejected"
+
+	CashbackReviewAutomatic CashbackReviewSource = "automatic"
+	CashbackReviewManual    CashbackReviewSource = "manual"
 
 	CashbackSettlementFrozen    CashbackSettlementStatus = "frozen"
 	CashbackSettlementIssued    CashbackSettlementStatus = "issued"
@@ -81,6 +85,7 @@ var (
 type CashbackOrderContext struct {
 	ID                            int64                    `json:"id" gorm:"primaryKey"`
 	TopUpID                       int                      `json:"top_up_id" gorm:"not null;uniqueIndex"`
+	CampaignID                    int64                    `json:"campaign_id" gorm:"type:bigint;not null;default:0;index"`
 	TradeNo                       string                   `json:"trade_no" gorm:"type:varchar(255);not null;index"`
 	UserID                        int                      `json:"user_id" gorm:"not null;index;index:idx_cashback_principal_debt,priority:1"`
 	PaymentProvider               string                   `json:"payment_provider" gorm:"type:varchar(50);not null"`
@@ -128,6 +133,7 @@ type CashbackReward struct {
 	AvailableAt             int64                    `json:"available_at" gorm:"type:bigint;not null;index:idx_cashback_settlement_scan,priority:3"`
 	ReviewStatus            CashbackReviewStatus     `json:"review_status" gorm:"type:varchar(16);not null;index:idx_cashback_settlement_scan,priority:1;index"`
 	ReviewedBy              int                      `json:"reviewed_by" gorm:"index"`
+	ReviewSource            CashbackReviewSource     `json:"review_source" gorm:"type:varchar(16);not null;default:''"`
 	ReviewedAt              int64                    `json:"reviewed_at" gorm:"type:bigint"`
 	ReviewReason            string                   `json:"review_reason" gorm:"type:text"`
 	SettlementStatus        CashbackSettlementStatus `json:"settlement_status" gorm:"type:varchar(16);not null;index:idx_cashback_settlement_scan,priority:2;index"`
@@ -244,6 +250,9 @@ func (context *CashbackOrderContext) BeforeSave(_ *gorm.DB) error {
 	if context.DeviceSignalStatus == CashbackDeviceSignalValid && len(context.DeviceFingerprintHash) != sha256.Size*2 {
 		return errors.New("invalid cashback device fingerprint hash")
 	}
+	if context.CampaignID < 0 {
+		return ErrCashbackInvalidInput
+	}
 	if context.CreditedQuota < 0 || context.CreditedQuota > common.MaxWalletQuota {
 		return errors.New("invalid cashback credited quota")
 	}
@@ -278,11 +287,16 @@ func (reward *CashbackReward) BeforeSave(_ *gorm.DB) error {
 }
 
 func (reward *CashbackReward) validate() error {
-	if reward.TopUpID <= 0 || strings.TrimSpace(reward.TradeNo) == "" || reward.InviteeID <= 0 || reward.InviterID <= 0 || reward.BeneficiaryID <= 0 || !validCashbackDirection(reward.Direction) {
+	if reward.TopUpID <= 0 || strings.TrimSpace(reward.TradeNo) == "" || reward.InviteeID <= 0 || reward.BeneficiaryID <= 0 || !validCashbackDirection(reward.Direction) {
 		return errors.New("invalid cashback reward relationship")
 	}
-	if reward.InviteeID == reward.InviterID {
-		return errors.New("self referral cashback is not allowed")
+	if reward.InviterID < 0 || reward.InviterID == reward.InviteeID ||
+		(reward.Direction == CashbackDirectionInviter && (reward.InviterID == 0 || reward.BeneficiaryID != reward.InviterID)) ||
+		(reward.Direction == CashbackDirectionInvitee && reward.BeneficiaryID != reward.InviteeID) {
+		return errors.New("invalid cashback reward relationship")
+	}
+	if reward.ReviewSource != "" && reward.ReviewSource != CashbackReviewAutomatic && reward.ReviewSource != CashbackReviewManual {
+		return errors.New("invalid cashback review source")
 	}
 	if reward.BaseQuota <= 0 || reward.BaseQuota > common.MaxWalletQuota || reward.RateBPS < 0 || reward.RateBPS > operation_setting.CashbackRateBasisPoints {
 		return errors.New("invalid cashback reward calculation")
@@ -414,12 +428,36 @@ func InsertOnlineTopUp(topUp *TopUp, baseQuota int, metadata CashbackRequestMeta
 		// Persist the activation decision with every new online order. Payment
 		// completion must not try to reconstruct transaction ordering from two
 		// second-resolution timestamps.
-		eligibleAfterFirstEnable := firstEnabledAt > 0 && topUp.CreateTime >= firstEnabledAt
+		orderPlacedAt, err := getDBTimestampOnStrict(tx)
+		if err != nil {
+			return err
+		}
+		eligibleAfterFirstEnable := firstEnabledAt > 0 && topUp.CreateTime >= firstEnabledAt && orderPlacedAt >= firstEnabledAt
+		var campaignID int64
+		if eligibleAfterFirstEnable {
+			setting, err := loadCashbackSettingTx(tx)
+			if err != nil {
+				return err
+			}
+			if setting.InviteeEnabled {
+				var campaign CashbackCampaign
+				err := tx.Where("start_at <= ? AND end_at > ? AND (stopped_at = 0 OR stopped_at > ?) AND start_at <= ? AND end_at > ?",
+					orderPlacedAt, orderPlacedAt, orderPlacedAt, topUp.CreateTime, topUp.CreateTime).
+					Order("id desc").First(&campaign).Error
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				if err == nil {
+					campaignID = campaign.ID
+				}
+			}
+		}
 		deviceHash, deviceStatus := ParseCashbackDeviceSignal(metadata.DeviceSignal)
 		requestIP := normalizeCashbackIP(metadata.RequestIP)
 		userAgentHash := HashCashbackUserAgent(metadata.UserAgent)
 		context := CashbackOrderContext{
 			TopUpID:                  topUp.Id,
+			CampaignID:               campaignID,
 			TradeNo:                  topUp.TradeNo,
 			UserID:                   topUp.UserId,
 			PaymentProvider:          topUp.PaymentProvider,
@@ -455,7 +493,7 @@ func cashbackFirstEnabledAtTx(tx *gorm.DB) (int64, error) {
 	}
 	var option Option
 	key := operation_setting.CashbackSettingName + ".first_enabled_at"
-	if err := tx.Where("key = ?", key).First(&option).Error; err != nil {
+	if err := tx.Where(map[string]any{"key": key}).First(&option).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}

@@ -75,9 +75,7 @@ func buildCashbackRiskSnapshotTx(tx *gorm.DB, input cashbackRiskInput) (Cashback
 	cutoff := now - cashbackRiskWindowSeconds
 	snapshot := CashbackRiskSnapshot{
 		InviteeAccountAgeSeconds:   nonNegativeDuration(now, input.Invitee.CreatedAt),
-		InviterAccountAgeSeconds:   nonNegativeDuration(now, input.Inviter.CreatedAt),
 		RegistrationToTopUpSeconds: nonNegativeDuration(input.TopUp.CreateTime, input.Invitee.CreatedAt),
-		RelationshipAgeSeconds:     nonNegativeDuration(input.TopUp.CreateTime, input.Invitee.CreatedAt),
 		RequestIP:                  input.OrderContext.RequestIP,
 		DeviceSignalStatus:         input.OrderContext.DeviceSignalStatus,
 		DeviceHashShort:            CashbackDeviceHashShort(input.OrderContext.DeviceFingerprintHash),
@@ -172,11 +170,15 @@ func buildCashbackRiskSnapshotTx(tx *gorm.DB, input cashbackRiskInput) (Cashback
 		addFlag("reward_capped")
 	}
 
-	if err := populateCashbackInviterRiskTx(tx, input.Inviter.Id, input.TopUp.Id, cutoff, &snapshot); err != nil {
-		return CashbackRiskSnapshot{}, "", err
-	}
-	if snapshot.InviterDistinctInvitees24h >= int64(input.Setting.IPAccountThreshold) {
-		addFlag("inviter_concentration")
+	if input.Inviter.Id > 0 {
+		snapshot.InviterAccountAgeSeconds = nonNegativeDuration(now, input.Inviter.CreatedAt)
+		snapshot.RelationshipAgeSeconds = nonNegativeDuration(input.TopUp.CreateTime, input.Invitee.CreatedAt)
+		if err := populateCashbackInviterRiskTx(tx, input.Inviter.Id, input.TopUp.Id, cutoff, &snapshot); err != nil {
+			return CashbackRiskSnapshot{}, "", err
+		}
+		if snapshot.InviterDistinctInvitees24h >= int64(input.Setting.IPAccountThreshold) {
+			addFlag("inviter_concentration")
+		}
 	}
 	if err := tx.Model(&CashbackOrderContext{}).
 		Where("user_id = ? AND incident_kind <> ''", input.Invitee.Id).

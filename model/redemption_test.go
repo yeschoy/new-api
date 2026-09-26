@@ -175,9 +175,9 @@ func TestRedemptionDatabaseMatrix(t *testing.T) {
 			require.Empty(t, tables, "matrix requires an empty, isolated database")
 			require.False(t, common.RedisEnabled, "matrix must not touch a shared Redis cache")
 			t.Cleanup(func() {
-				require.NoError(t, db.Migrator().DropTable(&UserSubscription{}, &SubscriptionPlan{}, &Redemption{}, &Log{}, &User{}))
+				require.NoError(t, db.Migrator().DropTable(&WalletRefundCreditEvent{}, &UserSubscription{}, &SubscriptionPlan{}, &Redemption{}, &Log{}, &User{}))
 			})
-			require.NoError(t, db.AutoMigrate(&User{}, &Log{}, &SubscriptionPlan{}, &UserSubscription{}, &Redemption{}))
+			require.NoError(t, db.AutoMigrate(&User{}, &WalletRefundCreditEvent{}, &Log{}, &SubscriptionPlan{}, &UserSubscription{}, &Redemption{}))
 
 			originalDB, originalLogDB := DB, LOG_DB
 			originalMain, originalLog := common.MainDatabaseType(), common.LogDatabaseType()

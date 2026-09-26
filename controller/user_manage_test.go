@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -66,7 +67,7 @@ func setupManageUserTestDB(t *testing.T) *gorm.DB {
 			}
 		}
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.CasbinRule{}, &model.AuthzRole{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.CasbinRule{}, &model.AuthzRole{}, &model.AdminQuotaCreditEvidence{}, &model.WalletRefundCreditEvent{}))
 	require.NoError(t, logDB.AutoMigrate(&model.Log{}, &model.AuditLog{}))
 	versionQuery := "SELECT version()"
 	if dialect == "sqlite" {
@@ -485,6 +486,147 @@ func TestManageUserQuotaMiddlewareKeepsOneOperationPerRequest(t *testing.T) {
 	assert.Equal(t, 1100, operator.Quota)
 }
 
+func TestManageUserQuotaAddEvidenceIsAtomicAndDoesNotPriceLegacyRequests(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	user := model.User{Username: "quota-evidence", Role: common.RoleCommonUser, Quota: 100}
+	require.NoError(t, db.Create(&user).Error)
+	require.True(t, db.Migrator().HasTable(&model.AdminQuotaCreditEvidence{})) // Fresh install.
+	// Upgrade a database with an existing wallet; never fabricate old credits.
+	require.NoError(t, db.Migrator().DropTable(&model.AdminQuotaCreditEvidence{}))
+	for range 2 {
+		require.NoError(t, db.AutoMigrate(&model.AdminQuotaCreditEvidence{}))
+	}
+	require.True(t, db.Migrator().HasIndex(&model.AdminQuotaCreditEvidence{}, "ux_admin_quota_credit_event_key"))
+	require.True(t, db.Migrator().HasIndex(&model.AdminQuotaCreditEvidence{}, "idx_admin_quota_credit_user_id"))
+	var historicalCount int64
+	require.NoError(t, db.Model(&model.AdminQuotaCreditEvidence{}).Count(&historicalCount).Error)
+	assert.Zero(t, historicalCount)
+
+	// The existing request has no CNY input; it must still be accepted without
+	// inventing a historical CNY face value from quota or today's exchange rate.
+	response := performManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":25}`, user.Id))
+	require.Contains(t, response.Body.String(), `"success":true`)
+	adjustment, err := model.AdjustUserQuota(user.Id, 9999, common.RoleRootUser, "add", 10, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 135, adjustment.After)
+	var credits []model.AdminQuotaCreditEvidence
+	require.NoError(t, db.Where("user_id = ?", user.Id).Order("id").Find(&credits).Error)
+	require.Len(t, credits, 2)
+	assert.Less(t, credits[0].ID, credits[1].ID)
+	for i, credit := range credits {
+		assert.Equal(t, int64(user.Id), credit.UserID)
+		assert.Equal(t, int64(9999), credit.OperatorID)
+		assert.Equal(t, int64([]int{25, 10}[i]), credit.CreditedQuota)
+		assert.Nil(t, credit.CNYCents)
+		assert.Positive(t, credit.CreditedAt)
+		key, decodeErr := hex.DecodeString(credit.EventKey)
+		require.NoError(t, decodeErr)
+		assert.Len(t, key, 32)
+	}
+	assert.NotEqual(t, credits[0].EventKey, credits[1].EventKey)
+	invalidCNY := int64(0)
+	assert.Error(t, db.Create(&model.AdminQuotaCreditEvidence{
+		EventKey: strings.Repeat("a", 64), UserID: int64(user.Id), OperatorID: 9999,
+		CreditedQuota: 1, CNYCents: &invalidCNY, CreditedAt: credits[0].CreditedAt,
+	}).Error, "a present CNY amount must be positive")
+	assert.Error(t, db.Create(&model.AdminQuotaCreditEvidence{
+		EventKey: credits[0].EventKey, UserID: int64(user.Id), OperatorID: 9999,
+		CreditedQuota: 1, CreditedAt: credits[0].CreditedAt,
+	}).Error, "duplicate event keys must be rejected")
+
+	_, err = model.AdjustUserQuota(user.Id, 9999, common.RoleRootUser, "subtract", 5, nil)
+	require.NoError(t, err)
+	_, err = model.AdjustUserQuota(user.Id, 9999, common.RoleRootUser, "override", 200, nil)
+	require.NoError(t, err)
+	credits = nil
+	require.NoError(t, db.Where("user_id = ?", user.Id).Find(&credits).Error)
+	assert.Len(t, credits, 2, "subtract and override are not purchase credits")
+
+	const callback = "test:reject_admin_credit_evidence"
+	require.NoError(t, db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+		if strings.HasSuffix(tx.Statement.Table, "admin_quota_credit_evidences") {
+			tx.AddError(errors.New("evidence unavailable"))
+		}
+	}))
+	_, err = model.AdjustUserQuota(user.Id, 9999, common.RoleRootUser, "add", 50, nil)
+	require.ErrorContains(t, err, "evidence unavailable")
+	require.NoError(t, db.Callback().Create().Remove(callback))
+	require.NoError(t, db.First(&user, user.Id).Error)
+	assert.Equal(t, 200, user.Quota, "failed evidence insert must roll back wallet mutation")
+	credits = nil
+	require.NoError(t, db.Where("user_id = ?", user.Id).Find(&credits).Error)
+	assert.Len(t, credits, 2)
+
+	// Conversely a failed wallet update must not leave an orphan evidence row.
+	const updateCallback = "test:reject_admin_credit_wallet"
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register(updateCallback, func(tx *gorm.DB) {
+		if strings.HasSuffix(tx.Statement.Table, "users") {
+			tx.AddError(errors.New("wallet unavailable"))
+		}
+	}))
+	_, err = model.AdjustUserQuota(user.Id, 9999, common.RoleRootUser, "add", 50, nil)
+	require.ErrorContains(t, err, "wallet unavailable")
+	require.NoError(t, db.Callback().Update().Remove(updateCallback))
+	var count int64
+	require.NoError(t, db.Model(&model.AdminQuotaCreditEvidence{}).Where("user_id = ?", user.Id).Count(&count).Error)
+	assert.EqualValues(t, 2, count)
+}
+
+func TestManageUserQuotaCNYInputIsEvidenceNotConversionAndRollsBack(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	user := model.User{Username: "cny-credit", Role: common.RoleCommonUser, Quota: 100}
+	require.NoError(t, db.Create(&user).Error)
+
+	// The UI's 7.3 CNY/USD display rate produces this quota for 100 CNY;
+	// the API records the declared CNY cents without repricing the credit.
+	response := performManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":6849315,"cny_cents":10000}`, user.Id))
+	require.Contains(t, response.Body.String(), `"success":true`)
+	// At a display rate of 1, the same input produces a different quota.
+	response = performManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":50000000,"cny_cents":10000}`, user.Id))
+	require.Contains(t, response.Body.String(), `"success":true`)
+	var credits []model.AdminQuotaCreditEvidence
+	require.NoError(t, db.Where("user_id = ?", user.Id).Order("id").Find(&credits).Error)
+	require.Len(t, credits, 2)
+	for i, quota := range []int64{6849315, 50000000} {
+		require.NotNil(t, credits[i].CNYCents)
+		assert.EqualValues(t, 10000, *credits[i].CNYCents)
+		assert.Equal(t, quota, credits[i].CreditedQuota)
+	}
+	require.NoError(t, db.First(&user, user.Id).Error)
+	assert.Equal(t, 56849415, user.Quota)
+
+	for _, body := range []string{
+		fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":69,"cny_cents":0}`, user.Id),
+		fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"subtract","value":1,"cny_cents":101}`, user.Id),
+		fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"override","value":1,"cny_cents":101}`, user.Id),
+		fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":1,"cny_cents":9223372036854775807}`, user.Id),
+		fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":69,"cny_cents":1.01}`, user.Id),
+	} {
+		response = performManageUserRequest(t, body)
+		assert.Contains(t, response.Body.String(), `"success":false`)
+	}
+	require.NoError(t, db.First(&user, user.Id).Error)
+	assert.Equal(t, 56849415, user.Quota)
+	var count int64
+	require.NoError(t, db.Model(&model.AdminQuotaCreditEvidence{}).Where("user_id = ?", user.Id).Count(&count).Error)
+	assert.EqualValues(t, 2, count)
+
+	// A failed evidence insert must not commit the CNY credit either.
+	const callback = "test:reject_cny_credit"
+	require.NoError(t, db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+		if strings.HasSuffix(tx.Statement.Table, "admin_quota_credit_evidences") {
+			tx.AddError(errors.New("evidence unavailable"))
+		}
+	}))
+	response = performManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"add_quota","mode":"add","value":69,"cny_cents":101}`, user.Id))
+	assert.Contains(t, response.Body.String(), `"success":false`)
+	require.NoError(t, db.Callback().Create().Remove(callback))
+	require.NoError(t, db.First(&user, user.Id).Error)
+	assert.Equal(t, 56849415, user.Quota)
+	require.NoError(t, db.Model(&model.AdminQuotaCreditEvidence{}).Where("user_id = ?", user.Id).Count(&count).Error)
+	assert.EqualValues(t, 2, count)
+}
+
 func TestManageUserQuotaConcurrentSnapshots(t *testing.T) {
 	db := setupManageUserTestDB(t)
 	user := model.User{Username: "concurrent-quota", Quota: 1000}
@@ -506,7 +648,7 @@ func TestManageUserQuotaConcurrentSnapshots(t *testing.T) {
 	results := make(chan result, 2)
 	for _, value := range []int{10, 20} {
 		go func(value int) {
-			adjustment, err := model.AdjustUserQuota(user.Id, common.RoleRootUser, "add", value)
+			adjustment, err := model.AdjustUserQuota(user.Id, 9999, common.RoleRootUser, "add", value, nil)
 			results <- result{adjustment, err, value}
 		}(value)
 	}

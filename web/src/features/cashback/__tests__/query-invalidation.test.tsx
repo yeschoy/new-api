@@ -44,6 +44,7 @@ const filters: CashbackRewardFilters = {
   pageSize: 20,
   tradeNo: '',
   userId: '',
+  campaignId: '',
   direction: '',
   reviewStatus: '',
   settlementStatus: '',

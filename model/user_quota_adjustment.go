@@ -1,6 +1,8 @@
 package model
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -23,8 +25,8 @@ type UserQuotaAdjustment struct {
 	After    int
 }
 
-func AdjustUserQuota(userID, operatorRole int, mode string, value int) (*UserQuotaAdjustment, error) {
-	if userID <= 0 || (mode != "add" && mode != "subtract" && mode != "override") {
+func AdjustUserQuota(userID, operatorID, operatorRole int, mode string, value int, cnyCents *int64) (*UserQuotaAdjustment, error) {
+	if userID <= 0 || operatorID <= 0 || (mode != "add" && mode != "subtract" && mode != "override") || (cnyCents != nil && (mode != "add" || *cnyCents <= 0 || *cnyCents > common.MaxWalletQuota)) {
 		return nil, ErrInvalidUserQuotaAdjustment
 	}
 	if mode != "override" && value <= 0 {
@@ -67,6 +69,30 @@ func AdjustUserQuota(userID, operatorRole int, mode string, value int) (*UserQuo
 			if result.RowsAffected != 1 {
 				return gorm.ErrRecordNotFound
 			}
+		}
+		// Generate the key after locking the user. The evidence and wallet
+		// mutation commit or roll back together; no CNY face value is inferred.
+		var key [32]byte
+		if _, err := rand.Read(key[:]); err != nil {
+			return err
+		}
+		if mode == "add" {
+			creditedAt, err := getDBTimestampOnStrict(tx)
+			if err != nil {
+				return err
+			}
+			evidence := AdminQuotaCreditEvidence{
+				EventKey: hex.EncodeToString(key[:]), UserID: int64(user.Id), OperatorID: int64(operatorID),
+				CreditedQuota: int64(value), CNYCents: cnyCents, CreditedAt: creditedAt,
+			}
+			if err := tx.Create(&evidence).Error; err != nil {
+				return err
+			}
+			if err := recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "admin_add", evidence.ID, int64(value), ""); err != nil {
+				return err
+			}
+		} else if err := recordWalletRefundCreditTx(tx, user, walletRefundException, "admin_adjustment", 0, 0, hex.EncodeToString(key[:])); err != nil {
+			return err
 		}
 		adjustment = UserQuotaAdjustment{UserID: user.Id, Username: user.Username, Before: user.Quota, After: after}
 		return nil

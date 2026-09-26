@@ -27,6 +27,12 @@ type cashbackConfigUpdateRequest struct {
 	IPAccountThreshold       *int  `json:"ip_account_threshold"`
 	DeviceAccountThreshold   *int  `json:"device_account_threshold"`
 	DailyTopUpCountThreshold *int  `json:"daily_topup_count_threshold"`
+	AutoReviewEnabled        *bool `json:"auto_review_enabled"`
+	LowReviewRequired        *bool `json:"low_review_required"`
+	MediumReviewRequired     *bool `json:"medium_review_required"`
+	HighReviewRequired       *bool `json:"high_review_required"`
+	SevereReviewRequired     *bool `json:"severe_review_required"`
+	AutoReviewImmediateIssue *bool `json:"auto_review_immediate_issue"`
 }
 
 func decodeCashbackConfigUpdate(reader io.Reader) (cashbackConfigUpdateRequest, error) {
@@ -131,6 +137,11 @@ func UpdateCashbackConfig(c *gin.Context) {
 		candidate,
 		operation_setting.IsPaymentComplianceConfirmed(),
 		time.Now().Unix(),
+		operation_setting.CashbackReviewPolicyUpdate{
+			AutoReviewEnabled: request.AutoReviewEnabled, LowReviewRequired: request.LowReviewRequired,
+			MediumReviewRequired: request.MediumReviewRequired, HighReviewRequired: request.HighReviewRequired,
+			SevereReviewRequired: request.SevereReviewRequired, AutoReviewImmediateIssue: request.AutoReviewImmediateIssue,
+		},
 	)
 	if err != nil {
 		var validationErr *operation_setting.CashbackSettingValidationError
@@ -187,6 +198,24 @@ func cashbackConfigChangedFields(current, next operation_setting.CashbackSetting
 	}
 	if current.DailyTopUpCountThreshold != next.DailyTopUpCountThreshold {
 		fields = append(fields, "daily_topup_count_threshold")
+	}
+	if current.AutoReviewEnabled != next.AutoReviewEnabled {
+		fields = append(fields, "auto_review_enabled")
+	}
+	if current.LowReviewRequired != next.LowReviewRequired {
+		fields = append(fields, "low_review_required")
+	}
+	if current.MediumReviewRequired != next.MediumReviewRequired {
+		fields = append(fields, "medium_review_required")
+	}
+	if current.HighReviewRequired != next.HighReviewRequired {
+		fields = append(fields, "high_review_required")
+	}
+	if current.SevereReviewRequired != next.SevereReviewRequired {
+		fields = append(fields, "severe_review_required")
+	}
+	if current.AutoReviewImmediateIssue != next.AutoReviewImmediateIssue {
+		fields = append(fields, "auto_review_immediate_issue")
 	}
 	if current.FirstEnabledAt != next.FirstEnabledAt {
 		fields = append(fields, "first_enabled_at")

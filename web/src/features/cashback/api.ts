@@ -25,6 +25,7 @@ import type {
   CashbackRewardDetail,
   CashbackRewardFilters,
   CashbackRewardPage,
+  CashbackRecordedSpendReport,
   CashbackSummary,
 } from './types'
 
@@ -39,6 +40,7 @@ export async function getCashbackRewards(
         page_size: filters.pageSize,
         trade_no: filters.tradeNo || undefined,
         user_id: filters.userId || undefined,
+        campaign_id: filters.campaignId || undefined,
         direction: filters.direction || undefined,
         review_status: filters.reviewStatus || undefined,
         settlement_status: filters.settlementStatus || undefined,
@@ -55,6 +57,26 @@ export async function getCashbackReward(
   const res = await api.get<ApiResponse<CashbackRewardDetail>>(
     `/api/cashback/rewards/${rewardId}`,
     { disableDuplicate: true }
+  )
+  return res.data
+}
+
+export async function getCashbackRecordedSpend(
+  userId: number,
+  startAt: number,
+  endAt: number,
+  confirmedCNYTopUpIds: number[] = []
+): Promise<ApiResponse<CashbackRecordedSpendReport>> {
+  const params = new URLSearchParams({
+    start_at: String(startAt),
+    end_at: String(endAt),
+  })
+  for (const id of confirmedCNYTopUpIds) {
+    params.append('confirm_cny_top_up_id', String(id))
+  }
+  const res = await api.get<ApiResponse<CashbackRecordedSpendReport>>(
+    `/api/cashback/users/${userId}/recorded-spend`,
+    { params, disableDuplicate: true }
   )
   return res.data
 }

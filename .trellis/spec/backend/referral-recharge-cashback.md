@@ -19,7 +19,8 @@ browser signal + online order
   -> CashbackOrderContext
   -> verified provider success transaction
   -> CashbackReward per enabled direction
-  -> manual review + T+N maturity + current hard-block check
+  -> per-direction review policy + current hard-block / reconciliation check
+  -> manual/T+N settlement or same-payment transaction immediate issue
   -> User.quota
   -> optional incident recovery / debt
 ```
@@ -85,14 +86,58 @@ snapshot and overrun the cap.
 | Route | Auth / guard | Contract |
 | --- | --- | --- |
 | `GET /api/cashback/config` | Root | Returns the stored config plus `compliance_confirmed` |
-| `PUT /api/cashback/config` | Root | Replaces the complete writable config object atomically |
+| `PUT /api/cashback/config` | Root | Replaces the existing required config fields atomically; omitted optional review policy fields preserve the current values |
+| `GET /api/cashback/campaigns` | Root | Lists bounded campaign history |
+| `POST /api/cashback/campaigns` | Root + critical rate limit | Creates a nonoverlapping scheduled campaign with `start_at`, `end_at`, `max_rewards_per_user` |
+| `POST /api/cashback/campaigns/:id/stop` | Root + critical rate limit | Idempotently stops a campaign without modifying its start/end or existing rewards |
 | `GET /api/cashback/rewards` | Admin | Paginated list; filters: `trade_no`, `user_id`, `direction`, `review_status`, `settlement_status`, `risk_level` |
 | `GET /api/cashback/rewards/:id` | Admin | Returns reward, order context, snapshots, and usernames; every read emits `cashback.sensitive_view` |
 | `GET /api/cashback/summary` | Admin | Returns money/risk/debt/reconciliation aggregates and clusters |
+| `GET /api/cashback/users/:id/recorded-spend?start_at=&end_at=&confirm_cny_top_up_id=...` | Admin | Bounded display (90 days, at most 50 positive-amount completed top-ups) and optional repeated per-order Epay CNY confirmations. Optional LOG_DB consume-log aggregates are only recorded-spend observations; an independently bounded full ordered credit scan may return FIFO remaining quota and conditional manual cash reference. Every successful view audits the confirmed IDs. |
 | `POST /api/cashback/rewards/:id/review` | Admin + critical rate limit | `{ "action": "approve" | "reject", "reason": string }` |
 | `POST /api/cashback/topups/:id/incident` | Admin + critical rate limit | `{ "kind": "refund" | "chargeback" | "dispute", "cumulative_refund_rate_bps": int, "reason": string, "evidence_ref": string }` |
 | `POST /api/cashback/rewards/:id/debt/resolve` | Admin + critical rate limit | `{ "reason": string }` |
 | `POST /api/cashback/orders/:id/principal-debt/resolve` | Admin + critical rate limit | `{ "reason": string }` |
+
+The recorded-spend report is read-only, not a payout or certified cash balance.
+LOG_DB consume intervals can include subscription usage or omit wallet spending;
+missing/error LOG_DB returns `log_status=unavailable` and no observed intervals,
+without blocking independent FIFO computation. The administrator must stop
+usage and confirm the main-DB wallet balance is final (including batch flushes
+and reservation refunds); this is an assumption, **not** verified by the query.
+The main-DB wallet, event and source checks run in one read-only repeatable-read
+snapshot; optional LOG_DB observations run only after it closes. Numeric FIFO
+references are deployment-gated by `CASHBACK_REFUND_REFERENCE_ENABLED=true`
+(default off): operators enable it only after every writer is upgraded and
+source/balance history is reconciled. Reverse source checks scan all history
+without relying on second-resolution timestamps from different clocks; they
+can detect omissions, not prove completeness. Without this gate the endpoint
+still returns bounded recorded intervals and manual reconciliation. The FIFO
+scan reads all credit events from a nonrefundable zero wallet opening or a
+new-registration opening (including its nonrefundable welcome grant),
+independently of the display window (over 1000 events => manual), validates
+known source records and exceptional changes, then consumes
+`sum(grants)-User.quota` from oldest to newest. A historical nonzero/missing
+opening, negative or excessive balance, missing evidence, debt, incident,
+admin subtract/override or unknown grant requires manual reconciliation;
+optional consume logs never certify a particular interval. Gift credits enter
+only at actual issuance and are never cash. New admin add batches use their
+original declared CNY cents; quota-only adds and non-Epay orders remain in
+FIFO but prevent a complete cash total if unspent. Once the ordered credits,
+sources and wallet balance pass every numeric-evidence gate, an individually
+confirmed Epay order or admin add with declared CNY cents retains its own
+per-credit manual reference even when another unspent purchase lacks a cash
+face value. The total stays nil/manual; never sum those partial figures as a
+complete amount. Any missing source, exception or invalid balance suppresses
+all numeric references. Epay signed cents have no
+currency: individually confirmed successful Epay orders for the user may be
+outside the 90-day display window (at most 50 IDs per request) and receive
+CNY *manual reference* amounts in that request; no system verification or
+persistent attestation is implied. Integer proration floors each surviving
+purchase's paid cents by remaining/original purchased quota. Historical
+external refunds, omitted direct credits and old instances cannot be proven
+absent by this one evidence table; operators must reconcile these externally.
+No wallet, cashback, payout or ordinary spend is mutated by reading.
 
 The normal response envelope is `{ success, message, data? }`. Cashback errors
 also expose a stable `code`; a hard block may include `blocking_reason`.
@@ -105,13 +150,13 @@ than GORM models.
 
 ### Database signatures
 
-Only these cashback tables are registered in normal and fast migration lists:
+These cashback tables are registered in the main-database migration list:
 
-- `CashbackOrderContext`: unique `top_up_id`; normalized `base_quota`, actual
+- `CashbackOrderContext`: unique `top_up_id`; nullable-by-zero campaign association, normalized `base_quota`, actual
   `credited_quota`, order-local activation eligibility, request risk evidence,
   completion source/provider, incident, cumulative principal reversal, and
   principal debt.
-- `CashbackReward`: unique `(top_up_id, direction)`; relationship, calculation,
+- `CashbackReward`: unique `(top_up_id, direction)`; review source, relationship, calculation,
   immutable config/risk snapshots, review/settlement state, retry evidence,
   recovery, and reward debt.
 - `CashbackDeviceLink`: unique `(user_id, device_fingerprint_hash)` and reverse
@@ -121,6 +166,38 @@ Only these cashback tables are registered in normal and fast migration lists:
   `(reward_id, kind)` and `(top_up_id, kind)` indexes support bounded
   reconciliation batches. `LOG_DB` remains human-facing best-effort audit
   evidence and is never the money ledger.
+- `CashbackCampaign`: immutable `[start_at,end_at)` window, optional early
+  `stopped_at`, positive per-payer reward limit and creator/stopper identities.
+  `CashbackOrderContext.campaign_id=0` preserves old/unbound orders;
+  `CashbackReward.review_source` distinguishes automatic and manual review while
+  empty historical values remain readable.
+- `EpayPaymentEvidence`: main-DB side table with primary key `top_up_id`;
+  stores the first signed Epay amount and payment identifiers in the same
+  transaction as the successful top-up. It is not a wallet credit ledger or
+  a currency/merchant-settlement attestation.
+- `AdminQuotaCreditEvidence`: main-DB side table for **new** administrator `add`
+  operations only. Each positive quota credit and its unique event key, user,
+  operator and DB timestamp commit with the locked user wallet row. Its nullable
+  `cny_cents` is non-NULL only for new explicit positive bounded integer-CNY-cent
+  `add_quota` requests from a form displaying CNY. It records the administrator's
+  original input, not signed payment or a conversion of quota. The existing
+  display-currency conversion still determines the submitted quota; the server
+  validates cents independently of quota and wallet bounds and commits cents,
+  credited quota and balance together. USD/token/custom and legacy quota-only
+  adds keep NULL; do not infer CNY from quota or backfill historical credits.
+  `subtract`/`override` do not create a purchase credit. `(user_id,id)` orders
+  only these administrator credits, not other wallet grant sources. This table
+  alone is not a wallet ledger, settlement proof, or refund cash quote.
+- `WalletRefundCreditEvent`: main-DB `(user_id,id)` ordered low-frequency
+  opening/purchase/gift/nonrefundable/exception evidence. Every covered wallet
+  grant is written in the same transaction after locking the user's row;
+  ordinary consumption never writes an event. `opening` is nonrefundable;
+  `source_type=registration` identifies an atomic new-user welcome grant,
+  whereas a historical positive `wallet` opening requires manual review.
+  Manual order completion uses `source_type=manual_topup` even without a legacy
+  order context, participates in FIFO, and never has signed cash provenance;
+  online purchases still require a matching context and Epay signature proof.
+  Exceptions block numeric output, and event IDs (not seconds) order grants.
 
 The settlement scan index is ordered by
 `(review_status, settlement_status, available_at)`. Rolling exposure uses
@@ -150,6 +227,19 @@ wallet quota; floating-point money arithmetic is forbidden.
   increments the version under a locked Option row.
 - Generated rewards retain their config version and full config snapshot.
   Later configuration changes never recalculate an existing reward.
+- Review automation applies only to payer (`invitee` wire value) rewards. Its
+  master switch defaults off; low/medium require no manual review by default,
+  high/severe do; `auto_review_immediate_issue` defaults on but acts only for
+  auto-approved rewards. Invitee/payer and inviter directions remain independently
+  enabled; the latter always needs manual review. Missing new Option keys load
+  these defaults; older PUT clients omit policy fields without resetting them.
+- Campaigns are explicitly created, never synthesized at migration. Creation
+  and early stop serialize on the config version Option row. Order creation
+  captures campaign ID only when both server order-placement time and stored
+  order time are in its active window and the payer switch is enabled; payment
+  must also complete inside the same live campaign. Positive payer rewards
+  consume one per-user per-campaign slot even if later canceled or recovered.
+  Zero rewards do not count. No campaign never blocks inviter cashback.
 
 ### Order creation and provider completion
 
@@ -166,14 +256,41 @@ wallet quota; floating-point money arithmetic is forbidden.
   legacy context-less orders, `first_enabled_at` remains a compatibility
   fallback, with timestamp equality treated as pre-activation because new
   same-second orders carry an explicit context.
-- Verified provider settlement marks the order successful, calls
-  `CompleteTopUpCashbackTx`, and credits top-up quota in the same database
-  transaction. Any cashback invariant failure rolls back the complete payment
-  mutation so the provider can retry.
+- Verified provider settlement marks the order successful, credits purchased
+  quota under the payer's existing quota fence, then calls
+  `CompleteTopUpCashbackTx` in the same database transaction. This ordering
+  prepares transaction-local immediate issuance without issuing it yet.
+  Before purchase credit, read the payer's inviter, lock payer and possible
+  inviter in ascending user ID order (as reward issuance does), then recheck
+  the payer's referral identity under the lock. A changed referral fails the
+  transaction for a retry rather than adding a later lock in reverse order.
+  Verify the owned payer quota fence again after cashback completion and before
+  commit; pre-credit verification alone cannot protect subsequent mutations.
+  Any cashback invariant or fence failure rolls back the purchase credit,
+  order status, and reward mutation so the provider can retry; only a committed
+  purchase refreshes the quota cache after the transaction.
+- Both verified Epay notify and browser return pass the signed `money` to the
+  settlement transaction. Pending orders require a positive decimal amount
+  with no more than two fractional digits, parsed in integer cents and equal
+  to the stored order's original two-decimal checkout price. Invalid or
+  mismatched amounts fail the callback without credit; a later valid callback
+  remains retryable. The first verified completion atomically stores an
+  `EpayPaymentEvidence` row (unique `top_up_id`): signed paid hundredths,
+  merchant `out_trade_no`, gateway `trade_no`, signed merchant `pid`, completion
+  source, and payment timestamp; retries never overwrite it. Pending Epay
+  orders cannot settle without nonempty, bounded verified gateway trade number
+  and merchant ID; missing/invalid details leave the order and wallet unchanged.
+  Already successful historical orders remain idempotent without such details.
+  No secret key is stored. Legacy completed orders without evidence are not
+  backfilled. Epay's
+  signature does not attest currency: this evidence alone is **not** a CNY
+  attestation or permission to offer an automatic cash refund quote.
 - `provider_callback` and `verified_return` are eligible completion sources.
   `admin_manual` records the completion evidence but cannot generate rewards.
-- The payment-time configuration and current valid referral relationship decide
-  eligibility. Each enabled direction gets at most one row, enforced by
+- The payment-time configuration decides payer eligibility independently of a
+  referral, subject to its order-bound live campaign and per-user positive
+  reward limit. Only inviter rewards require an unchanged valid referral.
+  Each eligible direction gets at most one row, enforced by
   `(top_up_id, direction)`.
 - Calculation is
   `floor(base_quota * rate_bps / 10000)`, then the single-reward and beneficiary
@@ -193,14 +310,25 @@ wallet quota; floating-point money arithmetic is forbidden.
   account age, registration delay, session/IP/UA evidence, device rotation,
   provider consistency, top-up outcomes/frequency/amount patterns, inviter
   concentration, prior incidents, and exposure caps.
-- Every payable reward begins `review_status=pending` and
-  `settlement_status=frozen`; no automatic review is allowed.
+- Inviter and payer rewards requiring review begin `pending/frozen`.
+  Auto-approved payer rewards begin `approved/frozen` with
+  `review_source=automatic`, `reviewed_by=0` and a review timestamp. If the
+  immediate switch is on, `available_at=paid_at`; otherwise they retain T+N.
+  Existing manually approved rewards retain their original maturity and no
+  change in policy retroactively changes them. Historical empty review sources
+  are inferred from `reviewed_by` for display, not rewritten.
 - Reject always requires a non-empty reason. Approving `high` or `severe` risk
   also requires a reason.
 - Issuance requires all of: `approved`, `frozen`, `now >= available_at`, positive
-  reward quota, a successful matching online order, unchanged valid referral,
-  enabled accounts, eligible completion source/channel, no incident, and no
-  open beneficiary reward or principal debt.
+  reward quota, a successful matching online order, enabled payer/beneficiary
+  accounts, eligible completion source/channel, no incident, and no open
+  beneficiary reward or principal debt. An inviter reward additionally requires
+  an unchanged valid referral; payer rewards do not. Immediate issuance runs
+  after purchased quota credit in the verified payment transaction, uses the
+  held payer quota fence and transaction-local bounded reconciliation, and
+  writes a unique issue mutation before commit. A failed check rolls back both
+  purchase and reward. Post-commit cache publication invalidates the balance
+  instead of publishing only the purchase delta when an immediate gift issued.
 - Row locks, the unique mutation event, and state predicates—not the scheduler
   lease—guarantee at-most-once issuance. `cashback_settlement` runs every minute
   in batches of 100. Before issuing, it advances a bounded, primary-key ordered
@@ -336,8 +464,9 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 - Configuration: defaults; individual/combined rates; compliance; positive
   caps; immutable first-enable timestamp; atomic version update.
-- Migration: exactly the four side tables; no cashback columns on existing
-  business tables; unique order context, `(top_up_id, direction)`, and mutation
+- Migration: five cashback side tables; no cashback columns on existing
+  business tables; old context/reward rows survive added fields and repeated
+  migration; unique order context, `(top_up_id, direction)`, and mutation
   event keys.
 - Provider matrix: Epay, Stripe, Creem, Waffo, and Waffo Pancake create the same
   normalized cashback semantics; forged callbacks are rejected; verified
@@ -393,10 +522,9 @@ go createCashback(topUp)
 // Correct: one row-locked READ COMMITTED transaction owns all money state.
 err := cashbackTransaction(func(tx *gorm.DB) error {
     // lock TopUp, validate provider, mark success
-    if err := CompleteTopUpCashbackTx(tx, topUp, creditedQuota, source); err != nil {
-        return err
-    }
-    return creditTopUpQuota(tx, topUp.UserId, creditedQuota, nil)
+    // This locks potential beneficiaries by ascending ID, credits the payer,
+    // completes cashback, and verifies the payer fence again before commit.
+    return creditOnlineTopUpWithCashbackTx(tx, topUp, creditedQuota, nil, source, payerFences)
 })
 ```
 

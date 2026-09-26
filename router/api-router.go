@@ -214,6 +214,7 @@ func SetApiRouter(router *gin.Engine) {
 			cashbackAdminRoute.GET("/rewards", controller.ListCashbackRewards)
 			cashbackAdminRoute.GET("/rewards/:id", controller.GetCashbackReward)
 			cashbackAdminRoute.GET("/summary", controller.GetCashbackSummary)
+			cashbackAdminRoute.GET("/users/:id/recorded-spend", controller.GetCashbackRecordedSpend)
 			cashbackAdminRoute.POST("/rewards/:id/review", middleware.CriticalRateLimit(), controller.ReviewCashbackReward)
 			cashbackAdminRoute.POST("/topups/:id/incident", middleware.CriticalRateLimit(), controller.RecordCashbackIncident)
 			cashbackAdminRoute.POST("/rewards/:id/debt/resolve", middleware.CriticalRateLimit(), controller.ResolveCashbackRewardDebt)
@@ -225,6 +226,9 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			cashbackConfigRoute.GET("/config", controller.GetCashbackConfig)
 			cashbackConfigRoute.PUT("/config", controller.UpdateCashbackConfig)
+			cashbackConfigRoute.GET("/campaigns", controller.ListCashbackCampaigns)
+			cashbackConfigRoute.POST("/campaigns", middleware.CriticalRateLimit(), controller.CreateCashbackCampaign)
+			cashbackConfigRoute.POST("/campaigns/:id/stop", middleware.CriticalRateLimit(), controller.StopCashbackCampaign)
 		}
 
 		optionRoute := apiRouter.Group("/option")

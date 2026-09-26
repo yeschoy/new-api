@@ -57,7 +57,7 @@ end
 if not cache_valid then
   return -1
 end
-redis.call('HINCRBY', KEYS[1], 'Quota', tonumber(ARGV[1]))
+redis.call('HINCRBY', KEYS[1], 'Quota', ARGV[1])
 if ARGV[4] ~= '' then
   redis.call('EXPIRE', KEYS[1], ARGV[7])
 end

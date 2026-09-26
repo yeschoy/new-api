@@ -51,6 +51,12 @@ func assertRegistrationInviteeQuotaAndAudit(t *testing.T, user User) {
 	var stored User
 	require.NoError(t, DB.First(&stored, user.Id).Error)
 	assert.Equal(t, 125, stored.Quota)
+	var opening []WalletRefundCreditEvent
+	require.NoError(t, DB.Where("user_id = ?", user.Id).Find(&opening).Error)
+	require.Len(t, opening, 1)
+	assert.Equal(t, walletRefundOpening, opening[0].Kind)
+	assert.Equal(t, "registration", opening[0].SourceType)
+	assert.EqualValues(t, 125, opening[0].Quota) // Registration grants are never refundable purchases.
 
 	var logs []Log
 	require.NoError(t, LOG_DB.Where("user_id = ? AND type = ?", user.Id, LogTypeSystem).Find(&logs).Error)

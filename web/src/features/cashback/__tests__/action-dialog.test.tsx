@@ -77,6 +77,7 @@ const detail: CashbackRewardDetail = {
     available_at: 2,
     review_status: 'pending',
     reviewed_by: 0,
+    review_source: '',
     reviewed_at: 0,
     review_reason: '',
     settlement_status: 'frozen',
@@ -97,6 +98,7 @@ const detail: CashbackRewardDetail = {
   order: {
     id: 4,
     top_up_id: 12,
+    campaign_id: 0,
     trade_no: 'order',
     user_id: 2,
     payment_provider: 'stripe',

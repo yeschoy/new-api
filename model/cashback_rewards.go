@@ -18,7 +18,7 @@ type cashbackDirectionConfig struct {
 	RateBPS       int
 }
 
-func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, source CashbackCompletionSource) error {
+func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, source CashbackCompletionSource, heldFences ...*userQuotaMutationFences) error {
 	if tx == nil || topUp == nil || topUp.Id <= 0 {
 		return errors.New("invalid cashback completion input")
 	}
@@ -91,8 +91,23 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 		}
 		return err
 	}
-	if initialInvitee.InviterId <= 0 || initialInvitee.InviterId == initialInvitee.Id {
-		return nil
+	var campaign CashbackCampaign
+	if setting.InviteeEnabled && orderContext.CampaignID > 0 {
+		// The payment path already owns this row; direct transaction callers
+		// must also lock it before users so early stop cannot race eligibility.
+		err := lockForUpdate(tx).Where("id = ?", orderContext.CampaignID).First(&campaign).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil {
+			paymentCheckAt, clockErr := getDBTimestampOnStrict(tx)
+			if clockErr != nil {
+				return clockErr
+			}
+			if !campaign.activeAt(topUp.CompleteTime) || !campaign.activeAt(paymentCheckAt) {
+				campaign = CashbackCampaign{}
+			}
+		}
 	}
 	users, err := lockCashbackUsersTx(tx, initialInvitee.Id, initialInvitee.InviterId)
 	if err != nil {
@@ -100,9 +115,15 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 	}
 	invitee, inviteeOK := users[initialInvitee.Id]
 	inviter, inviterOK := users[initialInvitee.InviterId]
-	if !inviteeOK || !inviterOK || invitee.DeletedAt.Valid || inviter.DeletedAt.Valid ||
-		invitee.Status != common.UserStatusEnabled || inviter.Status != common.UserStatusEnabled ||
-		invitee.InviterId != inviter.Id || invitee.Id == inviter.Id {
+	if !inviteeOK || invitee.DeletedAt.Valid || invitee.Status != common.UserStatusEnabled {
+		return nil
+	}
+	validInviter := inviterOK && inviter.Id != invitee.Id && !inviter.DeletedAt.Valid &&
+		inviter.Status == common.UserStatusEnabled && invitee.InviterId == inviter.Id
+	if !validInviter {
+		inviter = User{}
+	}
+	if !validInviter && campaign.ID == 0 {
 		return nil
 	}
 
@@ -119,12 +140,12 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 		return err
 	}
 	directions := make([]cashbackDirectionConfig, 0, 2)
-	if setting.InviterEnabled {
+	if setting.InviterEnabled && validInviter {
 		directions = append(directions, cashbackDirectionConfig{
 			Direction: CashbackDirectionInviter, BeneficiaryID: inviter.Id, RateBPS: setting.InviterRateBPS,
 		})
 	}
-	if setting.InviteeEnabled {
+	if setting.InviteeEnabled && campaign.ID > 0 {
 		directions = append(directions, cashbackDirectionConfig{
 			Direction: CashbackDirectionInvitee, BeneficiaryID: invitee.Id, RateBPS: setting.InviteeRateBPS,
 		})
@@ -155,6 +176,18 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			return err
 		}
 		rewardQuota, capReason := capCashbackQuota(calculatedQuota, dailyUsed, setting)
+		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 {
+			var used int64
+			orders := tx.Model(&CashbackOrderContext{}).Select("top_up_id").Where("campaign_id = ?", campaign.ID)
+			if err := tx.Model(&CashbackReward{}).
+				Where("top_up_id IN (?) AND direction = ? AND beneficiary_id = ? AND reward_quota > 0", orders, CashbackDirectionInvitee, invitee.Id).
+				Count(&used).Error; err != nil {
+				return err
+			}
+			if used >= int64(campaign.MaxRewardsPerUser) {
+				continue
+			}
+		}
 		blockedByDebt, err := cashbackHasOpenDebtTx(tx, direction.BeneficiaryID)
 		if err != nil {
 			return err
@@ -222,8 +255,57 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			ConfigSnapshot:   string(configSnapshot),
 			BlockingReason:   blockingReason,
 		}
+		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 && setting.AutoReviewEnabled {
+			reviewRequired := true
+			switch riskLevel {
+			case CashbackRiskLow:
+				reviewRequired = setting.LowReviewRequired
+			case CashbackRiskMedium:
+				reviewRequired = setting.MediumReviewRequired
+			case CashbackRiskHigh:
+				reviewRequired = setting.HighReviewRequired
+			case CashbackRiskSevere:
+				reviewRequired = setting.SevereReviewRequired
+			}
+			if !reviewRequired {
+				reward.ReviewStatus = CashbackReviewApproved
+				reward.ReviewSource = CashbackReviewAutomatic
+				reward.ReviewedAt = topUp.CompleteTime
+				if setting.AutoReviewImmediateIssue {
+					reward.AvailableAt = topUp.CompleteTime
+				}
+			}
+		}
 		if err := tx.Create(&reward).Error; err != nil {
 			return err
+		}
+		if reward.ReviewSource == CashbackReviewAutomatic && reward.AvailableAt == topUp.CompleteTime {
+			if common.RedisEnabled && (len(heldFences) == 0 || heldFences[0] == nil || !heldFences[0].owns(invitee.Id)) {
+				return ErrUserQuotaMutationFenceLost
+			}
+			if len(heldFences) > 0 {
+				if err := heldFences[0].verify(); err != nil {
+					return err
+				}
+			}
+			if err := requireCashbackReconciliationHealthyTx(tx); err != nil {
+				return err
+			}
+			blockingReason, currentUsers, err := cashbackHardBlockReasonTx(tx, topUp, &orderContext, &reward)
+			if err != nil {
+				return err
+			}
+			if blockingReason != "" {
+				return errors.New("immediate cashback blocked: " + blockingReason)
+			}
+			if _, err := issueLockedCashbackRewardTx(tx, &reward, currentUsers[reward.BeneficiaryID], topUp.CompleteTime); err != nil {
+				return err
+			}
+			if len(heldFences) > 0 && heldFences[0] != nil {
+				heldFences[0].cashbackIssued = true
+				heldFences[0].cashbackRewardID = reward.ID
+				heldFences[0].cashbackQuota = reward.RewardQuota
+			}
 		}
 	}
 	return nil

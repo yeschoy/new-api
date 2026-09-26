@@ -2,9 +2,11 @@ package controller
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -30,7 +32,7 @@ func setupCashbackConfigControllerTest(t *testing.T) {
 
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.Option{}, &model.User{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.Option{}, &model.User{}, &model.TopUp{}, &model.CashbackCampaign{}, &model.CashbackOrderContext{}, &model.EpayPaymentEvidence{}, &model.Log{}, &model.AuditLog{}))
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	common.RedisEnabled = false
@@ -73,6 +75,53 @@ func runCashbackConfigUpdate(t *testing.T, body string) *httptest.ResponseRecord
 	return recorder
 }
 
+func TestRecordedSpendRejectsInvalidCurrencyConfirmations(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	for _, query := range []string{
+		"confirm_cny_top_up_id=0", "confirm_cny_top_up_id=abc",
+		"confirm_cny_top_up_id=1&confirm_cny_top_up_id=1",
+		"confirm_cny_top_up_id=123", // No such order for this user.
+	} {
+		t.Run(query, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/api/cashback/users/1/recorded-spend?start_at=100&end_at=200&"+query, nil)
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+			context.Params = gin.Params{{Key: "id", Value: "1"}}
+			context.Request = request
+			GetCashbackRecordedSpend(context)
+			assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		})
+	}
+}
+
+func TestRecordedSpendConfirmsOutsideWindowAndAudits(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	payer := model.User{Username: "report-outside-payer", AffCode: "report-outside-payer", Status: common.UserStatusEnabled}
+	require.NoError(t, model.DB.Create(&payer).Error)
+	order := model.TopUp{UserId: payer.Id, TradeNo: "report-outside-epay", Amount: 100, Status: common.TopUpStatusSuccess, CompleteTime: 100, PaymentProvider: model.PaymentProviderEpay}
+	require.NoError(t, model.DB.Create(&order).Error)
+	require.NoError(t, model.DB.Create(&model.CashbackOrderContext{TopUpID: order.Id, UserID: payer.Id, TradeNo: order.TradeNo, PaymentProvider: model.PaymentProviderEpay, BaseQuota: 100, CreditedQuota: 100, DeviceSignalStatus: model.CashbackDeviceSignalMissing, CompletionSource: model.CashbackCompletionProviderCallback, CompletionProvider: model.PaymentProviderEpay}).Error)
+	require.NoError(t, model.DB.Create(&model.EpayPaymentEvidence{TopUpID: order.Id, TradeNo: order.TradeNo, GatewayTradeNo: "gateway", MerchantID: "merchant", PaidCents: 10000, Source: model.CashbackCompletionProviderCallback, VerifiedAt: order.CompleteTime}).Error)
+	request := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/cashback/users/%d/recorded-spend?start_at=200&end_at=300&confirm_cny_top_up_id=%d", payer.Id, order.Id), nil)
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Params = gin.Params{{Key: "id", Value: fmt.Sprint(payer.Id)}}
+	context.Request = request
+	context.Set("id", 1)
+	context.Set("username", "cashback-config-admin")
+	GetCashbackRecordedSpend(context)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"refund_status":"manual_reconciliation"`)
+	assert.Contains(t, recorder.Body.String(), `"top_ups":[]`)
+	var audit []model.AuditLog
+	require.NoError(t, model.DB.Where("action = ?", "cashback.recorded_spend_view").Find(&audit).Error)
+	require.Len(t, audit, 1)
+	require.NotNil(t, audit[0].Other.Op)
+	assert.Contains(t, fmt.Sprint(audit[0].Other.Op.Params["confirmed_cny_top_up_ids"]), fmt.Sprint(order.Id))
+}
+
 func TestUpdateCashbackConfigPreservesFirstEnableBoundary(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setupCashbackConfigControllerTest(t)
@@ -102,6 +151,87 @@ func TestUpdateCashbackConfigPreservesFirstEnableBoundary(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, firstEnabledAt, stored.FirstEnabledAt)
 	assert.EqualValues(t, 2, stored.Version)
+}
+
+func TestUpdateCashbackConfigPreservesReviewPolicyForOldClients(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	current, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.False(t, current.AutoReviewEnabled)
+	assert.False(t, current.LowReviewRequired)
+	assert.False(t, current.MediumReviewRequired)
+	assert.True(t, current.HighReviewRequired)
+	assert.True(t, current.SevereReviewRequired)
+	assert.True(t, current.AutoReviewImmediateIssue)
+
+	body := `{"inviter_enabled":false,"invitee_enabled":false,"inviter_rate_bps":0,"invitee_rate_bps":0,
+		"settlement_days":7,"max_reward_quota":1000,"daily_reward_quota":5000,
+		"ip_account_threshold":3,"device_account_threshold":2,"daily_topup_count_threshold":5,
+		"auto_review_enabled":true,"medium_review_required":true,"high_review_required":false,"auto_review_immediate_issue":false}`
+	response := runCashbackConfigUpdate(t, body)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	current, err = model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.True(t, current.AutoReviewEnabled)
+	assert.True(t, current.MediumReviewRequired)
+	assert.False(t, current.HighReviewRequired)
+	assert.True(t, current.SevereReviewRequired)
+	assert.False(t, current.AutoReviewImmediateIssue)
+	response = runCashbackConfigUpdate(t, validCashbackConfigJSON)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	stored, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Equal(t, current.AutoReviewEnabled, stored.AutoReviewEnabled)
+	assert.Equal(t, current.MediumReviewRequired, stored.MediumReviewRequired)
+	assert.Equal(t, current.HighReviewRequired, stored.HighReviewRequired)
+	assert.Equal(t, current.AutoReviewImmediateIssue, stored.AutoReviewImmediateIssue)
+}
+
+func TestCashbackCampaignCreateAndStop(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	start := time.Now().Unix() + 60
+	body := fmt.Sprintf(`{"start_at":%d,"end_at":%d,"max_rewards_per_user":1}`, start, start+3600)
+	call := func(method, path, body string, handler gin.HandlerFunc) *httptest.ResponseRecorder {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		context, _ := gin.CreateTestContext(recorder)
+		context.Request = httptest.NewRequest(method, path, bytes.NewBufferString(body))
+		context.Set("id", 1)
+		context.Set("role", common.RoleRootUser)
+		context.Set("username", "cashback-config-admin")
+		if path != "/api/cashback/campaigns" {
+			context.Params = gin.Params{{Key: "id", Value: "1"}}
+		}
+		handler(context)
+		return recorder
+	}
+	response := call(http.MethodPost, "/api/cashback/campaigns", body, CreateCashbackCampaign)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), `"status":"planned"`)
+	response = call(http.MethodPost, "/api/cashback/campaigns", body, CreateCashbackCampaign)
+	assert.Equal(t, http.StatusConflict, response.Code)
+	response = call(http.MethodPost, "/api/cashback/campaigns/1/stop", "", StopCashbackCampaign)
+	assert.Equal(t, http.StatusOK, response.Code)
+	assert.Contains(t, response.Body.String(), `"status":"ended"`)
+	response = call(http.MethodPost, "/api/cashback/campaigns/1/stop", "", StopCashbackCampaign)
+	assert.Equal(t, http.StatusOK, response.Code)
+	response = call(http.MethodPost, "/api/cashback/campaigns", body, CreateCashbackCampaign)
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	var audit []model.AuditLog
+	require.NoError(t, model.LOG_DB.Where("action IN ?", []string{"cashback.campaign_create", "cashback.campaign_stop"}).Order("id").Find(&audit).Error)
+	require.Len(t, audit, 4) // Successful create, stop, idempotent stop, replacement create.
+	assert.Equal(t, "cashback.campaign_create", audit[0].Action)
+	assert.Equal(t, "cashback.campaign_stop", audit[1].Action)
+	assert.Equal(t, "cashback.campaign_stop", audit[2].Action)
+	assert.Equal(t, "cashback.campaign_create", audit[3].Action)
+	for _, event := range audit {
+		assert.Equal(t, 1, event.UserId)
+		assert.Equal(t, common.RoleRootUser, event.ActorRole)
+		assert.True(t, event.Success)
+	}
 }
 
 func TestUpdateCashbackConfigMalformedJSONReturnsStableConfigField(t *testing.T) {

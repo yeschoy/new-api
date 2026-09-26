@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -45,12 +48,15 @@ const (
 )
 
 var (
-	ErrPaymentMethodMismatch    = errors.New("payment method mismatch")
-	ErrTopUpNotFound            = errors.New("topup not found")
-	ErrTopUpStatusInvalid       = errors.New("topup status invalid")
-	ErrInvalidTopUpQuota        = errors.New("invalid top-up quota")
-	ErrTopUpQuotaLimitExceeded  = errors.New("top-up quota limit exceeded")
-	ErrWalletQuotaLimitExceeded = errors.New("wallet quota limit exceeded")
+	ErrPaymentMethodMismatch     = errors.New("payment method mismatch")
+	ErrTopUpNotFound             = errors.New("topup not found")
+	ErrTopUpStatusInvalid        = errors.New("topup status invalid")
+	ErrInvalidTopUpQuota         = errors.New("invalid top-up quota")
+	ErrTopUpQuotaLimitExceeded   = errors.New("top-up quota limit exceeded")
+	ErrWalletQuotaLimitExceeded  = errors.New("wallet quota limit exceeded")
+	ErrEpayPaymentAmountInvalid  = errors.New("invalid epay payment amount")
+	ErrEpayPaymentAmountMismatch = errors.New("epay payment amount mismatch")
+	ErrEpayPaymentProofInvalid   = errors.New("invalid epay payment proof")
 )
 
 func (topUp *TopUp) Insert() error {
@@ -186,7 +192,7 @@ func validateTopUpQuotaFenceCandidatePaymentMethod(topUp *TopUp, candidate topUp
 	return nil
 }
 
-func creditTopUpQuotaProtected(tx *gorm.DB, userId int, creditedQuota int, updates map[string]interface{}, fences *userQuotaMutationFences) error {
+func creditTopUpQuotaProtected(tx *gorm.DB, userId int, creditedQuota int, updates map[string]any, fences *userQuotaMutationFences) error {
 	if common.RedisEnabled && (fences == nil || !fences.owns(userId)) {
 		return ErrUserQuotaMutationFenceLost
 	}
@@ -194,6 +200,65 @@ func creditTopUpQuotaProtected(tx *gorm.DB, userId int, creditedQuota int, updat
 		return err
 	}
 	return creditTopUpQuota(tx, userId, creditedQuota, updates)
+}
+
+// creditOnlineTopUpWithCashbackTx serializes the payer and potential inviter in
+// the same order as reward issuance before any wallet UPDATE. The payer lock
+// also prevents the referral from changing between this check and completion.
+func creditOnlineTopUpWithCashbackTx(tx *gorm.DB, topUp *TopUp, quota int, updates map[string]any, source CashbackCompletionSource, fences *userQuotaMutationFences) error {
+	var payer User
+	if err := tx.Unscoped().Select("id", "inviter_id").Where("id = ?", topUp.UserId).First(&payer).Error; err != nil {
+		return err
+	}
+	// Lock the bound campaign before user rows. Early stop locks the config
+	// version then this campaign; neither path may later acquire a user row
+	// in the opposite order. Sample payment time only after the campaign lock.
+	var context CashbackOrderContext
+	err := tx.Select("campaign_id").Where("top_up_id = ?", topUp.Id).First(&context).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	if err == nil && context.CampaignID > 0 {
+		var campaign CashbackCampaign
+		// A missing campaign cannot grant payer cashback, but must not
+		// suppress an otherwise eligible inviter reward or the purchase.
+		if err := lockForUpdate(tx).Where("id = ?", context.CampaignID).First(&campaign).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+	ids := []int{payer.Id}
+	if payer.InviterId > 0 && payer.InviterId != payer.Id {
+		ids = append(ids, payer.InviterId)
+	}
+	users, err := lockCashbackUsersTx(tx, ids...)
+	if err != nil {
+		return err
+	}
+	lockedPayer, ok := users[payer.Id]
+	if !ok || lockedPayer.InviterId != payer.InviterId {
+		return ErrCashbackInvalidState // Referral changed while acquiring locks; retry from a new transaction.
+	}
+	paidAt, err := getDBTimestampOnStrict(tx)
+	if err != nil {
+		return err
+	}
+	topUp.CompleteTime = paidAt
+	topUp.Status = common.TopUpStatusSuccess
+	if err := tx.Save(topUp).Error; err != nil {
+		return err
+	}
+	if err := recordWalletRefundCreditTx(tx, lockedPayer, walletRefundPurchase, "topup", int64(topUp.Id), int64(quota), ""); err != nil {
+		return err
+	}
+	if err := creditTopUpQuotaProtected(tx, topUp.UserId, quota, updates, fences); err != nil {
+		return err
+	}
+	if err := CompleteTopUpCashbackTx(tx, topUp, quota, source, fences); err != nil {
+		return err
+	}
+	// The completion may later issue cashback in this transaction. Ownership
+	// verified only before the purchase UPDATE is not sufficient at commit.
+	return fences.verify()
 }
 
 func (topUp *TopUp) Update() error {
@@ -253,15 +318,57 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 // 在同一个事务内完成，因此同一订单的并发/重复回调（包括多实例部署下）最多充值一次。
 // alreadyDone=true 表示订单此前已完成，本次为幂等重复回调。
 // 进程内的 LockOrder 只是优化，正确性由本函数的数据库行锁保证。
-func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
-	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, callerIp, CashbackCompletionProviderCallback)
+// Pending orders require verified payment details; historical successful orders
+// remain idempotent even when their original completion predates this evidence.
+func RechargeEpay(tradeNo string, actualPaymentMethod string, signedMoney string, callerIp string, verifiedDetails EpayVerifiedDetails) (alreadyDone bool, err error) {
+	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, signedMoney, callerIp, CashbackCompletionProviderCallback, verifiedDetails)
 }
 
-func RechargeEpayVerifiedReturn(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
-	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, callerIp, CashbackCompletionVerifiedReturn)
+func RechargeEpayVerifiedReturn(tradeNo string, actualPaymentMethod string, signedMoney string, callerIp string, verifiedDetails EpayVerifiedDetails) (alreadyDone bool, err error) {
+	return rechargeEpayWithSource(tradeNo, actualPaymentMethod, signedMoney, callerIp, CashbackCompletionVerifiedReturn, verifiedDetails)
 }
 
-func rechargeEpayWithSource(tradeNo string, actualPaymentMethod string, callerIp string, completionSource CashbackCompletionSource) (alreadyDone bool, err error) {
+// epayAmountCents accepts only positive decimal amounts with at most two
+// fractional digits. Parse in integer cents so callbacks cannot round a
+// different signed amount into the checkout price. Epay does not sign a
+// currency; this check alone cannot establish CNY settlement for refunds.
+func epayAmountCents(money string) (int64, error) {
+	whole, fraction, hasDot := strings.Cut(money, ".")
+	if whole == "" || hasDot && (fraction == "" || len(fraction) > 2) {
+		return 0, ErrEpayPaymentAmountInvalid
+	}
+	for _, part := range []string{whole, fraction} {
+		for i := range len(part) {
+			if part[i] < '0' || part[i] > '9' {
+				return 0, ErrEpayPaymentAmountInvalid
+			}
+		}
+	}
+	units, err := strconv.ParseInt(whole, 10, 64)
+	if err != nil || units > math.MaxInt64/100 {
+		return 0, ErrEpayPaymentAmountInvalid
+	}
+	cents := units * 100
+	if hasDot {
+		minor, err := strconv.ParseInt(fraction, 10, 64)
+		if err != nil {
+			return 0, ErrEpayPaymentAmountInvalid
+		}
+		if len(fraction) == 1 {
+			minor *= 10
+		}
+		if cents > math.MaxInt64-minor {
+			return 0, ErrEpayPaymentAmountInvalid
+		}
+		cents += minor
+	}
+	if cents == 0 {
+		return 0, ErrEpayPaymentAmountInvalid
+	}
+	return cents, nil
+}
+
+func rechargeEpayWithSource(tradeNo string, actualPaymentMethod string, signedMoney string, callerIp string, completionSource CashbackCompletionSource, verifiedDetails EpayVerifiedDetails) (alreadyDone bool, err error) {
 	if tradeNo == "" {
 		return false, errors.New("未提供支付单号")
 	}
@@ -303,6 +410,23 @@ func rechargeEpayWithSource(tradeNo string, actualPaymentMethod string, callerIp
 		if err := validateTopUpQuotaFenceCandidatePaymentMethod(topUp, candidate); err != nil {
 			return err
 		}
+		if strings.TrimSpace(verifiedDetails.GatewayTradeNo) == "" || strings.TrimSpace(verifiedDetails.MerchantID) == "" || len(verifiedDetails.GatewayTradeNo) > 255 || len(verifiedDetails.MerchantID) > 255 {
+			return ErrEpayPaymentProofInvalid
+		}
+		paidCents, err := epayAmountCents(signedMoney)
+		if err != nil {
+			return err
+		}
+		// RequestEpay sends FormatFloat(payMoney, 'f', 2, 64). Recreate
+		// that exact checkout representation from the stored order, not
+		// from the current (mutable) pricing configuration.
+		expectedCents, err := epayAmountCents(strconv.FormatFloat(topUp.Money, 'f', 2, 64))
+		if err != nil {
+			return err
+		}
+		if paidCents != expectedCents {
+			return ErrEpayPaymentAmountMismatch
+		}
 		if actualPaymentMethod != "" && topUp.PaymentMethod != actualPaymentMethod {
 			topUp.PaymentMethod = actualPaymentMethod
 		}
@@ -313,15 +437,18 @@ func rechargeEpayWithSource(tradeNo string, actualPaymentMethod string, callerIp
 		if quotaErr != nil || quotaToAdd <= 0 {
 			return ErrInvalidTopUpQuota
 		}
-		topUp.CompleteTime = common.GetTimestamp()
-		topUp.Status = common.TopUpStatusSuccess
-		if err := tx.Save(topUp).Error; err != nil {
+		if err := creditOnlineTopUpWithCashbackTx(tx, topUp, quotaToAdd, nil, completionSource, creditFences); err != nil {
 			return err
 		}
-		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, completionSource); err != nil {
+		if err := tx.Create(&EpayPaymentEvidence{
+			TopUpID: topUp.Id, TradeNo: topUp.TradeNo,
+			GatewayTradeNo: verifiedDetails.GatewayTradeNo, MerchantID: verifiedDetails.MerchantID,
+			PaidCents: paidCents,
+			Source:    completionSource, VerifiedAt: topUp.CompleteTime,
+		}).Error; err != nil {
 			return err
 		}
-		return creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences)
+		return creditFences.verify()
 	})
 	if err != nil {
 		if !errors.Is(err, ErrTopUpNotFound) && !errors.Is(err, ErrPaymentMethodMismatch) && !errors.Is(err, ErrTopUpStatusInvalid) {
@@ -388,25 +515,15 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 			return err
 		}
 
-		topUp.CompleteTime = common.GetTimestamp()
-		topUp.Status = common.TopUpStatusSuccess
-		err = tx.Save(topUp).Error
-		if err != nil {
-			return err
-		}
-
 		quota, err = common.WalletQuotaFromDecimalStrict(
 			decimal.NewFromFloat(topUp.Money).Mul(decimal.NewFromFloat(common.QuotaPerUnit)),
 		)
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
 		}
-		if err := CompleteTopUpCashbackTx(tx, topUp, quota, CashbackCompletionProviderCallback); err != nil {
-			return err
-		}
-		return creditTopUpQuotaProtected(tx, topUp.UserId, quota, map[string]any{
+		return creditOnlineTopUpWithCashbackTx(tx, topUp, quota, map[string]any{
 			"stripe_customer": customerId,
-		}, creditFences)
+		}, CashbackCompletionProviderCallback, creditFences)
 	})
 
 	if err != nil {
@@ -659,6 +776,14 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 			return err
 		}
 
+		// 人工补单也占一个真实购买批次，但没有验签实付证据。
+		var payer User
+		if err := lockForUpdate(tx).Select("id", "quota").Where("id = ?", topUp.UserId).First(&payer).Error; err != nil {
+			return err
+		}
+		if err := recordWalletRefundCreditTx(tx, payer, walletRefundPurchase, "manual_topup", int64(topUp.Id), int64(quotaToAdd), ""); err != nil {
+			return err
+		}
 		// 增加用户额度（立即写库，保持一致性）
 		if err := creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences); err != nil {
 			return err
@@ -731,21 +856,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			return err
 		}
 
-		topUp.CompleteTime = common.GetTimestamp()
-		topUp.Status = common.TopUpStatusSuccess
-		err = tx.Save(topUp).Error
-		if err != nil {
-			return err
-		}
-
 		// Creem 直接使用 Amount 作为充值额度（整数）
 		quota, err = common.WalletQuotaFromDecimalStrict(decimal.NewFromInt(topUp.Amount))
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
-		}
-
-		if err := CompleteTopUpCashbackTx(tx, topUp, quota, CashbackCompletionProviderCallback); err != nil {
-			return err
 		}
 
 		// 构建更新字段，优先使用邮箱，如果邮箱为空则使用用户名
@@ -766,7 +880,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			}
 		}
 
-		return creditTopUpQuotaProtected(tx, topUp.UserId, quota, updateFields, creditFences)
+		return creditOnlineTopUpWithCashbackTx(tx, topUp, quota, updateFields, CashbackCompletionProviderCallback, creditFences)
 	})
 
 	if err != nil {
@@ -840,16 +954,7 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 			return ErrInvalidTopUpQuota
 		}
 
-		topUp.CompleteTime = common.GetTimestamp()
-		topUp.Status = common.TopUpStatusSuccess
-		if err := tx.Save(topUp).Error; err != nil {
-			return err
-		}
-		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, CashbackCompletionProviderCallback); err != nil {
-			return err
-		}
-
-		return creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences)
+		return creditOnlineTopUpWithCashbackTx(tx, topUp, quotaToAdd, nil, CashbackCompletionProviderCallback, creditFences)
 	})
 
 	if err != nil {
@@ -925,16 +1030,7 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 			return ErrInvalidTopUpQuota
 		}
 
-		topUp.CompleteTime = common.GetTimestamp()
-		topUp.Status = common.TopUpStatusSuccess
-		if err := tx.Save(topUp).Error; err != nil {
-			return err
-		}
-		if err := CompleteTopUpCashbackTx(tx, topUp, quotaToAdd, CashbackCompletionProviderCallback); err != nil {
-			return err
-		}
-
-		return creditTopUpQuotaProtected(tx, topUp.UserId, quotaToAdd, nil, creditFences)
+		return creditOnlineTopUpWithCashbackTx(tx, topUp, quotaToAdd, nil, CashbackCompletionProviderCallback, creditFences)
 	})
 
 	if err != nil {

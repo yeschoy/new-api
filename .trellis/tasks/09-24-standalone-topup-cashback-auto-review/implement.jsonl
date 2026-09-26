@@ -3,4 +3,4 @@
 {"file":".trellis/spec/frontend/index.md","reason":"前端规范入口及返现合同索引"}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"API、配置、活动、订单、奖励、前端跨层契约"}
 {"file":".agents/rules/billing.md","reason":"额度换算、结算与扣减安全约束，实施前须完整阅读"}
-{"file":".trellis/tasks/09-24-standalone-topup-cashback-auto-review/research/current-state-and-constraints.md","reason":"已核查现状、受影响文件及数据库矩阵准备情况"}
+{"file":".trellis/tasks/09-24-standalone-topup-cashback-auto-review/research/current-state-and-constraints.md","reason":"已核查返现现状与只读报表的日志局限；其中退款确认/持久账本建议已撤销，超长文件须完整读取"}

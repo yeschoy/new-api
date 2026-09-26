@@ -1,18 +1,25 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
+
+	"gorm.io/gorm"
 )
 
 const cashbackReconciliationBatchSize = 100
+
+var errCashbackReconciliationCursorConflict = errors.New("cashback reconciliation cursor changed; retry")
 
 type cashbackReconciliationCursor struct {
 	sync.Mutex
 	RewardID       int64
 	OrderContextID int64
 	MutationID     int64
+	Generation     uint64
+	Pinned         bool
 }
 
 var cashbackReconciliationProgress cashbackReconciliationCursor
@@ -31,41 +38,76 @@ type cashbackMutationAggregate struct {
 // settlement run until repaired. Process restarts safely restart the scan at
 // the beginning instead of running an unbounded full-history query.
 func CashbackReconciliationInconsistencyCount() (int64, error) {
+	return cashbackReconciliationInconsistencyCountTx(DB, true)
+}
+
+// advance is false inside money transactions: an uncommitted repair must not
+// advance past a mismatch if that transaction rolls back. A standalone scan
+// can clear a pin after the repair commits. Each call examines at most one page
+// per table; a concurrent cursor change is retryable, never a healthy result.
+func cashbackReconciliationInconsistencyCountTx(tx *gorm.DB, advance bool) (int64, error) {
 	cashbackReconciliationProgress.Lock()
-	defer cashbackReconciliationProgress.Unlock()
+	startRewardID := cashbackReconciliationProgress.RewardID
+	startOrderID := cashbackReconciliationProgress.OrderContextID
+	startMutationID := cashbackReconciliationProgress.MutationID
+	generation := cashbackReconciliationProgress.Generation
+	cashbackReconciliationProgress.Unlock()
 
-	rewards, nextRewardID, err := nextCashbackRewardReconciliationBatch(cashbackReconciliationProgress.RewardID)
+	// Never hold the cursor mutex while waiting for a DB connection: payment
+	// transactions may own the only connection and reconcile inside it.
+	rewards, nextRewardID, err := nextCashbackRewardReconciliationBatch(tx, startRewardID)
 	if err != nil {
 		return 0, err
 	}
-	orders, nextOrderID, err := nextCashbackOrderReconciliationBatch(cashbackReconciliationProgress.OrderContextID)
+	orders, nextOrderID, err := nextCashbackOrderReconciliationBatch(tx, startOrderID)
 	if err != nil {
 		return 0, err
 	}
-	mutations, nextMutationID, err := nextCashbackMutationReconciliationBatch(cashbackReconciliationProgress.MutationID)
+	mutations, nextMutationID, err := nextCashbackMutationReconciliationBatch(tx, startMutationID)
 	if err != nil {
 		return 0, err
 	}
 
-	rewardIssues, err := cashbackRewardReconciliationIssues(rewards)
+	rewardIssues, err := cashbackRewardReconciliationIssues(tx, rewards)
 	if err != nil {
 		return 0, err
 	}
-	orderIssues, err := cashbackOrderReconciliationIssues(orders)
+	orderIssues, err := cashbackOrderReconciliationIssues(tx, orders)
 	if err != nil {
 		return 0, err
 	}
-	mutationIssues, err := cashbackMutationReconciliationIssues(mutations)
+	mutationIssues, err := cashbackMutationReconciliationIssues(tx, mutations)
 	if err != nil {
 		return 0, err
 	}
 	issues := rewardIssues + orderIssues + mutationIssues
-	if issues == 0 {
+
+	cashbackReconciliationProgress.Lock()
+	defer cashbackReconciliationProgress.Unlock()
+	if issues > 0 {
+		// Mismatches are sticky. A later page cannot replace an earlier pin;
+		// an older in-flight scan may also discover an earlier mismatch.
+		cashbackReconciliationProgress.RewardID = min(cashbackReconciliationProgress.RewardID, startRewardID)
+		cashbackReconciliationProgress.OrderContextID = min(cashbackReconciliationProgress.OrderContextID, startOrderID)
+		cashbackReconciliationProgress.MutationID = min(cashbackReconciliationProgress.MutationID, startMutationID)
+		cashbackReconciliationProgress.Pinned = true
+		cashbackReconciliationProgress.Generation++ // Invalidates every in-flight clean scan, even on the same page.
+		return issues, nil
+	}
+	if cashbackReconciliationProgress.Generation != generation {
+		return 0, errCashbackReconciliationCursorConflict
+	}
+	if cashbackReconciliationProgress.Pinned && !advance {
+		return 0, errCashbackReconciliationCursorConflict
+	}
+	if advance {
 		cashbackReconciliationProgress.RewardID = nextRewardID
 		cashbackReconciliationProgress.OrderContextID = nextOrderID
 		cashbackReconciliationProgress.MutationID = nextMutationID
+		cashbackReconciliationProgress.Pinned = false
+		cashbackReconciliationProgress.Generation++
 	}
-	return issues, nil
+	return 0, nil
 }
 
 func requireCashbackReconciliationHealthy() error {
@@ -79,10 +121,21 @@ func requireCashbackReconciliationHealthy() error {
 	return nil
 }
 
-func nextCashbackRewardReconciliationBatch(afterID int64) ([]CashbackReward, int64, error) {
+func requireCashbackReconciliationHealthyTx(tx *gorm.DB) error {
+	inconsistencies, err := cashbackReconciliationInconsistencyCountTx(tx, false)
+	if err != nil {
+		return err
+	}
+	if inconsistencies > 0 {
+		return fmt.Errorf("cashback reconciliation found %d inconsistent records", inconsistencies)
+	}
+	return nil
+}
+
+func nextCashbackRewardReconciliationBatch(tx *gorm.DB, afterID int64) ([]CashbackReward, int64, error) {
 	var rewards []CashbackReward
 	query := func(cursor int64) error {
-		return DB.Where("id > ?", cursor).Order("id asc").Limit(cashbackReconciliationBatchSize).Find(&rewards).Error
+		return tx.Where("id > ?", cursor).Order("id asc").Limit(cashbackReconciliationBatchSize).Find(&rewards).Error
 	}
 	if err := query(afterID); err != nil {
 		return nil, afterID, err
@@ -98,10 +151,10 @@ func nextCashbackRewardReconciliationBatch(afterID int64) ([]CashbackReward, int
 	return rewards, rewards[len(rewards)-1].ID, nil
 }
 
-func nextCashbackOrderReconciliationBatch(afterID int64) ([]CashbackOrderContext, int64, error) {
+func nextCashbackOrderReconciliationBatch(tx *gorm.DB, afterID int64) ([]CashbackOrderContext, int64, error) {
 	var orders []CashbackOrderContext
 	query := func(cursor int64) error {
-		return DB.Where("id > ?", cursor).Order("id asc").Limit(cashbackReconciliationBatchSize).Find(&orders).Error
+		return tx.Where("id > ?", cursor).Order("id asc").Limit(cashbackReconciliationBatchSize).Find(&orders).Error
 	}
 	if err := query(afterID); err != nil {
 		return nil, afterID, err
@@ -117,10 +170,10 @@ func nextCashbackOrderReconciliationBatch(afterID int64) ([]CashbackOrderContext
 	return orders, orders[len(orders)-1].ID, nil
 }
 
-func nextCashbackMutationReconciliationBatch(afterID int64) ([]CashbackQuotaMutation, int64, error) {
+func nextCashbackMutationReconciliationBatch(tx *gorm.DB, afterID int64) ([]CashbackQuotaMutation, int64, error) {
 	var mutations []CashbackQuotaMutation
 	query := func(cursor int64) error {
-		return DB.Where("id > ?", cursor).Order("id asc").Limit(cashbackReconciliationBatchSize).Find(&mutations).Error
+		return tx.Where("id > ?", cursor).Order("id asc").Limit(cashbackReconciliationBatchSize).Find(&mutations).Error
 	}
 	if err := query(afterID); err != nil {
 		return nil, afterID, err
@@ -136,7 +189,7 @@ func nextCashbackMutationReconciliationBatch(afterID int64) ([]CashbackQuotaMuta
 	return mutations, mutations[len(mutations)-1].ID, nil
 }
 
-func cashbackRewardReconciliationIssues(rewards []CashbackReward) (int64, error) {
+func cashbackRewardReconciliationIssues(tx *gorm.DB, rewards []CashbackReward) (int64, error) {
 	if len(rewards) == 0 {
 		return 0, nil
 	}
@@ -145,7 +198,7 @@ func cashbackRewardReconciliationIssues(rewards []CashbackReward) (int64, error)
 		ids = append(ids, rewards[i].ID)
 	}
 	var aggregates []cashbackMutationAggregate
-	if err := DB.Model(&CashbackQuotaMutation{}).
+	if err := tx.Model(&CashbackQuotaMutation{}).
 		Select("reward_id, kind, COALESCE(SUM(quota), 0) AS quota, COUNT(*) AS event_count").
 		Where("reward_id IN ?", ids).
 		Group("reward_id, kind").
@@ -182,7 +235,7 @@ func cashbackRewardReconciliationIssues(rewards []CashbackReward) (int64, error)
 	return issues, nil
 }
 
-func cashbackOrderReconciliationIssues(orders []CashbackOrderContext) (int64, error) {
+func cashbackOrderReconciliationIssues(tx *gorm.DB, orders []CashbackOrderContext) (int64, error) {
 	if len(orders) == 0 {
 		return 0, nil
 	}
@@ -191,7 +244,7 @@ func cashbackOrderReconciliationIssues(orders []CashbackOrderContext) (int64, er
 		topUpIDs = append(topUpIDs, orders[i].TopUpID)
 	}
 	var aggregates []cashbackMutationAggregate
-	if err := DB.Model(&CashbackQuotaMutation{}).
+	if err := tx.Model(&CashbackQuotaMutation{}).
 		Select("top_up_id, kind, COALESCE(SUM(quota), 0) AS quota, COUNT(*) AS event_count").
 		Where("top_up_id IN ? AND kind = ?", topUpIDs, CashbackQuotaMutationPrincipalRecovery).
 		Group("top_up_id, kind").
@@ -214,7 +267,7 @@ func cashbackOrderReconciliationIssues(orders []CashbackOrderContext) (int64, er
 	return issues, nil
 }
 
-func cashbackMutationReconciliationIssues(mutations []CashbackQuotaMutation) (int64, error) {
+func cashbackMutationReconciliationIssues(tx *gorm.DB, mutations []CashbackQuotaMutation) (int64, error) {
 	if len(mutations) == 0 {
 		return 0, nil
 	}
@@ -230,7 +283,7 @@ func cashbackMutationReconciliationIssues(mutations []CashbackQuotaMutation) (in
 	}
 	var rewards []CashbackReward
 	if len(rewardIDs) > 0 {
-		if err := DB.Select("id", "top_up_id", "beneficiary_id").Where("id IN ?", rewardIDs).Find(&rewards).Error; err != nil {
+		if err := tx.Select("id", "top_up_id", "beneficiary_id").Where("id IN ?", rewardIDs).Find(&rewards).Error; err != nil {
 			return 0, err
 		}
 	}
@@ -240,7 +293,7 @@ func cashbackMutationReconciliationIssues(mutations []CashbackQuotaMutation) (in
 	}
 	var orders []CashbackOrderContext
 	if len(topUpIDs) > 0 {
-		if err := DB.Select("top_up_id", "user_id").Where("top_up_id IN ?", topUpIDs).Find(&orders).Error; err != nil {
+		if err := tx.Select("top_up_id", "user_id").Where("top_up_id IN ?", topUpIDs).Find(&orders).Error; err != nil {
 			return 0, err
 		}
 	}
@@ -277,5 +330,7 @@ func resetCashbackReconciliationProgress() {
 	cashbackReconciliationProgress.RewardID = 0
 	cashbackReconciliationProgress.OrderContextID = 0
 	cashbackReconciliationProgress.MutationID = 0
+	cashbackReconciliationProgress.Pinned = false
+	cashbackReconciliationProgress.Generation++
 	cashbackReconciliationProgress.Unlock()
 }

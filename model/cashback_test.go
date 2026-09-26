@@ -1,8 +1,10 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -32,7 +34,7 @@ func setupCashbackTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(
-		&User{}, &UserSession{}, &TopUp{}, &Option{}, &CashbackOrderContext{}, &CashbackReward{}, &CashbackDeviceLink{}, &CashbackQuotaMutation{}, &Log{},
+		&User{}, &UserSession{}, &TopUp{}, &EpayPaymentEvidence{}, &AdminQuotaCreditEvidence{}, &WalletRefundCreditEvent{}, &Redemption{}, &Checkin{}, &Option{}, &CashbackCampaign{}, &CashbackOrderContext{}, &CashbackReward{}, &CashbackDeviceLink{}, &CashbackQuotaMutation{}, &Log{},
 	))
 	DB, LOG_DB = db, db
 	resetCashbackReconciliationProgress()
@@ -60,6 +62,10 @@ func setupCashbackTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+func epayTestDetails(tradeNo string) EpayVerifiedDetails {
+	return EpayVerifiedDetails{GatewayTradeNo: "gateway-" + tradeNo, MerchantID: "merchant"}
+}
+
 func saveCashbackTestSetting(t *testing.T, firstEnabledAt int64) operation_setting.CashbackSetting {
 	t.Helper()
 	setting := operation_setting.DefaultCashbackSetting()
@@ -73,6 +79,9 @@ func saveCashbackTestSetting(t *testing.T, firstEnabledAt int64) operation_setti
 	setting.Version = 3
 	require.NoError(t, operation_setting.ValidateCashbackSetting(setting, true))
 	require.NoError(t, SaveCashbackSetting(setting))
+	// Existing reward fixtures explicitly opt into one bounded campaign.
+	// Tests for absent/stopped campaigns create their own orders separately.
+	require.NoError(t, DB.Create(&CashbackCampaign{StartAt: firstEnabledAt, EndAt: time.Now().Unix() + 365*24*60*60, MaxRewardsPerUser: 100_000, CreatedBy: 1}).Error)
 	return setting
 }
 
@@ -105,12 +114,534 @@ func createCompletedCashbackTopUp(t *testing.T, invitee User, createTime, comple
 		if err := tx.Save(&locked).Error; err != nil {
 			return err
 		}
-		if err := CompleteTopUpCashbackTx(tx, &locked, creditedQuota, CashbackCompletionProviderCallback); err != nil {
+		if err := creditTopUpQuota(tx, invitee.Id, creditedQuota, nil); err != nil {
 			return err
 		}
-		return creditTopUpQuota(tx, invitee.Id, creditedQuota, nil)
+		return CompleteTopUpCashbackTx(tx, &locked, creditedQuota, CashbackCompletionProviderCallback)
 	}))
 	return topUp
+}
+
+func TestCashbackRecordedSpendReportsOnlyObservedIntervals(t *testing.T) {
+	db := setupCashbackTestDB(t)
+	user := User{Username: "report-payer", Password: "password", Status: common.UserStatusEnabled, Quota: 40}
+	require.NoError(t, db.Create(&user).Error)
+	for _, topUp := range []TopUp{
+		{UserId: user.Id, Amount: 100, TradeNo: "report-old", CompleteTime: 110, Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay},
+		{UserId: user.Id, Amount: 50, TradeNo: "report-new", CompleteTime: 150, Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderStripe},
+	} {
+		require.NoError(t, db.Create(&topUp).Error)
+	}
+	// Subscription purchases insert zero-amount TopUp compatibility rows,
+	// which are not wallet credits and cannot delimit recharge intervals.
+	require.NoError(t, db.Create(&TopUp{UserId: user.Id, Amount: 0, TradeNo: "subscription-only", CompleteTime: 125, Status: common.TopUpStatusSuccess}).Error)
+	for _, log := range []Log{
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 109, Quota: 3},
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 110, Quota: 25, Other: `{"billing_source":"subscription","wallet_quota_deducted":0}`},
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 149, Quota: 5},
+		{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 150, Quota: 20},
+		{UserId: user.Id, Type: LogTypeTopup, CreatedAt: 150, Quota: 100},
+		{UserId: user.Id + 1, Type: LogTypeConsume, CreatedAt: 150, Quota: 80},
+	} {
+		require.NoError(t, db.Create(&log).Error)
+	}
+
+	report, err := GetCashbackRecordedSpendReport(user.Id, 100, 200)
+	require.NoError(t, err)
+	assert.Equal(t, "manual_reconciliation", report.RefundStatus)
+	assert.Equal(t, "optional_log_db_consume", report.Source)
+	// This is all observed consume-log quota, including subscription-funded usage;
+	// the 25-unit row did not debit the user's wallet.
+	assert.Equal(t, []CashbackRecordedSpendInterval{
+		{StartAt: 100, EndAt: 110, RecordedAllConsumeLogQuota: 3, RecordedConsumeCount: 1},
+		{StartAt: 110, EndAt: 150, RecordedAllConsumeLogQuota: 30, RecordedConsumeCount: 2},
+		{StartAt: 150, EndAt: 200, RecordedAllConsumeLogQuota: 20, RecordedConsumeCount: 1},
+	}, report.Intervals)
+	assert.Len(t, report.TopUps, 2)
+
+	// Missing consumption logs do not prove there was no spending and must
+	// never cause the API to emit a fabricated FIFO remainder or cash quote.
+	require.NoError(t, db.Where("type = ?", LogTypeConsume).Delete(&Log{}).Error)
+	missing, err := GetCashbackRecordedSpendReport(user.Id, 100, 200)
+	require.NoError(t, err)
+	assert.Equal(t, "manual_reconciliation", missing.RefundStatus)
+	for _, interval := range missing.Intervals {
+		assert.Zero(t, interval.RecordedAllConsumeLogQuota)
+		assert.Zero(t, interval.RecordedConsumeCount)
+	}
+	encoded, err := common.Marshal(missing)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), "recorded_all_consume_log_quota")
+	assert.NotContains(t, string(encoded), "recorded_spend_quota")
+	assert.NotContains(t, string(encoded), "refund_amount")
+	assert.NotContains(t, string(encoded), "remaining_purchase")
+	var unchanged User
+	require.NoError(t, db.First(&unchanged, user.Id).Error)
+	assert.Equal(t, 40, unchanged.Quota)
+}
+
+func TestCashbackRecordedSpendBoundsAmbiguousAndExcessiveTopUps(t *testing.T) {
+	setupCashbackTestDB(t)
+	user := User{Username: "report-bound", Password: "password"}
+	require.NoError(t, DB.Create(&user).Error)
+	for i := range 2 {
+		require.NoError(t, DB.Create(&TopUp{UserId: user.Id, TradeNo: fmt.Sprintf("same-second-%d", i), Amount: 1, Status: common.TopUpStatusSuccess, CompleteTime: 150}).Error)
+	}
+	// A log stamped 150 cannot be proven to follow either top-up.
+	require.NoError(t, LOG_DB.Create(&Log{UserId: user.Id, Type: LogTypeConsume, CreatedAt: 150, Quota: 9}).Error)
+	report, err := GetCashbackRecordedSpendReport(user.Id, 100, 200)
+	require.NoError(t, err)
+	assert.Equal(t, int64(150), report.Intervals[1].StartAt)
+	assert.Equal(t, int64(150), report.Intervals[1].EndAt) // Same-second events have no provable order.
+	assert.Zero(t, report.Intervals[1].RecordedAllConsumeLogQuota)
+	assert.Equal(t, int64(9), report.Intervals[2].RecordedAllConsumeLogQuota) // Timestamp bucket, not proof of "after".
+	for i := 2; i < 51; i++ {
+		require.NoError(t, DB.Create(&TopUp{UserId: user.Id, TradeNo: fmt.Sprintf("over-limit-%d", i), Amount: 1, Status: common.TopUpStatusSuccess, CompleteTime: 160}).Error)
+	}
+	_, err = GetCashbackRecordedSpendReport(user.Id, 100, 200)
+	assert.ErrorIs(t, err, ErrCashbackReportRange)
+}
+
+func TestCashbackRecordedSpendFailsClosedWhenLogDBUnavailable(t *testing.T) {
+	setupCashbackTestDB(t)
+	user := User{Username: "report-no-logs", Password: "password"}
+	require.NoError(t, DB.Create(&user).Error)
+	logDB := LOG_DB
+	// A missing log table must not be interpreted as a zero-consumption interval.
+	other, err := gorm.Open(sqlite.Open("file:"+t.Name()+"-missing?mode=memory&cache=shared"), &gorm.Config{})
+	require.NoError(t, err)
+	LOG_DB = other
+	t.Cleanup(func() { LOG_DB = logDB })
+	report, err := GetCashbackRecordedSpendReport(user.Id, 100, 200)
+	require.NoError(t, err)
+	assert.Equal(t, "unavailable", report.LogStatus)
+	assert.Empty(t, report.Intervals)
+	_, err = GetCashbackRecordedSpendReport(user.Id, 100, 100)
+	assert.ErrorIs(t, err, ErrCashbackReportRange)
+}
+
+func TestCashbackRefundReferenceFIFO(t *testing.T) {
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	type grant struct {
+		kind   string
+		quota  int64
+		paid   int64
+		parent int
+	}
+	for _, tc := range []struct {
+		name         string
+		grants       []grant
+		balance      int64
+		wantPurchase []int64
+		wantGift     []int64
+		wantCents    int64
+	}{
+		{"old gift before new purchase", []grant{{"purchase", 100, 10000, 0}, {"gift", 10, 0, 0}, {"purchase", 50, 5000, 0}, {"gift", 5, 0, 1}}, 40, []int64{0, 35}, []int64{0, 5}, 3500},
+		{"both purchases remain", []grant{{"purchase", 100, 10000, 0}, {"gift", 10, 0, 0}, {"purchase", 50, 5000, 0}, {"gift", 5, 0, 1}}, 140, []int64{75, 50}, []int64{10, 5}, 12500},
+		{"gift credited late", []grant{{"purchase", 100, 10000, 0}, {"purchase", 50, 5000, 0}, {"gift", 10, 0, 0}}, 55, []int64{0, 45}, []int64{10}, 4500},
+		{"settled reservation netted", []grant{{"purchase", 100, 10000, 0}, {"purchase", 50, 5000, 0}}, 110, []int64{60, 50}, nil, 11000},
+		{"signed paid proration", []grant{{"purchase", 100, 9000, 0}}, 50, []int64{50}, nil, 4500},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupCashbackTestDB(t)
+			now := time.Now().Unix()
+			user := User{Username: "fifo-payer", Status: common.UserStatusEnabled}
+			require.NoError(t, db.Create(&user).Error)
+			var purchases []int
+			for i, item := range tc.grants {
+				var sourceType string
+				var sourceID int64
+				if item.kind == "purchase" {
+					order := TopUp{UserId: user.Id, Amount: item.quota, TradeNo: fmt.Sprintf("fifo-%d", i), Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay, CompleteTime: now}
+					require.NoError(t, db.Create(&order).Error)
+					require.NoError(t, db.Create(&CashbackOrderContext{TopUpID: order.Id, TradeNo: order.TradeNo, UserID: user.Id, PaymentProvider: PaymentProviderEpay, BaseQuota: int(item.quota), CreditedQuota: int(item.quota), DeviceSignalStatus: CashbackDeviceSignalMissing, CompletionSource: CashbackCompletionProviderCallback, CompletionProvider: PaymentProviderEpay}).Error)
+					require.NoError(t, db.Create(&EpayPaymentEvidence{TopUpID: order.Id, TradeNo: order.TradeNo, GatewayTradeNo: "gateway", MerchantID: "merchant", PaidCents: item.paid, Source: CashbackCompletionProviderCallback, VerifiedAt: now}).Error)
+					purchases = append(purchases, order.Id)
+					sourceType, sourceID = "topup", int64(order.Id)
+				} else {
+					var parent TopUp
+					require.NoError(t, db.First(&parent, purchases[item.parent]).Error)
+					reward := CashbackReward{TopUpID: parent.Id, TradeNo: parent.TradeNo, Direction: CashbackDirectionInvitee, InviteeID: user.Id, BeneficiaryID: user.Id, BaseQuota: 100, RateBPS: 1000, CalculatedQuota: int(item.quota), RewardQuota: int(item.quota), SettlementDays: 1, PaidAt: now, AvailableAt: now, ReviewStatus: CashbackReviewApproved, IssuedAt: now, SettlementStatus: CashbackSettlementIssued, RiskLevel: CashbackRiskLow, RiskSnapshot: `{}`, ConfigSnapshot: `{}`}
+					require.NoError(t, db.Create(&reward).Error)
+					sourceType, sourceID = "cashback_reward", reward.ID
+				}
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					return recordWalletRefundCreditTx(tx, user, map[string]string{"purchase": walletRefundPurchase, "gift": walletRefundGift}[item.kind], sourceType, sourceID, item.quota, "")
+				}))
+			}
+			require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", tc.balance).Error)
+			confirmed := purchases
+			report, err := GetCashbackRecordedSpendReport(user.Id, now-50, now+1, confirmed...)
+			require.NoError(t, err)
+			assert.Equal(t, "reference", report.RefundStatus)
+			require.NotNil(t, report.TotalReferenceCNYCents)
+			assert.Equal(t, tc.wantCents, *report.TotalReferenceCNYCents)
+			var gotPurchase, gotGift []int64
+			for _, credit := range report.Credits {
+				switch credit.Kind {
+				case walletRefundPurchase:
+					gotPurchase = append(gotPurchase, credit.RemainingQuota)
+				case walletRefundGift:
+					gotGift = append(gotGift, credit.RemainingQuota)
+					assert.Nil(t, credit.ReferenceCNYCents)
+				}
+			}
+			assert.Equal(t, tc.wantPurchase, gotPurchase)
+			assert.Equal(t, tc.wantGift, gotGift)
+			// Optional consumption logs never alter the final FIFO projection.
+			require.NoError(t, db.Create(&Log{UserId: user.Id, Type: LogTypeConsume, CreatedAt: now - 10, Quota: 999}).Error)
+			again, err := GetCashbackRecordedSpendReport(user.Id, now-50, now+1, confirmed...)
+			require.NoError(t, err)
+			assert.Equal(t, report.Credits, again.Credits)
+			assert.Equal(t, report.TotalReferenceCNYCents, again.TotalReferenceCNYCents)
+			require.NotEqual(t, report.Intervals, again.Intervals)
+			var unchanged User
+			require.NoError(t, db.First(&unchanged, user.Id).Error)
+			assert.EqualValues(t, tc.balance, unchanged.Quota)
+		})
+	}
+}
+
+func TestCashbackRefundReferenceFailsClosedBeforeJavaScriptPrecisionLoss(t *testing.T) {
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	for _, tc := range []struct {
+		name, reason          string
+		quota, cents, balance int64
+	}{
+		{"net consumption", "javascript_precision_limit", 6_000_000_000_000_000, 100, 0},
+		{"CNY total", "cash_amount_overflow", 100, 700_000_000_000_000, 200},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupCashbackTestDB(t)
+			user := User{Username: "precision-report", Status: common.UserStatusEnabled}
+			require.NoError(t, db.Create(&user).Error)
+			for i := range 2 {
+				proof := AdminQuotaCreditEvidence{EventKey: fmt.Sprintf("%064d", i+1), UserID: int64(user.Id), OperatorID: 999, CreditedQuota: tc.quota, CNYCents: &tc.cents, CreditedAt: time.Now().Unix()}
+				require.NoError(t, db.Create(&proof).Error)
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					return recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "admin_add", proof.ID, tc.quota, "")
+				}))
+			}
+			require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", tc.balance).Error)
+			now := time.Now().Unix()
+			report, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1)
+			require.NoError(t, err)
+			assert.Equal(t, "manual_reconciliation", report.RefundStatus)
+			assert.Equal(t, tc.reason, report.ManualReason)
+			assert.Nil(t, report.TotalReferenceCNYCents)
+			if tc.name == "net consumption" {
+				assert.Nil(t, report.NetSpentQuota)
+			} else {
+				require.Len(t, report.Credits, 3)
+				assert.Nil(t, report.Credits[1].ReferenceCNYCents)
+			}
+		})
+	}
+}
+
+func TestCashbackRefundReferenceAdminAndWalletCode(t *testing.T) {
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	db := setupCashbackTestDB(t)
+	user := User{Username: "fifo-admin-code", Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&user).Error)
+	firstCents, lastCents := int64(3000), int64(5000)
+	_, err := AdjustUserQuota(user.Id, 999, common.RoleRootUser, "add", 30, &firstCents)
+	require.NoError(t, err)
+	code := Redemption{Key: "fifo-wallet-code", Quota: 7, Status: common.RedemptionCodeStatusEnabled}
+	require.NoError(t, db.Create(&code).Error)
+	_, err = Redeem(code.Key, user.Id)
+	require.NoError(t, err)
+	_, err = AdjustUserQuota(user.Id, 999, common.RoleRootUser, "add", 50, &lastCents)
+	require.NoError(t, err)
+	// 45 net units spent: old purchase 30, code 7, new purchase 8.
+	require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", 42).Error)
+	now := time.Now().Unix()
+	report, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1)
+	require.NoError(t, err)
+	assert.Equal(t, "reference", report.RefundStatus)
+	assert.Equal(t, int64(4200), *report.TotalReferenceCNYCents)
+	require.Len(t, report.Credits, 4)
+	assert.Equal(t, []int64{0, 0, 0, 42}, []int64{report.Credits[0].RemainingQuota, report.Credits[1].RemainingQuota, report.Credits[2].RemainingQuota, report.Credits[3].RemainingQuota})
+	assert.Nil(t, report.Credits[2].ReferenceCNYCents) // Wallet code is never cash.
+
+	// Historical quota-only adds remain FIFO purchases, but lack the original
+	// CNY input; no current exchange rate can manufacture their face value.
+	_, err = AdjustUserQuota(user.Id, 999, common.RoleRootUser, "add", 10, nil)
+	require.NoError(t, err)
+	manual, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1)
+	require.NoError(t, err)
+	assert.Equal(t, "manual_reconciliation", manual.RefundStatus)
+	assert.Nil(t, manual.TotalReferenceCNYCents)
+	assert.Equal(t, "cash_amount_or_currency_unconfirmed", manual.ManualReason)
+	// A missing face value blocks the *complete* total, not the supported
+	// per-credit figure from a separate, fully evidenced purchase.
+	require.Len(t, manual.Credits, 5)
+	require.NotNil(t, manual.Credits[3].ReferenceCNYCents)
+	assert.EqualValues(t, 4200, *manual.Credits[3].ReferenceCNYCents)
+	assert.Nil(t, manual.Credits[4].ReferenceCNYCents)
+	logDB := LOG_DB
+	LOG_DB = nil
+	t.Cleanup(func() { LOG_DB = logDB })
+	withoutLogs, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1)
+	require.NoError(t, err)
+	assert.Equal(t, "unavailable", withoutLogs.LogStatus)
+	assert.Empty(t, withoutLogs.Intervals)
+	assert.Equal(t, manual.Credits, withoutLogs.Credits)
+}
+
+func TestCashbackRefundReferenceKeepsProvenPerCreditAmountsWhenTotalIsUnknown(t *testing.T) {
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	db := setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	user := User{Username: "partial-reference", Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&user).Error)
+	order := TopUp{UserId: user.Id, Amount: 100, TradeNo: "partial-epay", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay, CompleteTime: now}
+	require.NoError(t, db.Create(&order).Error)
+	require.NoError(t, db.Create(&CashbackOrderContext{TopUpID: order.Id, TradeNo: order.TradeNo, UserID: user.Id, PaymentProvider: PaymentProviderEpay, BaseQuota: 100, CreditedQuota: 100, DeviceSignalStatus: CashbackDeviceSignalMissing, CompletionSource: CashbackCompletionProviderCallback, CompletionProvider: PaymentProviderEpay}).Error)
+	require.NoError(t, db.Create(&EpayPaymentEvidence{TopUpID: order.Id, TradeNo: order.TradeNo, GatewayTradeNo: "gateway", MerchantID: "merchant", PaidCents: 9000, Source: CashbackCompletionProviderCallback, VerifiedAt: now}).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "topup", int64(order.Id), 100, "")
+	}))
+	adminCents := int64(3000)
+	_, err := AdjustUserQuota(user.Id, 999, common.RoleRootUser, "add", 30, &adminCents)
+	require.NoError(t, err)
+	stripe := TopUp{UserId: user.Id, Amount: 50, TradeNo: "partial-stripe", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderStripe, CompleteTime: now}
+	require.NoError(t, db.Create(&stripe).Error)
+	require.NoError(t, db.Create(&CashbackOrderContext{TopUpID: stripe.Id, TradeNo: stripe.TradeNo, UserID: user.Id, PaymentProvider: PaymentProviderStripe, BaseQuota: 50, CreditedQuota: 50, DeviceSignalStatus: CashbackDeviceSignalMissing, CompletionSource: CashbackCompletionProviderCallback, CompletionProvider: PaymentProviderStripe}).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "topup", int64(stripe.Id), 50, "")
+	}))
+	// Epay has 50 purchased units left; admin add has 30, Stripe has 50.
+	require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", 130).Error)
+	report, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1, order.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "manual_reconciliation", report.RefundStatus)
+	assert.Equal(t, "cash_amount_or_currency_unconfirmed", report.ManualReason)
+	assert.Nil(t, report.TotalReferenceCNYCents)
+	require.Len(t, report.Credits, 4)
+	require.NotNil(t, report.Credits[1].ReferenceCNYCents)
+	assert.EqualValues(t, 4500, *report.Credits[1].ReferenceCNYCents)
+	require.NotNil(t, report.Credits[2].ReferenceCNYCents)
+	assert.EqualValues(t, 3000, *report.Credits[2].ReferenceCNYCents)
+	assert.Nil(t, report.Credits[3].ReferenceCNYCents)
+	require.Len(t, report.TopUps, 2)
+	require.NotNil(t, report.TopUps[0].ReferenceCNYCents)
+	assert.EqualValues(t, 4500, *report.TopUps[0].ReferenceCNYCents)
+	assert.Nil(t, report.TopUps[1].ReferenceCNYCents)
+
+	// Source corruption invalidates even the formerly supported per-order amount.
+	require.NoError(t, db.Delete(&CashbackOrderContext{}, "top_up_id = ?", order.Id).Error)
+	invalid, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1)
+	require.NoError(t, err)
+	assert.Equal(t, "missing_purchase_source", invalid.ManualReason)
+	assert.Nil(t, invalid.WalletQuota)
+	assert.Empty(t, invalid.Credits)
+}
+
+func TestCashbackRefundReferenceFailsClosed(t *testing.T) {
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	for _, tc := range []struct {
+		name  string
+		alter func(*testing.T, *gorm.DB, User, TopUp)
+		want  string
+	}{
+		{"no currency confirmation", func(*testing.T, *gorm.DB, User, TopUp) {}, "cash_amount_or_currency_unconfirmed"},
+		{"missing source", func(t *testing.T, db *gorm.DB, _ User, order TopUp) {
+			require.NoError(t, db.Delete(&CashbackOrderContext{}, "top_up_id = ?", order.Id).Error)
+		}, "missing_purchase_source"},
+		{"missing signed amount", func(t *testing.T, db *gorm.DB, _ User, order TopUp) {
+			require.NoError(t, db.Delete(&EpayPaymentEvidence{}, "top_up_id = ?", order.Id).Error)
+		}, "missing_signed_payment"},
+		{"negative balance", func(t *testing.T, db *gorm.DB, user User, _ TopUp) {
+			require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", -1).Error)
+		}, "invalid_wallet_balance"},
+		{"balance above grants", func(t *testing.T, db *gorm.DB, user User, _ TopUp) {
+			require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", 101).Error)
+		}, "balance_exceeds_credits"},
+		{"exception", func(t *testing.T, db *gorm.DB, user User, _ TopUp) {
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				return recordWalletRefundCreditTx(tx, user, walletRefundException, "admin_adjustment", 0, 0, "different")
+			}))
+		}, "exceptional_wallet_change"},
+		{"old balance", func(t *testing.T, db *gorm.DB, user User, _ TopUp) {
+			require.NoError(t, db.Model(&WalletRefundCreditEvent{}).Where("user_id = ? AND kind = ?", user.Id, walletRefundOpening).UpdateColumn("quota", 5).Error)
+		}, "missing_or_legacy_opening"},
+		{"missing event", func(t *testing.T, db *gorm.DB, _ User, order TopUp) {
+			require.NoError(t, db.Where("source_type = ? AND source_id = ?", "topup", order.Id).Delete(&WalletRefundCreditEvent{}).Error)
+			require.NoError(t, db.Model(&User{}).Where("id = ?", order.UserId).Update("quota", 0).Error)
+		}, "missing_purchase_event"},
+		{"clock-skewed missing event", func(t *testing.T, db *gorm.DB, _ User, order TopUp) {
+			require.NoError(t, db.Where("source_type = ? AND source_id = ?", "topup", order.Id).Delete(&WalletRefundCreditEvent{}).Error)
+			require.NoError(t, db.Model(&TopUp{}).Where("id = ?", order.Id).Update("complete_time", order.CompleteTime-3600).Error)
+			require.NoError(t, db.Model(&User{}).Where("id = ?", order.UserId).Update("quota", 0).Error)
+		}, "missing_purchase_event"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupCashbackTestDB(t)
+			now := time.Now().Unix()
+			user := User{Username: "fifo-fail", Status: common.UserStatusEnabled}
+			require.NoError(t, db.Create(&user).Error)
+			order := TopUp{UserId: user.Id, Amount: 100, TradeNo: "fifo-fail-order", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay, CompleteTime: now}
+			require.NoError(t, db.Create(&order).Error)
+			require.NoError(t, db.Create(&CashbackOrderContext{TopUpID: order.Id, TradeNo: order.TradeNo, UserID: user.Id, PaymentProvider: PaymentProviderEpay, BaseQuota: 100, CreditedQuota: 100, DeviceSignalStatus: CashbackDeviceSignalMissing, CompletionSource: CashbackCompletionProviderCallback, CompletionProvider: PaymentProviderEpay}).Error)
+			require.NoError(t, db.Create(&EpayPaymentEvidence{TopUpID: order.Id, TradeNo: order.TradeNo, GatewayTradeNo: "gateway", MerchantID: "merchant", PaidCents: 9000, Source: CashbackCompletionProviderCallback, VerifiedAt: now}).Error)
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				return recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "topup", int64(order.Id), 100, "")
+			}))
+			require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", 50).Error)
+			tc.alter(t, db, user, order)
+			confirmed := []int{order.Id}
+			if tc.name == "no currency confirmation" || tc.name == "missing source" || tc.name == "missing signed amount" || tc.name == "clock-skewed missing event" {
+				confirmed = nil
+			}
+			report, err := GetCashbackRecordedSpendReport(user.Id, now-50, now+1, confirmed...)
+			require.NoError(t, err)
+			assert.Equal(t, "manual_reconciliation", report.RefundStatus)
+			assert.Equal(t, tc.want, report.ManualReason)
+			assert.Nil(t, report.TotalReferenceCNYCents)
+		})
+	}
+}
+
+func TestCashbackRefundReferenceGateAndSources(t *testing.T) {
+	db := setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	user := User{Username: "reference-gate", Status: common.UserStatusEnabled, Quota: 25}
+	require.NoError(t, db.Create(&user).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return recordWalletRefundCreditTx(tx, user, walletRefundOpening, "registration", 0, 0, "")
+	}))
+	order := TopUp{UserId: user.Id, Amount: 100, TradeNo: "reference-outside-display", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay, CompleteTime: now - 200}
+	require.NoError(t, db.Create(&order).Error)
+	require.NoError(t, db.Create(&CashbackOrderContext{TopUpID: order.Id, TradeNo: order.TradeNo, UserID: user.Id, PaymentProvider: PaymentProviderEpay, BaseQuota: 100, CreditedQuota: 100, DeviceSignalStatus: CashbackDeviceSignalMissing, CompletionSource: CashbackCompletionProviderCallback, CompletionProvider: PaymentProviderEpay}).Error)
+	require.NoError(t, db.Create(&EpayPaymentEvidence{TopUpID: order.Id, TradeNo: order.TradeNo, GatewayTradeNo: "gateway", MerchantID: "merchant", PaidCents: 9000, Source: CashbackCompletionProviderCallback, VerifiedAt: order.CompleteTime}).Error)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "topup", int64(order.Id), 100, "")
+	}))
+	// Registration's 25-unit nonrefundable opening and 50 purchased units were
+	// consumed. A historical positive wallet opening would not be eligible.
+	require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", 50).Error)
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "")
+	closed, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1, order.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "wallet_evidence_incomplete", closed.ManualReason)
+	assert.Nil(t, closed.WalletQuota)
+	assert.Nil(t, closed.TotalReferenceCNYCents)
+	assert.Empty(t, closed.TopUps)
+	assert.Len(t, closed.Intervals, 1)
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	report, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1, order.Id)
+	require.NoError(t, err)
+	assert.Equal(t, "reference", report.RefundStatus)
+	assert.Empty(t, report.TopUps) // Display is bounded, confirmation is not.
+	require.NotNil(t, report.TotalReferenceCNYCents)
+	assert.EqualValues(t, 4500, *report.TotalReferenceCNYCents)
+	assert.Equal(t, "registration", report.Credits[0].SourceType)
+	assert.Zero(t, report.Credits[0].RemainingQuota)
+	assert.EqualValues(t, 50, report.Credits[1].RemainingQuota)
+	assert.Equal(t, "reference-outside-display", report.Credits[1].TradeNo)
+	assert.Equal(t, PaymentProviderEpay, report.Credits[1].PaymentProvider)
+	assert.True(t, report.Credits[1].SignedAmountAvailable) // Signature has no currency.
+
+	other := User{Username: "reference-other", AffCode: "reference-other-code", Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&other).Error)
+	otherOrder := TopUp{UserId: other.Id, Amount: 1, TradeNo: "reference-other-order", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay, CompleteTime: now}
+	require.NoError(t, db.Create(&otherOrder).Error)
+	stripe := TopUp{UserId: user.Id, Amount: 1, TradeNo: "reference-stripe", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderStripe, CompleteTime: now}
+	require.NoError(t, db.Create(&stripe).Error)
+	for _, id := range []int{otherOrder.Id, stripe.Id, 999999} {
+		_, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1, id)
+		assert.ErrorIs(t, err, ErrCashbackReportRange)
+	}
+}
+
+func TestCashbackRefundReferenceManualTopUpWithoutLegacyContext(t *testing.T) {
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	db := setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	user := User{Username: "manual-legacy-topup", Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&user).Error)
+	order := TopUp{UserId: user.Id, Amount: 1, TradeNo: "manual-legacy-order", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay, CompleteTime: now}
+	require.NoError(t, db.Create(&order).Error)
+	manualQuota, err := common.WalletQuotaFromDecimalStrict(decimal.NewFromFloat(common.QuotaPerUnit))
+	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return recordWalletRefundCreditTx(tx, user, walletRefundPurchase, "manual_topup", int64(order.Id), int64(manualQuota), "")
+	}))
+	require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("quota", manualQuota-40).Error)
+	report, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1)
+	require.NoError(t, err)
+	assert.Equal(t, "manual_reconciliation", report.RefundStatus)
+	assert.Equal(t, "cash_amount_or_currency_unconfirmed", report.ManualReason)
+	require.Len(t, report.Credits, 2)
+	assert.EqualValues(t, manualQuota-40, report.Credits[1].RemainingQuota)
+	assert.Equal(t, "manual_topup", report.Credits[1].SourceType)
+	assert.False(t, report.Credits[1].SignedAmountAvailable)
+	assert.Nil(t, report.TotalReferenceCNYCents)
+	_, err = GetCashbackRecordedSpendReport(user.Id, now-60, now+1, order.Id)
+	assert.ErrorIs(t, err, ErrCashbackReportRange) // Manual Epay has no signed cash proof.
+	// An online credit with the same missing context must still fail closed.
+	require.NoError(t, db.Model(&WalletRefundCreditEvent{}).Where("source_id = ? AND kind = ?", order.Id, walletRefundPurchase).UpdateColumn("source_type", "topup").Error)
+	invalid, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1)
+	require.NoError(t, err)
+	assert.Equal(t, "missing_purchase_source", invalid.ManualReason)
+	assert.Nil(t, invalid.WalletQuota)
+}
+
+func TestCashbackRefundReferenceUsesOneMainDatabaseSnapshot(t *testing.T) {
+	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")
+	setupCashbackTestDB(t)
+	path := filepath.Join(t.TempDir(), "snapshot.sqlite")
+	reader, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	require.NoError(t, err)
+	writer, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, reader.Exec("PRAGMA journal_mode=WAL").Error)
+	require.NoError(t, reader.AutoMigrate(&User{}, &TopUp{}, &CashbackOrderContext{}, &EpayPaymentEvidence{}, &WalletRefundCreditEvent{}, &CashbackReward{}, &AdminQuotaCreditEvidence{}, &Redemption{}, &Checkin{}, &Log{}))
+	DB, LOG_DB = reader, reader
+	// An identical LOG_DB connection with just one slot must never be queried
+	// while the main read transaction is still holding that slot.
+	sqlDB, err := reader.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	user := User{Username: "snapshot-payer", Status: common.UserStatusEnabled, Quota: 100}
+	require.NoError(t, reader.Create(&user).Error)
+	now := time.Now().Unix()
+	order := TopUp{UserId: user.Id, Amount: 100, TradeNo: "snapshot-order", Status: common.TopUpStatusSuccess, PaymentProvider: PaymentProviderEpay, CompleteTime: now}
+	require.NoError(t, reader.Create(&order).Error)
+	require.NoError(t, reader.Create(&CashbackOrderContext{TopUpID: order.Id, TradeNo: order.TradeNo, UserID: user.Id, PaymentProvider: PaymentProviderEpay, BaseQuota: 100, CreditedQuota: 100, DeviceSignalStatus: CashbackDeviceSignalMissing, CompletionSource: CashbackCompletionProviderCallback, CompletionProvider: PaymentProviderEpay}).Error)
+	require.NoError(t, reader.Create(&EpayPaymentEvidence{TopUpID: order.Id, TradeNo: order.TradeNo, GatewayTradeNo: "gateway", MerchantID: "merchant", PaidCents: 10000, Source: CashbackCompletionProviderCallback, VerifiedAt: now}).Error)
+	require.NoError(t, reader.Transaction(func(tx *gorm.DB) error {
+		return recordWalletRefundCreditTx(tx, User{Id: user.Id}, walletRefundPurchase, "topup", int64(order.Id), 100, "")
+	}))
+	changed := false
+	require.NoError(t, reader.Callback().Query().After("gorm:query").Register("cashback_snapshot_interleave", func(query *gorm.DB) {
+		if changed || query.Statement.Table != "users" || query.Error != nil {
+			return
+		}
+		changed = true
+		// Another committed connection changes both balance and payment source
+		// after the snapshot's first read, before event/source lookups.
+		if err := writer.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(&User{}).Where("id = ?", user.Id).Update("quota", 50).Error; err != nil {
+				return err
+			}
+			return tx.Model(&EpayPaymentEvidence{}).Where("top_up_id = ?", order.Id).Update("paid_cents", 9000).Error
+		}); err != nil {
+			query.AddError(err)
+		}
+	}))
+	report, err := GetCashbackRecordedSpendReport(user.Id, now-60, now+1, order.Id)
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, "reference", report.RefundStatus)
+	require.NotNil(t, report.TotalReferenceCNYCents)
+	assert.EqualValues(t, 10000, *report.TotalReferenceCNYCents)
+	require.NotNil(t, report.WalletQuota)
+	assert.EqualValues(t, 100, *report.WalletQuota)
+	var latest User
+	require.NoError(t, writer.First(&latest, user.Id).Error)
+	assert.Equal(t, 50, latest.Quota)
 }
 
 func TestCashbackMigrationCreatesOnlySideTablesAndUniqueDirection(t *testing.T) {
@@ -119,6 +650,7 @@ func TestCashbackMigrationCreatesOnlySideTablesAndUniqueDirection(t *testing.T) 
 	assert.True(t, db.Migrator().HasTable(&CashbackReward{}))
 	assert.True(t, db.Migrator().HasTable(&CashbackDeviceLink{}))
 	assert.True(t, db.Migrator().HasTable(&CashbackQuotaMutation{}))
+	assert.True(t, db.Migrator().HasTable(&EpayPaymentEvidence{}))
 	assert.True(t, db.Migrator().HasIndex(&CashbackQuotaMutation{}, "idx_cashback_mutation_reward_kind"))
 	assert.True(t, db.Migrator().HasIndex(&CashbackQuotaMutation{}, "idx_cashback_mutation_topup_kind"))
 
@@ -135,8 +667,28 @@ func TestCashbackMigrationCreatesOnlySideTablesAndUniqueDirection(t *testing.T) 
 		RiskLevel: CashbackRiskLow, RiskSnapshot: `{}`, ConfigSnapshot: `{}`,
 	}
 	require.NoError(t, db.Create(&reward).Error)
+	originalID := reward.ID
 	reward.ID = 0
 	assert.Error(t, db.Create(&reward).Error)
+	require.NoError(t, db.Migrator().DropColumn(&CashbackOrderContext{}, "campaign_id"))
+	require.NoError(t, db.Migrator().DropColumn(&CashbackReward{}, "review_source"))
+	require.NoError(t, db.Migrator().DropTable(&EpayPaymentEvidence{}))
+	require.NoError(t, db.Migrator().DropTable(&CashbackCampaign{}))
+	for range 2 {
+		require.NoError(t, db.AutoMigrate(&CashbackCampaign{}, &CashbackOrderContext{}, &CashbackReward{}, &EpayPaymentEvidence{}))
+	}
+	assert.True(t, db.Migrator().HasTable(&EpayPaymentEvidence{}))
+	var evidenceRows int64
+	require.NoError(t, db.Model(&EpayPaymentEvidence{}).Count(&evidenceRows).Error)
+	assert.Zero(t, evidenceRows) // Never infer verified amounts for historical top-ups.
+	evidence := EpayPaymentEvidence{TopUpID: 1, TradeNo: "order-1", GatewayTradeNo: "gateway-1", MerchantID: "merchant", PaidCents: 100}
+	require.NoError(t, db.Create(&evidence).Error)
+	assert.Error(t, db.Create(&evidence).Error) // One immutable evidence row per order.
+	var preserved CashbackReward
+	require.NoError(t, db.First(&preserved, originalID).Error)
+	assert.Equal(t, reward.TradeNo, preserved.TradeNo)
+	assert.Empty(t, preserved.ReviewSource)
+	assert.True(t, db.Migrator().HasIndex(&CashbackReward{}, "ux_cashback_topup_direction"))
 }
 
 func TestInsertOnlineTopUpHonorsImmutableFirstEnableBoundaryAndHashesDevice(t *testing.T) {
@@ -184,7 +736,7 @@ func TestSameSecondFirstEnableUsesOrderLocalEligibilitySnapshot(t *testing.T) {
 	assert.False(t, preEnableContext.EligibleAfterFirstEnable)
 
 	saveCashbackTestSetting(t, now)
-	alreadyDone, err := RechargeEpay(preEnable.TradeNo, "alipay", "127.0.0.1")
+	alreadyDone, err := RechargeEpay(preEnable.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(preEnable.TradeNo))
 	require.NoError(t, err)
 	assert.False(t, alreadyDone)
 	var rewardCount int64
@@ -566,6 +1118,240 @@ func TestCashbackReconciliationAdvancesInBoundedBatchesAndPinsMismatch(t *testin
 	issues, err = CashbackReconciliationInconsistencyCount()
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, issues)
+
+	// The payment owns the sole DB connection while an outside scan reaches
+	// its first query. The outside scan must not hold the cursor mutex while
+	// waiting for the connection, or the transaction's scan deadlocks.
+	resetCashbackReconciliationProgress()
+	sqlDB, err := DB.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	tx := DB.WithContext(ctx).Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+
+	type outsideScanKey struct{}
+	entered := make(chan struct{})
+	var enteredOnce sync.Once
+	const callback = "test:reconciliation-single-connection"
+	require.NoError(t, DB.Callback().Query().Before("gorm:query").Register(callback, func(query *gorm.DB) {
+		if query.Statement.Context.Value(outsideScanKey{}) != nil {
+			enteredOnce.Do(func() { close(entered) })
+		}
+	}))
+	defer func() { _ = DB.Callback().Query().Remove(callback) }()
+
+	type scanResult struct {
+		issues int64
+		err    error
+	}
+	outside := make(chan scanResult, 1)
+	go func() {
+		count, scanErr := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(ctx, outsideScanKey{}, true)), true)
+		outside <- scanResult{count, scanErr}
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		<-outside
+		require.FailNow(t, "outside reconciliation did not start its DB query")
+	}
+
+	inside := make(chan scanResult, 1)
+	go func() {
+		count, scanErr := cashbackReconciliationInconsistencyCountTx(tx, false)
+		inside <- scanResult{count, scanErr}
+	}()
+	select {
+	case result := <-inside:
+		require.NoError(t, result.err)
+		assert.Zero(t, result.issues)
+	case <-ctx.Done():
+		_ = tx.Rollback().Error
+		<-inside
+		<-outside
+		require.FailNow(t, "payment reconciliation waited on a scan blocked by its DB connection")
+	}
+	require.NoError(t, tx.Commit().Error)
+	result := <-outside
+	require.NoError(t, result.err)
+	assert.Zero(t, result.issues)
+	assert.Equal(t, rewards[cashbackReconciliationBatchSize-1].ID, cashbackReconciliationProgress.RewardID)
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, issues)
+	assert.True(t, cashbackReconciliationProgress.Pinned)
+}
+
+func TestCashbackReconciliationConcurrentCleanCannotUnpinMismatch(t *testing.T) {
+	setupCashbackTestDB(t)
+	reward := CashbackReward{TopUpID: 1, TradeNo: "cursor-clean", Direction: CashbackDirectionInvitee,
+		InviteeID: 2, BeneficiaryID: 2, BaseQuota: 100, RateBPS: 100, CalculatedQuota: 1,
+		RewardQuota: 1, SettlementDays: 7, PaidAt: 1, AvailableAt: 2,
+		ReviewStatus: CashbackReviewPending, SettlementStatus: CashbackSettlementFrozen,
+		RiskLevel: CashbackRiskLow, RiskSnapshot: `{}`, ConfigSnapshot: `{}`}
+	require.NoError(t, DB.Create(&reward).Error)
+
+	type pausedScanKey struct{}
+	entered, release := make(chan struct{}), make(chan struct{})
+	const callback = "test:cursor-stale-clean"
+	require.NoError(t, DB.Callback().Query().After("gorm:query").Register(callback, func(query *gorm.DB) {
+		if query.Statement.Table == "cashback_rewards" && query.Statement.Context.Value(pausedScanKey{}) != nil {
+			close(entered)
+			<-release
+		}
+	}))
+	defer func() { _ = DB.Callback().Query().Remove(callback) }()
+	type scanResult struct {
+		issues int64
+		err    error
+	}
+	stale := make(chan scanResult, 1)
+	go func() {
+		issues, err := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(t.Context(), pausedScanKey{}, true)), true)
+		stale <- scanResult{issues, err}
+	}()
+	<-entered
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&reward).Update("recovered_quota", 2).Error)
+	issues, err := CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, issues)
+	close(release)
+	result := <-stale
+	assert.ErrorIs(t, result.err, errCashbackReconciliationCursorConflict)
+	assert.Zero(t, result.issues)
+	assert.True(t, cashbackReconciliationProgress.Pinned)
+	assert.Zero(t, cashbackReconciliationProgress.RewardID)
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&reward).Update("recovered_quota", 0).Error)
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.Zero(t, issues)
+	assert.False(t, cashbackReconciliationProgress.Pinned)
+	assert.Equal(t, reward.ID, cashbackReconciliationProgress.RewardID)
+}
+
+func TestCashbackReconciliationConcurrentMismatchesKeepEarlierPage(t *testing.T) {
+	setupCashbackTestDB(t)
+	rewards := make([]CashbackReward, cashbackReconciliationBatchSize+1)
+	for i := range rewards {
+		rewards[i] = CashbackReward{TopUpID: i + 1, TradeNo: fmt.Sprintf("cursor-mismatch-%d", i),
+			Direction: CashbackDirectionInvitee, InviteeID: 2, BeneficiaryID: 2,
+			BaseQuota: 100, RateBPS: 100, CalculatedQuota: 1, RewardQuota: 1,
+			SettlementDays: 7, PaidAt: 1, AvailableAt: 2,
+			ReviewStatus: CashbackReviewPending, SettlementStatus: CashbackSettlementFrozen,
+			RiskLevel: CashbackRiskLow, RiskSnapshot: `{}`, ConfigSnapshot: `{}`}
+	}
+	rewards[cashbackReconciliationBatchSize].RecoveredQuota = 2
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Create(&rewards).Error)
+
+	type earlyScanKey struct{}
+	type lateScanKey struct{}
+	earlyEntered, releaseEarly := make(chan struct{}), make(chan struct{})
+	lateEntered, releaseLate := make(chan struct{}), make(chan struct{})
+	const callback = "test:cursor-two-mismatches"
+	require.NoError(t, DB.Callback().Query().Before("gorm:query").Register(callback, func(query *gorm.DB) {
+		if query.Statement.Table == "cashback_rewards" && query.Statement.Context.Value(earlyScanKey{}) != nil {
+			close(earlyEntered)
+			<-releaseEarly
+		}
+	}))
+	defer func() { _ = DB.Callback().Query().Remove(callback) }()
+	require.NoError(t, DB.Callback().Query().After("gorm:query").Register(callback+":after", func(query *gorm.DB) {
+		if query.Statement.Table == "cashback_rewards" && query.Statement.Context.Value(lateScanKey{}) != nil {
+			close(lateEntered)
+			<-releaseLate
+		}
+	}))
+	defer func() { _ = DB.Callback().Query().Remove(callback + ":after") }()
+	type scanResult struct {
+		issues int64
+		err    error
+	}
+	early := make(chan scanResult, 1)
+	go func() {
+		issues, err := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(t.Context(), earlyScanKey{}, true)), true)
+		early <- scanResult{issues, err}
+	}()
+	<-earlyEntered
+	issues, err := CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	require.Zero(t, issues)
+	require.Equal(t, rewards[cashbackReconciliationBatchSize-1].ID, cashbackReconciliationProgress.RewardID)
+	late := make(chan scanResult, 1)
+	go func() {
+		issues, err := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(t.Context(), lateScanKey{}, true)), true)
+		late <- scanResult{issues, err}
+	}()
+	<-lateEntered
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&rewards[0]).Update("recovered_quota", 2).Error)
+	close(releaseEarly)
+	first := <-early
+	require.NoError(t, first.err)
+	require.EqualValues(t, 1, first.issues)
+	require.Zero(t, cashbackReconciliationProgress.RewardID)
+	close(releaseLate)
+	second := <-late
+	require.NoError(t, second.err)
+	require.EqualValues(t, 1, second.issues)
+	assert.True(t, cashbackReconciliationProgress.Pinned)
+	assert.Zero(t, cashbackReconciliationProgress.RewardID, "later mismatch must not overwrite earlier pin")
+
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&rewards[0]).Update("recovered_quota", 0).Error)
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	require.Zero(t, issues)
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, issues, "later mismatch remains discoverable after earlier repair")
+	assert.Equal(t, rewards[cashbackReconciliationBatchSize-1].ID, cashbackReconciliationProgress.RewardID)
+}
+
+func TestCashbackReconciliationTransactionRollbackDoesNotAdvanceOrPermanentlyPin(t *testing.T) {
+	setupCashbackTestDB(t)
+	reward := CashbackReward{TopUpID: 1, TradeNo: "cursor-rollback", Direction: CashbackDirectionInvitee,
+		InviteeID: 2, BeneficiaryID: 2, BaseQuota: 100, RateBPS: 100, CalculatedQuota: 1,
+		RewardQuota: 1, SettlementDays: 7, PaidAt: 1, AvailableAt: 2,
+		ReviewStatus: CashbackReviewPending, SettlementStatus: CashbackSettlementFrozen,
+		RiskLevel: CashbackRiskLow, RiskSnapshot: `{}`, ConfigSnapshot: `{}`}
+	require.NoError(t, DB.Create(&reward).Error)
+
+	tx := DB.Begin()
+	require.NoError(t, tx.Error)
+	issues, err := cashbackReconciliationInconsistencyCountTx(tx, false)
+	require.NoError(t, err)
+	require.Zero(t, issues)
+	require.NoError(t, tx.Rollback().Error)
+	assert.Zero(t, cashbackReconciliationProgress.RewardID, "a rolled-back clean scan must not advance")
+
+	tx = DB.Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, tx.Session(&gorm.Session{SkipHooks: true}).Model(&reward).Update("recovered_quota", 2).Error)
+	issues, err = cashbackReconciliationInconsistencyCountTx(tx, false)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, issues)
+	require.NoError(t, tx.Rollback().Error)
+	assert.True(t, cashbackReconciliationProgress.Pinned)
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	require.Zero(t, issues)
+	assert.False(t, cashbackReconciliationProgress.Pinned, "rolled-back mismatch must be rechecked and cleared")
+
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&reward).Update("recovered_quota", 2).Error)
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	require.EqualValues(t, 1, issues)
+	tx = DB.Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, tx.Session(&gorm.Session{SkipHooks: true}).Model(&reward).Update("recovered_quota", 0).Error)
+	_, err = cashbackReconciliationInconsistencyCountTx(tx, false)
+	require.ErrorIs(t, err, errCashbackReconciliationCursorConflict, "uncommitted repair cannot clear a pin")
+	require.NoError(t, tx.Rollback().Error)
+	issues, err = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, issues)
+	assert.True(t, cashbackReconciliationProgress.Pinned)
 }
 
 func TestConcurrentCashbackSettlementCreditsAtMostOnce(t *testing.T) {
@@ -707,6 +1493,9 @@ func TestCashbackIncidentIsMonotonicIdempotentAndCreatesDebt(t *testing.T) {
 		Select("COALESCE(SUM(quota), 0)").Scan(&recoveredLedgerQuota).Error)
 	assert.EqualValues(t, 65_000, recoveredLedgerQuota)
 	assert.Zero(t, first.PrincipalDebtQuota)
+	var incidentEvents int64
+	require.NoError(t, DB.Model(&WalletRefundCreditEvent{}).Where("source_type = ? AND source_id = ?", "cashback_incident", topUp.Id).Count(&incidentEvents).Error)
+	assert.EqualValues(t, 2, incidentEvents) // Payer and inviter both need manual reconciliation.
 
 	var afterFirst User
 	require.NoError(t, DB.First(&afterFirst, invitee.Id).Error)
@@ -718,6 +1507,8 @@ func TestCashbackIncidentIsMonotonicIdempotentAndCreatesDebt(t *testing.T) {
 	assert.True(t, duplicate.Idempotent)
 	require.NoError(t, DB.First(&afterFirst, invitee.Id).Error)
 	assert.Equal(t, firstQuota, afterFirst.Quota)
+	require.NoError(t, DB.Model(&WalletRefundCreditEvent{}).Where("source_type = ? AND source_id = ?", "cashback_incident", topUp.Id).Count(&incidentEvents).Error)
+	assert.EqualValues(t, 2, incidentEvents)
 
 	require.NoError(t, DB.Model(&User{}).Where("id = ?", invitee.Id).Update("quota", 25_000).Error)
 	full, err := HandleCashbackIncident(topUp.Id, CashbackIncidentInput{
@@ -726,6 +1517,8 @@ func TestCashbackIncidentIsMonotonicIdempotentAndCreatesDebt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 25_000, full.PrincipalRecoveredNow)
 	assert.Equal(t, 25_000, full.PrincipalDebtQuota)
+	require.NoError(t, DB.Model(&WalletRefundCreditEvent{}).Where("source_type = ? AND source_id = ?", "cashback_incident", topUp.Id).Count(&incidentEvents).Error)
+	assert.EqualValues(t, 4, incidentEvents) // An increasing cumulative incident is a new exception, not a grant.
 
 	_, err = HandleCashbackIncident(topUp.Id, CashbackIncidentInput{
 		Kind: CashbackIncidentRefund, CumulativeRefundRateBPS: 9_000, Reason: "invalid rollback", OperatorID: 999, Now: now + 3,
@@ -1338,7 +2131,7 @@ func TestCashbackCapturesRegistrationIPWithoutDeviceFingerprint(t *testing.T) {
 	assert.Equal(t, 0, risk.RecentDeviceCount)
 }
 
-func TestSelfReferralNeverCreatesCashback(t *testing.T) {
+func TestSelfReferralNeverCreatesInviterCashback(t *testing.T) {
 	setupCashbackTestDB(t)
 	now := time.Now().Unix()
 	saveCashbackTestSetting(t, now-100)
@@ -1349,7 +2142,246 @@ func TestSelfReferralNeverCreatesCashback(t *testing.T) {
 	order := createCompletedCashbackTopUp(t, user, now, now, 100_000, 100_000)
 	var count int64
 	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&count).Error)
+	assert.EqualValues(t, 1, count)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&reward).Error)
+	assert.Equal(t, CashbackDirectionInvitee, reward.Direction)
+	assert.Zero(t, reward.InviterID)
+}
+
+func TestWalletRefundCreditEventsAreOrderedAtomicAndNonrefundable(t *testing.T) {
+	db := setupCashbackTestDB(t)
+	user := User{Username: "wallet-credit-legacy", Status: common.UserStatusEnabled, Quota: 30}
+	require.NoError(t, db.Create(&user).Error) // Old mixed balance has no historical purchase provenance.
+	cents := int64(125)
+	_, err := AdjustUserQuota(user.Id, 999, common.RoleRootUser, "add", 20, &cents)
+	require.NoError(t, err)
+	var events []WalletRefundCreditEvent
+	require.NoError(t, db.Where("user_id = ?", user.Id).Order("id").Find(&events).Error)
+	require.Len(t, events, 2)
+	assert.Equal(t, []string{walletRefundOpening, walletRefundPurchase}, []string{events[0].Kind, events[1].Kind})
+	assert.Equal(t, []int64{30, 20}, []int64{events[0].Quota, events[1].Quota})
+	var evidence AdminQuotaCreditEvidence
+	require.NoError(t, db.First(&evidence, events[1].SourceID).Error)
+	assert.Equal(t, "admin_add", events[1].SourceType)
+	assert.Equal(t, &cents, evidence.CNYCents)
+	assert.Equal(t, int64(user.Id), evidence.UserID)
+
+	require.NoError(t, db.AutoMigrate(&Redemption{}, &Checkin{}))
+	code := Redemption{Key: "wallet-credit-code", Quota: 7, Status: common.RedemptionCodeStatusEnabled}
+	require.NoError(t, db.Create(&code).Error)
+	_, err = Redeem(code.Key, user.Id)
+	require.NoError(t, err)
+	_, err = Redeem(code.Key, user.Id)
+	require.Error(t, err)
+	setting := operation_setting.GetCheckinSetting()
+	previous := *setting
+	t.Cleanup(func() { *setting = previous })
+	*setting = operation_setting.CheckinSetting{Enabled: true, MinQuota: 5, MaxQuota: 5}
+	checkin, err := UserCheckin(user.Id)
+	require.NoError(t, err)
+	_, err = UserCheckin(user.Id)
+	require.Error(t, err)
+
+	transfer := User{Id: user.Id}
+	// The affiliate minimum is a full quota unit; use an isolated larger balance.
+	minimum := common.QuotaFromFloat(common.QuotaPerUnit)
+	require.NoError(t, db.Model(&User{}).Where("id = ?", user.Id).Update("aff_quota", minimum).Error)
+	require.NoError(t, transfer.TransferAffQuotaToQuota(minimum))
+	_, err = AdjustUserQuota(user.Id, 999, common.RoleRootUser, "subtract", 2, nil)
+	require.NoError(t, err)
+	_, err = AdjustUserQuota(user.Id, 999, common.RoleRootUser, "override", 1, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Where("user_id = ?", user.Id).Order("id").Find(&events).Error)
+	require.Len(t, events, 7)
+	assert.Equal(t, []string{walletRefundOpening, walletRefundPurchase, walletRefundNonrefundable, walletRefundNonrefundable, walletRefundNonrefundable, walletRefundException, walletRefundException},
+		[]string{events[0].Kind, events[1].Kind, events[2].Kind, events[3].Kind, events[4].Kind, events[5].Kind, events[6].Kind})
+	assert.Equal(t, []int64{30, 20, 7, 5, int64(minimum), 0, 0},
+		[]int64{events[0].Quota, events[1].Quota, events[2].Quota, events[3].Quota, events[4].Quota, events[5].Quota, events[6].Quota})
+	assert.Equal(t, int64(code.Id), events[2].SourceID)
+	assert.Equal(t, int64(checkin.Id), events[3].SourceID)
+	assert.Equal(t, "affiliate_transfer", events[4].SourceType)
+	assert.Less(t, events[0].ID, events[1].ID)
+	assert.Less(t, events[1].ID, events[2].ID)
+	require.Error(t, db.Create(&WalletRefundCreditEvent{UserID: events[1].UserID, EventKey: events[1].EventKey, Kind: walletRefundPurchase, SourceType: "admin_add", SourceID: evidence.ID, Quota: 20, CreatedAt: events[1].CreatedAt}).Error)
+
+	debtUser := User{Username: "wallet-credit-negative-opening", AffCode: "wallet-credit-negative", Status: common.UserStatusEnabled, Quota: -10}
+	require.NoError(t, db.Create(&debtUser).Error)
+	_, err = AdjustUserQuota(debtUser.Id, 999, common.RoleRootUser, "add", 20, nil)
+	require.NoError(t, err) // Existing negative balances must not prevent a legitimate credit.
+	var debtEvents []WalletRefundCreditEvent
+	require.NoError(t, db.Where("user_id = ?", debtUser.Id).Order("id").Find(&debtEvents).Error)
+	require.Len(t, debtEvents, 3)
+	assert.Equal(t, []string{walletRefundOpening, walletRefundException, walletRefundPurchase}, []string{debtEvents[0].Kind, debtEvents[1].Kind, debtEvents[2].Kind})
+	assert.Zero(t, debtEvents[0].Quota)
+
+	var before User
+	require.NoError(t, db.First(&before, user.Id).Error)
+	require.NoError(t, db.Migrator().DropTable(&WalletRefundCreditEvent{}))
+	_, err = AdjustUserQuota(user.Id, 999, common.RoleRootUser, "add", 9, nil)
+	require.Error(t, err)
+	var after User
+	require.NoError(t, db.First(&after, user.Id).Error)
+	assert.Equal(t, before.Quota, after.Quota)
+	var evidenceCount int64
+	require.NoError(t, db.Model(&AdminQuotaCreditEvidence{}).Where("user_id = ?", user.Id).Count(&evidenceCount).Error)
+	assert.EqualValues(t, 1, evidenceCount)
+}
+
+func TestAffiliateTransferRejectsWalletOverflowWithoutSpendingAffiliateBalance(t *testing.T) {
+	minimum := common.QuotaFromFloat(common.QuotaPerUnit)
+	for _, tc := range []struct {
+		name                     string
+		quota, wallet, affiliate int
+	}{
+		{"transfer_above_limit", common.MaxWalletQuota + 1, 100, common.MaxWalletQuota + 1},
+		{"wallet_would_exceed_limit", minimum, common.MaxWalletQuota - minimum + 1, minimum},
+		{"integer_overflow", int(^uint(0) >> 1), 100, int(^uint(0) >> 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupCashbackTestDB(t)
+			user := User{Username: "affiliate-bound", Status: common.UserStatusEnabled, Quota: tc.wallet, AffQuota: tc.affiliate}
+			require.NoError(t, db.Create(&user).Error)
+			err := (&User{Id: user.Id}).TransferAffQuotaToQuota(tc.quota)
+			require.ErrorContains(t, err, "钱包额度")
+			var stored User
+			require.NoError(t, db.First(&stored, user.Id).Error)
+			assert.Equal(t, tc.wallet, stored.Quota)
+			assert.Equal(t, tc.affiliate, stored.AffQuota)
+			var events int64
+			require.NoError(t, db.Model(&WalletRefundCreditEvent{}).Where("user_id = ?", user.Id).Count(&events).Error)
+			assert.Zero(t, events)
+		})
+	}
+}
+
+func TestAffiliateTransferKeepsHotQuotaCacheAndEvidenceAtomic(t *testing.T) {
+	db := setupCashbackTestDB(t)
+	resetBatchUpdateTestState(t)
+	useUserCacheMiniRedis(t)
+	minimum := common.QuotaFromFloat(common.QuotaPerUnit)
+	user := User{Username: "affiliate-cache", Status: common.UserStatusEnabled, Quota: 100, AffQuota: minimum * 2}
+	require.NoError(t, db.Create(&user).Error)
+	require.NoError(t, populateUserCache(user))
+
+	transfer := User{Id: user.Id}
+	require.NoError(t, transfer.TransferAffQuotaToQuota(minimum))
+	var stored User
+	require.NoError(t, db.First(&stored, user.Id).Error)
+	assert.Equal(t, 100+minimum, stored.Quota)
+	assert.Equal(t, minimum, stored.AffQuota)
+	cached, err := common.RDB.HGet(t.Context(), getUserCacheKey(user.Id), "Quota").Int()
+	require.NoError(t, err)
+	assert.Equal(t, stored.Quota, cached, "committed transfer must update hot spend authority")
+
+	owner, err := acquireUserQuotaMutationFences(user.Id)
+	require.NoError(t, err)
+	err = transfer.TransferAffQuotaToQuota(minimum)
+	require.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	owner.releaseUnused()
+
+	// Losing fence ownership after the user row update must abort both balances
+	// and preserve the replacement owner's fence.
+	const callback = "test:affiliate-transfer-fence-loss"
+	replaced := false
+	require.NoError(t, db.Callback().Update().After("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if !replaced && tx.Statement.Table == "users" {
+			replaced = true
+			_ = common.RDB.Set(t.Context(), getUserQuotaMutationFenceKey(user.Id), "replacement-owner", time.Minute).Err()
+		}
+	}))
+	callbackRegistered := true
+	t.Cleanup(func() {
+		if callbackRegistered {
+			_ = db.Callback().Update().Remove(callback)
+		}
+	})
+	err = transfer.TransferAffQuotaToQuota(minimum)
+	require.ErrorIs(t, err, ErrUserQuotaMutationFenceLost)
+	assert.True(t, replaced)
+	assert.Equal(t, "replacement-owner", common.RDB.Get(t.Context(), getUserQuotaMutationFenceKey(user.Id)).Val())
+	require.NoError(t, db.Callback().Update().Remove(callback))
+	callbackRegistered = false
+	require.NoError(t, common.RDB.Del(t.Context(), getUserQuotaMutationFenceKey(user.Id)).Err())
+	var rolledBack User
+	require.NoError(t, db.First(&rolledBack, user.Id).Error)
+	assert.Equal(t, stored.Quota, rolledBack.Quota)
+	assert.Equal(t, stored.AffQuota, rolledBack.AffQuota)
+
+	// A failed evidence insert must roll back both wallet and affiliate balances.
+	require.NoError(t, db.Migrator().DropTable(&WalletRefundCreditEvent{}))
+	err = transfer.TransferAffQuotaToQuota(minimum)
+	require.Error(t, err)
+	var after User
+	require.NoError(t, db.First(&after, user.Id).Error)
+	assert.Equal(t, stored.Quota, after.Quota)
+	assert.Equal(t, stored.AffQuota, after.AffQuota)
+	cached, err = common.RDB.HGet(t.Context(), getUserCacheKey(user.Id), "Quota").Int()
+	require.NoError(t, err)
+	assert.Equal(t, stored.Quota, cached)
+}
+
+func TestCheckinRejectsExcessiveGrantWithoutRecordingCheckinOrCredit(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		wallet, award int
+	}{
+		{"award_above_limit", 37, common.MaxWalletQuota + 1},
+		{"wallet_would_exceed_limit", common.MaxWalletQuota - 4, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupCashbackTestDB(t)
+			setting := operation_setting.GetCheckinSetting()
+			previous := *setting
+			t.Cleanup(func() { *setting = previous })
+			*setting = operation_setting.CheckinSetting{Enabled: true, MinQuota: tc.award, MaxQuota: tc.award}
+			user := User{Username: "checkin-bound", Status: common.UserStatusEnabled, Quota: tc.wallet}
+			require.NoError(t, db.Create(&user).Error)
+			_, err := UserCheckin(user.Id)
+			require.ErrorContains(t, err, "钱包额度")
+			assert.Equal(t, tc.wallet, getUserQuotaFromDB(t, user.Id))
+			var count int64
+			require.NoError(t, db.Model(&Checkin{}).Where("user_id = ?", user.Id).Count(&count).Error)
+			assert.Zero(t, count)
+			require.NoError(t, db.Model(&WalletRefundCreditEvent{}).Where("user_id = ?", user.Id).Count(&count).Error)
+			assert.Zero(t, count)
+		})
+	}
+}
+
+func TestCheckinRejectsNegativeConfigurationAndSkipsZeroQuotaUpdate(t *testing.T) {
+	db := setupCashbackTestDB(t)
+	require.Equal(t, "checkins", db.NamingStrategy.TableName("Checkin"))
+	require.NoError(t, db.AutoMigrate(&Checkin{}))
+	require.True(t, db.Migrator().HasTable(&Checkin{}))
+	user := User{Username: "zero-checkin", Status: common.UserStatusEnabled, Quota: 37}
+	require.NoError(t, db.Create(&user).Error)
+	setting := operation_setting.GetCheckinSetting()
+	previous := *setting
+	t.Cleanup(func() { *setting = previous })
+	*setting = operation_setting.CheckinSetting{Enabled: true, MinQuota: -1, MaxQuota: -1}
+	_, err := UserCheckin(user.Id)
+	require.ErrorContains(t, err, "签到奖励配置无效")
+	var count int64
+	require.NoError(t, db.Model(&Checkin{}).Where("user_id = ?", user.Id).Count(&count).Error)
 	assert.Zero(t, count)
+
+	*setting = operation_setting.CheckinSetting{Enabled: true, MinQuota: 0, MaxQuota: 0}
+	const callback = "test:zero-checkin-no-wallet-update"
+	require.NoError(t, db.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "users" {
+			tx.AddError(errors.New("zero checkin must not update wallet"))
+		}
+	}))
+	t.Cleanup(func() { _ = db.Callback().Update().Remove(callback) })
+	checkin, err := UserCheckin(user.Id)
+	require.NoError(t, err)
+	assert.Zero(t, checkin.QuotaAwarded)
+	assert.Equal(t, 37, getUserQuotaFromDB(t, user.Id))
+	require.NoError(t, db.Model(&WalletRefundCreditEvent{}).Where("user_id = ?", user.Id).Count(&count).Error)
+	assert.Zero(t, count)
+	_, err = UserCheckin(user.Id)
+	require.ErrorContains(t, err, "今日已签到")
 }
 
 func TestRechargeEpayCreatesCashbackOnceAndManualCompletionStaysIneligible(t *testing.T) {
@@ -1368,12 +2400,34 @@ func TestRechargeEpayCreatesCashbackOnceAndManualCompletionStaysIneligible(t *te
 		CreateTime: now, Status: common.TopUpStatusPending,
 	}
 	require.NoError(t, InsertOnlineTopUp(&order, baseQuota, CashbackRequestMetadata{}))
-	alreadyDone, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	proof := EpayVerifiedDetails{GatewayTradeNo: "epay-gateway-1", MerchantID: "merchant-1"}
+	alreadyDone, err := RechargeEpay(order.TradeNo, "alipay", "0.99", "127.0.0.1", proof)
+	require.ErrorIs(t, err, ErrEpayPaymentAmountMismatch)
+	assert.False(t, alreadyDone)
+	var evidenceCount int64
+	require.NoError(t, DB.Model(&EpayPaymentEvidence{}).Where("top_up_id = ?", order.Id).Count(&evidenceCount).Error)
+	assert.Zero(t, evidenceCount)
+	assert.Equal(t, common.TopUpStatusPending, GetTopUpByTradeNo(order.TradeNo).Status)
+	var pendingEvents int64
+	require.NoError(t, DB.Model(&WalletRefundCreditEvent{}).Where("source_type = ? AND source_id = ?", "topup", order.Id).Count(&pendingEvents).Error)
+	assert.Zero(t, pendingEvents)
+	alreadyDone, err = RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", proof)
 	require.NoError(t, err)
 	assert.False(t, alreadyDone)
-	alreadyDone, err = RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	var evidence EpayPaymentEvidence
+	require.NoError(t, DB.First(&evidence, "top_up_id = ?", order.Id).Error)
+	assert.Equal(t, int64(100), evidence.PaidCents)
+	assert.Equal(t, proof.GatewayTradeNo, evidence.GatewayTradeNo)
+	assert.Equal(t, proof.MerchantID, evidence.MerchantID)
+	assert.Equal(t, order.TradeNo, evidence.TradeNo)
+	assert.Equal(t, CashbackCompletionProviderCallback, evidence.Source)
+	assert.Positive(t, evidence.VerifiedAt)
+	alreadyDone, err = RechargeEpayVerifiedReturn(order.TradeNo, "wxpay", "2.00", "127.0.0.1", EpayVerifiedDetails{GatewayTradeNo: "other", MerchantID: "other"})
 	require.NoError(t, err)
 	assert.True(t, alreadyDone)
+	var evidences []EpayPaymentEvidence
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).Find(&evidences).Error)
+	require.Equal(t, []EpayPaymentEvidence{evidence}, evidences) // Retry must not overwrite first verified source/amount.
 	var rewardCount int64
 	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&rewardCount).Error)
 	assert.EqualValues(t, 2, rewardCount)
@@ -1390,12 +2444,30 @@ func TestRechargeEpayCreatesCashbackOnceAndManualCompletionStaysIneligible(t *te
 	var manualContext CashbackOrderContext
 	require.NoError(t, DB.Where("top_up_id = ?", manual.Id).First(&manualContext).Error)
 	assert.Equal(t, CashbackCompletionAdminManual, manualContext.CompletionSource)
+	var manualEvidence int64
+	require.NoError(t, DB.Model(&EpayPaymentEvidence{}).Where("top_up_id = ?", manual.Id).Count(&manualEvidence).Error)
+	assert.Zero(t, manualEvidence)
 	var logCountBefore int64
 	require.NoError(t, LOG_DB.Model(&Log{}).Where("user_id = ? AND type = ?", invitee.Id, LogTypeTopup).Count(&logCountBefore).Error)
 	require.NoError(t, ManualCompleteTopUp(manual.TradeNo, "127.0.0.1"))
 	var logCountAfter int64
 	require.NoError(t, LOG_DB.Model(&Log{}).Where("user_id = ? AND type = ?", invitee.Id, LogTypeTopup).Count(&logCountAfter).Error)
 	assert.Equal(t, logCountBefore, logCountAfter)
+	var credits []WalletRefundCreditEvent
+	require.NoError(t, DB.Where("user_id = ?", invitee.Id).Order("id").Find(&credits).Error)
+	require.GreaterOrEqual(t, len(credits), 3)
+	assert.Equal(t, walletRefundOpening, credits[0].Kind)
+	assert.Equal(t, walletRefundPurchase, credits[1].Kind)
+	assert.Equal(t, int64(order.Id), credits[1].SourceID)
+	var purchases int
+	for _, event := range credits {
+		if event.Kind == walletRefundPurchase {
+			purchases++
+		}
+	}
+	assert.Equal(t, 2, purchases) // Callback and manual retries did not credit again.
+	assert.Equal(t, int64(manual.Id), credits[len(credits)-1].SourceID)
+	assert.Equal(t, "manual_topup", credits[len(credits)-1].SourceType)
 
 	wrongChannel := TopUp{
 		UserId: invitee.Id, Amount: 1, Money: 1, TradeNo: "wrong-channel-cashback",
@@ -1403,11 +2475,699 @@ func TestRechargeEpayCreatesCashbackOnceAndManualCompletionStaysIneligible(t *te
 		CreateTime: now + 2, Status: common.TopUpStatusPending,
 	}
 	require.NoError(t, InsertOnlineTopUp(&wrongChannel, baseQuota, CashbackRequestMetadata{}))
-	_, err = RechargeEpay(wrongChannel.TradeNo, "alipay", "127.0.0.1")
+	_, err = RechargeEpay(wrongChannel.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(wrongChannel.TradeNo))
 	assert.ErrorIs(t, err, ErrPaymentMethodMismatch)
 	var unchanged TopUp
 	require.NoError(t, DB.First(&unchanged, wrongChannel.Id).Error)
 	assert.Equal(t, common.TopUpStatusPending, unchanged.Status)
+}
+
+func TestEpayEvidenceFailureRollsBackPaymentAndAllowsRetry(t *testing.T) {
+	db := setupCashbackTestDB(t)
+	payer := User{Username: "epay-evidence-rollback", Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&payer).Error)
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "epay-evidence-rollback",
+		PaymentMethod: "alipay", PaymentProvider: PaymentProviderEpay, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1, CashbackRequestMetadata{}))
+	proof := EpayVerifiedDetails{GatewayTradeNo: "gateway-rollback", MerchantID: "merchant-rollback"}
+	for _, tc := range []struct {
+		name   string
+		settle func(EpayVerifiedDetails) (bool, error)
+		proof  EpayVerifiedDetails
+	}{
+		{"notify missing details", func(details EpayVerifiedDetails) (bool, error) {
+			return RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", details)
+		}, EpayVerifiedDetails{}},
+		{"return incomplete details", func(details EpayVerifiedDetails) (bool, error) {
+			return RechargeEpayVerifiedReturn(order.TradeNo, "alipay", "1.00", "127.0.0.1", details)
+		}, EpayVerifiedDetails{GatewayTradeNo: "gateway-rollback"}},
+		{"notify oversized details", func(details EpayVerifiedDetails) (bool, error) {
+			return RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", details)
+		}, EpayVerifiedDetails{GatewayTradeNo: strings.Repeat("x", 256), MerchantID: "merchant"}},
+		{"return blank details", func(details EpayVerifiedDetails) (bool, error) {
+			return RechargeEpayVerifiedReturn(order.TradeNo, "alipay", "1.00", "127.0.0.1", details)
+		}, EpayVerifiedDetails{GatewayTradeNo: " ", MerchantID: "merchant"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			alreadyDone, err := tc.settle(tc.proof)
+			require.ErrorIs(t, err, ErrEpayPaymentProofInvalid)
+			assert.False(t, alreadyDone)
+			assert.Equal(t, common.TopUpStatusPending, GetTopUpByTradeNo(order.TradeNo).Status)
+			var wallet User
+			require.NoError(t, db.First(&wallet, payer.Id).Error)
+			assert.Zero(t, wallet.Quota)
+			var evidenceCount, rewardCount int64
+			require.NoError(t, db.Model(&EpayPaymentEvidence{}).Where("top_up_id = ?", order.Id).Count(&evidenceCount).Error)
+			require.NoError(t, db.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&rewardCount).Error)
+			assert.Zero(t, evidenceCount)
+			assert.Zero(t, rewardCount)
+		})
+	}
+	require.NoError(t, db.Migrator().DropTable(&EpayPaymentEvidence{}))
+	alreadyDone, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", proof)
+	require.Error(t, err)
+	assert.False(t, alreadyDone)
+	assert.Equal(t, common.TopUpStatusPending, GetTopUpByTradeNo(order.TradeNo).Status)
+	var wallet User
+	require.NoError(t, db.First(&wallet, payer.Id).Error)
+	assert.Zero(t, wallet.Quota)
+	require.NoError(t, db.AutoMigrate(&EpayPaymentEvidence{}))
+	alreadyDone, err = RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", proof)
+	require.NoError(t, err)
+	assert.False(t, alreadyDone)
+	var evidence EpayPaymentEvidence
+	require.NoError(t, db.First(&evidence, "top_up_id = ?", order.Id).Error)
+	assert.Equal(t, int64(100), evidence.PaidCents)
+
+	// Orders completed before payment evidence was introduced remain valid
+	// historical successes; a retry must not backfill proof or credit again.
+	historical := TopUp{UserId: payer.Id, TradeNo: "epay-historical-success", PaymentProvider: PaymentProviderEpay,
+		PaymentMethod: "alipay", Status: common.TopUpStatusSuccess}
+	require.NoError(t, db.Create(&historical).Error)
+	require.NoError(t, db.First(&wallet, payer.Id).Error)
+	creditedQuota := wallet.Quota
+	for _, settle := range []func() (bool, error){
+		func() (bool, error) {
+			return RechargeEpay(historical.TradeNo, "alipay", "", "127.0.0.1", EpayVerifiedDetails{})
+		},
+		func() (bool, error) {
+			return RechargeEpayVerifiedReturn(historical.TradeNo, "alipay", "", "127.0.0.1", EpayVerifiedDetails{})
+		},
+	} {
+		alreadyDone, err := settle()
+		require.NoError(t, err)
+		assert.True(t, alreadyDone)
+	}
+	require.NoError(t, db.First(&wallet, payer.Id).Error)
+	assert.Equal(t, creditedQuota, wallet.Quota)
+	var evidenceCount int64
+	require.NoError(t, db.Model(&EpayPaymentEvidence{}).Where("top_up_id = ?", historical.Id).Count(&evidenceCount).Error)
+	assert.Zero(t, evidenceCount)
+}
+
+func TestOnlineTopUpCreditRollsBackWhenCashbackCompletionFails(t *testing.T) {
+	providers := []struct {
+		name   string
+		method string
+		amount int64
+		settle func(string) error
+	}{
+		{"epay", "alipay", 1, func(tradeNo string) error {
+			_, err := RechargeEpay(tradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(tradeNo))
+			return err
+		}},
+		{"stripe", PaymentMethodStripe, 1, func(tradeNo string) error {
+			return Recharge(tradeNo, "customer", "127.0.0.1")
+		}},
+		{"creem", PaymentMethodCreem, 1_000, func(tradeNo string) error {
+			return RechargeCreem(tradeNo, "payer@example.com", "", "127.0.0.1")
+		}},
+		{"waffo", PaymentMethodWaffo, 1, func(tradeNo string) error {
+			return RechargeWaffo(tradeNo, "127.0.0.1")
+		}},
+		{"waffo_pancake", PaymentMethodWaffoPancake, 1, func(tradeNo string) error {
+			return RechargeWaffoPancake(tradeNo)
+		}},
+	}
+	for _, provider := range providers {
+		t.Run(provider.name, func(t *testing.T) {
+			setupCashbackTestDB(t)
+			oldQuotaPerUnit := common.QuotaPerUnit
+			common.QuotaPerUnit = 1_000
+			t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+			now := time.Now().Unix()
+			saveCashbackTestSetting(t, now-100)
+			_, payer := createCashbackUsers(t, now-30*24*60*60)
+			topUp := TopUp{
+				UserId: payer.Id, Amount: provider.amount, Money: 1,
+				TradeNo: "rollback-" + provider.name, PaymentProvider: provider.name,
+				PaymentMethod: provider.method, CreateTime: now, Status: common.TopUpStatusPending,
+			}
+			// A required post-enable context is missing. The purchase credit
+			// now precedes cashback completion but must not escape its transaction.
+			require.NoError(t, DB.Create(&topUp).Error)
+			require.Error(t, provider.settle(topUp.TradeNo))
+			var stored TopUp
+			require.NoError(t, DB.First(&stored, topUp.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, stored.Status)
+			assert.Zero(t, stored.CompleteTime)
+			var user User
+			require.NoError(t, DB.First(&user, payer.Id).Error)
+			assert.Zero(t, user.Quota)
+			assert.Empty(t, user.StripeCustomer)
+			assert.Empty(t, user.Email)
+			var count int64
+			require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", topUp.Id).Count(&count).Error)
+			assert.Zero(t, count)
+		})
+	}
+}
+
+func TestOnlineTopUpWithoutInviterCreditsWalletAndPayerReward(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	payer := User{Username: "online-topup-without-inviter", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create(&payer).Error)
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "topup-without-inviter",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	_, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.NoError(t, err)
+	var stored User
+	require.NoError(t, DB.First(&stored, payer.Id).Error)
+	assert.Equal(t, 1_000, stored.Quota)
+	var rewardCount int64
+	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&rewardCount).Error)
+	assert.EqualValues(t, 1, rewardCount)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&reward).Error)
+	assert.Equal(t, CashbackDirectionInvitee, reward.Direction)
+	assert.Equal(t, payer.Id, reward.BeneficiaryID)
+	assert.Zero(t, reward.InviterID)
+}
+
+func TestCashbackCampaignBindsOrderAndLimitsOnlyPositivePayerRewards(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	var campaign CashbackCampaign
+	require.NoError(t, DB.First(&campaign).Error)
+	require.NoError(t, DB.Model(&campaign).Update("max_rewards_per_user", 1).Error)
+	inviter, payer := createCashbackUsers(t, now-30*24*60*60)
+	first := createCompletedCashbackTopUp(t, payer, now, now, 1_000, 1_000)
+	second := createCompletedCashbackTopUp(t, payer, now+1, now+1, 1_000, 1_000)
+	var firstRewards, secondRewards []CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", first.Id).Find(&firstRewards).Error)
+	require.NoError(t, DB.Where("top_up_id = ?", second.Id).Find(&secondRewards).Error)
+	assert.Len(t, firstRewards, 2)
+	require.Len(t, secondRewards, 1)
+	assert.Equal(t, CashbackDirectionInviter, secondRewards[0].Direction)
+	assert.Equal(t, inviter.Id, secondRewards[0].BeneficiaryID)
+	var secondContext CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", second.Id).First(&secondContext).Error)
+	assert.Equal(t, campaign.ID, secondContext.CampaignID)
+	zeroPayer := User{Username: "zero-reward-payer", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create(&zeroPayer).Error)
+	zero := createCompletedCashbackTopUp(t, zeroPayer, now+3, now+3, 1, 1)
+	var canceled CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", zero.Id).First(&canceled).Error)
+	assert.Zero(t, canceled.RewardQuota)
+	assert.Equal(t, CashbackSettlementCanceled, canceled.SettlementStatus)
+	positive := createCompletedCashbackTopUp(t, zeroPayer, now+4, now+4, 1_000, 1_000)
+	var payable CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", positive.Id).First(&payable).Error)
+	assert.Positive(t, payable.RewardQuota)
+	// The campaign is not a precondition for inviter rewards.
+	require.NoError(t, DB.Delete(&campaign).Error)
+	third := createCompletedCashbackTopUp(t, payer, now+2, now+2, 1_000, 1_000)
+	var thirdRewards []CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", third.Id).Find(&thirdRewards).Error)
+	require.Len(t, thirdRewards, 1)
+	assert.Equal(t, CashbackDirectionInviter, thirdRewards[0].Direction)
+}
+
+func TestCashbackOrderDoesNotBindCampaignOnFutureApplicationTimestamp(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	var campaign CashbackCampaign
+	require.NoError(t, DB.First(&campaign).Error)
+	startAt := now + 3600
+	require.NoError(t, DB.Model(&campaign).Update("start_at", startAt).Error)
+	payer := User{Username: "future-app-clock-payer", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create(&payer).Error)
+	order := TopUp{UserId: payer.Id, TradeNo: "future-app-clock-order", PaymentProvider: PaymentProviderEpay,
+		CreateTime: startAt, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	var context CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&context).Error)
+	assert.True(t, context.EligibleAfterFirstEnable)
+	assert.Zero(t, context.CampaignID)
+}
+
+func TestCashbackStoppedCampaignDoesNotAttachLaterOrRewardPendingOrder(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	var campaign CashbackCampaign
+	require.NoError(t, DB.First(&campaign).Error)
+	inviter, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "stopped-campaign-pending",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	var context CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&context).Error)
+	require.Equal(t, campaign.ID, context.CampaignID)
+	stopped, err := StopCashbackCampaign(campaign.ID, 99)
+	require.NoError(t, err)
+	require.Positive(t, stopped.StoppedAt)
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	_, err = RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.NoError(t, err)
+	var rewards []CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).Find(&rewards).Error)
+	require.Len(t, rewards, 1)
+	assert.Equal(t, CashbackDirectionInviter, rewards[0].Direction)
+	assert.Equal(t, inviter.Id, rewards[0].BeneficiaryID)
+	later := TopUp{UserId: payer.Id, TradeNo: "after-stopped-campaign", PaymentProvider: PaymentProviderEpay,
+		CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&later, 1_000, CashbackRequestMetadata{}))
+	var laterContext CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", later.Id).First(&laterContext).Error)
+	assert.Zero(t, laterContext.CampaignID)
+}
+
+func TestCashbackPaymentAtExclusiveCampaignEndPreservesInviterReward(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	var campaign CashbackCampaign
+	require.NoError(t, DB.First(&campaign).Error)
+	inviter, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "campaign-exclusive-end",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	var context CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&context).Error)
+	require.Equal(t, campaign.ID, context.CampaignID)
+	// The order was bound while active; payment at the exclusive end is too
+	// late even though the inviter direction remains independent of the event.
+	endAt, err := getDBTimestampOnStrict(DB)
+	require.NoError(t, err)
+	require.NoError(t, DB.Model(&campaign).Update("end_at", endAt).Error)
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	_, err = RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.NoError(t, err)
+	var paid TopUp
+	require.NoError(t, DB.First(&paid, order.Id).Error)
+	require.GreaterOrEqual(t, paid.CompleteTime, endAt)
+	var rewards []CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).Find(&rewards).Error)
+	require.Len(t, rewards, 1)
+	assert.Equal(t, CashbackDirectionInviter, rewards[0].Direction)
+	assert.Equal(t, inviter.Id, rewards[0].BeneficiaryID)
+	assert.Equal(t, paid.CompleteTime, rewards[0].PaidAt)
+}
+
+func TestCashbackCampaignRejectsStaleCompletionTimeAtExclusiveEnd(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	var campaign CashbackCampaign
+	require.NoError(t, DB.First(&campaign).Error)
+	inviter, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "campaign-stale-paid-at",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	var context CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&context).Error)
+	require.Equal(t, campaign.ID, context.CampaignID)
+	endAt, err := getDBTimestampOnStrict(DB)
+	require.NoError(t, err)
+	require.NoError(t, DB.Model(&campaign).Update("end_at", endAt).Error)
+
+	// A stale, pre-end timestamp from a transaction caller cannot resurrect
+	// payer cashback after the database clock reaches the exclusive end.
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		var paid TopUp
+		if err := lockForUpdate(tx).First(&paid, order.Id).Error; err != nil {
+			return err
+		}
+		paid.Status = common.TopUpStatusSuccess
+		paid.CompleteTime = endAt - 1
+		if err := tx.Save(&paid).Error; err != nil {
+			return err
+		}
+		if err := creditTopUpQuota(tx, payer.Id, 1_000, nil); err != nil {
+			return err
+		}
+		return CompleteTopUpCashbackTx(tx, &paid, 1_000, CashbackCompletionProviderCallback)
+	}))
+	var rewards []CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).Find(&rewards).Error)
+	require.Len(t, rewards, 1)
+	assert.Equal(t, CashbackDirectionInviter, rewards[0].Direction)
+	assert.Equal(t, inviter.Id, rewards[0].BeneficiaryID)
+}
+
+func TestCashbackAutoReviewImmediateIssueUsesPaymentTransaction(t *testing.T) {
+	for _, immediate := range []bool{true, false} {
+		t.Run(fmt.Sprintf("immediate=%t", immediate), func(t *testing.T) {
+			setupCashbackTestDB(t)
+			now := time.Now().Unix()
+			setting := saveCashbackTestSetting(t, now-100)
+			setting.AutoReviewEnabled = true
+			setting.AutoReviewImmediateIssue = immediate
+			setting.HighReviewRequired = false
+			setting.SevereReviewRequired = false
+			require.NoError(t, SaveCashbackSetting(setting))
+			_, payer := createCashbackUsers(t, now-30*24*60*60)
+			order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
+			var reward CashbackReward
+			require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&reward).Error)
+			assert.Equal(t, CashbackReviewApproved, reward.ReviewStatus)
+			assert.Equal(t, CashbackReviewAutomatic, reward.ReviewSource)
+			assert.Zero(t, reward.ReviewedBy)
+			var wallet User
+			require.NoError(t, DB.First(&wallet, payer.Id).Error)
+			if immediate {
+				assert.Equal(t, CashbackSettlementIssued, reward.SettlementStatus)
+				assert.Equal(t, now, reward.AvailableAt)
+				assert.Equal(t, 10_000+reward.RewardQuota, wallet.Quota)
+				var mutations int64
+				require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("reward_id = ? AND kind = ?", reward.ID, CashbackQuotaMutationIssue).Count(&mutations).Error)
+				assert.EqualValues(t, 1, mutations)
+				outcome, err := IssueCashbackReward(reward.ID, now+1)
+				require.NoError(t, err)
+				assert.True(t, outcome.Skipped)
+			} else {
+				assert.Equal(t, CashbackSettlementFrozen, reward.SettlementStatus)
+				assert.Equal(t, now+int64(setting.SettlementDays)*24*60*60, reward.AvailableAt)
+				assert.Equal(t, 10_000, wallet.Quota)
+			}
+		})
+	}
+}
+
+func TestCashbackReviewPolicyAppliesEachRiskBandOnlyToPayer(t *testing.T) {
+	cases := []struct {
+		name             string
+		level            CashbackRiskLevel
+		masterEnabled    bool
+		reviewRequired   bool
+		matchingSession  bool
+		missingDevice    bool
+		newAccount       bool
+		frequencyLimit   int
+		wantReviewStatus CashbackReviewStatus
+	}{
+		{"low automatic", CashbackRiskLow, true, false, true, false, false, 5, CashbackReviewApproved},
+		{"low manual", CashbackRiskLow, true, true, true, false, false, 5, CashbackReviewPending},
+		{"medium automatic", CashbackRiskMedium, true, false, false, false, false, 5, CashbackReviewApproved},
+		{"medium manual", CashbackRiskMedium, true, true, false, false, false, 5, CashbackReviewPending},
+		{"high automatic", CashbackRiskHigh, true, false, false, true, false, 5, CashbackReviewApproved},
+		{"high manual", CashbackRiskHigh, true, true, false, true, false, 5, CashbackReviewPending},
+		{"severe automatic", CashbackRiskSevere, true, false, false, true, true, 1, CashbackReviewApproved},
+		{"severe manual", CashbackRiskSevere, true, true, false, true, true, 1, CashbackReviewPending},
+		{"master off", CashbackRiskLow, false, false, true, false, false, 5, CashbackReviewPending},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setupCashbackTestDB(t)
+			now := time.Now().Unix()
+			setting := saveCashbackTestSetting(t, now-100)
+			setting.AutoReviewEnabled = tc.masterEnabled
+			setting.AutoReviewImmediateIssue = false
+			setting.DailyTopUpCountThreshold = tc.frequencyLimit
+			// Keep the other bands at their opposite setting: a policy must
+			// choose the actual reward risk rather than one shared toggle.
+			setting.LowReviewRequired = !tc.reviewRequired
+			setting.MediumReviewRequired = !tc.reviewRequired
+			setting.HighReviewRequired = !tc.reviewRequired
+			setting.SevereReviewRequired = !tc.reviewRequired
+			switch tc.level {
+			case CashbackRiskLow:
+				setting.LowReviewRequired = tc.reviewRequired
+			case CashbackRiskMedium:
+				setting.MediumReviewRequired = tc.reviewRequired
+			case CashbackRiskHigh:
+				setting.HighReviewRequired = tc.reviewRequired
+			case CashbackRiskSevere:
+				setting.SevereReviewRequired = tc.reviewRequired
+			}
+			require.NoError(t, SaveCashbackSetting(setting))
+			createdAt := now - 30*24*60*60
+			if tc.newAccount {
+				createdAt = now
+			}
+			inviter, payer := createCashbackUsers(t, createdAt)
+			if tc.matchingSession {
+				require.NoError(t, DB.Create(&UserSession{UserID: payer.Id, IP: "203.0.113.10", UserAgent: "cashback-test-agent", CreatedAt: now}).Error)
+			}
+			signal := "v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+			if tc.missingDevice {
+				signal = ""
+			}
+			order := TopUp{UserId: payer.Id, Amount: 1000, Money: 1, TradeNo: "review-policy-" + tc.name,
+				PaymentMethod: PaymentMethodWaffo, PaymentProvider: PaymentProviderWaffo, CreateTime: now, Status: common.TopUpStatusPending}
+			require.NoError(t, InsertOnlineTopUp(&order, 1000, CashbackRequestMetadata{
+				RequestIP: "203.0.113.10", UserAgent: "cashback-test-agent", DeviceSignal: signal,
+			}))
+			require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+				var locked TopUp
+				if err := lockForUpdate(tx).First(&locked, order.Id).Error; err != nil {
+					return err
+				}
+				locked.Status = common.TopUpStatusSuccess
+				locked.CompleteTime = now
+				if err := tx.Save(&locked).Error; err != nil {
+					return err
+				}
+				if err := creditTopUpQuota(tx, payer.Id, 1000, nil); err != nil {
+					return err
+				}
+				return CompleteTopUpCashbackTx(tx, &locked, 1000, CashbackCompletionProviderCallback)
+			}))
+			var rewards []CashbackReward
+			require.NoError(t, DB.Where("top_up_id = ?", order.Id).Find(&rewards).Error)
+			require.Len(t, rewards, 2)
+			for _, reward := range rewards {
+				assert.Equal(t, tc.level, reward.RiskLevel)
+				assert.Equal(t, CashbackSettlementFrozen, reward.SettlementStatus)
+				if reward.Direction == CashbackDirectionInviter {
+					assert.Equal(t, inviter.Id, reward.BeneficiaryID)
+					assert.Equal(t, CashbackReviewPending, reward.ReviewStatus)
+					assert.Empty(t, reward.ReviewSource)
+					continue
+				}
+				assert.Equal(t, payer.Id, reward.BeneficiaryID)
+				assert.Equal(t, tc.wantReviewStatus, reward.ReviewStatus)
+				if tc.wantReviewStatus == CashbackReviewApproved {
+					assert.Equal(t, CashbackReviewAutomatic, reward.ReviewSource)
+				} else {
+					assert.Empty(t, reward.ReviewSource)
+				}
+			}
+		})
+	}
+}
+
+func TestCashbackSevereRiskAutoApprovalRemainsInAdminRiskFilter(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.AutoReviewEnabled = true
+	setting.SevereReviewRequired = false
+	setting.MaxRewardQuota = 50
+	setting.DailyTopUpCountThreshold = 1
+	setting.AutoReviewImmediateIssue = false
+	require.NoError(t, SaveCashbackSetting(setting))
+	payer := User{Username: "auto-severe-risk", Status: common.UserStatusEnabled, CreatedAt: now}
+	require.NoError(t, DB.Create(&payer).Error)
+	order := createCompletedCashbackTopUp(t, payer, now, now, 1_000, 1_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&reward).Error)
+	require.Equal(t, CashbackRiskSevere, reward.RiskLevel)
+	assert.Equal(t, CashbackReviewApproved, reward.ReviewStatus)
+	assert.Equal(t, CashbackReviewAutomatic, reward.ReviewSource)
+	assert.Equal(t, CashbackSettlementFrozen, reward.SettlementStatus)
+	filtered, _, err := ListCashbackRewards(CashbackRewardFilter{RiskLevel: CashbackRiskSevere}, nil)
+	require.NoError(t, err)
+	require.Len(t, filtered, 1)
+	assert.Equal(t, reward.ID, filtered[0].ID)
+}
+
+func TestCashbackImmediateIssueKeepsPurchaseAndRewardBehindOneQuotaFence(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.AutoReviewEnabled = true
+	setting.HighReviewRequired = false
+	setting.SevereReviewRequired = false
+	require.NoError(t, SaveCashbackSetting(setting))
+	payer := User{Username: "immediate-fenced-payer", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create(&payer).Error)
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "immediate-fenced-order",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	redis := useUserCacheMiniRedis(t)
+	require.NoError(t, writeUserCache(payer.ToBaseUser(), true))
+	_, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.NoError(t, err)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&reward).Error)
+	require.Equal(t, CashbackSettlementIssued, reward.SettlementStatus)
+	_, err = cacheGetUserBase(payer.Id)
+	assert.ErrorIs(t, err, ErrUserQuotaMutationPending)
+	redis.FastForward(time.Duration(userQuotaMutationCooldownSeconds()+1) * time.Second)
+	user, err := GetUserCache(payer.Id)
+	require.NoError(t, err)
+	assert.Equal(t, 1_000+reward.RewardQuota, user.Quota)
+}
+
+func TestCashbackImmediateIssueLosesFenceAfterRewardMutationAndRollsBack(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.AutoReviewEnabled = true
+	setting.HighReviewRequired = false
+	setting.SevereReviewRequired = false
+	require.NoError(t, SaveCashbackSetting(setting))
+	payer := User{Username: "immediate-lost-fence", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create(&payer).Error)
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "immediate-lost-fence-order",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	useUserCacheMiniRedis(t)
+	const callback = "test:immediate-lost-fence"
+	require.NoError(t, DB.Callback().Update().After("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "cashback_rewards" {
+			_ = common.RDB.Del(t.Context(), getUserQuotaMutationFenceKey(payer.Id)).Err()
+		}
+	}))
+	_, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.ErrorIs(t, err, ErrUserQuotaMutationFenceLost)
+	require.NoError(t, DB.Callback().Update().Remove(callback))
+	var stored TopUp
+	require.NoError(t, DB.First(&stored, order.Id).Error)
+	assert.Equal(t, common.TopUpStatusPending, stored.Status)
+	var wallet User
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Zero(t, wallet.Quota)
+	var count int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("top_up_id = ?", order.Id).Count(&count).Error)
+	assert.Zero(t, count)
+}
+
+func TestCashbackImmediateIssueFailureRollsBackVerifiedPayment(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.AutoReviewEnabled = true
+	setting.HighReviewRequired = false
+	setting.SevereReviewRequired = false
+	require.NoError(t, SaveCashbackSetting(setting))
+	payer := User{Username: "immediate-rollback", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create(&payer).Error)
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "immediate-rollback-order",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	fail := errors.New("forced immediate mutation failure")
+	const callback = "test:immediate-mutation-failure"
+	require.NoError(t, DB.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "cashback_quota_mutations" {
+			tx.AddError(fail)
+		}
+	}))
+	_, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.ErrorIs(t, err, fail)
+	require.NoError(t, DB.Callback().Create().Remove(callback))
+	var stored TopUp
+	require.NoError(t, DB.First(&stored, order.Id).Error)
+	assert.Equal(t, common.TopUpStatusPending, stored.Status)
+	var wallet User
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Zero(t, wallet.Quota)
+	var count int64
+	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&count).Error)
+	assert.Zero(t, count)
+	_, err = RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.NoError(t, err)
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Greater(t, wallet.Quota, 1_000)
+}
+
+func TestOnlineTopUpRefusesChangedReferralBeforeCredit(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "changed-referral-before-lock",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+
+	const callbackName = "test:change-referral-before-payer-lock"
+	changed := false
+	require.NoError(t, DB.Callback().Query().After("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+		if changed || tx.Statement.Table != "users" {
+			return
+		}
+		if _, ok := tx.Statement.Dest.(*User); !ok {
+			return
+		}
+		changed = true
+		// Simulate a relationship update between the candidate read and the
+		// sorted row lock. The payment must retry, not credit an old referral.
+		if err := tx.Exec("UPDATE users SET inviter_id = 0 WHERE id = ?", payer.Id).Error; err != nil {
+			tx.AddError(err)
+		}
+	}))
+	_, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.ErrorIs(t, err, ErrCashbackInvalidState)
+	require.True(t, changed)
+	require.NoError(t, DB.Callback().Query().Remove(callbackName))
+	var stored TopUp
+	require.NoError(t, DB.First(&stored, order.Id).Error)
+	assert.Equal(t, common.TopUpStatusPending, stored.Status)
+	var user User
+	require.NoError(t, DB.First(&user, payer.Id).Error)
+	assert.Zero(t, user.Quota)
+	assert.Equal(t, payer.InviterId, user.InviterId) // Transaction rolled back the concurrent-change simulation.
+}
+
+func TestOnlineTopUpLostFenceAfterCompletionRollsBack(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: "lost-fence-after-completion",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	useUserCacheMiniRedis(t)
+
+	const callbackName = "test:topup-fence-lost-after-credit"
+	require.NoError(t, DB.Callback().Update().After("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+		if tx.Statement.Table == "cashback_order_contexts" {
+			if err := common.RDB.Del(t.Context(), getUserQuotaMutationFenceKey(payer.Id)).Err(); err != nil {
+				tx.AddError(err)
+			}
+		}
+	}))
+	_, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	require.ErrorIs(t, err, ErrUserQuotaMutationFenceLost)
+	require.NoError(t, DB.Callback().Update().Remove(callbackName))
+	var stored TopUp
+	require.NoError(t, DB.First(&stored, order.Id).Error)
+	assert.Equal(t, common.TopUpStatusPending, stored.Status)
+	var user User
+	require.NoError(t, DB.First(&user, payer.Id).Error)
+	assert.Zero(t, user.Quota)
+	var rewardCount int64
+	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&rewardCount).Error)
+	assert.Zero(t, rewardCount)
 }
 
 func TestAllOnlineTopUpProvidersCreateCashbackInSettlement(t *testing.T) {
@@ -1421,7 +3181,7 @@ func TestAllOnlineTopUpProvidersCreateCashbackInSettlement(t *testing.T) {
 		{
 			name: "epay", provider: PaymentProviderEpay, method: "alipay", amount: 1,
 			settle: func(tradeNo string) error {
-				_, err := RechargeEpay(tradeNo, "alipay", "127.0.0.1")
+				_, err := RechargeEpay(tradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(tradeNo))
 				return err
 			},
 		},
@@ -1456,7 +3216,28 @@ func TestAllOnlineTopUpProvidersCreateCashbackInSettlement(t *testing.T) {
 			}
 			require.NoError(t, InsertOnlineTopUp(&topUp, 1_000, CashbackRequestMetadata{}))
 
+			// Purchase credit must not acquire the payer row ahead of the
+			// smaller inviter row (issuance locks both in ascending order).
+			lockedBeneficiaries := false
+			callbackName := "test:online-topup-user-lock-order"
+			require.NoError(t, DB.Callback().Query().After("gorm:query").Register(callbackName, func(tx *gorm.DB) {
+				if tx.Statement.Table != "users" {
+					return
+				}
+				users, ok := tx.Statement.Dest.(*[]User)
+				if ok && len(*users) == 2 && (*users)[0].Id < (*users)[1].Id {
+					lockedBeneficiaries = true
+				}
+			}))
+			require.NoError(t, DB.Callback().Update().Before("gorm:update").Register(callbackName, func(tx *gorm.DB) {
+				if tx.Statement.Table == "users" && !lockedBeneficiaries {
+					tx.AddError(errors.New("purchase credit preceded ordered beneficiary locks"))
+				}
+			}))
 			require.NoError(t, provider.settle(topUp.TradeNo))
+			require.True(t, lockedBeneficiaries)
+			require.NoError(t, DB.Callback().Query().Remove(callbackName))
+			require.NoError(t, DB.Callback().Update().Remove(callbackName))
 			require.NoError(t, provider.settle(topUp.TradeNo))
 
 			var rewardCount int64
@@ -1469,6 +3250,58 @@ func TestAllOnlineTopUpProvidersCreateCashbackInSettlement(t *testing.T) {
 			var storedUser User
 			require.NoError(t, DB.First(&storedUser, invitee.Id).Error)
 			assert.Equal(t, 1_000, storedUser.Quota)
+		})
+	}
+}
+
+func TestCashbackVerifiedPaymentsFailClosedWhenDatabaseClockFails(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	oldQuotaPerUnit := common.QuotaPerUnit
+	common.QuotaPerUnit = 1_000
+	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
+	for _, provider := range []struct {
+		name, method string
+		amount       int64
+		settle       func(string) error
+	}{
+		{PaymentProviderEpay, "alipay", 1, func(ref string) error {
+			_, err := RechargeEpay(ref, "alipay", "1.00", "127.0.0.1", epayTestDetails(ref))
+			return err
+		}},
+		{PaymentProviderStripe, PaymentMethodStripe, 1, func(ref string) error { return Recharge(ref, "customer", "127.0.0.1") }},
+		{PaymentProviderCreem, PaymentMethodCreem, 1_000, func(ref string) error { return RechargeCreem(ref, "", "", "127.0.0.1") }},
+		{PaymentProviderWaffo, PaymentMethodWaffo, 1, func(ref string) error { return RechargeWaffo(ref, "127.0.0.1") }},
+		{PaymentProviderWaffoPancake, PaymentMethodWaffoPancake, 1, RechargeWaffoPancake},
+	} {
+		t.Run(provider.name, func(t *testing.T) {
+			payer := User{Username: "clock_" + provider.name, AffCode: "clock_" + provider.name, Status: common.UserStatusEnabled}
+			require.NoError(t, DB.Create(&payer).Error)
+			order := TopUp{UserId: payer.Id, Amount: provider.amount, Money: 1, TradeNo: "clock_" + provider.name,
+				PaymentMethod: provider.method, PaymentProvider: provider.name, CreateTime: now, Status: common.TopUpStatusPending}
+			require.NoError(t, InsertOnlineTopUp(&order, 1_000, CashbackRequestMetadata{}))
+			const callback = "test:cashback-db-clock-failure"
+			clockQueries := 0
+			require.NoError(t, DB.Callback().Row().Before("gorm:row").Register(callback, func(tx *gorm.DB) {
+				if strings.Contains(tx.Statement.SQL.String(), "strftime('%s','now')") {
+					clockQueries++
+					tx.AddError(errors.New("database clock unavailable"))
+				}
+			}))
+			require.Error(t, provider.settle(order.TradeNo))
+			require.NoError(t, DB.Callback().Row().Remove(callback))
+			require.Positive(t, clockQueries)
+			var stored TopUp
+			require.NoError(t, DB.First(&stored, order.Id).Error)
+			assert.Equal(t, common.TopUpStatusPending, stored.Status)
+			assert.Zero(t, stored.CompleteTime)
+			var wallet User
+			require.NoError(t, DB.First(&wallet, payer.Id).Error)
+			assert.Zero(t, wallet.Quota)
+			var rewards int64
+			require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&rewards).Error)
+			assert.Zero(t, rewards)
 		})
 	}
 }

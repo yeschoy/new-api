@@ -1,7 +1,9 @@
 package model
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -620,6 +622,13 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 		return fmt.Errorf("转移额度最小为%s！", logger.LogQuota(common.QuotaFromFloat(common.QuotaPerUnit)))
 	}
 
+	fences, err := acquireUserQuotaMutationFences(user.Id)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() { finalizeUserQuotaMutationFences(fences, committed) }()
+
 	// 开始数据库事务
 	tx := DB.Begin()
 	if tx.Error != nil {
@@ -628,9 +637,13 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 	defer tx.Rollback() // 确保在函数退出时事务能回滚
 
 	// 加锁查询用户以确保数据一致性
-	err := lockForUpdate(tx).First(user, user.Id).Error
+	err = lockForUpdate(tx).First(user, user.Id).Error
 	if err != nil {
 		return err
+	}
+
+	if quota <= 0 || quota > common.MaxWalletQuota || user.Quota < 0 || user.Quota > common.MaxWalletQuota-quota {
+		return errors.New("转移失败：钱包额度超出上限或当前余额无效")
 	}
 
 	// 再次检查用户的AffQuota是否足够
@@ -638,7 +651,16 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 		return errors.New("邀请额度不足！")
 	}
 
-	// 更新用户额度
+	// 同一用户行锁下先记录不可退批次，再更新钱包。转入没有
+	// 独立业务流水 ID，使用新随机键区别每一次已提交的转入。
+	before := *user
+	var key [32]byte
+	if _, err := rand.Read(key[:]); err != nil {
+		return err
+	}
+	if err := recordWalletRefundCreditTx(tx, before, walletRefundNonrefundable, "affiliate_transfer", 0, int64(quota), hex.EncodeToString(key[:])); err != nil {
+		return err
+	}
 	user.AffQuota -= quota
 	user.Quota += quota
 
@@ -647,8 +669,15 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 		return err
 	}
 
-	// 提交事务
-	return tx.Commit().Error
+	if err := fences.verify(); err != nil {
+		return err
+	}
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+	committed = true
+	syncCreditUserQuotaCache(fences, user.Id, quota, "affiliate transfer")
+	return nil
 }
 
 func (user *User) prepareForInsert(tx *gorm.DB) error {
@@ -748,7 +777,10 @@ func (user *User) Insert(inviterId int) error {
 				user.SetSetting(defaultSetting)
 			}
 
-			return tx.Create(user).Error
+			if err := tx.Create(user).Error; err != nil {
+				return err
+			}
+			return recordWalletRefundCreditTx(tx, *user, walletRefundOpening, "registration", 0, 0, "")
 		})
 	}); err != nil {
 		return err
@@ -812,7 +844,10 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 			user.SetSetting(defaultSetting)
 		}
 
-		return tx.Create(user).Error
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		return recordWalletRefundCreditTx(tx, *user, walletRefundOpening, "registration", 0, 0, "")
 	})
 }
 

@@ -46,6 +46,7 @@ const page: CashbackRewardPage = {
       available_at: 1700604800,
       review_status: 'pending',
       reviewed_by: 0,
+      review_source: '',
       reviewed_at: 0,
       review_reason: '',
       settlement_status: 'frozen',
@@ -99,6 +100,33 @@ describe('cashback table', () => {
     )
 
     expect(screen.getByText(label)).toBeVisible()
+  })
+
+  it('shows an automatically reviewed severe payer reward without hiding its risk', () => {
+    render(
+      <CashbackTable
+        page={{
+          ...page,
+          items: [
+            {
+              ...page.items[0],
+              direction: 'invitee',
+              review_status: 'approved',
+              review_source: 'automatic',
+              risk_level: 'severe',
+            },
+          ],
+        }}
+        isLoading={false}
+        isError={false}
+        onSelect={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Top-up payer')).toBeVisible()
+    expect(screen.getByText('Automatic review')).toBeVisible()
+    expect(screen.getByText('Severe risk')).toBeVisible()
   })
 
   it('renders an explicit empty state', () => {

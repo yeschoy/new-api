@@ -15,6 +15,7 @@ const cashbackListCountLimit = 10_001
 type CashbackRewardFilter struct {
 	TradeNo          string
 	UserID           int
+	CampaignID       int64
 	Direction        CashbackDirection
 	ReviewStatus     CashbackReviewStatus
 	SettlementStatus CashbackSettlementStatus
@@ -80,6 +81,10 @@ func ListCashbackRewards(filter CashbackRewardFilter, pageInfo *common.PageInfo)
 		}
 		if filter.UserID > 0 {
 			query = query.Where("(beneficiary_id = ? OR invitee_id = ? OR inviter_id = ?)", filter.UserID, filter.UserID, filter.UserID)
+		}
+		if filter.CampaignID > 0 {
+			orders := db.Model(&CashbackOrderContext{}).Select("top_up_id").Where("campaign_id = ?", filter.CampaignID)
+			query = query.Where("top_up_id IN (?)", orders)
 		}
 		if filter.Direction != "" {
 			if !validCashbackDirection(filter.Direction) {
@@ -214,7 +219,7 @@ func GetCashbackAdminSummary() (CashbackAdminSummary, error) {
 	clusterCutoff := time.Now().Unix() - cashbackRiskWindowSeconds
 	if err := DB.Model(&CashbackReward{}).
 		Select("inviter_id, COUNT(DISTINCT invitee_id) AS distinct_invitees, COUNT(*) AS reward_count, COALESCE(SUM(reward_quota), 0) AS reward_quota").
-		Where("created_at >= ?", clusterCutoff).
+		Where("created_at >= ? AND inviter_id > 0", clusterCutoff).
 		Group("inviter_id").
 		Having("COUNT(DISTINCT invitee_id) >= ?", 2).
 		Order("distinct_invitees desc").

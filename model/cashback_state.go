@@ -147,6 +147,7 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 			reward.ReviewStatus = CashbackReviewRejected
 			reward.SettlementStatus = CashbackSettlementCanceled
 			reward.ReviewedBy = reviewerID
+			reward.ReviewSource = CashbackReviewManual
 			reward.ReviewedAt = now
 			reward.ReviewReason = reason
 			if err := tx.Save(reward).Error; err != nil {
@@ -185,6 +186,7 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 			if reward.ReviewStatus == CashbackReviewPending {
 				reward.ReviewStatus = CashbackReviewApproved
 				reward.ReviewedBy = reviewerID
+				reward.ReviewSource = CashbackReviewManual
 				reward.ReviewedAt = now
 				reward.ReviewReason = reason
 				reward.BlockingReason = ""
@@ -415,21 +417,37 @@ func cashbackHardBlockReasonTx(tx *gorm.DB, topUp *TopUp, orderContext *Cashback
 	if reward.InviteeID == reward.InviterID {
 		return "self_referral", nil, nil
 	}
-	users, err := lockCashbackUsersTx(tx, reward.InviteeID, reward.InviterID, reward.BeneficiaryID)
+	if reward.Direction == CashbackDirectionInvitee && reward.BeneficiaryID != reward.InviteeID ||
+		reward.Direction == CashbackDirectionInviter && (reward.InviterID <= 0 || reward.BeneficiaryID != reward.InviterID) {
+		return "order_relationship_mismatch", nil, nil
+	}
+	ids := []int{reward.InviteeID, reward.BeneficiaryID}
+	if reward.Direction == CashbackDirectionInviter {
+		ids = append(ids, reward.InviterID)
+	}
+	users, err := lockCashbackUsersTx(tx, ids...)
 	if err != nil {
 		return "", nil, err
 	}
 	invitee, inviteeOK := users[reward.InviteeID]
-	inviter, inviterOK := users[reward.InviterID]
 	beneficiary, beneficiaryOK := users[reward.BeneficiaryID]
-	if !inviteeOK || !inviterOK || !beneficiaryOK || invitee.DeletedAt.Valid || inviter.DeletedAt.Valid || beneficiary.DeletedAt.Valid {
+	if !inviteeOK || !beneficiaryOK || invitee.DeletedAt.Valid || beneficiary.DeletedAt.Valid {
 		return "referral_account_missing", users, nil
 	}
-	if invitee.Status != common.UserStatusEnabled || inviter.Status != common.UserStatusEnabled || beneficiary.Status != common.UserStatusEnabled {
+	if invitee.Status != common.UserStatusEnabled || beneficiary.Status != common.UserStatusEnabled {
 		return "referral_account_disabled", users, nil
 	}
-	if invitee.InviterId != inviter.Id {
-		return "referral_relationship_changed", users, nil
+	if reward.Direction == CashbackDirectionInviter {
+		inviter, inviterOK := users[reward.InviterID]
+		if !inviterOK || inviter.DeletedAt.Valid {
+			return "referral_account_missing", users, nil
+		}
+		if inviter.Status != common.UserStatusEnabled {
+			return "referral_account_disabled", users, nil
+		}
+		if invitee.InviterId != inviter.Id {
+			return "referral_relationship_changed", users, nil
+		}
 	}
 	hasDebt, err := cashbackHasOpenDebtTx(tx, reward.BeneficiaryID)
 	if err != nil {
@@ -453,6 +471,9 @@ func issueLockedCashbackRewardTx(tx *gorm.DB, reward *CashbackReward, beneficiar
 	}
 	if beneficiary.Id != reward.BeneficiaryID {
 		return false, ErrCashbackHardBlocked
+	}
+	if err := recordWalletRefundCreditTx(tx, beneficiary, walletRefundGift, "cashback_reward", reward.ID, int64(reward.RewardQuota), ""); err != nil {
+		return false, err
 	}
 	if err := creditTopUpQuota(tx, reward.BeneficiaryID, reward.RewardQuota, nil); err != nil {
 		return false, err
@@ -570,6 +591,13 @@ func HandleCashbackIncident(topUpID int, input CashbackIncidentInput) (CashbackI
 		users, err := lockCashbackUsersTx(tx, userIDs...)
 		if err != nil {
 			return err
+		}
+		// Even an incident that only creates debt or cancels frozen rewards
+		// invalidates automatic FIFO pricing for every affected wallet.
+		for _, user := range users {
+			if err := recordWalletRefundCreditTx(tx, user, walletRefundException, "cashback_incident", int64(topUpID), 0, fmt.Sprintf("%s:%d", input.Kind, input.CumulativeRefundRateBPS)); err != nil {
+				return err
+			}
 		}
 		for i := range rewards {
 			reward := &rewards[i]

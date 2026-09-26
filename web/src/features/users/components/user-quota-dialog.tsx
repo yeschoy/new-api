@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -28,6 +28,7 @@ import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
 import { formatQuota, parseQuotaFromDollars } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { cn } from '@/lib/utils'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { adjustUserQuota } from '../api'
 import type { QuotaAdjustMode } from '../types'
@@ -40,18 +41,68 @@ interface UserQuotaDialogProps {
   onSuccess: () => void
 }
 
+// An amount is evidence only when its decimal value is exactly representable in cents.
+function parseExactCnyCents(amount: string): number | undefined {
+  const match = /^(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/.exec(
+    amount
+  )
+  if (!match) return undefined
+
+  const fraction = match[2] ?? match[3] ?? ''
+  const digits = ((match[1] ?? '') + fraction).replace(/^0+/, '')
+  if (!digits) return undefined
+
+  const exponent = Number(match[4] ?? 0)
+  if (!Number.isSafeInteger(exponent)) return undefined
+  const scale = exponent + 2 - fraction.length
+  if (!Number.isSafeInteger(scale)) return undefined
+
+  let centsDigits: string
+  if (scale < 0) {
+    if (-scale >= digits.length || !/^0+$/.test(digits.slice(scale))) {
+      return undefined
+    }
+    centsDigits = digits.slice(0, scale)
+  } else {
+    if (digits.length + scale > 16) return undefined
+    centsDigits = digits + '0'.repeat(scale)
+  }
+
+  if (centsDigits.length > 16) return undefined
+  const cents = BigInt(centsDigits)
+  return cents <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(cents) : undefined
+}
+
 export function UserQuotaDialog(props: UserQuotaDialogProps) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<QuotaAdjustMode>('add')
-  const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
+  // Keep the displayed unit and conversion current while the dialog is open.
+  useSystemConfigStore((state) => state.config?.currency)
 
-  const { meta: currencyMeta } = getCurrencyDisplay()
+  const { config, meta: currencyMeta } = getCurrencyDisplay()
+  const [amountInput, setAmountInput] = useState(() => ({
+    value: '',
+    currency: config.quotaDisplayType,
+  }))
+  // Never render or submit an amount entered under a different display unit.
+  const amount =
+    amountInput.currency === config.quotaDisplayType ? amountInput.value : ''
+  useEffect(() => {
+    setAmountInput((previous) =>
+      previous.currency === config.quotaDisplayType
+        ? previous
+        : { value: '', currency: config.quotaDisplayType }
+    )
+  }, [config.quotaDisplayType])
+
   const currencyLabel = getCurrencyLabel()
   const tokensOnly = currencyMeta.kind === 'tokens'
 
   const amountValue = Number.parseFloat(amount) || 0
   const quotaValue = parseQuotaFromDollars(Math.abs(amountValue))
+  const cnyAdd = mode === 'add' && config.quotaDisplayType === 'CNY'
+  const cnyCents = cnyAdd ? parseExactCnyCents(amount) : undefined
 
   const getPreviewText = () => {
     const current = props.currentQuota
@@ -83,10 +134,11 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
         action: 'add_quota',
         mode,
         value: mode === 'override' ? value : Math.abs(value),
+        ...(cnyAdd && cnyCents !== undefined ? { cny_cents: cnyCents } : {}),
       })
       if (result.success) {
         toast.success(t('Quota adjusted successfully'))
-        setAmount('')
+        setAmountInput({ value: '', currency: config.quotaDisplayType })
         setMode('add')
         props.onOpenChange(false)
         props.onSuccess()
@@ -101,7 +153,7 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
   }
 
   const handleCancel = () => {
-    setAmount('')
+    setAmountInput({ value: '', currency: config.quotaDisplayType })
     setMode('add')
     props.onOpenChange(false)
   }
@@ -147,7 +199,10 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
                 )}
                 onClick={() => {
                   setMode(m)
-                  setAmount('')
+                  setAmountInput({
+                    value: '',
+                    currency: config.quotaDisplayType,
+                  })
                 }}
               >
                 {m === 'add' && t('Add')}
@@ -159,16 +214,22 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
         </div>
 
         <div className='space-y-2'>
-          <Label>
+          <Label htmlFor='user-quota-amount'>
             {t('Amount')} ({currencyLabel})
           </Label>
           <Input
+            id='user-quota-amount'
             type='number'
             step={tokensOnly ? 1 : 0.000001}
             min={mode === 'override' ? undefined : 0}
             placeholder={placeholder}
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) =>
+              setAmountInput({
+                value: e.target.value,
+                currency: config.quotaDisplayType,
+              })
+            }
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleConfirm()
             }}
