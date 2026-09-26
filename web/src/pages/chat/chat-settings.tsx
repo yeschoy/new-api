@@ -19,7 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 
-import { useI18n } from '@/i18n/i18n'
+import { tk, useI18n } from '@/i18n/i18n'
+import type { ReasoningEffort } from '@/lib/chat-stream'
 import { cn } from '@/lib/format'
 
 import { DEFAULT_SETTINGS, type ChatSettings } from './use-chat'
@@ -27,15 +28,22 @@ import { DEFAULT_SETTINGS, type ChatSettings } from './use-chat'
 const FIELD =
   'border-or-line bg-or-bg text-or-fg placeholder:text-or-dim focus:border-or-fg/25 w-full rounded-[6px] border px-3 text-[14px] outline-none transition-colors'
 
+const EFFORTS: ReadonlyArray<{ value: ReasoningEffort | null; label: string }> = [
+  { value: null, label: tk('默认') },
+  { value: 'low', label: tk('低') },
+  { value: 'medium', label: tk('中') },
+  { value: 'high', label: tk('高') },
+]
+
 function isCustomized(settings: ChatSettings): boolean {
   return (
-    settings.temperature !== DEFAULT_SETTINGS.temperature ||
+    settings.reasoningEffort !== DEFAULT_SETTINGS.reasoningEffort ||
     settings.maxTokens !== DEFAULT_SETTINGS.maxTokens ||
     settings.systemPrompt.trim() !== ''
   )
 }
 
-/** Popover at the bottom left of the message box: temperature, output cap and system prompt, all left to the model until set. */
+/** Popover at the bottom left of the message box: thinking effort, output cap and system prompt, all left to the model until set. */
 export function ChatSettingsPopover(props: {
   settings: ChatSettings
   onChange: (settings: ChatSettings) => void
@@ -46,7 +54,7 @@ export function ChatSettingsPopover(props: {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
-  const temperatureId = useId()
+  const effortId = useId()
   const maxTokensId = useId()
   const systemPromptId = useId()
   const update = (patch: Partial<ChatSettings>) => props.onChange({ ...settings, ...patch })
@@ -109,26 +117,30 @@ export function ChatSettingsPopover(props: {
 
           <div className='flex flex-col gap-4'>
             <div>
-              <div className='mb-1.5 flex items-center justify-between'>
-                <label htmlFor={temperatureId} className='text-or-fg text-[13px] font-medium'>
-                  {t('温度（Temperature）')}
-                </label>
-                <span className='font-geist text-or-muted text-[13px]'>{settings.temperature === null ? t('默认') : settings.temperature.toFixed(1)}</span>
+              <span id={effortId} className='text-or-fg mb-1.5 block text-[13px] font-medium'>
+                {t('思考强度')}
+              </span>
+              <div role='radiogroup' aria-labelledby={effortId} className='border-or-line grid h-9 grid-cols-4 gap-0.5 rounded-[6px] border p-0.5'>
+                {EFFORTS.map((option) => (
+                  <label
+                    key={option.label}
+                    className={cn(
+                      'flex cursor-pointer items-center justify-center rounded-[4px] px-1 text-[13px] whitespace-nowrap transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-or-fg/40',
+                      settings.reasoningEffort === option.value ? 'bg-or-fg/10 text-or-fg font-medium' : 'text-or-muted hover:text-or-fg'
+                    )}
+                  >
+                    <input
+                      type='radio'
+                      name={effortId}
+                      checked={settings.reasoningEffort === option.value}
+                      onChange={() => update({ reasoningEffort: option.value })}
+                      className='sr-only'
+                    />
+                    {t(option.label)}
+                  </label>
+                ))}
               </div>
-              <input
-                id={temperatureId}
-                type='range'
-                min={0}
-                max={2}
-                step={0.1}
-                value={settings.temperature ?? 1}
-                onChange={(e) => update({ temperature: Number(e.target.value) })}
-                className='accent-or-primary h-4 w-full'
-              />
-              <div className='text-or-dim mt-0.5 flex justify-between text-[12px]'>
-                <span>{t('精确')}</span>
-                <span>{t('发散')}</span>
-              </div>
+              <p className='text-or-dim mt-1.5 text-[12px]'>{t('越高想得越深，回复也更慢、更耗 Token')}</p>
             </div>
 
             <div>

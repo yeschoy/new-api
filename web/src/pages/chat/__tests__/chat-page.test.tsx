@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 
@@ -90,7 +90,7 @@ describe('ChatPage', () => {
     expect(screen.queryByRole('textbox', { name: '消息' })).toBeNull()
   })
 
-  it('sends with the temperature, max tokens and system prompt set in the settings popover', async () => {
+  it('sends with the thinking effort, max tokens and system prompt set in the settings popover', async () => {
     signIn()
     fetchMock.mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n']))
     const user = userEvent.setup()
@@ -98,8 +98,10 @@ describe('ChatPage', () => {
 
     await user.click(screen.getByRole('button', { name: '对话设置' }))
     const panel = screen.getByRole('dialog', { name: '对话设置' })
-    fireEvent.change(within(panel).getByLabelText('温度（Temperature）'), { target: { value: '0.4' } })
-    expect(within(panel).getByText('0.4')).toBeInTheDocument()
+    expect(within(panel).queryByRole('slider')).toBeNull()
+    const effort = within(panel).getByRole('radiogroup', { name: '思考强度' })
+    expect(within(effort).getByRole('radio', { name: '默认' })).toBeChecked()
+    await user.click(within(effort).getByRole('radio', { name: '高' }))
     await user.type(within(panel).getByLabelText('最大输出 Tokens'), '256')
     await user.type(within(panel).getByLabelText('系统提示词'), '简洁')
     await user.keyboard('{Escape}')
@@ -114,7 +116,7 @@ describe('ChatPage', () => {
         { role: 'user', content: 'hi' },
       ],
       stream: true,
-      temperature: 0.4,
+      reasoning_effort: 'high',
       max_tokens: 256,
     })
   })
@@ -178,13 +180,14 @@ describe('ChatPage', () => {
     const panel = screen.getByRole('dialog', { name: '对话设置' })
     await user.type(within(panel).getByLabelText('系统提示词'), '简洁')
     await user.type(within(panel).getByLabelText('最大输出 Tokens'), '64')
+    await user.click(within(panel).getByRole('radio', { name: '低' }))
     await user.click(within(panel).getByRole('button', { name: /重置/ }))
     expect(within(panel).getByLabelText('系统提示词')).toHaveValue('')
     expect(within(panel).getByLabelText('最大输出 Tokens')).toHaveValue(null)
-    expect(within(panel).getByText('默认')).toBeInTheDocument()
+    expect(within(panel).getByRole('radio', { name: '默认' })).toBeChecked()
   })
 
-  it('leaves the temperature to the model until you set one', async () => {
+  it('leaves the thinking effort to the model until you pick one', async () => {
     signIn()
     fetchMock.mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n']))
     const user = userEvent.setup()

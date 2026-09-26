@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { t } from '@/i18n/i18n'
-import { streamChatCompletion, type ChatCompletionBody } from '@/lib/chat-stream'
+import { streamChatCompletion, type ChatCompletionBody, type ReasoningEffort } from '@/lib/chat-stream'
 
 export type ChatMessage = {
   role: 'user' | 'assistant'
@@ -40,13 +40,13 @@ export type Conversation = {
 
 export type ChatSettings = {
   /** null = let the model decide. */
-  temperature: number | null
+  reasoningEffort: ReasoningEffort | null
   /** null = let the model decide. */
   maxTokens: number | null
   systemPrompt: string
 }
 
-export const DEFAULT_SETTINGS: ChatSettings = { temperature: null, maxTokens: null, systemPrompt: '' }
+export const DEFAULT_SETTINGS: ChatSettings = { reasoningEffort: null, maxTokens: null, systemPrompt: '' }
 
 const STORAGE_KEY = 'chat-conversations'
 
@@ -84,7 +84,7 @@ function buildBody(model: string, settings: ChatSettings, history: ChatMessage[]
   }
   const body: ChatCompletionBody = { model, messages, stream: true }
   // Only what the user chose is sent; otherwise each model keeps its own default.
-  if (settings.temperature !== null) body.temperature = settings.temperature
+  if (settings.reasoningEffort) body.reasoning_effort = settings.reasoningEffort
   if (settings.maxTokens && settings.maxTokens > 0) body.max_tokens = settings.maxTokens
   return body
 }

@@ -315,14 +315,10 @@ const TABLE: Record<string, string> = {
   请先选择一个模型: 'Chọn mô hình trước',
   对话设置: 'Cài đặt trò chuyện',
   重置: 'Đặt lại',
-  '温度（Temperature）': 'Nhiệt độ (Temperature)',
-  精确: 'Chính xác',
-  发散: 'Sáng tạo',
   '最大输出 Tokens': 'Token đầu ra tối đa',
   不限制: 'Không giới hạn',
   系统提示词: 'System prompt',
   '例如：你是一名资深的前端工程师，回答要简洁': 'VD: Bạn là một kỹ sư frontend cấp cao. Giữ câu trả lời ngắn gọn.',
-  助手: 'Trợ lý',
   '思考中…': 'Đang suy nghĩ…',
   思考过程: 'Suy luận',
   '加载模型中…': 'Đang tải mô hình…',
@@ -347,6 +343,11 @@ const TABLE: Record<string, string> = {
   '无法使用麦克风，请检查浏览器权限': 'Không dùng được micrô. Hãy kiểm tra quyền của trình duyệt.',
   '共 {count} 个模型': '{count} mô hình',
   默认: 'Mặc định',
+  思考强度: 'Mức độ suy luận',
+  低: 'Thấp',
+  中: 'Vừa',
+  高: 'Cao',
+  '越高想得越深，回复也更慢、更耗 Token': 'Càng cao càng suy nghĩ sâu, nhưng trả lời chậm hơn và tốn nhiều token hơn',
 }
 
 export default TABLE

@@ -63,7 +63,7 @@ describe('useChat', () => {
       ])
     )
     const { result } = renderHook(() => useChat('gpt-test'))
-    act(() => result.current.setSettings({ temperature: 0.5, maxTokens: 256, systemPrompt: '简洁' }))
+    act(() => result.current.setSettings({ reasoningEffort: 'medium', maxTokens: 256, systemPrompt: '简洁' }))
 
     await act(() => result.current.send('  hi  '))
 
@@ -78,7 +78,7 @@ describe('useChat', () => {
         { role: 'user', content: 'hi' },
       ],
       stream: true,
-      temperature: 0.5,
+      reasoning_effort: 'medium',
       max_tokens: 256,
     })
 

@@ -29,12 +29,15 @@ export type StreamEvent =
 
 export type ChatRole = 'system' | 'user' | 'assistant'
 
+/** How long a reasoning model thinks before it answers. */
+export type ReasoningEffort = 'low' | 'medium' | 'high'
+
 /** Body of POST /pg/chat/completions (OpenAI chat completions). */
 export type ChatCompletionBody = {
   model: string
   messages: Array<{ role: ChatRole; content: string }>
   stream: true
-  temperature?: number
+  reasoning_effort?: ReasoningEffort
   max_tokens?: number
 }
 

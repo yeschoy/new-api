@@ -315,14 +315,10 @@ const TABLE: Record<string, string> = {
   请先选择一个模型: 'Escolha um modelo primeiro',
   对话设置: 'Configurações do chat',
   重置: 'Redefinir',
-  '温度（Temperature）': 'Temperature',
-  精确: 'Preciso',
-  发散: 'Criativo',
   '最大输出 Tokens': 'Máximo de tokens de saída',
   不限制: 'Sem limite',
   系统提示词: 'System prompt',
   '例如：你是一名资深的前端工程师，回答要简洁': 'ex.: Você é um engenheiro frontend sênior. Seja conciso nas respostas.',
-  助手: 'Assistente',
   '思考中…': 'Pensando…',
   思考过程: 'Raciocínio',
   '加载模型中…': 'Carregando modelos…',
@@ -347,6 +343,11 @@ const TABLE: Record<string, string> = {
   '无法使用麦克风，请检查浏览器权限': 'Não foi possível usar o microfone. Verifique as permissões do navegador.',
   '共 {count} 个模型': '{count} modelos',
   默认: 'Padrão',
+  思考强度: 'Esforço de raciocínio',
+  低: 'Baixo',
+  中: 'Médio',
+  高: 'Alto',
+  '越高想得越深，回复也更慢、更耗 Token': 'Mais alto pensa mais a fundo, mas responde mais devagar e usa mais tokens',
 }
 
 export default TABLE
