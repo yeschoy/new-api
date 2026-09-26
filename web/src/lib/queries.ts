@@ -21,6 +21,7 @@ import { useMemo } from 'react'
 
 import { useI18n } from '@/i18n/i18n'
 
+import { guessIcon } from './model-icons'
 import { currencyDisplay } from './pricing'
 import {
   getPricing,
@@ -71,11 +72,12 @@ export function useCatalog() {
     const vendors = new Map((data.vendors ?? []).map((v) => [v.id, v]))
     return data.data.map((model) => {
       const vendor = model.vendor_id ? vendors.get(model.vendor_id) : undefined
+      const vendorName = vendor?.name || model.vendor_name
       return {
         ...model,
         // Models the operator left without a vendor are filed under 其他.
-        vendor: vendor?.name || model.vendor_name || t('其他'),
-        vendorIcon: vendor?.icon || model.vendor_icon || model.icon,
+        vendor: vendorName || t('其他'),
+        vendorIcon: vendor?.icon || model.vendor_icon || model.icon || guessIcon(model.model_name, vendorName),
       }
     })
   }, [query.data, lang, t])

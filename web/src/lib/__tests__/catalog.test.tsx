@@ -24,13 +24,19 @@ import { api } from '@/lib/api'
 
 import { useCatalog } from '../queries'
 
-const PRICING = {
-  success: true,
-  data: [
-    { model_name: 'named', vendor_id: 1, quota_type: 0, model_ratio: 1, completion_ratio: 1 },
-    { model_name: 'orphan', quota_type: 0, model_ratio: 1, completion_ratio: 1 },
-  ],
-  vendors: [{ id: 1, name: 'DeepSeek' }],
+const price = { quota_type: 0, model_ratio: 1, completion_ratio: 1 }
+
+/** useCatalog over a stubbed /api/pricing answer. */
+async function catalogOf(pricing: object) {
+  vi.spyOn(api, 'get').mockResolvedValue({ data: { success: true, ...pricing } })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const hook = renderHook(() => useCatalog(), {
+    wrapper: (props: { children: React.ReactNode }) => (
+      <QueryClientProvider client={client}>{props.children}</QueryClientProvider>
+    ),
+  })
+  await waitFor(() => expect(hook.result.current.models.length).toBeGreaterThan(0))
+  return hook.result
 }
 
 afterEach(() => {
@@ -41,19 +47,33 @@ afterEach(() => {
 
 describe('useCatalog', () => {
   it('files models without a vendor under 其他, in the current language', async () => {
-    vi.spyOn(api, 'get').mockResolvedValue({ data: PRICING })
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { result } = renderHook(() => useCatalog(), {
-      wrapper: (props: { children: React.ReactNode }) => (
-        <QueryClientProvider client={client}>{props.children}</QueryClientProvider>
-      ),
+    const result = await catalogOf({
+      data: [
+        { model_name: 'named', vendor_id: 1, ...price },
+        { model_name: 'orphan', ...price },
+      ],
+      vendors: [{ id: 1, name: 'DeepSeek' }],
     })
-    await waitFor(() => expect(result.current.models).toHaveLength(2))
     expect(result.current.models.map((model) => model.vendor)).toEqual(['DeepSeek', '其他'])
 
     act(() => {
       setLang('en')
     })
     expect(result.current.models[1].vendor).toBe('Other')
+  })
+
+  it('gives models without an icon their family icon, keeping icons set in the admin', async () => {
+    const result = await catalogOf({
+      data: [
+        { model_name: 'deepseek-v4', vendor_id: 1, ...price },
+        { model_name: 'grok-4.7', vendor_id: 2, ...price },
+        { model_name: 'seed-2.1-pro', ...price },
+      ],
+      vendors: [
+        { id: 1, name: 'DeepSeek', icon: 'Custom.Icon' },
+        { id: 2, name: 'xAI' },
+      ],
+    })
+    expect(result.current.models.map((model) => model.vendorIcon)).toEqual(['Custom.Icon', 'Grok', 'Doubao.Color'])
   })
 })

@@ -73,15 +73,26 @@ export function NewBadge() {
 /** A home-page model: every catalog entry, with its usage when rankings are on. */
 export type FeaturedEntry = { model: CatalogModel; ranking?: ModelRanking }
 
-/** Ranked models first, in rank order, then the rest of the catalog; rankings of models no longer listed are dropped. */
-export function featuredEntries(catalog: CatalogModel[], rows: ModelRanking[]): FeaturedEntry[] {
+/** The first cards on the home page, in this order, whenever the catalog has them. */
+export const PINNED_MODELS = ['deepseek-v4.1-flash', 'gpt-6-sol', 'claude-opus-5-5']
+
+/**
+ * Pinned models first, then ranked models in rank order, then the rest of the
+ * catalog. Names the catalog does not have (pinned or ranked) are skipped.
+ */
+export function featuredEntries(catalog: CatalogModel[], rows: ModelRanking[], pinned = PINNED_MODELS): FeaturedEntry[] {
   const byName = new Map(catalog.map((model) => [model.model_name, model]))
-  const ranked = rows.flatMap((row) => {
-    const model = byName.get(row.model_name)
-    return model ? [{ model, ranking: row }] : []
-  })
-  const listed = new Set(ranked.map((entry) => entry.model.model_name))
-  return [...ranked, ...catalog.filter((model) => !listed.has(model.model_name)).map((model) => ({ model }))]
+  const rankingOf = new Map(rows.map((row) => [row.model_name, row]))
+  const order = [...pinned, ...rows.map((row) => row.model_name), ...catalog.map((model) => model.model_name)]
+  const listed = new Set<string>()
+  const entries: FeaturedEntry[] = []
+  for (const name of order) {
+    const model = byName.get(name)
+    if (!model || listed.has(name)) continue
+    listed.add(name)
+    entries.push({ model, ranking: rankingOf.get(name) })
+  }
+  return entries
 }
 
 /** 411×181 cards for every model, three until expanded. */
@@ -119,7 +130,7 @@ function FeaturedCard(props: { entry: FeaturedEntry }) {
     <article className='border-or-line bg-or-card flex h-[181px] flex-col justify-between rounded-[8px] border p-6'>
       <div className='flex items-start gap-3'>
         <span className='flex size-10 shrink-0 items-center justify-center rounded-[6px] bg-white text-black'>
-          <ProviderIcon name={ranking?.vendor_icon || model.vendorIcon} fallback={model.vendor} size={22} />
+          <ProviderIcon name={model.vendorIcon || ranking?.vendor_icon} fallback={model.vendor} size={22} />
         </span>
         <div className='min-w-0'>
           <div className='flex items-center gap-2 text-[14px] font-medium'>

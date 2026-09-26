@@ -41,4 +41,16 @@ describe('featuredEntries', () => {
   it('still lists every model when rankings are switched off', () => {
     expect(featuredEntries([model('a'), model('b')], []).map((entry) => entry.model.model_name)).toEqual(['a', 'b'])
   })
+
+  it('puts the chosen models first, in their order, skipping any the catalog lacks', () => {
+    const entries = featuredEntries([model('x'), model('b'), model('a')], [ranked('x', 1)], ['a', 'missing', 'b'])
+    expect(entries.map((entry) => entry.model.model_name)).toEqual(['a', 'b', 'x'])
+    expect(entries[2].ranking?.rank).toBe(1)
+  })
+
+  it('opens with DeepSeek V4.1 Flash, GPT-6 Sol and Claude Opus 5.5', () => {
+    const catalog = ['glm-5.3', 'claude-opus-5-5', 'gpt-6-sol', 'deepseek-v4.1-flash'].map(model)
+    const entries = featuredEntries(catalog, [ranked('glm-5.3', 1)])
+    expect(entries.map((entry) => entry.model.model_name)).toEqual(['deepseek-v4.1-flash', 'gpt-6-sol', 'claude-opus-5-5', 'glm-5.3'])
+  })
 })
