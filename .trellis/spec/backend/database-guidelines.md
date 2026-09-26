@@ -47,6 +47,7 @@ Questions to answer:
 ## Common Mistakes
 
 - Do not call `GetDBTimestamp()` (which queries the global `DB`) inside a GORM transaction. SQLite test setups may have one available connection, so the nested query waits on the transaction's own connection indefinitely. Use `getDBTimestampOn(tx)` for transaction-local database time; `CreateUserSubscriptionFromPlanTx` is an example. This also keeps transactional reads on the same connection across dialects.
+- Avoid a redundant fixed `TableName()` when GORM's default already names the production table correctly. `Checkin` naturally maps to `checkins`; its former override bypassed `schema.NamingStrategy{TablePrefix: ...}` in MySQL/PostgreSQL migration tests, causing test setup and cleanup to touch an unscoped table. Verify the default table name before removing any override, then test normal startup and prefixed isolated migrations on SQLite, MySQL and PostgreSQL.
 
 ## Scenario: Redemption code entitlement migration and grant
 

@@ -371,7 +371,10 @@ wallet quota; floating-point money arithmetic is forbidden.
   reserving Redis. Any queued or already-swapped/in-flight user-quota delta
   makes the locked DB row non-authoritative and aborts accounting as retryable,
   including when the user cache hash is absent. Retry only after the batch delta
-  has flushed.
+  has flushed. In `model/quota_reserve.go:userQuotaDeltaScript`, pass the signed
+  decimal `ARGV[1]` directly to Redis `HINCRBY`; converting it with Lua
+  `tonumber` rounds odd integer deltas above 2^53 and causes the cache to
+  disagree with the committed wallet row by one quota unit.
 - During an active quota fence, authentication and profile reads may return a
   direct DB snapshot without publishing it into Redis. Quota-authoritative reads
   (`GetUserQuota`, billing trust checks), reservations, and cache publication
@@ -485,7 +488,10 @@ wallet quota; floating-point money arithmetic is forbidden.
   quota fence, quota getters above the trust threshold remain fail-closed,
   committed auth changes publish/retain their floor and revoke sessions even
   when quota-cache refresh or Redis is unavailable, and invalid review actions
-  never write settlement retry metadata.
+  never write settlement retry metadata. Run
+  `TestManageUserQuotaCacheUsesCommittedIntegerDifference/large_odd_difference`
+  with Redis: exact DB/cache equality is required above the JavaScript-safe
+  integer boundary, not merely a rounded numeric comparison.
 - Risk: missing/invalid device, shared IP/device, login mismatch, account age,
   velocity, repeated/small-then-large amounts, inviter concentration, and the
   rule that one correlation signal does not auto-reject.
@@ -548,6 +554,16 @@ principalToDebit := creditedQuota * request.RefundPercent / 100
 // Correct: derive the new cumulative target and apply only its increase.
 newTarget := floor(creditedQuota * cumulativeRateBPS / 10000)
 deltaTarget := newTarget - oldTarget
+```
+
+### Exact Redis wallet deltas
+
+```lua
+-- Wrong: Lua doubles cannot represent every int64 delta.
+redis.call('HINCRBY', KEYS[1], 'Quota', tonumber(ARGV[1]))
+
+-- Correct: Redis parses the decimal integer string itself.
+redis.call('HINCRBY', KEYS[1], 'Quota', ARGV[1])
 ```
 
 ### Device and detail boundaries
