@@ -119,6 +119,29 @@ describe('ChatPage', () => {
     })
   })
 
+  it('keeps the settings and the model inside the message box, like GPT and Claude', () => {
+    signIn()
+    renderChat('/chat?model=gpt-test')
+    const box = screen.getByRole('group', { name: '对话' })
+    expect(within(box).getByRole('textbox', { name: '消息' })).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: '对话设置' })).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: /gpt-test/ })).toBeInTheDocument()
+  })
+
+  it('copies a reply', async () => {
+    signIn()
+    fetchMock.mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n']))
+    const user = userEvent.setup()
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
+    renderChat('/chat?model=gpt-test')
+
+    await user.type(screen.getByRole('textbox', { name: '消息' }), 'hi{Enter}')
+    await screen.findByText('好')
+    await user.click(await screen.findByRole('button', { name: '复制' }))
+    expect(writeText).toHaveBeenCalledWith('好')
+    expect(await screen.findByRole('button', { name: '已复制' })).toBeInTheDocument()
+  })
+
   it('resets the settings to their defaults', async () => {
     signIn()
     const user = userEvent.setup()

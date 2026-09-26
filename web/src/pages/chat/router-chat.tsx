@@ -29,7 +29,7 @@ import { ModelPicker } from './model-picker'
 import { RouterSidebar } from './router-sidebar'
 import type { ChatController } from './use-chat'
 
-/** Chat workspace: history rail, model + settings bar, thread, composer. */
+/** Chat workspace: history rail, thread, and a GPT-style message box holding the settings and the model. */
 export function RouterChat(props: { chat: ChatController; models: CatalogModel[]; loading: boolean }) {
   const { t } = useI18n()
   const chat = props.chat
@@ -39,33 +39,22 @@ export function RouterChat(props: { chat: ChatController; models: CatalogModel[]
     <div className='flex h-[calc(100dvh-56px)] xl:h-[calc(100dvh-78px)]'>
       <RouterSidebar chat={chat} className='hidden md:flex' />
       <section className='flex min-w-0 flex-1 flex-col'>
-        <div className='border-or-line flex h-14 shrink-0 items-center gap-2 border-b px-4'>
+        {/* Phones have no history rail, so a slim bar keeps 新对话 in reach. */}
+        <div className='border-or-line flex h-12 shrink-0 items-center gap-2 border-b px-4 md:hidden'>
           <button
             type='button'
             onClick={chat.newChat}
             aria-label={t('新对话')}
             title={t('新对话')}
-            className='border-or-line text-or-muted hover:text-or-fg flex size-9 shrink-0 items-center justify-center rounded-[6px] border md:hidden'
+            className='border-or-line text-or-muted hover:text-or-fg flex size-9 shrink-0 items-center justify-center rounded-[6px] border'
           >
             <SquarePen className='size-4' />
           </button>
-          <ModelPicker
-            models={props.models}
-            value={chat.model}
-            onChange={chat.setModel}
-            loading={props.loading}
-            className='w-[300px] min-w-0'
-          />
-          <div className='ml-auto flex min-w-9 items-center gap-3'>
-            {chat.active ? (
-              <span className='text-or-muted hidden truncate text-[13px] lg:block'>{chat.active.title}</span>
-            ) : null}
-            <ChatSettingsPopover settings={chat.settings} onChange={chat.setSettings} />
-          </div>
+          {chat.active ? <span className='text-or-muted min-w-0 truncate text-[13px]'>{chat.active.title}</span> : null}
         </div>
 
         {messages.length > 0 ? (
-          <MessageList messages={messages} streaming={chat.streaming} models={props.models} className='min-h-0 flex-1' />
+          <MessageList messages={messages} streaming={chat.streaming} className='min-h-0 flex-1' />
         ) : (
           <ChatEmptyState
             model={chat.model}
@@ -76,7 +65,22 @@ export function RouterChat(props: { chat: ChatController; models: CatalogModel[]
         )}
 
         <div className='mx-auto w-full max-w-[768px] shrink-0 px-4 pt-2 pb-3'>
-          <ChatComposer streaming={chat.streaming} disabled={!chat.model} onSend={chat.send} onStop={chat.stop} />
+          <ChatComposer
+            streaming={chat.streaming}
+            disabled={!chat.model}
+            onSend={chat.send}
+            onStop={chat.stop}
+            tools={<ChatSettingsPopover settings={chat.settings} onChange={chat.setSettings} />}
+            model={
+              <ModelPicker
+                models={props.models}
+                value={chat.model}
+                onChange={chat.setModel}
+                loading={props.loading}
+                className='min-w-0'
+              />
+            }
+          />
         </div>
       </section>
     </div>

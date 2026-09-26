@@ -16,31 +16,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { AlertCircle } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { AlertCircle, Check, Copy } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
-import { ProviderIcon } from '@/components/provider-icon'
 import { useI18n } from '@/i18n/i18n'
 import { cn } from '@/lib/format'
-import type { CatalogModel } from '@/lib/queries'
 
 import type { ChatMessage } from './use-chat'
 
 const s = {
-  user: 'border-or-line bg-or-fill text-or-fg rounded-[8px] border',
+  user: 'bg-or-fill text-or-fg rounded-[20px]',
   assistant: 'text-or-fg',
   label: 'text-or-muted',
+  action: 'text-or-muted hover:bg-or-fill hover:text-or-fg rounded-[6px]',
   reasoning: 'border-or-line text-or-muted border-l-2',
   error: 'border-or-red/30 bg-or-red/10 text-or-red rounded-[6px] border',
 }
 
-/** Scrollable thread; follows new tokens unless the reader scrolled up. */
-export function MessageList(props: {
-  messages: ChatMessage[]
-  streaming: boolean
-  models: CatalogModel[]
-  className?: string
-}) {
+/** GPT-style thread: your messages in bubbles on the right, replies in the open; follows new tokens unless you scrolled up. */
+export function MessageList(props: { messages: ChatMessage[]; streaming: boolean; className?: string }) {
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickRef = useRef(true)
@@ -64,21 +58,15 @@ export function MessageList(props: {
           if (m.role === 'user') {
             return (
               <div key={index} className='flex justify-end'>
-                <div className={cn('max-w-[80%] px-3.5 py-2.5 text-[14px] leading-6 break-words whitespace-pre-wrap', s.user)}>
+                <div className={cn('max-w-[80%] px-4 py-2.5 text-[15px] leading-6 break-words whitespace-pre-wrap', s.user)}>
                   {m.content}
                 </div>
               </div>
             )
           }
           const live = props.streaming && index === lastIndex
-          const name = m.model ?? ''
-          const info = props.models.find((c) => c.model_name === name)
           return (
             <div key={index} className='flex flex-col gap-2'>
-              <div className={cn('flex items-center gap-2 text-[13px] font-medium', s.label)}>
-                <ProviderIcon name={info?.vendorIcon} fallback={info?.vendor ?? name} size={16} />
-                <span className='truncate'>{name || t('助手')}</span>
-              </div>
               {m.reasoning ? (
                 <details open={live && !m.content} className='text-[13px]'>
                   <summary className={cn('cursor-pointer select-none', s.label)}>
@@ -88,7 +76,7 @@ export function MessageList(props: {
                 </details>
               ) : null}
               {m.content || (live && !m.reasoning) ? (
-                <div className={cn('text-[14px] leading-7 break-words whitespace-pre-wrap', s.assistant)}>
+                <div className={cn('text-[15px] leading-7 break-words whitespace-pre-wrap', s.assistant)}>
                   {m.content}
                   {live ? (
                     <span
@@ -104,10 +92,46 @@ export function MessageList(props: {
                   <span className='break-words'>{m.error}</span>
                 </div>
               ) : null}
+              {!live && m.content ? (
+                <div className='-ml-1.5 flex items-center gap-1'>
+                  <CopyButton text={m.content} />
+                  {m.model ? <span className={cn('ml-1 truncate text-[12px]', s.label)}>{m.model}</span> : null}
+                </div>
+              ) : null}
             </div>
           )
         })}
       </div>
     </div>
+  )
+}
+
+/** Copies a reply; the icon turns into a tick for two seconds. */
+function CopyButton(props: { text: string }) {
+  const { t } = useI18n()
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return
+    const id = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(id)
+  }, [copied])
+
+  const label = copied ? t('已复制') : t('复制')
+  return (
+    <button
+      type='button'
+      aria-label={label}
+      title={label}
+      onClick={() => {
+        navigator.clipboard.writeText(props.text).then(
+          () => setCopied(true),
+          () => undefined
+        )
+      }}
+      className={cn('flex size-7 items-center justify-center transition-colors', s.action)}
+    >
+      {copied ? <Check className='size-3.5' aria-hidden='true' /> : <Copy className='size-3.5' aria-hidden='true' />}
+    </button>
   )
 }

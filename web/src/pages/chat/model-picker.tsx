@@ -25,7 +25,7 @@ import { cn } from '@/lib/format'
 import type { CatalogModel } from '@/lib/queries'
 
 const s = {
-  trigger: 'border-or-line bg-or-fill text-or-fg hover:bg-or-fg/[0.06] h-9 rounded-[6px] border px-3 text-[14px] font-medium',
+  trigger: 'text-or-muted hover:text-or-fg hover:bg-or-fill h-9 rounded-full px-3 text-[13px] font-medium',
   panel: 'border-or-line bg-or-card rounded-[8px] border shadow-xl',
   search: 'border-or-line text-or-fg placeholder:text-or-dim border-b',
   item: 'text-or-fg hover:bg-or-fill rounded-[6px]',
@@ -33,7 +33,7 @@ const s = {
   muted: 'text-or-muted',
 }
 
-/** Searchable model dropdown with provider icons. */
+/** Searchable model menu shown at the bottom right of the message box; it opens upwards. */
 export function ModelPicker(props: {
   models: CatalogModel[]
   value: string
@@ -82,19 +82,19 @@ export function ModelPicker(props: {
         aria-haspopup='listbox'
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className={cn('flex w-full min-w-0 items-center gap-2 transition-colors', s.trigger)}
+        className={cn('flex max-w-full min-w-0 items-center gap-1.5 transition-colors', s.trigger)}
       >
         {props.value ? (
-          <ProviderIcon name={current?.vendorIcon} fallback={current?.vendor ?? props.value} size={16} />
+          <ProviderIcon name={current?.vendorIcon} fallback={current?.vendor ?? props.value} size={15} />
         ) : null}
-        <span className={cn('min-w-0 flex-1 truncate text-left', !props.value && s.muted)}>
+        <span className='max-w-[150px] min-w-0 truncate text-left sm:max-w-[240px]'>
           {props.value || (props.loading ? t('加载模型中…') : t('选择模型'))}
         </span>
-        <ChevronDown className={cn('size-4 shrink-0', s.muted)} aria-hidden='true' />
+        <ChevronDown className='size-3.5 shrink-0' aria-hidden='true' />
       </button>
 
       {open ? (
-        <div className={cn('absolute top-full left-0 z-50 mt-1 w-[340px] max-w-[calc(100vw-32px)]', s.panel)}>
+        <div className={cn('absolute right-0 bottom-full z-50 mb-2 w-[340px] max-w-[calc(100vw-32px)]', s.panel)}>
           <label className={cn('flex h-10 items-center gap-2 px-3', s.search)}>
             <Search className={cn('size-4 shrink-0', s.muted)} aria-hidden='true' />
             <input
@@ -109,7 +109,7 @@ export function ModelPicker(props: {
               className='w-full bg-transparent text-[14px] outline-none'
             />
           </label>
-          <ul role='listbox' aria-label={t('模型')} className='max-h-[320px] overflow-y-auto p-1'>
+          <ul role='listbox' aria-label={t('模型')} className='max-h-[min(320px,40vh)] overflow-y-auto p-1'>
             {filtered.length === 0 ? (
               <li className={cn('px-3 py-6 text-center text-[13px]', s.muted)}>{t('没有匹配的模型')}</li>
             ) : null}

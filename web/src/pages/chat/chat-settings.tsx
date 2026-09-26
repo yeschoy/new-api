@@ -77,7 +77,7 @@ export function ChatSettingsPopover(props: {
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          'border-or-line hover:bg-or-fill hover:text-or-fg relative flex size-9 shrink-0 items-center justify-center rounded-[6px] border transition-colors',
+          'hover:bg-or-fill hover:text-or-fg relative flex size-9 shrink-0 items-center justify-center rounded-full transition-colors',
           open ? 'bg-or-fill text-or-fg' : 'text-or-muted'
         )}
       >
@@ -91,7 +91,7 @@ export function ChatSettingsPopover(props: {
         <div
           role='dialog'
           aria-labelledby={titleId}
-          className='border-or-line bg-or-card absolute top-full right-0 z-50 mt-1 w-[320px] max-w-[calc(100vw-32px)] rounded-[8px] border p-4 shadow-xl'
+          className='border-or-line bg-or-card absolute bottom-full left-0 z-50 mb-2 max-h-[70vh] w-[320px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-[8px] border p-4 shadow-xl'
         >
           <div className='mb-4 flex items-center justify-between'>
             <h2 id={titleId} className='text-or-fg text-[14px] font-semibold'>
