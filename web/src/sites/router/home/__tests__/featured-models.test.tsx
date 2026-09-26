@@ -27,7 +27,8 @@ const model = { model_name: 'glm-5.3', vendor: 'Zhipu', quota_type: 0, model_rat
 describe('FeaturedModels', () => {
   it('shows token usage and weekly trend, never prices, for a model without usage figures', () => {
     render(<FeaturedModels rows={[]} catalog={[model]} modelCount={1} vendorCount={1} />)
-    const card = within(screen.getByRole('article'))
+    // The first card is a pinned model with no usage figures yet.
+    const card = within(screen.getAllByRole('article')[0])
     expect(card.getByText('Token 用量')).toBeInTheDocument()
     expect(card.getByText('周趋势')).toBeInTheDocument()
     expect(card.getAllByText('--')).toHaveLength(2)

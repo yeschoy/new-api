@@ -22,6 +22,7 @@ import { useState } from 'react'
 import { ProviderIcon } from '@/components/provider-icon'
 import { tk, useI18n } from '@/i18n/i18n'
 import { cn, compactNumber, shortDate } from '@/lib/format'
+import { guessIcon } from '@/lib/model-icons'
 import type { CatalogModel } from '@/lib/queries'
 import type { ModelRanking } from '@/lib/services'
 
@@ -73,17 +74,27 @@ export function NewBadge() {
 /** A home-page model: every catalog entry, with its usage when rankings are on. */
 export type FeaturedEntry = { model: CatalogModel; ranking?: ModelRanking }
 
-/** The first cards on the home page, in this order, whenever the catalog has them. */
-export const PINNED_MODELS = ['deepseek-v4.1-flash', 'gpt-6-sol', 'claude-opus-5-5']
+/** The first cards on the home page, in this order; shown even before the catalog lists them. */
+export const PINNED_MODELS: ReadonlyArray<{ name: string; vendor: string }> = [
+  { name: 'deepseek-v4.1-flash', vendor: 'DeepSeek' },
+  { name: 'gpt-6-sol', vendor: 'OpenAI' },
+  { name: 'claude-opus-5-5', vendor: 'Anthropic' },
+]
 
 /**
  * Pinned models first, then ranked models in rank order, then the rest of the
- * catalog. Names the catalog does not have (pinned or ranked) are skipped.
+ * catalog. Ranked models the catalog does not have are skipped; pinned ones
+ * get a card from their name and vendor alone.
  */
 export function featuredEntries(catalog: CatalogModel[], rows: ModelRanking[], pinned = PINNED_MODELS): FeaturedEntry[] {
   const byName = new Map(catalog.map((model) => [model.model_name, model]))
+  for (const pin of pinned) {
+    if (!byName.has(pin.name)) {
+      byName.set(pin.name, { model_name: pin.name, vendor: pin.vendor, vendorIcon: guessIcon(pin.name, pin.vendor) } as CatalogModel)
+    }
+  }
   const rankingOf = new Map(rows.map((row) => [row.model_name, row]))
-  const order = [...pinned, ...rows.map((row) => row.model_name), ...catalog.map((model) => model.model_name)]
+  const order = [...pinned.map((pin) => pin.name), ...rows.map((row) => row.model_name), ...catalog.map((model) => model.model_name)]
   const listed = new Set<string>()
   const entries: FeaturedEntry[] = []
   for (const name of order) {
@@ -178,7 +189,7 @@ const TOOLS = [
   { name: 'Pi', icon: 'Pi', body: tk('轻巧的编程助手') },
 ]
 
-/** Five apps: compact rows on phones; from md 270px cards with a preview band (one row from xl). */
+/** Five apps: compact rows on phones; from md cards with a 170px preview band (one row from xl), as tall as the tallest in their row. */
 export function FeaturedApps() {
   const { t } = useI18n()
   return (
@@ -186,11 +197,11 @@ export function FeaturedApps() {
       <SectionHeader title={t('常用应用')} subtitle={t('这些工具都能直接接入本站接口')} chevron />
       <div className='mt-6 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-6 xl:grid-cols-5'>
         {TOOLS.map((tool) => (
-          <article key={tool.name} className='border-or-line bg-or-card flex flex-col overflow-hidden rounded-[8px] border md:h-[270px]'>
-            <div className='bg-or-thumb hidden flex-1 items-center justify-center md:flex'>
+          <article key={tool.name} className='border-or-line bg-or-card flex flex-col overflow-hidden rounded-[8px] border'>
+            <div className='bg-or-thumb hidden h-[170px] shrink-0 items-center justify-center md:flex'>
               <ProviderIcon name={tool.icon} fallback={tool.name} size={56} />
             </div>
-            <div className='flex items-center gap-3 px-4 py-3 md:px-6 md:py-4'>
+            <div className='flex items-center gap-3 px-4 py-3 md:items-start md:px-6 md:py-4'>
               <span className='border-or-line flex size-8 items-center justify-center rounded-[6px] border'>
                 <ProviderIcon name={tool.icon} fallback={tool.name} size={18} />
               </span>

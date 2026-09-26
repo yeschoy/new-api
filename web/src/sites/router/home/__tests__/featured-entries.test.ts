@@ -27,30 +27,33 @@ const ranked = (name: string, rank: number) =>
 
 describe('featuredEntries', () => {
   it('lists every model, the ranked ones first with their usage', () => {
-    const entries = featuredEntries([model('a'), model('b'), model('c')], [ranked('c', 1)])
+    const entries = featuredEntries([model('a'), model('b'), model('c')], [ranked('c', 1)], [])
     expect(entries.map((entry) => entry.model.model_name)).toEqual(['c', 'a', 'b'])
     expect(entries[0].ranking?.rank).toBe(1)
     expect(entries[1].ranking).toBeUndefined()
   })
 
   it('leaves out ranked models the catalog no longer has', () => {
-    const entries = featuredEntries([model('a')], [ranked('gone', 1), ranked('a', 2)])
+    const entries = featuredEntries([model('a')], [ranked('gone', 1), ranked('a', 2)], [])
     expect(entries.map((entry) => entry.model.model_name)).toEqual(['a'])
   })
 
   it('still lists every model when rankings are switched off', () => {
-    expect(featuredEntries([model('a'), model('b')], []).map((entry) => entry.model.model_name)).toEqual(['a', 'b'])
+    expect(featuredEntries([model('a'), model('b')], [], []).map((entry) => entry.model.model_name)).toEqual(['a', 'b'])
   })
 
-  it('puts the chosen models first, in their order, skipping any the catalog lacks', () => {
-    const entries = featuredEntries([model('x'), model('b'), model('a')], [ranked('x', 1)], ['a', 'missing', 'b'])
-    expect(entries.map((entry) => entry.model.model_name)).toEqual(['a', 'b', 'x'])
-    expect(entries[2].ranking?.rank).toBe(1)
+  it('puts the chosen models first, in their order, even ones the catalog lacks', () => {
+    const pinned = [{ name: 'a', vendor: 'Vendor' }, { name: 'missing', vendor: 'Anthropic' }, { name: 'b', vendor: 'Vendor' }]
+    const entries = featuredEntries([model('x'), model('b'), model('a')], [ranked('x', 1)], pinned)
+    expect(entries.map((entry) => entry.model.model_name)).toEqual(['a', 'missing', 'b', 'x'])
+    expect(entries[1].model.vendor).toBe('Anthropic')
+    expect(entries[3].ranking?.rank).toBe(1)
   })
 
   it('opens with DeepSeek V4.1 Flash, GPT-6 Sol and Claude Opus 5.5', () => {
-    const catalog = ['glm-5.3', 'claude-opus-5-5', 'gpt-6-sol', 'deepseek-v4.1-flash'].map(model)
+    const catalog = ['glm-5.3', 'gpt-6-sol', 'deepseek-v4.1-flash'].map(model)
     const entries = featuredEntries(catalog, [ranked('glm-5.3', 1)])
     expect(entries.map((entry) => entry.model.model_name)).toEqual(['deepseek-v4.1-flash', 'gpt-6-sol', 'claude-opus-5-5', 'glm-5.3'])
+    expect(entries[2].model.vendorIcon).toBe('Claude.Color')
   })
 })
