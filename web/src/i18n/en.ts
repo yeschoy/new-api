@@ -348,4 +348,5 @@ export const EN: Record<string, string> = {
   中: 'Medium',
   高: 'High',
   '越高想得越深，回复也更慢、更耗 Token': 'Higher thinks deeper, but replies slower and uses more tokens',
+  '野菜|品牌': 'yeschoy',
 }

@@ -348,6 +348,7 @@ const TABLE: Record<string, string> = {
   中: '中',
   高: '高',
   '越高想得越深，回复也更慢、更耗 Token': '越高想得越深，回覆也更慢、更耗 Token',
+  '野菜|品牌': '野菜',
 }
 
 export default TABLE

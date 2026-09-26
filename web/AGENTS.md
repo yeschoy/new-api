@@ -25,7 +25,7 @@ One design, a replica of the openrouter.ai catalog. Components live under `src/s
 - Layouts must hold on 360px phones (portrait and landscape), tablets, and desktops in either orientation. Keep a 24px side margin at every width (`px-6` with a `max-w-[…]` that includes it, never dropping the padding at a breakpoint), let grids step down in columns, and centre content that can outgrow a short screen with `justify-center-safe`.
 - Pages never force a redirect to sign-in or setup. Signed-in-only pages wrap their content in `RequireAuth` (use `framed` when the children render their own page frame), which shows an in-page sign-in notice. An uninitialised instance shows no setup notice or button anywhere; the administrator opens `/setup` by URL.
 
-Brand name and logo always come from the operator's system settings (`useBrand()` in `src/lib/queries.ts`); never hard-code a brand.
+The site is called 野菜 in Chinese (简体 and 繁體) and yeschoy in every other language: `useBrand()` in `src/lib/queries.ts` returns `t('野菜|品牌')`, and the browser tab shows the same name. The system name setting is not used. The logo is the yeschoy mark in `src/components/brand-mark.tsx` (also `public/favicon.svg`), unless the operator sets a logo URL in the system settings.
 
 ## Languages
 

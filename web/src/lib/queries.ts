@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { useI18n } from '@/i18n/i18n'
 
@@ -39,13 +39,25 @@ export function useStatus() {
   })
 }
 
-/** Operator-configured brand; never hard-coded. */
+/**
+ * The site's name, 野菜 in Chinese and yeschoy in every other language (the
+ * system name setting is not used), and the operator's logo if one is set.
+ */
 export function useBrand(): { name: string; logo: string | null } {
+  const { t } = useI18n()
   const { data } = useStatus()
   return {
-    name: data?.system_name?.trim() || 'New API',
+    name: t('野菜|品牌'),
     logo: data?.logo?.trim() || null,
   }
+}
+
+/** Names the browser tab after the brand, in the current language. */
+export function useBrandTitle() {
+  const { name } = useBrand()
+  useEffect(() => {
+    document.title = name
+  }, [name])
 }
 
 export function useCurrency() {
