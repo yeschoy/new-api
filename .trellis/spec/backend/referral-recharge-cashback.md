@@ -319,6 +319,11 @@ wallet quota; floating-point money arithmetic is forbidden.
   Preserve their original maturity, amount, snapshots and review evidence;
   empty historical review sources qualify only with `reviewed_by > 0`.
   Automatic approvals never become manual through configuration changes.
+- A zero-payable reward is canceled before payer auto-review; its persisted
+  `review_status=pending` may remain as historical evidence, but a canceled
+  reward is not an actionable review. Admin pending filters and UI exclude
+  canceled/zero-quota rows while retaining calculation, cap and block reasons
+  in detail. Do not fabricate approval to suppress a misleading pending badge.
 - Reject always requires a non-empty reason. Approving `high` or `severe` risk
   also requires a reason.
 - Issuance requires all of: `approved`, `frozen`, positive reward quota,

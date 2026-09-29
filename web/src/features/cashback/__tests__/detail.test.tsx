@@ -115,6 +115,77 @@ describe('cashback detail settlement eligibility', () => {
     queryClient.clear()
   })
 
+  it('keeps a historical pending/canceled zero reward and its reasons visible without approval actions', async () => {
+    vi.mocked(getCashbackReward).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        ...detail,
+        reward: {
+          ...detail.reward,
+          review_status: 'pending',
+          review_source: '',
+          reviewed_by: 0,
+          reviewed_at: 0,
+          calculated_quota: 50,
+          reward_quota: 0,
+          cap_reason: 'daily_cap_exhausted',
+          blocking_reason: 'no_payable_cashback_quota',
+          settlement_status: 'canceled',
+        },
+      },
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByText('Canceled')).toBeVisible()
+    expect(screen.queryByText('Pending review')).not.toBeInTheDocument()
+    expect(screen.getByText('daily_cap_exhausted')).toBeVisible()
+    expect(screen.getByText('no_payable_cashback_quota')).toBeVisible()
+    expect(screen.getByText('50')).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Approve' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Reject' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('Available at')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Original hold date').nextElementSibling
+    ).toHaveTextContent('2023')
+    queryClient.clear()
+  })
+
+  it('shows one original hold date for a canceled manually approved reward', async () => {
+    vi.mocked(getCashbackReward).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        ...detail,
+        reward: { ...detail.reward, settlement_status: 'canceled' },
+      },
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findByText('Canceled')).toBeVisible()
+    expect(screen.getAllByText('Original hold date')).toHaveLength(1)
+    expect(screen.queryByText('Available at')).not.toBeInTheDocument()
+    queryClient.clear()
+  })
+
   it('does not present the future hold date as the availability of an already issued manual reward', async () => {
     vi.mocked(getCashbackReward).mockResolvedValue({
       success: true,

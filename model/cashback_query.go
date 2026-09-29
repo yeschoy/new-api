@@ -97,6 +97,9 @@ func ListCashbackRewards(filter CashbackRewardFilter, pageInfo *common.PageInfo)
 				return nil, errors.New("invalid cashback review status filter")
 			}
 			query = query.Where("review_status = ?", filter.ReviewStatus)
+			if filter.ReviewStatus == CashbackReviewPending {
+				query = query.Where("settlement_status = ? AND reward_quota > 0", CashbackSettlementFrozen)
+			}
 		}
 		if filter.SettlementStatus != "" {
 			if !validCashbackSettlementStatus(filter.SettlementStatus) {
@@ -158,7 +161,7 @@ func GetCashbackAdminSummary() (CashbackAdminSummary, error) {
 		InviterClusters: []CashbackInviterCluster{},
 		DeviceClusters:  []CashbackDeviceCluster{},
 	}
-	if err := sumCashbackRewardColumn("reward_quota", "review_status = ? AND settlement_status = ?", &summary.PendingReviewQuota, CashbackReviewPending, CashbackSettlementFrozen); err != nil {
+	if err := sumCashbackRewardColumn("reward_quota", "review_status = ? AND settlement_status = ? AND reward_quota > 0", &summary.PendingReviewQuota, CashbackReviewPending, CashbackSettlementFrozen); err != nil {
 		return CashbackAdminSummary{}, err
 	}
 	if err := sumCashbackRewardColumn("reward_quota", "review_status = ? AND settlement_status = ?", &summary.AwaitingMaturityQuota, CashbackReviewApproved, CashbackSettlementFrozen); err != nil {

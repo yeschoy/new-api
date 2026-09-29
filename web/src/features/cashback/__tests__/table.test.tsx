@@ -132,6 +132,7 @@ describe('cashback table', () => {
     )
 
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByText('Pending review')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'View' }))
     expect(onSelect).toHaveBeenCalledWith(7)
   })
@@ -248,6 +249,35 @@ describe('cashback table', () => {
     expect(
       screen.queryByText('Eligible after manual approval')
     ).not.toBeInTheDocument()
+  })
+
+  it('shows a canceled zero reward without a pending-review label or future payout date', () => {
+    render(
+      <CashbackTable
+        page={{
+          ...page,
+          items: [
+            {
+              ...page.items[0],
+              calculated_quota: 50,
+              reward_quota: 0,
+              cap_reason: 'daily_cap_exhausted',
+              review_status: 'pending',
+              settlement_status: 'canceled',
+            },
+          ],
+        }}
+        isLoading={false}
+        isError={false}
+        onSelect={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Canceled')).toBeVisible()
+    expect(screen.queryByText('Pending review')).not.toBeInTheDocument()
+    expect(screen.getByText('50')).toBeVisible()
+    expect(screen.queryByText(/2023-11-\d+/)).not.toBeInTheDocument()
   })
 
   it('renders an explicit empty state', () => {

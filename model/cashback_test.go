@@ -3446,6 +3446,9 @@ func TestCashbackSevereRiskAutoApprovalRemainsInAdminRiskFilter(t *testing.T) {
 	now := time.Now().Unix()
 	setting := saveCashbackTestSetting(t, now-100)
 	setting.AutoReviewEnabled = true
+	setting.LowReviewRequired = false
+	setting.MediumReviewRequired = false
+	setting.HighReviewRequired = false
 	setting.SevereReviewRequired = false
 	setting.MaxRewardQuota = 50
 	setting.DailyTopUpCountThreshold = 1
@@ -3457,6 +3460,7 @@ func TestCashbackSevereRiskAutoApprovalRemainsInAdminRiskFilter(t *testing.T) {
 	var reward CashbackReward
 	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&reward).Error)
 	require.Equal(t, CashbackRiskSevere, reward.RiskLevel)
+	require.Positive(t, reward.RewardQuota)
 	assert.Equal(t, CashbackReviewApproved, reward.ReviewStatus)
 	assert.Equal(t, CashbackReviewAutomatic, reward.ReviewSource)
 	assert.Equal(t, CashbackSettlementFrozen, reward.SettlementStatus)
@@ -3464,6 +3468,110 @@ func TestCashbackSevereRiskAutoApprovalRemainsInAdminRiskFilter(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, filtered, 1)
 	assert.Equal(t, reward.ID, filtered[0].ID)
+}
+
+func TestCashbackCanceledZeroRewardsRemainAuditableButNotPendingReview(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.InviterEnabled = false
+	setting.AutoReviewEnabled = true
+	setting.AutoReviewImmediateIssue = false
+	setting.LowReviewRequired = false
+	setting.MediumReviewRequired = false
+	setting.HighReviewRequired = false
+	setting.SevereReviewRequired = false
+	setting.DailyRewardQuota = 50
+	require.NoError(t, SaveCashbackSetting(setting))
+	payer := User{Username: "canceled-zero-payer", Status: common.UserStatusEnabled, CreatedAt: now}
+	require.NoError(t, DB.Create(&payer).Error)
+
+	first := createCompletedCashbackTopUp(t, payer, now, now, 1_000, 1_000)
+	var payable CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", first.Id).First(&payable).Error)
+	require.Equal(t, 50, payable.RewardQuota)
+	require.Equal(t, CashbackReviewApproved, payable.ReviewStatus)
+
+	// Exhausted daily cap: the historical review column remains pending, but
+	// canceled rewards are never an actionable review or an issuance.
+	second := createCompletedCashbackTopUp(t, payer, now+1, now+1, 1_000, 1_000)
+	var capped CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", second.Id).First(&capped).Error)
+	require.Equal(t, 50, capped.CalculatedQuota)
+	require.Zero(t, capped.RewardQuota)
+	require.Equal(t, CashbackReviewPending, capped.ReviewStatus)
+	require.Equal(t, CashbackSettlementCanceled, capped.SettlementStatus)
+	assert.Empty(t, capped.ReviewSource)
+	assert.Zero(t, capped.ReviewedAt)
+	assert.Contains(t, capped.CapReason, "daily_cap_exhausted")
+	assert.Equal(t, "no_payable_cashback_quota", capped.BlockingReason)
+	_, err := ReviewCashbackReward(capped.ID, CashbackReviewActionApprove, "checked", 999, now+1)
+	require.ErrorIs(t, err, ErrCashbackInvalidState)
+	_, err = ReviewCashbackReward(capped.ID, CashbackReviewActionReject, "checked", 999, now+1)
+	require.ErrorIs(t, err, ErrCashbackInvalidState)
+
+	// Leave room under the cap: the debt alone must cancel a payable reward.
+	// Preserve the original calculation and cancellation reason in detail.
+	setting.DailyRewardQuota = 150
+	require.NoError(t, SaveCashbackSetting(setting))
+	require.NoError(t, DB.Model(&payable).Update("outstanding_debt_quota", 1).Error)
+	third := createCompletedCashbackTopUp(t, payer, now+2, now+2, 1_000, 1_000)
+	var debt CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", third.Id).First(&debt).Error)
+	assert.Equal(t, 50, debt.CalculatedQuota)
+	assert.Zero(t, debt.RewardQuota)
+	assert.Equal(t, CashbackSettlementCanceled, debt.SettlementStatus)
+	assert.Equal(t, "open_debt", debt.CapReason)
+	assert.Empty(t, debt.ReviewSource)
+	assert.Zero(t, debt.ReviewedAt)
+	assert.Equal(t, "beneficiary_has_open_cashback_debt", debt.BlockingReason)
+
+	setting.AutoReviewEnabled = false
+	require.NoError(t, SaveCashbackSetting(setting))
+	other := User{Username: "real-pending-payer", AffCode: "real-pending-code", Status: common.UserStatusEnabled, CreatedAt: now}
+	require.NoError(t, DB.Create(&other).Error)
+	fourth := createCompletedCashbackTopUp(t, other, now+3, now+3, 1_000, 1_000)
+	var actionable CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", fourth.Id).First(&actionable).Error)
+	require.Equal(t, CashbackReviewPending, actionable.ReviewStatus)
+	require.Equal(t, CashbackSettlementFrozen, actionable.SettlementStatus)
+
+	all, total, err := ListCashbackRewards(CashbackRewardFilter{}, nil)
+	require.NoError(t, err)
+	assert.EqualValues(t, 4, total)
+	require.Len(t, all, 4)
+	pending, count, err := ListCashbackRewards(CashbackRewardFilter{ReviewStatus: CashbackReviewPending}, nil)
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, count)
+	require.Len(t, pending, 1)
+	assert.Equal(t, actionable.ID, pending[0].ID)
+	conflicting, count, err := ListCashbackRewards(CashbackRewardFilter{ReviewStatus: CashbackReviewPending, SettlementStatus: CashbackSettlementCanceled}, nil)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+	assert.Empty(t, conflicting)
+	canceled, count, err := ListCashbackRewards(CashbackRewardFilter{SettlementStatus: CashbackSettlementCanceled}, nil)
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, count)
+	require.Len(t, canceled, 2)
+	for _, original := range []CashbackReward{capped, debt} {
+		detail, err := GetCashbackRewardWithContext(original.ID)
+		require.NoError(t, err)
+		assert.Equal(t, original.CalculatedQuota, detail.Reward.CalculatedQuota)
+		assert.Equal(t, original.CapReason, detail.Reward.CapReason)
+		assert.Equal(t, original.BlockingReason, detail.Reward.BlockingReason)
+		assert.Equal(t, CashbackReviewPending, detail.Reward.ReviewStatus)
+		assert.Zero(t, detail.Reward.ReviewedAt)
+	}
+	summary, err := GetCashbackAdminSummary()
+	require.NoError(t, err)
+	assert.EqualValues(t, 50, summary.PendingReviewQuota)
+	assert.EqualValues(t, 2, summary.RejectedOrCanceledCount)
+	var wallet User
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Equal(t, 3_000, wallet.Quota)
+	var issued int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("kind = ?", CashbackQuotaMutationIssue).Count(&issued).Error)
+	assert.Zero(t, issued)
 }
 
 func TestCashbackImmediateIssueKeepsPurchaseAndRewardBehindOneQuotaFence(t *testing.T) {

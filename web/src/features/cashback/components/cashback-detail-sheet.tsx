@@ -117,6 +117,10 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
   )
   const detail = query.data
   const manualPayer = detail && isManuallyApprovedPayer(detail.reward)
+  let availableAt = formatTime(detail?.reward.available_at ?? 0)
+  if (manualPayer && detail?.reward.settlement_status === 'frozen') {
+    availableAt = t('Eligible after manual approval')
+  }
   let reviewSource = '—'
   if (detail?.reward.review_source === 'automatic') {
     reviewSource = t('Automatic review')
@@ -166,10 +170,15 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
             {detail && (
               <div className='space-y-5'>
                 <div className='flex flex-wrap gap-2'>
-                  <CashbackStatusBadge
-                    kind='review'
-                    value={detail.reward.review_status}
-                  />
+                  {!(
+                    detail.reward.review_status === 'pending' &&
+                    detail.reward.settlement_status === 'canceled'
+                  ) && (
+                    <CashbackStatusBadge
+                      kind='review'
+                      value={detail.reward.review_status}
+                    />
+                  )}
                   <CashbackStatusBadge
                     kind='settlement'
                     value={detail.reward.settlement_status}
@@ -247,16 +256,16 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                     />
                     {!(
                       manualPayer &&
-                      detail.reward.settlement_status === 'issued'
+                      (detail.reward.settlement_status === 'issued' ||
+                        detail.reward.settlement_status === 'canceled')
                     ) && (
                       <DetailRow
-                        label={t('Available at')}
-                        value={
-                          manualPayer &&
-                          detail.reward.settlement_status === 'frozen'
-                            ? t('Eligible after manual approval')
-                            : formatTime(detail.reward.available_at)
-                        }
+                        label={t(
+                          detail.reward.settlement_status === 'canceled'
+                            ? 'Original hold date'
+                            : 'Available at'
+                        )}
+                        value={availableAt}
                       />
                     )}
                     {manualPayer && (

@@ -153,10 +153,15 @@ export function CashbackTable(props: CashbackTableProps) {
                     />
                   </TableCell>
                   <TableCell>
-                    <CashbackStatusBadge
-                      kind='review'
-                      value={reward.review_status}
-                    />
+                    {reward.review_status === 'pending' &&
+                    reward.settlement_status === 'canceled' ? (
+                      '—'
+                    ) : (
+                      <CashbackStatusBadge
+                        kind='review'
+                        value={reward.review_status}
+                      />
+                    )}
                     {reward.review_source === 'automatic' && (
                       <div className='text-muted-foreground text-xs'>
                         {t('Automatic review')}
@@ -185,7 +190,11 @@ export function CashbackTable(props: CashbackTableProps) {
                         </div>
                       </>
                     ) : (
-                      formatTime(reward.available_at)
+                      formatTime(
+                        reward.settlement_status === 'canceled'
+                          ? 0
+                          : reward.available_at
+                      )
                     )}
                   </TableCell>
                   <TableCell className='text-right'>
