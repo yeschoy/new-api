@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -90,6 +91,8 @@ type CashbackOrderContext struct {
 	UserID                        int                      `json:"user_id" gorm:"not null;index;index:idx_cashback_principal_debt,priority:1"`
 	PaymentProvider               string                   `json:"payment_provider" gorm:"type:varchar(50);not null"`
 	BaseQuota                     int                      `json:"base_quota" gorm:"type:bigint;not null"`
+	FaceAmount                    int64                    `json:"face_amount" gorm:"type:bigint;not null;default:0"`
+	QuotaPerFaceUnit              string                   `json:"quota_per_face_unit" gorm:"type:varchar(128);not null;default:''"`
 	CreditedQuota                 int                      `json:"credited_quota" gorm:"type:bigint;not null;default:0"`
 	RequestIP                     string                   `json:"request_ip" gorm:"type:varchar(64);index"`
 	RequestUserAgentHash          string                   `json:"request_user_agent_hash" gorm:"type:char(64);index"`
@@ -124,6 +127,8 @@ type CashbackReward struct {
 	BeneficiaryID           int                      `json:"beneficiary_id" gorm:"not null;index:idx_cashback_beneficiary_created,priority:1;index:idx_cashback_beneficiary_debt,priority:1;index:idx_cashback_beneficiary_paid,priority:1"`
 	BaseQuota               int                      `json:"base_quota" gorm:"type:bigint;not null"`
 	RateBPS                 int                      `json:"rate_bps" gorm:"not null"`
+	Strategy                string                   `json:"strategy" gorm:"type:varchar(20);not null;default:''"`
+	FixedPerHundred         int                      `json:"fixed_per_hundred" gorm:"not null;default:0"`
 	CalculatedQuota         int                      `json:"calculated_quota" gorm:"type:bigint;not null"`
 	RewardQuota             int                      `json:"reward_quota" gorm:"type:bigint;not null"`
 	CapReason               string                   `json:"cap_reason" gorm:"type:varchar(128)"`
@@ -168,9 +173,11 @@ type CashbackDeviceLink struct {
 }
 
 type CashbackRequestMetadata struct {
-	RequestIP    string
-	UserAgent    string
-	DeviceSignal string
+	RequestIP        string
+	UserAgent        string
+	DeviceSignal     string
+	FaceAmount       int64
+	QuotaPerFaceUnit string
 }
 
 // cashbackTransaction uses READ COMMITTED so aggregate reads performed after
@@ -250,6 +257,19 @@ func (context *CashbackOrderContext) BeforeSave(_ *gorm.DB) error {
 	if context.DeviceSignalStatus == CashbackDeviceSignalValid && len(context.DeviceFingerprintHash) != sha256.Size*2 {
 		return errors.New("invalid cashback device fingerprint hash")
 	}
+	if context.FaceAmount < 0 || (context.FaceAmount == 0) != (context.QuotaPerFaceUnit == "") {
+		return errors.New("invalid cashback face basis")
+	}
+	if context.FaceAmount > 0 {
+		factor, err := decimal.NewFromString(context.QuotaPerFaceUnit)
+		if err != nil || factor.LessThanOrEqual(decimal.Zero) || context.FaceAmount > common.MaxWalletQuota {
+			return errors.New("invalid cashback face conversion")
+		}
+		basis := decimal.NewFromInt(context.FaceAmount).Mul(factor)
+		if basis.LessThan(decimal.NewFromInt(int64(context.BaseQuota-1))) || basis.GreaterThan(decimal.NewFromInt(int64(context.BaseQuota+1))) {
+			return errors.New("cashback face conversion does not match principal")
+		}
+	}
 	if context.CampaignID < 0 {
 		return ErrCashbackInvalidInput
 	}
@@ -300,6 +320,14 @@ func (reward *CashbackReward) validate() error {
 	}
 	if reward.BaseQuota <= 0 || reward.BaseQuota > common.MaxWalletQuota || reward.RateBPS < 0 || reward.RateBPS > operation_setting.CashbackRateBasisPoints {
 		return errors.New("invalid cashback reward calculation")
+	}
+	if reward.Strategy != "" && reward.Strategy != operation_setting.CashbackStrategyRate && reward.Strategy != operation_setting.CashbackStrategyPerHundred {
+		return errors.New("invalid cashback reward strategy")
+	}
+	if reward.FixedPerHundred < 0 || reward.FixedPerHundred > 100 ||
+		(reward.Strategy == operation_setting.CashbackStrategyPerHundred && (reward.FixedPerHundred == 0 || reward.RateBPS != 0)) ||
+		(reward.Strategy != operation_setting.CashbackStrategyPerHundred && reward.FixedPerHundred != 0) {
+		return errors.New("invalid cashback reward fixed amount")
 	}
 	if reward.CalculatedQuota < 0 || reward.CalculatedQuota > reward.BaseQuota || reward.RewardQuota < 0 || reward.RewardQuota > reward.CalculatedQuota {
 		return errors.New("invalid cashback reward quota")
@@ -413,7 +441,7 @@ func InsertOnlineTopUp(topUp *TopUp, baseQuota int, metadata CashbackRequestMeta
 	if topUp == nil {
 		return errors.New("top-up is required")
 	}
-	if baseQuota <= 0 || baseQuota > common.MaxWalletQuota {
+	if baseQuota <= 0 || baseQuota > common.MaxWalletQuota || metadata.FaceAmount <= 0 || metadata.QuotaPerFaceUnit == "" {
 		return ErrInvalidTopUpQuota
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
@@ -462,6 +490,8 @@ func InsertOnlineTopUp(topUp *TopUp, baseQuota int, metadata CashbackRequestMeta
 			UserID:                   topUp.UserId,
 			PaymentProvider:          topUp.PaymentProvider,
 			BaseQuota:                baseQuota,
+			FaceAmount:               metadata.FaceAmount,
+			QuotaPerFaceUnit:         metadata.QuotaPerFaceUnit,
 			RequestIP:                requestIP,
 			RequestUserAgentHash:     userAgentHash,
 			DeviceFingerprintHash:    deviceHash,

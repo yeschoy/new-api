@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -303,6 +304,36 @@ func TestUpdateCashbackConfigRejectsTrailingJSONWithoutMutation(t *testing.T) {
 	assert.Equal(t, before, after)
 }
 
+func TestCashbackConfigStrategyUpdatesAreAtomicAndOldClientsPreserveStrategy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	body := strings.Replace(validCashbackConfigJSON, `"inviter_rate_bps":0,`, `"inviter_rate_bps":0,"inviter_strategy":"per_hundred","inviter_fixed_per_hundred":25,`, 1)
+	assert.Equal(t, http.StatusOK, runCashbackConfigUpdate(t, body).Code)
+	assert.Equal(t, http.StatusOK, runCashbackConfigUpdate(t, validCashbackConfigJSON).Code)
+	before, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Equal(t, operation_setting.CashbackStrategyPerHundred, before.InviterStrategy)
+	assert.Equal(t, 25, before.InviterFixedPerHundred)
+
+	for _, input := range []struct{ field, extra string }{
+		{"inviter_strategy", `"inviter_strategy":"other"`},
+		{"inviter_strategy", `"inviter_strategy":1`},
+		{"invitee_strategy", `"invitee_strategy":1`},
+		{"inviter_fixed_per_hundred", `"inviter_strategy":"per_hundred","inviter_fixed_per_hundred":-1`},
+		{"invitee_fixed_per_hundred", `"invitee_fixed_per_hundred":1.5`},
+		{"inviter_fixed_per_hundred", `"inviter_strategy":"per_hundred","inviter_fixed_per_hundred":1.5`},
+		{"inviter_fixed_per_hundred", `"inviter_strategy":"per_hundred","inviter_fixed_per_hundred":101`},
+	} {
+		request := strings.Replace(validCashbackConfigJSON, `"inviter_rate_bps":0,`, `"inviter_rate_bps":0,`+input.extra+`,`, 1)
+		response := runCashbackConfigUpdate(t, request)
+		require.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), `"field":"`+input.field+`"`)
+		after, err := model.GetCashbackSettingFromDB()
+		require.NoError(t, err)
+		assert.Equal(t, before, after)
+	}
+}
+
 func TestUpdateCashbackConfigRejectsCombinedRateAboveOneHundredPercent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setupCashbackConfigControllerTest(t)
@@ -315,7 +346,7 @@ func TestUpdateCashbackConfigRejectsCombinedRateAboveOneHundredPercent(t *testin
 	}`)
 
 	assert.Equal(t, http.StatusBadRequest, response.Code)
-	assert.Contains(t, response.Body.String(), "combined cashback rate")
+	assert.Contains(t, response.Body.String(), "combined cashback nominal return")
 	stored, err := model.GetCashbackSettingFromDB()
 	require.NoError(t, err)
 	assert.False(t, stored.AnyDirectionEnabled())

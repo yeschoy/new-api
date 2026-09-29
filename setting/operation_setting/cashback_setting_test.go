@@ -16,6 +16,8 @@ func TestDefaultCashbackSettingIsSafelyDisabled(t *testing.T) {
 	assert.False(t, setting.InviteeEnabled)
 	assert.Zero(t, setting.InviterRateBPS)
 	assert.Zero(t, setting.InviteeRateBPS)
+	assert.Equal(t, CashbackStrategyRate, setting.InviterStrategy)
+	assert.Equal(t, CashbackStrategyRate, setting.InviteeStrategy)
 	assert.Equal(t, 7, setting.SettlementDays)
 	assert.Zero(t, setting.MaxRewardQuota)
 	assert.Zero(t, setting.DailyRewardQuota)
@@ -41,6 +43,14 @@ func TestValidateCashbackSettingRejectsInvalidCrossFieldValues(t *testing.T) {
 	}{
 		{name: "enabled zero rate", mutate: func(s *CashbackSetting) { s.InviterRateBPS = 0 }, compliance: true, field: "inviter_rate_bps"},
 		{name: "combined rate", mutate: func(s *CashbackSetting) { s.InviteeRateBPS = 9_001 }, compliance: true, field: "invitee_rate_bps"},
+		{name: "unknown strategy", mutate: func(s *CashbackSetting) { s.InviterStrategy = "unknown" }, compliance: true, field: "inviter_strategy"},
+		{name: "fixed zero enabled", mutate: func(s *CashbackSetting) { s.InviterStrategy = CashbackStrategyPerHundred }, compliance: true, field: "inviter_fixed_per_hundred"},
+		{name: "fixed negative", mutate: func(s *CashbackSetting) { s.InviterFixedPerHundred = -1 }, compliance: true, field: "inviter_fixed_per_hundred"},
+		{name: "fixed above 100", mutate: func(s *CashbackSetting) { s.InviterFixedPerHundred = 101 }, compliance: true, field: "inviter_fixed_per_hundred"},
+		{name: "mixed nominal above 100", mutate: func(s *CashbackSetting) {
+			s.InviteeStrategy = CashbackStrategyPerHundred
+			s.InviteeFixedPerHundred = 91
+		}, compliance: true, field: "invitee_fixed_per_hundred"},
 		{name: "settlement below range", mutate: func(s *CashbackSetting) { s.SettlementDays = 0 }, compliance: true, field: "settlement_days"},
 		{name: "settlement above range", mutate: func(s *CashbackSetting) { s.SettlementDays = 91 }, compliance: true, field: "settlement_days"},
 		{name: "missing single cap", mutate: func(s *CashbackSetting) { s.MaxRewardQuota = 0 }, compliance: true, field: "max_reward_quota"},
@@ -72,6 +82,9 @@ func TestCashbackSettingOptionsRoundTrip(t *testing.T) {
 		InviteeEnabled:           true,
 		InviterRateBPS:           1_250,
 		InviteeRateBPS:           750,
+		InviterStrategy:          CashbackStrategyPerHundred,
+		InviteeStrategy:          CashbackStrategyRate,
+		InviterFixedPerHundred:   15,
 		SettlementDays:           14,
 		MaxRewardQuota:           90_000,
 		DailyRewardQuota:         180_000,
@@ -85,6 +98,17 @@ func TestCashbackSettingOptionsRoundTrip(t *testing.T) {
 	parsed, err := ParseCashbackSettingOptions(CashbackSettingOptionValues(original))
 	require.NoError(t, err)
 	assert.Equal(t, original, parsed)
+
+	legacy := CashbackSettingOptionValues(original)
+	delete(legacy, CashbackSettingName+".inviter_strategy")
+	delete(legacy, CashbackSettingName+".invitee_strategy")
+	delete(legacy, CashbackSettingName+".inviter_fixed_per_hundred")
+	delete(legacy, CashbackSettingName+".invitee_fixed_per_hundred")
+	parsed, err = ParseCashbackSettingOptions(legacy)
+	require.NoError(t, err)
+	assert.Equal(t, CashbackStrategyRate, parsed.InviterStrategy)
+	assert.Equal(t, CashbackStrategyRate, parsed.InviteeStrategy)
+	assert.Zero(t, parsed.InviterFixedPerHundred)
 }
 
 func TestParseCashbackSettingOptionsRejectsMalformedValues(t *testing.T) {

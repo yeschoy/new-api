@@ -14,9 +14,11 @@ import (
 )
 
 type cashbackDirectionConfig struct {
-	Direction     CashbackDirection
-	BeneficiaryID int
-	RateBPS       int
+	Direction       CashbackDirection
+	BeneficiaryID   int
+	RateBPS         int
+	Strategy        string
+	FixedPerHundred int
 }
 
 func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, source CashbackCompletionSource, heldFences ...*userQuotaMutationFences) error {
@@ -144,11 +146,13 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 	if setting.InviterEnabled && validInviter {
 		directions = append(directions, cashbackDirectionConfig{
 			Direction: CashbackDirectionInviter, BeneficiaryID: inviter.Id, RateBPS: setting.InviterRateBPS,
+			Strategy: setting.InviterStrategy, FixedPerHundred: setting.InviterFixedPerHundred,
 		})
 	}
 	if setting.InviteeEnabled && campaign.ID > 0 {
 		directions = append(directions, cashbackDirectionConfig{
 			Direction: CashbackDirectionInvitee, BeneficiaryID: invitee.Id, RateBPS: setting.InviteeRateBPS,
+			Strategy: setting.InviteeStrategy, FixedPerHundred: setting.InviteeFixedPerHundred,
 		})
 	}
 	sort.Slice(directions, func(i, j int) bool {
@@ -167,8 +171,19 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		err = nil
 
-		calculatedQuota, err := calculateCashbackQuota(orderContext.BaseQuota, direction.RateBPS)
+		calculatedQuota := 0
+		faceBasisUnavailable := false
+		if direction.Strategy == operation_setting.CashbackStrategyPerHundred {
+			if orderContext.FaceAmount == 0 && orderContext.QuotaPerFaceUnit == "" {
+				faceBasisUnavailable = true
+			} else {
+				calculatedQuota, err = calculateCashbackFixedQuota(&orderContext, direction.FixedPerHundred)
+			}
+		} else {
+			calculatedQuota, err = calculateCashbackQuota(orderContext.BaseQuota, direction.RateBPS)
+		}
 		if err != nil {
 			return err
 		}
@@ -177,6 +192,9 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			return err
 		}
 		rewardQuota, capReason := capCashbackQuota(calculatedQuota, dailyUsed, setting)
+		if faceBasisUnavailable {
+			capReason = appendCashbackReason(capReason, "face_basis_unavailable")
+		}
 		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 {
 			var used int64
 			orders := tx.Model(&CashbackOrderContext{}).Select("top_up_id").Where("campaign_id = ?", campaign.ID)
@@ -222,10 +240,12 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			riskLevel = CashbackRiskSevere
 		} else if rewardQuota == 0 {
 			settlementStatus = CashbackSettlementCanceled
-			if calculatedQuota == 0 {
-				capReason = appendCashbackReason(capReason, "below_minimum")
-			} else {
-				capReason = appendCashbackReason(capReason, "daily_cap_exhausted")
+			if !faceBasisUnavailable {
+				if calculatedQuota == 0 {
+					capReason = appendCashbackReason(capReason, "below_minimum")
+				} else {
+					capReason = appendCashbackReason(capReason, "daily_cap_exhausted")
+				}
 			}
 			blockingReason = "no_payable_cashback_quota"
 		}
@@ -243,6 +263,8 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			BeneficiaryID:    direction.BeneficiaryID,
 			BaseQuota:        orderContext.BaseQuota,
 			RateBPS:          direction.RateBPS,
+			Strategy:         direction.Strategy,
+			FixedPerHundred:  direction.FixedPerHundred,
 			CalculatedQuota:  calculatedQuota,
 			RewardQuota:      rewardQuota,
 			CapReason:        capReason,
@@ -256,6 +278,11 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			RiskSnapshot:     string(riskJSON),
 			ConfigSnapshot:   string(configSnapshot),
 			BlockingReason:   blockingReason,
+		}
+		if direction.Strategy == operation_setting.CashbackStrategyPerHundred {
+			reward.RateBPS = 0
+		} else {
+			reward.FixedPerHundred = 0
 		}
 		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 && setting.AutoReviewEnabled {
 			reviewRequired := true
@@ -356,6 +383,28 @@ func calculateCashbackQuota(baseQuota, rateBPS int) (int, error) {
 		Div(decimal.NewFromInt(operation_setting.CashbackRateBasisPoints)).
 		Floor()
 	return common.WalletQuotaFromDecimalStrict(value)
+}
+
+// calculateCashbackFixedQuota floors once after multiplying complete hundreds by
+// the order-time conversion factor, never using payment price or current rates.
+func calculateCashbackFixedQuota(context *CashbackOrderContext, fixed int) (int, error) {
+	if context == nil || context.FaceAmount <= 0 || context.BaseQuota <= 0 || fixed < 1 || fixed > 100 {
+		return 0, ErrCashbackInvalidInput
+	}
+	factor, err := decimal.NewFromString(context.QuotaPerFaceUnit)
+	if err != nil || !factor.GreaterThan(decimal.Zero) {
+		return 0, ErrCashbackInvalidInput
+	}
+	basis := decimal.NewFromInt(context.FaceAmount).Mul(factor)
+	if basis.LessThan(decimal.NewFromInt(int64(context.BaseQuota-1))) || basis.GreaterThan(decimal.NewFromInt(int64(context.BaseQuota+1))) {
+		return 0, ErrCashbackInvalidInput
+	}
+	value := decimal.NewFromInt(context.FaceAmount / 100).Mul(decimal.NewFromInt(int64(fixed))).Mul(factor).Floor()
+	quota, err := common.WalletQuotaFromDecimalStrict(value)
+	if err != nil || quota < 0 || quota > context.BaseQuota {
+		return 0, ErrCashbackInvalidInput
+	}
+	return quota, nil
 }
 
 // cashbackDailyRewardUsedTx sums rewards that were or still may be paid in the

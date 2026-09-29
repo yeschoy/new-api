@@ -268,6 +268,10 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	require.NoError(t, db.Migrator().DropTable(&EpayPaymentEvidence{}))
 	require.NoError(t, db.Migrator().DropTable(&WalletRefundCreditEvent{}))
 	require.NoError(t, db.Migrator().DropColumn(&CashbackOrderContext{}, "campaign_id"))
+	require.NoError(t, db.Migrator().DropColumn(&CashbackOrderContext{}, "face_amount"))
+	require.NoError(t, db.Migrator().DropColumn(&CashbackOrderContext{}, "quota_per_face_unit"))
+	require.NoError(t, db.Migrator().DropColumn(&CashbackReward{}, "strategy"))
+	require.NoError(t, db.Migrator().DropColumn(&CashbackReward{}, "fixed_per_hundred"))
 	require.NoError(t, db.Migrator().DropColumn(&CashbackReward{}, "review_source"))
 	require.NoError(t, db.Migrator().DropTable(&CashbackCampaign{}))
 	require.NoError(t, db.AutoMigrate(models...))
@@ -290,6 +294,14 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	var oldReward CashbackReward
 	require.NoError(t, db.First(&oldReward, reward.ID).Error)
 	require.Equal(t, reward.ReviewStatus, oldReward.ReviewStatus)
+	require.Empty(t, oldReward.Strategy) // Historical empty strategy is displayed as rate.
+	require.Zero(t, oldReward.FixedPerHundred)
+	var upgradedContext CashbackOrderContext
+	require.NoError(t, db.First(&upgradedContext, orderContext.ID).Error)
+	require.Zero(t, upgradedContext.FaceAmount)
+	require.Empty(t, upgradedContext.QuotaPerFaceUnit)
+	require.True(t, db.Migrator().HasColumn(&CashbackOrderContext{}, "face_amount"))
+	require.True(t, db.Migrator().HasColumn(&CashbackReward{}, "strategy"))
 
 	type issueResult struct {
 		outcome CashbackSettlementOutcome
@@ -459,7 +471,7 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	for i := range orders {
 		orders[i] = TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: fmt.Sprintf("%s_campaign_%d", namespace, i),
 			PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
-		require.NoError(t, InsertOnlineTopUp(&orders[i], 1_000, CashbackRequestMetadata{}))
+		require.NoError(t, insertCashbackTestTopUp(&orders[i], 1_000, CashbackRequestMetadata{}))
 		var ctx CashbackOrderContext
 		require.NoError(t, db.Where("top_up_id = ?", orders[i].Id).First(&ctx).Error)
 		require.Equal(t, campaign.ID, ctx.CampaignID)
@@ -552,7 +564,7 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return referencePayer.InsertWithTx(tx, 0) }))
 	referenceOrder := TopUp{UserId: referencePayer.Id, Amount: 100, Money: 90, TradeNo: namespace + "_refund_reference_order",
 		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
-	require.NoError(t, InsertOnlineTopUp(&referenceOrder, 100, CashbackRequestMetadata{}))
+	require.NoError(t, insertCashbackTestTopUp(&referenceOrder, 100, CashbackRequestMetadata{}))
 	_, err = RechargeEpay(referenceOrder.TradeNo, "alipay", "90.00", "127.0.0.1", epayTestDetails(referenceOrder.TradeNo))
 	require.NoError(t, err)
 	var referenceRewards []CashbackReward
@@ -687,7 +699,7 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	after := TopUp{UserId: pendingPayer.Id, Amount: 1, Money: 1, TradeNo: namespace + "_after_stop",
 		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
 	for _, order := range []*TopUp{&before, &after} {
-		require.NoError(t, InsertOnlineTopUp(order, 1_000, CashbackRequestMetadata{}))
+		require.NoError(t, insertCashbackTestTopUp(order, 1_000, CashbackRequestMetadata{}))
 		var ctx CashbackOrderContext
 		require.NoError(t, db.Where("top_up_id = ?", order.Id).First(&ctx).Error)
 		require.Equal(t, campaign.ID, ctx.CampaignID)
@@ -771,6 +783,30 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	require.NoError(t, db.Where("top_up_id = ?", after.Id).Find(&stoppedRewards).Error)
 	require.Len(t, stoppedRewards, 1)
 	require.Equal(t, CashbackDirectionInviter, stoppedRewards[0].Direction)
+
+	// Exercise the fixed rule on both real dialects after upgrading historical rows.
+	setting.InviteeEnabled = false
+	setting.MaxRewardQuota, setting.DailyRewardQuota = 100_000, 100_000
+	setting.InviterStrategy = operation_setting.CashbackStrategyPerHundred
+	setting.InviterFixedPerHundred = 20
+	require.NoError(t, SaveCashbackSetting(setting))
+	fixedPayer := User{Username: namespace + "_fixed_payer", AffCode: "fixed_" + namespace[len(namespace)-8:],
+		InviterId: inviter.Id, Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&fixedPayer).Error)
+	fixedOrder := TopUp{UserId: fixedPayer.Id, Amount: 250, Money: 1, TradeNo: namespace + "_fixed_order",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&fixedOrder, 250_000,
+		CashbackRequestMetadata{FaceAmount: 250, QuotaPerFaceUnit: "1000"}))
+	setting.InviterFixedPerHundred = 30
+	require.NoError(t, SaveCashbackSetting(setting))
+	_, err = RechargeEpay(fixedOrder.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(fixedOrder.TradeNo))
+	require.NoError(t, err)
+	var fixedReward CashbackReward
+	require.NoError(t, db.Where("top_up_id = ? AND direction = ?", fixedOrder.Id, CashbackDirectionInviter).First(&fixedReward).Error)
+	require.Equal(t, operation_setting.CashbackStrategyPerHundred, fixedReward.Strategy)
+	require.Equal(t, 30, fixedReward.FixedPerHundred)
+	require.Equal(t, 60_000, fixedReward.CalculatedQuota)
+	require.Equal(t, 60_000, fixedReward.RewardQuota)
 }
 
 func newCashbackIntegrationNamespace(t *testing.T) string {

@@ -17,37 +17,36 @@ import (
 )
 
 type cashbackConfigUpdateRequest struct {
-	InviterEnabled           *bool `json:"inviter_enabled"`
-	InviteeEnabled           *bool `json:"invitee_enabled"`
-	InviterRateBPS           *int  `json:"inviter_rate_bps"`
-	InviteeRateBPS           *int  `json:"invitee_rate_bps"`
-	SettlementDays           *int  `json:"settlement_days"`
-	MaxRewardQuota           *int  `json:"max_reward_quota"`
-	DailyRewardQuota         *int  `json:"daily_reward_quota"`
-	IPAccountThreshold       *int  `json:"ip_account_threshold"`
-	DeviceAccountThreshold   *int  `json:"device_account_threshold"`
-	DailyTopUpCountThreshold *int  `json:"daily_topup_count_threshold"`
-	AutoReviewEnabled        *bool `json:"auto_review_enabled"`
-	LowReviewRequired        *bool `json:"low_review_required"`
-	MediumReviewRequired     *bool `json:"medium_review_required"`
-	HighReviewRequired       *bool `json:"high_review_required"`
-	SevereReviewRequired     *bool `json:"severe_review_required"`
-	AutoReviewImmediateIssue *bool `json:"auto_review_immediate_issue"`
+	InviterEnabled           *bool   `json:"inviter_enabled"`
+	InviteeEnabled           *bool   `json:"invitee_enabled"`
+	InviterRateBPS           *int    `json:"inviter_rate_bps"`
+	InviteeRateBPS           *int    `json:"invitee_rate_bps"`
+	InviterStrategy          *string `json:"inviter_strategy"`
+	InviteeStrategy          *string `json:"invitee_strategy"`
+	InviterFixedPerHundred   *int    `json:"inviter_fixed_per_hundred"`
+	InviteeFixedPerHundred   *int    `json:"invitee_fixed_per_hundred"`
+	SettlementDays           *int    `json:"settlement_days"`
+	MaxRewardQuota           *int    `json:"max_reward_quota"`
+	DailyRewardQuota         *int    `json:"daily_reward_quota"`
+	IPAccountThreshold       *int    `json:"ip_account_threshold"`
+	DeviceAccountThreshold   *int    `json:"device_account_threshold"`
+	DailyTopUpCountThreshold *int    `json:"daily_topup_count_threshold"`
+	AutoReviewEnabled        *bool   `json:"auto_review_enabled"`
+	LowReviewRequired        *bool   `json:"low_review_required"`
+	MediumReviewRequired     *bool   `json:"medium_review_required"`
+	HighReviewRequired       *bool   `json:"high_review_required"`
+	SevereReviewRequired     *bool   `json:"severe_review_required"`
+	AutoReviewImmediateIssue *bool   `json:"auto_review_immediate_issue"`
 }
 
 func decodeCashbackConfigUpdate(reader io.Reader) (cashbackConfigUpdateRequest, error) {
 	var request cashbackConfigUpdateRequest
-	decoder := json.NewDecoder(reader)
-	if err := decoder.Decode(&request); err != nil {
+	data, err := io.ReadAll(reader)
+	if err != nil {
 		return request, err
 	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		if err == nil {
-			return request, errors.New("multiple cashback configuration documents")
-		}
-		return request, err
-	}
-	return request, nil
+	err = common.Unmarshal(data, &request)
+	return request, err
 }
 
 func (request cashbackConfigUpdateRequest) candidate() (operation_setting.CashbackSetting, string) {
@@ -113,10 +112,18 @@ func GetCashbackConfig(c *gin.Context) {
 func UpdateCashbackConfig(c *gin.Context) {
 	request, err := decodeCashbackConfigUpdate(c.Request.Body)
 	if err != nil {
+		field := "config"
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &typeErr) {
+			switch typeErr.Field {
+			case "inviter_strategy", "invitee_strategy", "inviter_fixed_per_hundred", "invitee_fixed_per_hundred":
+				field = typeErr.Field
+			}
+		}
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid cashback configuration",
-			"field":   "config",
+			"field":   field,
 		})
 		return
 	}
@@ -141,6 +148,10 @@ func UpdateCashbackConfig(c *gin.Context) {
 			AutoReviewEnabled: request.AutoReviewEnabled, LowReviewRequired: request.LowReviewRequired,
 			MediumReviewRequired: request.MediumReviewRequired, HighReviewRequired: request.HighReviewRequired,
 			SevereReviewRequired: request.SevereReviewRequired, AutoReviewImmediateIssue: request.AutoReviewImmediateIssue,
+			Strategy: operation_setting.CashbackStrategyUpdate{
+				InviterStrategy: request.InviterStrategy, InviteeStrategy: request.InviteeStrategy,
+				InviterFixedPerHundred: request.InviterFixedPerHundred, InviteeFixedPerHundred: request.InviteeFixedPerHundred,
+			},
 		},
 	)
 	if err != nil {
@@ -180,6 +191,18 @@ func cashbackConfigChangedFields(current, next operation_setting.CashbackSetting
 	}
 	if current.InviteeRateBPS != next.InviteeRateBPS {
 		fields = append(fields, "invitee_rate_bps")
+	}
+	if current.InviterStrategy != next.InviterStrategy {
+		fields = append(fields, "inviter_strategy")
+	}
+	if current.InviteeStrategy != next.InviteeStrategy {
+		fields = append(fields, "invitee_strategy")
+	}
+	if current.InviterFixedPerHundred != next.InviterFixedPerHundred {
+		fields = append(fields, "inviter_fixed_per_hundred")
+	}
+	if current.InviteeFixedPerHundred != next.InviteeFixedPerHundred {
+		fields = append(fields, "invitee_fixed_per_hundred")
 	}
 	if current.SettlementDays != next.SettlementDays {
 		fields = append(fields, "settlement_days")

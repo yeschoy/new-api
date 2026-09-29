@@ -61,6 +61,10 @@ func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, co
 			}
 		}
 		stored = candidate
+		stored.InviterStrategy = current.InviterStrategy
+		stored.InviteeStrategy = current.InviteeStrategy
+		stored.InviterFixedPerHundred = current.InviterFixedPerHundred
+		stored.InviteeFixedPerHundred = current.InviteeFixedPerHundred
 		stored.AutoReviewEnabled = current.AutoReviewEnabled
 		stored.LowReviewRequired = current.LowReviewRequired
 		stored.MediumReviewRequired = current.MediumReviewRequired

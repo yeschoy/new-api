@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -75,6 +76,9 @@ func TestTopUpQuotaValidation(t *testing.T) {
 }
 
 func TestCashbackBaseQuotaUsesFaceValueAcrossOnlineProviders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.CashbackDeviceLink{}))
 	oldQuotaPerUnit := common.QuotaPerUnit
 	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType
 	common.QuotaPerUnit = 500000
@@ -94,6 +98,34 @@ func TestCashbackBaseQuotaUsesFaceValueAcrossOnlineProviders(t *testing.T) {
 	creemQuota, err := cashbackBaseQuotaFromWalletQuota(100)
 	require.NoError(t, err)
 	assert.Equal(t, 100, creemQuota)
+
+	for _, tc := range []struct {
+		name, displayType, provider, factor string
+		amount, base, face                  int64
+		productQuota                        bool
+	}{
+		{"epay", operation_setting.QuotaDisplayTypeUSD, model.PaymentProviderEpay, "500000", 250, 125_000_000, 250, false},
+		{"stripe", operation_setting.QuotaDisplayTypeUSD, model.PaymentProviderStripe, "500000", 250, 125_000_000, 250, false},
+		{"waffo", operation_setting.QuotaDisplayTypeUSD, model.PaymentProviderWaffo, "500000", 250, 125_000_000, 250, false},
+		{"pancake", operation_setting.QuotaDisplayTypeUSD, model.PaymentProviderWaffoPancake, "500000", 250, 125_000_000, 250, false},
+		{"token_normalized", operation_setting.QuotaDisplayTypeTokens, model.PaymentProviderEpay, "1", 125_000_001, 125_000_000, 125_000_000, false},
+		{"creem", operation_setting.QuotaDisplayTypeTokens, model.PaymentProviderCreem, "1", 250, 250, 250, true},
+	} {
+		t.Run(tc.name+" checkout evidence", func(t *testing.T) {
+			operation_setting.GetGeneralSetting().QuotaDisplayType = tc.displayType
+			order := model.TopUp{UserId: 1, TradeNo: "face-basis-" + tc.name,
+				PaymentProvider: tc.provider, CreateTime: time.Now().Unix(), Status: common.TopUpStatusPending}
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			ctx.Request = httptest.NewRequest(http.MethodPost, "/api/user/pay", nil)
+			require.NoError(t, insertOnlineTopUpWithCashbackContext(ctx, &order, int(tc.base), tc.amount, tc.productQuota))
+			var evidence model.CashbackOrderContext
+			require.NoError(t, model.DB.Where("top_up_id = ?", order.Id).First(&evidence).Error)
+			assert.Equal(t, tc.face, evidence.FaceAmount)
+			assert.Equal(t, tc.factor, evidence.QuotaPerFaceUnit)
+			assert.Equal(t, int(tc.base), evidence.BaseQuota)
+		})
+	}
 }
 
 func TestValidateTopUpQuotaReturnsMaximumAmount(t *testing.T) {
