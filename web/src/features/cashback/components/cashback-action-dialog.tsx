@@ -101,9 +101,14 @@ export function CashbackActionDialog(props: CashbackActionDialogProps) {
     'principal-debt': t('Resolve principal debt'),
   }
   const descriptionMap: Record<CashbackDialogAction, string> = {
-    approve: t(
-      'Approval only authorizes settlement. The configured hold period still applies.'
-    ),
+    approve:
+      props.detail.reward.direction === 'invitee'
+        ? t(
+            'Manual payer approval can release cashback now after payment, wallet and reconciliation checks. Approval alone does not guarantee credit.'
+          )
+        : t(
+            'Inviter approval still waits for the configured settlement date and safety checks.'
+          ),
     reject: t('Rejected rewards remain traceable and can never be issued.'),
     incident: t(
       'This cancels or reclaims both cashback directions before reversing top-up principal.'

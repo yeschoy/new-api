@@ -3119,6 +3119,186 @@ func TestCashbackCampaignRejectsStaleCompletionTimeAtExclusiveEnd(t *testing.T) 
 	assert.Equal(t, inviter.Id, rewards[0].BeneficiaryID)
 }
 
+func TestCashbackManualPayerApprovalIssuesBeforeOriginalMaturity(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	inviter, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&reward).Error)
+	require.Positive(t, reward.RewardQuota)
+	require.Greater(t, reward.AvailableAt, now)
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&reward).Update("risk_level", CashbackRiskSevere).Error)
+
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "", 999, now)
+	require.ErrorIs(t, err, ErrCashbackReviewReason)
+	result, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "Verified payment and risk evidence", 999, now)
+	require.NoError(t, err)
+	assert.True(t, result.Issued)
+	assert.Equal(t, CashbackReviewManual, result.Reward.ReviewSource)
+	assert.Equal(t, reward.AvailableAt, result.Reward.AvailableAt)
+	again, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "Verified payment and risk evidence", 999, now)
+	require.NoError(t, err)
+	assert.True(t, again.Issued)
+	outcome, err := IssueCashbackReward(reward.ID, now)
+	require.NoError(t, err)
+	assert.True(t, outcome.Skipped)
+
+	var wallet User
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Equal(t, 10_000+reward.RewardQuota, wallet.Quota)
+	var inviterWallet User
+	require.NoError(t, DB.First(&inviterWallet, inviter.Id).Error)
+	assert.Zero(t, inviterWallet.Quota)
+	var mutations int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("reward_id = ? AND kind = ?", reward.ID, CashbackQuotaMutationIssue).Count(&mutations).Error)
+	assert.EqualValues(t, 1, mutations)
+}
+
+func TestCashbackManualPayerLegacyScanRespectsReviewEvidenceAndMaturity(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.AutoReviewEnabled = true
+	setting.AutoReviewImmediateIssue = false
+	setting.HighReviewRequired = false
+	setting.SevereReviewRequired = false
+	require.NoError(t, SaveCashbackSetting(setting))
+	_, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
+	var automatic, inviter CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&automatic).Error)
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&inviter).Error)
+	// An old approved row has no source but does retain the human reviewer ID.
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&automatic).
+		Updates(map[string]any{"review_source": "", "reviewed_by": 999}).Error)
+	due, err := HasMaturedCashbackRewards(now)
+	require.NoError(t, err)
+	assert.True(t, due)
+	run, err := SettleMaturedCashbackRewards(now, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, run.Scanned)
+	assert.Equal(t, 1, run.Issued)
+	require.NoError(t, DB.First(&automatic, automatic.ID).Error)
+	assert.Equal(t, CashbackSettlementIssued, automatic.SettlementStatus)
+	assert.Equal(t, CashbackReviewSource(""), automatic.ReviewSource)
+	assert.Equal(t, now+int64(setting.SettlementDays)*24*60*60, automatic.AvailableAt)
+	other, err := IssueCashbackReward(inviter.ID, now)
+	require.NoError(t, err)
+	assert.True(t, other.Skipped)
+
+	// A fresh auto-approved payer with immediate issue disabled is not a manual approval.
+	second := createCompletedCashbackTopUp(t, payer, now+1, now+1, 10_000, 10_000)
+	var deferred CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", second.Id, CashbackDirectionInvitee).First(&deferred).Error)
+	outcome, err := IssueCashbackReward(deferred.ID, now+1)
+	require.NoError(t, err)
+	assert.True(t, outcome.Skipped)
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&deferred).Update("review_source", "").Error)
+	outcome, err = IssueCashbackReward(deferred.ID, now+1)
+	require.NoError(t, err)
+	assert.True(t, outcome.Skipped, "missing historical review evidence must not bypass T+N")
+	due, err = HasMaturedCashbackRewards(now + 1)
+	require.NoError(t, err)
+	assert.False(t, due)
+}
+
+func TestCashbackManualPayerScanAndRetryCreditAtMostOnce(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&reward).Error)
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&reward).
+		Updates(map[string]any{"review_status": CashbackReviewApproved, "review_source": CashbackReviewManual, "reviewed_by": 999, "reviewed_at": now}).Error)
+
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for range 2 {
+		wg.Go(func() {
+			<-start
+			_, _ = SettleMaturedCashbackRewards(now, 1)
+		})
+	}
+	wg.Go(func() {
+		<-start
+		_, _ = IssueCashbackReward(reward.ID, now)
+	})
+	wg.Go(func() {
+		<-start
+		_, _ = ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	})
+	close(start)
+	wg.Wait()
+	_, err := IssueCashbackReward(reward.ID, now)
+	require.NoError(t, err, "a SQLite lock conflict must leave the reward retryable")
+	var wallet User
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Equal(t, 10_000+reward.RewardQuota, wallet.Quota)
+	var count int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("reward_id = ? AND kind = ?", reward.ID, CashbackQuotaMutationIssue).Count(&count).Error)
+	assert.EqualValues(t, 1, count)
+}
+
+func TestCashbackManualPayerLegacyFenceFailureRemainsRetryable(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&reward).Error)
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&reward).
+		Updates(map[string]any{"review_status": CashbackReviewApproved, "review_source": CashbackReviewManual, "reviewed_by": 999, "reviewed_at": now}).Error)
+	redis := useUserCacheMiniRedis(t)
+	redis.Close()
+	_, err := IssueCashbackReward(reward.ID, now)
+	require.Error(t, err)
+	require.NoError(t, DB.First(&reward, reward.ID).Error)
+	assert.Equal(t, CashbackSettlementFrozen, reward.SettlementStatus)
+	assert.NotEmpty(t, reward.LastSettlementError)
+	assert.Equal(t, now+cashbackSettlementRetryDelaySeconds, reward.NextSettlementAttemptAt)
+	var wallet User
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Equal(t, 10_000, wallet.Quota)
+	common.RedisEnabled = false
+	due, err := HasMaturedCashbackRewards(now)
+	require.NoError(t, err)
+	assert.False(t, due)
+	due, err = HasMaturedCashbackRewards(reward.NextSettlementAttemptAt)
+	require.NoError(t, err)
+	assert.True(t, due)
+	run, err := SettleMaturedCashbackRewards(reward.NextSettlementAttemptAt, 1)
+	require.NoError(t, err)
+	assert.Equal(t, 1, run.Issued)
+	require.NoError(t, DB.First(&wallet, payer.Id).Error)
+	assert.Equal(t, 10_000+reward.RewardQuota, wallet.Quota)
+}
+
+func TestCashbackManualPayerBlockedApprovalAndRetry(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, payer := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&reward).Error)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", payer.Id).Update("status", common.UserStatusDisabled).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.ErrorIs(t, err, ErrCashbackHardBlocked)
+	require.NoError(t, DB.First(&reward, reward.ID).Error)
+	assert.Equal(t, CashbackReviewPending, reward.ReviewStatus)
+	assert.Equal(t, CashbackSettlementFrozen, reward.SettlementStatus)
+	assert.Equal(t, "referral_account_disabled", reward.BlockingReason)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", payer.Id).Update("status", common.UserStatusEnabled).Error)
+	result, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now+1)
+	require.NoError(t, err)
+	assert.True(t, result.Issued)
+}
+
 func TestCashbackAutoReviewImmediateIssueUsesPaymentTransaction(t *testing.T) {
 	for _, immediate := range []bool{true, false} {
 		t.Run(fmt.Sprintf("immediate=%t", immediate), func(t *testing.T) {

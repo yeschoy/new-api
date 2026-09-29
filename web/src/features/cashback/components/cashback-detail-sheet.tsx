@@ -38,6 +38,7 @@ import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { useCashbackReward } from '../hooks/use-cashback'
+import { isManuallyApprovedPayer } from '../lib/settlement'
 import {
   CashbackActionDialog,
   type CashbackDialogAction,
@@ -115,6 +116,7 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
     (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
   )
   const detail = query.data
+  const manualPayer = detail && isManuallyApprovedPayer(detail.reward)
   let reviewSource = '—'
   if (detail?.reward.review_source === 'automatic') {
     reviewSource = t('Automatic review')
@@ -243,10 +245,26 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                       label={t('Actually credited top-up quota')}
                       value={detail.order.credited_quota.toLocaleString()}
                     />
-                    <DetailRow
-                      label={t('Available at')}
-                      value={formatTime(detail.reward.available_at)}
-                    />
+                    {!(
+                      manualPayer &&
+                      detail.reward.settlement_status === 'issued'
+                    ) && (
+                      <DetailRow
+                        label={t('Available at')}
+                        value={
+                          manualPayer &&
+                          detail.reward.settlement_status === 'frozen'
+                            ? t('Eligible after manual approval')
+                            : formatTime(detail.reward.available_at)
+                        }
+                      />
+                    )}
+                    {manualPayer && (
+                      <DetailRow
+                        label={t('Original hold date')}
+                        value={formatTime(detail.reward.available_at)}
+                      />
+                    )}
                   </dl>
                 </section>
 

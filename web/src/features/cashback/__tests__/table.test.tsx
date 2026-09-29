@@ -180,6 +180,76 @@ describe('cashback table', () => {
     expect(screen.getByText('Severe risk')).toBeVisible()
   })
 
+  it('shows manual payer eligibility without replacing the original hold date', () => {
+    render(
+      <CashbackTable
+        page={{
+          ...page,
+          items: [
+            {
+              ...page.items[0],
+              id: 7,
+              direction: 'invitee',
+              review_status: 'approved',
+              review_source: '',
+              reviewed_by: 12,
+            },
+            {
+              ...page.items[0],
+              id: 8,
+              direction: 'invitee',
+              review_status: 'approved',
+              review_source: 'automatic',
+              reviewed_by: 0,
+            },
+          ],
+        }}
+        isLoading={false}
+        isError={false}
+        onSelect={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Eligible after manual approval')).toBeVisible()
+    expect(screen.getByText(/Original hold date:/)).toBeVisible()
+    expect(screen.getAllByText('Top-up payer')).toHaveLength(2)
+    expect(screen.getAllByText('Eligible after manual approval')).toHaveLength(
+      1
+    )
+  })
+
+  it('shows the actual credit time and original hold date for an issued manual payer reward', () => {
+    render(
+      <CashbackTable
+        page={{
+          ...page,
+          items: [
+            {
+              ...page.items[0],
+              direction: 'invitee',
+              review_status: 'approved',
+              review_source: 'manual',
+              reviewed_by: 12,
+              settlement_status: 'issued',
+              issued_at: 1700000100,
+            },
+          ],
+        }}
+        isLoading={false}
+        isError={false}
+        onSelect={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText(/Issued at:.*2023/)).toBeVisible()
+    expect(screen.getByText(/Original hold date:.*2023/)).toBeVisible()
+    expect(
+      screen.queryByText('Eligible after manual approval')
+    ).not.toBeInTheDocument()
+  })
+
   it('renders an explicit empty state', () => {
     render(
       <CashbackTable

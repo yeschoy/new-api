@@ -181,6 +181,40 @@ describe('cashback action dialog', () => {
     queryClient.clear()
   })
 
+  it('explains that payer manual approval may release now but inviter approval still waits', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    })
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <CashbackActionDialog
+          action='approve'
+          detail={{
+            ...detail,
+            reward: { ...detail.reward, direction: 'invitee' },
+          }}
+          open
+          onOpenChange={() => undefined}
+        />
+      </QueryClientProvider>
+    )
+    expect(
+      screen.getByText(/Manual payer approval can release cashback now/)
+    ).toBeVisible()
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <CashbackActionDialog
+          action='approve'
+          detail={detail}
+          open
+          onOpenChange={() => undefined}
+        />
+      </QueryClientProvider>
+    )
+    expect(screen.getByText(/Inviter approval still waits/)).toBeVisible()
+    queryClient.clear()
+  })
+
   it('counts multilingual reasons as Unicode code points', () => {
     const queryClient = new QueryClient({
       defaultOptions: { mutations: { retry: false } },

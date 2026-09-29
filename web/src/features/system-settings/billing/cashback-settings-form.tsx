@@ -839,7 +839,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
                     </FormLabel>
                     <FormDescription>
                       {t(
-                        'When off, automatically approved rewards still wait for the configured settlement delay. Manual reviews always wait; payment and wallet checks still apply.'
+                        'When off, automatically approved payer rewards wait for the configured delay. Manually approved payer rewards may issue immediately; inviter rewards still wait. Safety checks always apply.'
                       )}
                     </FormDescription>
                   </SettingsSwitchContent>

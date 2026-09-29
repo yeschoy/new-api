@@ -18,6 +18,22 @@ type CashbackReviewAction string
 const cashbackSettlementRetryDelaySeconds int64 = 5 * 60
 const maxCashbackReasonCharacters = 1_000
 
+// A human-approved payer reward is eligible independently of its original
+// configuration hold date. Empty historical sources require reviewer evidence.
+func cashbackSettlementEligible(reward *CashbackReward, now int64) bool {
+	if reward.ReviewStatus != CashbackReviewApproved || reward.SettlementStatus != CashbackSettlementFrozen || reward.RewardQuota <= 0 {
+		return false
+	}
+	return now >= reward.AvailableAt || (reward.Direction == CashbackDirectionInvitee &&
+		(reward.ReviewSource == CashbackReviewManual || (reward.ReviewSource == "" && reward.ReviewedBy > 0)))
+}
+
+func cashbackSettlementDueQuery(now int64) *gorm.DB {
+	return DB.Model(&CashbackReward{}).
+		Where("review_status = ? AND settlement_status = ? AND reward_quota > 0 AND (next_settlement_attempt_at = 0 OR next_settlement_attempt_at <= ?)", CashbackReviewApproved, CashbackSettlementFrozen, now).
+		Where("available_at <= ? OR (direction = ? AND (review_source = ? OR (review_source = ? AND reviewed_by > 0)))", now, CashbackDirectionInvitee, CashbackReviewManual, "")
+}
+
 func cashbackTextWithinLimit(value string) bool {
 	return utf8.RuneCountInString(value) <= maxCashbackReasonCharacters
 }
@@ -90,10 +106,12 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 		return CashbackReviewResult{}, err
 	}
 
-	settlementEligibleAtStart := initial.ReviewStatus == CashbackReviewApproved && initial.SettlementStatus == CashbackSettlementFrozen && now >= initial.AvailableAt
-	manualSettlementCandidate := action == CashbackReviewActionApprove &&
+	settlementEligibleAtStart := cashbackSettlementEligible(&initial, now)
+	manualSettlementCandidate := action == CashbackReviewActionApprove && initial.RewardQuota > 0 &&
 		(initial.ReviewStatus == CashbackReviewPending || initial.ReviewStatus == CashbackReviewApproved) &&
-		initial.SettlementStatus == CashbackSettlementFrozen && now >= initial.AvailableAt &&
+		initial.SettlementStatus == CashbackSettlementFrozen &&
+		(now >= initial.AvailableAt || (initial.Direction == CashbackDirectionInvitee &&
+			(initial.ReviewStatus == CashbackReviewPending || cashbackSettlementEligible(&initial, now)))) &&
 		((initial.RiskLevel != CashbackRiskHigh && initial.RiskLevel != CashbackRiskSevere) || reason != "")
 	if manualSettlementCandidate {
 		if err := requireCashbackReconciliationHealthy(); err != nil {
@@ -208,7 +226,11 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 				}
 			}
 
-			if now >= reward.AvailableAt {
+			if cashbackSettlementEligible(reward, now) {
+				if common.RedisEnabled && !fences.owns(reward.BeneficiaryID) {
+					settlementErr = ErrUserQuotaMutationFenceLost
+					return settlementErr
+				}
 				issued, issueErr := issueLockedCashbackRewardTx(tx, reward, users[reward.BeneficiaryID], now)
 				if issueErr != nil {
 					settlementErr = issueErr
@@ -240,6 +262,12 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 }
 
 func IssueCashbackReward(rewardID int64, now int64) (CashbackSettlementOutcome, error) {
+	return issueCashbackReward(rewardID, now, true)
+}
+
+// The scheduler checks reconciliation once for the whole bounded batch; direct
+// issuance must perform that check itself before acquiring the quota fence.
+func issueCashbackReward(rewardID int64, now int64, checkReconciliation bool) (CashbackSettlementOutcome, error) {
 	if rewardID <= 0 {
 		return CashbackSettlementOutcome{}, ErrCashbackNotFound
 	}
@@ -257,8 +285,13 @@ func IssueCashbackReward(rewardID int64, now int64) (CashbackSettlementOutcome, 
 	if initial.SettlementStatus == CashbackSettlementIssued {
 		return CashbackSettlementOutcome{RewardID: rewardID, Skipped: true}, nil
 	}
-	if initial.ReviewStatus != CashbackReviewApproved || initial.SettlementStatus != CashbackSettlementFrozen || now < initial.AvailableAt {
+	if !cashbackSettlementEligible(&initial, now) {
 		return CashbackSettlementOutcome{RewardID: rewardID, Skipped: true}, nil
+	}
+	if checkReconciliation {
+		if err := requireCashbackReconciliationHealthy(); err != nil {
+			return CashbackSettlementOutcome{}, err
+		}
 	}
 	fences, err := acquireUserQuotaMutationFences(initial.BeneficiaryID)
 	if err != nil {
@@ -283,11 +316,7 @@ func IssueCashbackReward(rewardID int64, now int64) (CashbackSettlementOutcome, 
 			outcome.Skipped = true
 			return nil
 		}
-		if reward.ReviewStatus != CashbackReviewApproved || reward.SettlementStatus != CashbackSettlementFrozen {
-			outcome.Skipped = true
-			return nil
-		}
-		if now < reward.AvailableAt {
+		if !cashbackSettlementEligible(reward, now) {
 			outcome.Skipped = true
 			return nil
 		}
@@ -330,8 +359,7 @@ func HasMaturedCashbackRewards(now int64) (bool, error) {
 		now = time.Now().Unix()
 	}
 	var rewards []CashbackReward
-	result := DB.Select("id").
-		Where("review_status = ? AND settlement_status = ? AND available_at <= ? AND (next_settlement_attempt_at = 0 OR next_settlement_attempt_at <= ?)", CashbackReviewApproved, CashbackSettlementFrozen, now, now).
+	result := cashbackSettlementDueQuery(now).Select("id").
 		Order("id asc").
 		Limit(1).
 		Find(&rewards)
@@ -352,8 +380,7 @@ func SettleMaturedCashbackRewards(now int64, batchSize int) (CashbackSettlementR
 		return CashbackSettlementRunResult{}, err
 	}
 	var ids []int64
-	if err := DB.Model(&CashbackReward{}).
-		Where("review_status = ? AND settlement_status = ? AND available_at <= ? AND (next_settlement_attempt_at = 0 OR next_settlement_attempt_at <= ?)", CashbackReviewApproved, CashbackSettlementFrozen, now, now).
+	if err := cashbackSettlementDueQuery(now).
 		Order("id asc").
 		Limit(batchSize).
 		Pluck("id", &ids).Error; err != nil {
@@ -361,7 +388,7 @@ func SettleMaturedCashbackRewards(now int64, batchSize int) (CashbackSettlementR
 	}
 	result := CashbackSettlementRunResult{Scanned: len(ids)}
 	for _, id := range ids {
-		outcome, err := IssueCashbackReward(id, now)
+		outcome, err := issueCashbackReward(id, now, false)
 		if err != nil {
 			result.Failed++
 			continue
@@ -467,7 +494,7 @@ func issueLockedCashbackRewardTx(tx *gorm.DB, reward *CashbackReward, beneficiar
 	if reward.ReviewStatus != CashbackReviewApproved || reward.SettlementStatus != CashbackSettlementFrozen {
 		return false, ErrCashbackInvalidState
 	}
-	if now < reward.AvailableAt {
+	if !cashbackSettlementEligible(reward, now) {
 		return false, ErrCashbackNotMature
 	}
 	if reward.RewardQuota <= 0 {
@@ -834,7 +861,7 @@ func recordCashbackSettlementFailure(rewardID int64, settlementErr error, now in
 		return
 	}
 	result := DB.Session(&gorm.Session{SkipHooks: true}).Model(&CashbackReward{}).
-		Where("id = ? AND review_status = ? AND settlement_status = ? AND available_at <= ?", rewardID, CashbackReviewApproved, CashbackSettlementFrozen, now).
+		Where("id = ? AND review_status = ? AND settlement_status = ? AND reward_quota > 0 AND (available_at <= ? OR (direction = ? AND (review_source = ? OR (review_source = ? AND reviewed_by > 0))))", rewardID, CashbackReviewApproved, CashbackSettlementFrozen, now, CashbackDirectionInvitee, CashbackReviewManual, "").
 		Updates(map[string]interface{}{
 			"last_settlement_error":      settlementErr.Error(),
 			"next_settlement_attempt_at": now + cashbackSettlementRetryDelaySeconds,

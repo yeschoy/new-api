@@ -325,10 +325,20 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 
 	issuedCount := 0
 	for result := range results {
-		require.NoError(t, result.err)
+		if result.err != nil {
+			// Concurrent bounded reconciliation can advance the cursor between
+			// reads. That is a retryable conflict, not a payout decision.
+			require.ErrorIs(t, result.err, errCashbackReconciliationCursorConflict)
+			continue
+		}
 		if result.outcome.Issued {
 			issuedCount++
 		}
+	}
+	retry, err := IssueCashbackReward(reward.ID, now)
+	require.NoError(t, err)
+	if retry.Issued {
+		issuedCount++
 	}
 	require.Equal(t, 1, issuedCount)
 
@@ -344,6 +354,35 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	require.Len(t, issueMutations, 1)
 	require.Equal(t, fmt.Sprintf("cashback:reward:%d:issue", reward.ID), issueMutations[0].EventKey)
 	require.Equal(t, reward.RewardQuota, issueMutations[0].Quota)
+
+	// An approved historical payer row keeps its original future hold date but
+	// is picked up early on every database dialect when reviewer evidence exists.
+	manual := reward
+	manual.ID = 0
+	manual.Direction = CashbackDirectionInvitee
+	manual.BeneficiaryID = invitee.Id
+	manual.AvailableAt = now + 7*24*60*60
+	manual.IssuedAt = 0
+	manual.SettlementStatus = CashbackSettlementFrozen
+	require.NoError(t, db.Create(&manual).Error)
+	run, err := SettleMaturedCashbackRewards(now, 1)
+	require.NoError(t, err)
+	require.Equal(t, 1, run.Scanned)
+	require.Equal(t, 1, run.Issued)
+	var storedManual CashbackReward
+	require.NoError(t, db.First(&storedManual, manual.ID).Error)
+	require.Equal(t, CashbackSettlementIssued, storedManual.SettlementStatus)
+	require.Equal(t, manual.AvailableAt, storedManual.AvailableAt)
+	require.Empty(t, storedManual.ReviewSource)
+	var manualPayerWallet User
+	require.NoError(t, db.First(&manualPayerWallet, invitee.Id).Error)
+	require.Equal(t, manual.RewardQuota, manualPayerWallet.Quota)
+	run, err = SettleMaturedCashbackRewards(now, 1)
+	require.NoError(t, err)
+	require.Zero(t, run.Issued)
+	var payerMutations int64
+	require.NoError(t, db.Model(&CashbackQuotaMutation{}).Where("reward_id = ? AND kind = ?", manual.ID, CashbackQuotaMutationIssue).Count(&payerMutations).Error)
+	require.EqualValues(t, 1, payerMutations)
 
 	oldQuotaPerUnit := common.QuotaPerUnit
 	common.QuotaPerUnit = 1_000

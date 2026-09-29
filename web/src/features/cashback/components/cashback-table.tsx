@@ -36,6 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
+import { isManuallyApprovedPayer } from '../lib/settlement'
 import type { CashbackRewardPage } from '../types'
 import { CashbackStatusBadge } from './cashback-status-badge'
 import { CashbackStrategyLabel } from './cashback-strategy-label'
@@ -168,7 +169,25 @@ export function CashbackTable(props: CashbackTableProps) {
                       value={reward.settlement_status}
                     />
                   </TableCell>
-                  <TableCell>{formatTime(reward.available_at)}</TableCell>
+                  <TableCell>
+                    {isManuallyApprovedPayer(reward) &&
+                    (reward.settlement_status === 'frozen' ||
+                      reward.settlement_status === 'issued') ? (
+                      <>
+                        <div>
+                          {reward.settlement_status === 'issued'
+                            ? `${t('Issued at')}: ${formatTime(reward.issued_at)}`
+                            : t('Eligible after manual approval')}
+                        </div>
+                        <div className='text-muted-foreground text-xs'>
+                          {t('Original hold date')}:{' '}
+                          {formatTime(reward.available_at)}
+                        </div>
+                      </>
+                    ) : (
+                      formatTime(reward.available_at)
+                    )}
+                  </TableCell>
                   <TableCell className='text-right'>
                     <Button
                       type='button'

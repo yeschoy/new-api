@@ -20,7 +20,7 @@ browser signal + online order
   -> verified provider success transaction
   -> CashbackReward per enabled direction
   -> per-direction review policy + current hard-block / reconciliation check
-  -> manual/T+N settlement or same-payment transaction immediate issue
+  -> payer manual approval/eligible T+N settlement or same-payment immediate issue
   -> User.quota
   -> optional incident recovery / debt
 ```
@@ -313,13 +313,18 @@ wallet quota; floating-point money arithmetic is forbidden.
   Auto-approved payer rewards begin `approved/frozen` with
   `review_source=automatic`, `reviewed_by=0` and a review timestamp. If the
   immediate switch is on, `available_at=paid_at`; otherwise they retain T+N.
-  Existing manually approved rewards retain their original maturity and no
-  change in policy retroactively changes them. Historical empty review sources
-  are inferred from `reviewed_by` for display, not rewritten.
+  A positive manually approved payer reward may issue on approval without
+  waiting for its original `available_at`. Existing approved/frozen manual
+  payer rewards are eligible for bounded scheduler pickup before that date.
+  Preserve their original maturity, amount, snapshots and review evidence;
+  empty historical review sources qualify only with `reviewed_by > 0`.
+  Automatic approvals never become manual through configuration changes.
 - Reject always requires a non-empty reason. Approving `high` or `severe` risk
   also requires a reason.
-- Issuance requires all of: `approved`, `frozen`, `now >= available_at`, positive
-  reward quota, a successful matching online order, enabled payer/beneficiary
+- Issuance requires all of: `approved`, `frozen`, positive reward quota,
+  either `now >= available_at` or a manual payer review (including historical
+  empty source with positive reviewer ID), a successful matching online order,
+  enabled payer/beneficiary
   accounts, eligible completion source/channel, no incident, and no open
   beneficiary reward or principal debt. An inviter reward additionally requires
   an unchanged valid referral; payer rewards do not. Immediate issuance runs
@@ -330,7 +335,9 @@ wallet quota; floating-point money arithmetic is forbidden.
   instead of publishing only the purchase delta when an immediate gift issued.
 - Row locks, the unique mutation event, and state predicates—not the scheduler
   lease—guarantee at-most-once issuance. `cashback_settlement` runs every minute
-  in batches of 100. Before issuing, it advances a bounded, primary-key ordered
+  in batches of 100, including approved/frozen manual payer rewards with a
+  future original hold date and respecting retry times. Before issuing, it
+  advances a bounded, primary-key ordered
   reconciliation page across rewards, order contexts, and mutation evidence; a
   mismatched page remains pinned and stops settlement until repaired. Process
   restart safely begins the bounded scan from the start instead of running an
@@ -342,8 +349,8 @@ wallet quota; floating-point money arithmetic is forbidden.
   For review requests, only fence acquisition/verification and an actual
   issuance attempt are settlement failures; invalid review transitions do not
   delay settlement. A fence acquisition failure is recorded only when the
-  persisted reward was already approved, frozen, and mature. Ineligible,
-  pending, or immature records do not fabricate failures.
+  persisted reward was already approved, frozen, and effectively eligible.
+  Ineligible and pending records do not fabricate failures.
 
 ### Incidents, recovery, and debt
 
@@ -424,7 +431,8 @@ wallet quota; floating-point money arithmetic is forbidden.
 | Legacy pending order has no checkout face evidence under a fixed payment-time strategy | Complete purchase; create canceled zero-value fixed reward with `face_basis_unavailable` |
 | New checkout face conversion disagrees with base quota | Reject order/context atomically; never settle by guessing from price |
 | Device signal absent, malformed, too long, or Web Crypto unavailable | Continue auth/payment; snapshot `missing`/`invalid` risk evidence |
-| Approval occurs before `available_at` | Store approval but remain frozen |
+| Manual payer approval occurs before original `available_at` | Issue once in the fenced review transaction if safe; otherwise remain uncredited with a retryable failure/blocker |
+| Inviter approval or automatic payer approval with immediate issue off occurs before `available_at` | Keep frozen until original maturity |
 | Scheduler sees a blocked reward | Keep frozen, store blocker/retry time, and do not credit quota |
 | Bounded reconciliation page finds inconsistent state/evidence | Pin the page and fail the settlement run before issuing another reward |
 | Queued/in-flight user-quota batch delta exists, with or without a cache hash | Abort incident accounting as retryable before state/debt/ledger mutation; flush the delta before retry |
@@ -473,8 +481,10 @@ wallet quota; floating-point money arithmetic is forbidden.
 - Transactionality: a missing required context or cashback insert failure rolls
   back provider completion and wallet credit. Run concurrent cap/settlement
   tests and `go test -race` for cashback state.
-- Review/settlement: reason rules, maturity, hard blockers, task retries,
-  reconciliation stop, wallet maximum, and at-most-once quota credit.
+- Review/settlement: reason rules, immediate manual payer approval, legacy
+  reviewed-by evidence and bounded early pickup, inviter/automatic hold
+  boundaries, hard blockers, task retries, reconciliation stop, wallet maximum,
+  and at-most-once quota credit.
 - Incident/debt: cumulative partial-to-full refund, decreasing/duplicate rates,
   reward-before-principal recovery, insufficient balances, queued and in-flight
   batch deltas with warm/cold caches, fence-protected cache expiry/rehydration,
