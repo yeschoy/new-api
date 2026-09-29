@@ -81,6 +81,10 @@ export type CashbackConfig = {
   invitee_enabled: boolean
   inviter_rate_bps: number
   invitee_rate_bps: number
+  inviter_strategy: 'rate' | 'per_hundred'
+  invitee_strategy: 'rate' | 'per_hundred'
+  inviter_fixed_per_hundred: number
+  invitee_fixed_per_hundred: number
   settlement_days: number
   max_reward_quota: number
   daily_reward_quota: number

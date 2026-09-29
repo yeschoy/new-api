@@ -37,6 +37,8 @@ export type CashbackReward = {
   beneficiary_id: number
   base_quota: number
   rate_bps: number
+  strategy?: 'rate' | 'per_hundred' | ''
+  fixed_per_hundred?: number
   calculated_quota: number
   reward_quota: number
   cap_reason: string
@@ -73,6 +75,8 @@ export type CashbackOrderContext = {
   user_id: number
   payment_provider: string
   base_quota: number
+  face_amount?: number
+  quota_per_face_unit?: string
   credited_quota: number
   request_ip: string
   request_user_agent_hash: string

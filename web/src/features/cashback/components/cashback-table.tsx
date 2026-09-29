@@ -38,6 +38,7 @@ import {
 
 import type { CashbackRewardPage } from '../types'
 import { CashbackStatusBadge } from './cashback-status-badge'
+import { CashbackStrategyLabel } from './cashback-strategy-label'
 
 type CashbackTableProps = {
   page: CashbackRewardPage | undefined
@@ -95,7 +96,7 @@ export function CashbackTable(props: CashbackTableProps) {
             <TableHead>{t('Order')}</TableHead>
             <TableHead>{t('Direction')}</TableHead>
             <TableHead>{t('Beneficiary')}</TableHead>
-            <TableHead>{t('Base / rate')}</TableHead>
+            <TableHead>{t('Base / strategy')}</TableHead>
             <TableHead>{t('Calculated / payable')}</TableHead>
             <TableHead>{t('Risk')}</TableHead>
             <TableHead>{t('Review')}</TableHead>
@@ -135,7 +136,7 @@ export function CashbackTable(props: CashbackTableProps) {
                   <TableCell>
                     <div>{reward.base_quota.toLocaleString()}</div>
                     <div className='text-muted-foreground text-xs'>
-                      {(reward.rate_bps / 100).toFixed(2)}%
+                      <CashbackStrategyLabel reward={reward} />
                     </div>
                   </TableCell>
                   <TableCell>

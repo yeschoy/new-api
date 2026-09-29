@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,6 +54,10 @@ const config: CashbackConfig = {
   invitee_enabled: false,
   inviter_rate_bps: 0,
   invitee_rate_bps: 0,
+  inviter_strategy: 'rate',
+  invitee_strategy: 'rate',
+  inviter_fixed_per_hundred: 0,
+  invitee_fixed_per_hundred: 0,
   settlement_days: 7,
   max_reward_quota: 1000,
   daily_reward_quota: 5000,
@@ -126,6 +131,96 @@ describe('cashback settings validation', () => {
         'Enabled inviter cashback requires a positive rate'
       )
     ).toBeInTheDocument()
+  })
+
+  it('requires an integer fixed amount for an enabled per-hundred inviter', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(screen.getByRole('switch', { name: 'Reward the inviter' }))
+    await user.click(
+      screen.getByRole('combobox', { name: 'Inviter cashback strategy' })
+    )
+    await user.click(
+      await screen.findByRole('option', { name: 'Fixed per 100 of top-up' })
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(
+      await screen.findByText('Enter a whole number from 1 to 100')
+    ).toBeVisible()
+    expect(updateCashbackConfig).not.toHaveBeenCalled()
+
+    fireEvent.change(
+      screen.getByRole('spinbutton', { name: 'Inviter reward per 100' }),
+      {
+        target: { value: '20.5' },
+      }
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(updateCashbackConfig).not.toHaveBeenCalled()
+  })
+
+  it('rejects combined nominal return when fixed inviter and rate payer exceed 100%', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(screen.getByRole('switch', { name: 'Reward the inviter' }))
+    await user.click(
+      screen.getByRole('combobox', { name: 'Inviter cashback strategy' })
+    )
+    await user.click(
+      await screen.findByRole('option', { name: 'Fixed per 100 of top-up' })
+    )
+    fireEvent.change(
+      screen.getByRole('spinbutton', { name: 'Inviter reward per 100' }),
+      {
+        target: { value: '60' },
+      }
+    )
+    fireEvent.click(
+      screen.getByRole('switch', { name: 'Reward the top-up payer' })
+    )
+    fireEvent.change(
+      screen.getByRole('spinbutton', {
+        name: 'Top-up payer cashback rate (%)',
+      }),
+      {
+        target: { value: '50' },
+      }
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(
+      await screen.findByText('Combined cashback return cannot exceed 100%')
+    ).toBeVisible()
+    expect(updateCashbackConfig).not.toHaveBeenCalled()
+  })
+
+  it('describes combined nominal exposure when confirming a fixed reward', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(screen.getByRole('switch', { name: 'Reward the inviter' }))
+    await user.click(
+      screen.getByRole('combobox', { name: 'Inviter cashback strategy' })
+    )
+    await user.click(
+      await screen.findByRole('option', { name: 'Fixed per 100 of top-up' })
+    )
+    fireEvent.change(
+      screen.getByRole('spinbutton', { name: 'Inviter reward per 100' }),
+      { target: { value: '50' } }
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(
+      await screen.findByText(
+        'Enabling cashback or setting a high combined nominal return creates wallet exposure. Confirm the limits and review workflow before saving.'
+      )
+    ).toBeVisible()
   })
 
   it('presents malformed configuration errors as an accessible form error', async () => {
@@ -208,7 +303,7 @@ describe('cashback settings validation', () => {
     )
 
     expect(
-      await screen.findByText('Combined cashback rate cannot exceed 100%')
+      await screen.findByText('Combined cashback return cannot exceed 100%')
     ).toBeInTheDocument()
   })
 })
@@ -330,18 +425,32 @@ describe('cashback campaigns', () => {
     }
     listCashbackCampaigns.mockResolvedValue({ success: true, data: [campaign] })
     let finishStop = () => {}
-    stopCashbackCampaign.mockImplementation(() => new Promise((resolve) => {
-      finishStop = () => resolve({ success: true, data: { ...campaign, status: 'ended' } })
-    }))
+    stopCashbackCampaign.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishStop = () =>
+            resolve({ success: true, data: { ...campaign, status: 'ended' } })
+        })
+    )
     renderCampaigns()
-    fireEvent.click(await screen.findByRole('button', { name: 'Stop campaign' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Stop campaign' })
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Stop campaign' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Stop campaign' })).toBeDisabled())
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Stop campaign' })
+      ).toBeDisabled()
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    await waitFor(() => expect(screen.queryByText('Stop campaign early?')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByText('Stop campaign early?')).not.toBeInTheDocument()
+    )
 
     finishStop()
-    await waitFor(() => expect(successToast).toHaveBeenCalledWith('Campaign stopped'))
+    await waitFor(() =>
+      expect(successToast).toHaveBeenCalledWith('Campaign stopped')
+    )
     await waitFor(() => expect(listCashbackCampaigns).toHaveBeenCalledTimes(2))
     expect(stopCashbackCampaign).toHaveBeenCalledTimes(1)
   })
@@ -351,23 +460,46 @@ describe('cashback campaigns', () => {
     const start = dayjs().add(2, 'hour').unix()
     listCashbackCampaigns.mockResolvedValue({
       success: true,
-      data: [{ id: 3, start_at: start, end_at: start + 86400,
-        stopped_at: 0, stopped_by: 0, created_by: 9,
-        max_rewards_per_user: 1, created_at: start, status: 'planned' }],
+      data: [
+        {
+          id: 3,
+          start_at: start,
+          end_at: start + 86400,
+          stopped_at: 0,
+          stopped_by: 0,
+          created_by: 9,
+          max_rewards_per_user: 1,
+          created_at: start,
+          status: 'planned',
+        },
+      ],
     })
     let failStop = () => {}
-    stopCashbackCampaign.mockImplementation(() => new Promise((_resolve, reject) => {
-      failStop = () => reject(new Error('Campaign cannot be stopped'))
-    }))
+    stopCashbackCampaign.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          failStop = () => reject(new Error('Campaign cannot be stopped'))
+        })
+    )
     renderCampaigns()
-    fireEvent.click(await screen.findByRole('button', { name: 'Stop campaign' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Stop campaign' })
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Stop campaign' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Stop campaign' })).toBeDisabled())
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Stop campaign' })
+      ).toBeDisabled()
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-    await waitFor(() => expect(screen.queryByText('Stop campaign early?')).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.queryByText('Stop campaign early?')).not.toBeInTheDocument()
+    )
 
     failStop()
-    await waitFor(() => expect(errorToast).toHaveBeenCalledWith('Campaign cannot be stopped'))
+    await waitFor(() =>
+      expect(errorToast).toHaveBeenCalledWith('Campaign cannot be stopped')
+    )
     expect(errorToast).toHaveBeenCalledTimes(1)
     expect(listCashbackCampaigns).toHaveBeenCalledTimes(1)
   })
@@ -378,22 +510,42 @@ describe('cashback campaigns', () => {
       const start = dayjs().add(2, 'hour').unix()
       listCashbackCampaigns.mockResolvedValue({
         success: true,
-        data: [{ id: 3, start_at: start, end_at: start + 86400,
-          stopped_at: 0, stopped_by: 0, created_by: 9,
-          max_rewards_per_user: 1, created_at: start, status: 'planned' }],
+        data: [
+          {
+            id: 3,
+            start_at: start,
+            end_at: start + 86400,
+            stopped_at: 0,
+            stopped_by: 0,
+            created_by: 9,
+            max_rewards_per_user: 1,
+            created_at: start,
+            status: 'planned',
+          },
+        ],
       })
       stopCashbackCampaign.mockImplementation(() => new Promise(() => {}))
       renderCampaigns()
-      fireEvent.click(await screen.findByRole('button', { name: 'Stop campaign' }))
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Stop campaign' })
+      )
       fireEvent.click(screen.getByRole('button', { name: 'Stop campaign' }))
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Stop campaign' })).toBeDisabled())
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: 'Stop campaign' })
+        ).toBeDisabled()
+      )
 
       if (dismiss === 'Escape') {
         fireEvent.keyDown(document, { key: 'Escape' })
       } else {
         fireEvent.click(screen.getByRole('button', { name: 'Close' }))
       }
-      await waitFor(() => expect(screen.queryByText('Stop campaign early?')).not.toBeInTheDocument())
+      await waitFor(() =>
+        expect(
+          screen.queryByText('Stop campaign early?')
+        ).not.toBeInTheDocument()
+      )
       expect(stopCashbackCampaign).toHaveBeenCalledTimes(1)
     }
   )
@@ -441,8 +593,6 @@ describe('cashback campaigns', () => {
     expect(stopCashbackCampaign).not.toHaveBeenCalled()
     await screen.findByText('Stop campaign early?')
     fireEvent.click(screen.getByRole('button', { name: 'Stop campaign' }))
-    await waitFor(() =>
-      expect(stopCashbackCampaign).toHaveBeenCalledWith(3)
-    )
+    await waitFor(() => expect(stopCashbackCampaign).toHaveBeenCalledWith(3))
   })
 })

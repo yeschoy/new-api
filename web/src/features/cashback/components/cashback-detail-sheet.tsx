@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import dayjs from 'dayjs'
 import type { TFunction } from 'i18next'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -43,6 +43,7 @@ import {
   type CashbackDialogAction,
 } from './cashback-action-dialog'
 import { CashbackStatusBadge } from './cashback-status-badge'
+import { CashbackStrategyLabel } from './cashback-strategy-label'
 
 type CashbackDetailSheetProps = {
   rewardId: number | null
@@ -97,7 +98,7 @@ function riskCount(
   return typeof value === 'number' && Number.isFinite(value) ? value : '—'
 }
 
-function DetailRow(props: { label: string; value: string | number }) {
+function DetailRow(props: { label: string; value: ReactNode }) {
   return (
     <div className='grid grid-cols-[minmax(8rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-1.5'>
       <dt className='text-muted-foreground'>{props.label}</dt>
@@ -219,8 +220,12 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                       value={detail.reward.base_quota.toLocaleString()}
                     />
                     <DetailRow
-                      label={t('Cashback rate')}
-                      value={`${(detail.reward.rate_bps / 100).toFixed(2)}%`}
+                      label={t('Cashback strategy')}
+                      value={<CashbackStrategyLabel reward={detail.reward} />}
+                    />
+                    <DetailRow
+                      label={t('Selected top-up amount')}
+                      value={detail.order.face_amount || '—'}
                     />
                     <DetailRow
                       label={t('Calculated reward')}

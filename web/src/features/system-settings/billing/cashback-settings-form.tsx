@@ -48,6 +48,13 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 
 import { updateCashbackConfig } from '../api'
@@ -67,6 +74,10 @@ const fieldMap = {
   invitee_enabled: 'inviteeEnabled',
   inviter_rate_bps: 'inviterRatePercent',
   invitee_rate_bps: 'inviteeRatePercent',
+  inviter_strategy: 'inviterStrategy',
+  invitee_strategy: 'inviteeStrategy',
+  inviter_fixed_per_hundred: 'inviterFixedPerHundred',
+  invitee_fixed_per_hundred: 'inviteeFixedPerHundred',
   settlement_days: 'settlementDays',
   max_reward_quota: 'maxRewardQuota',
   daily_reward_quota: 'dailyRewardQuota',
@@ -86,6 +97,10 @@ type Values = {
   inviteeEnabled: boolean
   inviterRatePercent: number
   inviteeRatePercent: number
+  inviterStrategy: 'rate' | 'per_hundred'
+  inviteeStrategy: 'rate' | 'per_hundred'
+  inviterFixedPerHundred: number
+  inviteeFixedPerHundred: number
   settlementDays: number
   maxRewardQuota: number
   dailyRewardQuota: number
@@ -110,6 +125,10 @@ function configToValues(config: CashbackConfig): Values {
     inviteeEnabled: config.invitee_enabled,
     inviterRatePercent: config.inviter_rate_bps / 100,
     inviteeRatePercent: config.invitee_rate_bps / 100,
+    inviterStrategy: config.inviter_strategy ?? 'rate',
+    inviteeStrategy: config.invitee_strategy ?? 'rate',
+    inviterFixedPerHundred: config.inviter_fixed_per_hundred ?? 0,
+    inviteeFixedPerHundred: config.invitee_fixed_per_hundred ?? 0,
     settlementDays: config.settlement_days,
     maxRewardQuota: config.max_reward_quota,
     dailyRewardQuota: config.daily_reward_quota,
@@ -131,6 +150,10 @@ function valuesToRequest(values: Values): CashbackConfigUpdate {
     invitee_enabled: values.inviteeEnabled,
     inviter_rate_bps: Math.round(values.inviterRatePercent * 100),
     invitee_rate_bps: Math.round(values.inviteeRatePercent * 100),
+    inviter_strategy: values.inviterStrategy,
+    invitee_strategy: values.inviteeStrategy,
+    inviter_fixed_per_hundred: values.inviterFixedPerHundred,
+    invitee_fixed_per_hundred: values.inviteeFixedPerHundred,
     settlement_days: values.settlementDays,
     max_reward_quota: values.maxRewardQuota,
     daily_reward_quota: values.dailyRewardQuota,
@@ -171,6 +194,18 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       inviteeEnabled: z.boolean(),
       inviterRatePercent: percentage,
       inviteeRatePercent: percentage,
+      inviterStrategy: z.enum(['rate', 'per_hundred']),
+      inviteeStrategy: z.enum(['rate', 'per_hundred']),
+      inviterFixedPerHundred: z.coerce
+        .number({ error: t('Enter a whole number from 1 to 100') })
+        .int(t('Enter a whole number from 1 to 100'))
+        .min(0)
+        .max(100, t('Enter a whole number from 1 to 100')),
+      inviteeFixedPerHundred: z.coerce
+        .number({ error: t('Enter a whole number from 1 to 100') })
+        .int(t('Enter a whole number from 1 to 100'))
+        .min(0)
+        .max(100, t('Enter a whole number from 1 to 100')),
       settlementDays: z.coerce
         .number({ error: t('Enter valid settlement days') })
         .int()
@@ -189,25 +224,67 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       autoReviewImmediateIssue: z.boolean(),
     })
     .superRefine((values, context) => {
-      if (values.inviterEnabled && values.inviterRatePercent <= 0) {
+      if (
+        values.inviterEnabled &&
+        values.inviterStrategy === 'rate' &&
+        values.inviterRatePercent <= 0
+      ) {
         context.addIssue({
           code: 'custom',
           path: ['inviterRatePercent'],
           message: t('Enabled inviter cashback requires a positive rate'),
         })
       }
-      if (values.inviteeEnabled && values.inviteeRatePercent <= 0) {
+      if (
+        values.inviteeEnabled &&
+        values.inviteeStrategy === 'rate' &&
+        values.inviteeRatePercent <= 0
+      ) {
         context.addIssue({
           code: 'custom',
           path: ['inviteeRatePercent'],
           message: t('Enabled top-up payer cashback requires a positive rate'),
         })
       }
-      if (values.inviterRatePercent + values.inviteeRatePercent > 100) {
+      if (
+        values.inviterEnabled &&
+        values.inviterStrategy === 'per_hundred' &&
+        values.inviterFixedPerHundred < 1
+      ) {
         context.addIssue({
           code: 'custom',
-          path: ['inviteeRatePercent'],
-          message: t('Combined cashback rate cannot exceed 100%'),
+          path: ['inviterFixedPerHundred'],
+          message: t('Enter a whole number from 1 to 100'),
+        })
+      }
+      if (
+        values.inviteeEnabled &&
+        values.inviteeStrategy === 'per_hundred' &&
+        values.inviteeFixedPerHundred < 1
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['inviteeFixedPerHundred'],
+          message: t('Enter a whole number from 1 to 100'),
+        })
+      }
+      const inviterNominal =
+        values.inviterStrategy === 'rate'
+          ? values.inviterRatePercent
+          : values.inviterFixedPerHundred
+      const inviteeNominal =
+        values.inviteeStrategy === 'rate'
+          ? values.inviteeRatePercent
+          : values.inviteeFixedPerHundred
+      if (inviterNominal + inviteeNominal > 100) {
+        context.addIssue({
+          code: 'custom',
+          path: [
+            values.inviteeStrategy === 'rate'
+              ? 'inviteeRatePercent'
+              : 'inviteeFixedPerHundred',
+          ],
+          message: t('Combined cashback return cannot exceed 100%'),
         })
       }
       if (values.inviterEnabled || values.inviteeEnabled) {
@@ -279,7 +356,14 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
     const firstEnable =
       props.config.first_enabled_at === 0 &&
       (values.inviterEnabled || values.inviteeEnabled)
-    const highRate = values.inviterRatePercent + values.inviteeRatePercent >= 50
+    const highRate =
+      (values.inviterStrategy === 'rate'
+        ? values.inviterRatePercent
+        : values.inviterFixedPerHundred) +
+        (values.inviteeStrategy === 'rate'
+          ? values.inviteeRatePercent
+          : values.inviteeFixedPerHundred) >=
+      50
     if (firstEnable || highRate) {
       setPendingValues(values)
       setConfirmationOpen(true)
@@ -373,50 +457,168 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
           <div className='grid gap-6 sm:grid-cols-2'>
             <FormField
               control={form.control}
-              name='inviterRatePercent'
+              name='inviterStrategy'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('Inviter cashback rate (%)')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={0}
-                      max={100}
-                      step={0.01}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    {t('Applied to the selected top-up face value.')}
-                  </FormDescription>
+                  <FormLabel>{t('Inviter cashback strategy')}</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={mutation.isPending}
+                  >
+                    <FormControl>
+                      <SelectTrigger
+                        className='w-full'
+                        aria-label={t('Inviter cashback strategy')}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value='rate'>
+                        {t('Percentage of top-up')}
+                      </SelectItem>
+                      <SelectItem value='per_hundred'>
+                        {t('Fixed per 100 of top-up')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name='inviteeRatePercent'
+              name='inviteeStrategy'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('Top-up payer cashback rate (%)')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      min={0}
-                      max={100}
-                      step={0.01}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    {t(
-                      'The combined rate for both directions cannot exceed 100%.'
-                    )}
-                  </FormDescription>
+                  <FormLabel>{t('Payer cashback strategy')}</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={mutation.isPending}
+                  >
+                    <FormControl>
+                      <SelectTrigger
+                        className='w-full'
+                        aria-label={t('Payer cashback strategy')}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value='rate'>
+                        {t('Percentage of top-up')}
+                      </SelectItem>
+                      <SelectItem value='per_hundred'>
+                        {t('Fixed per 100 of top-up')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            {form.watch('inviterStrategy') === 'rate' ? (
+              <FormField
+                control={form.control}
+                name='inviterRatePercent'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Inviter cashback rate (%)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Applied to the selected top-up face value.')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name='inviterFixedPerHundred'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Inviter reward per 100')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={100}
+                        step={1}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Only complete hundreds count per order; remainders do not carry over.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {form.watch('inviteeStrategy') === 'rate' ? (
+              <FormField
+                control={form.control}
+                name='inviteeRatePercent'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Top-up payer cashback rate (%)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'The combined rate for both directions cannot exceed 100%.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name='inviteeFixedPerHundred'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Payer reward per 100')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={100}
+                        step={1}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Only complete hundreds count per order; remainders do not carry over.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name='settlementDays'
@@ -679,7 +881,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t(
-                'Enabling cashback or using a high combined rate creates wallet exposure. Confirm the limits and review workflow before saving.'
+                'Enabling cashback or setting a high combined nominal return creates wallet exposure. Confirm the limits and review workflow before saving.'
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
