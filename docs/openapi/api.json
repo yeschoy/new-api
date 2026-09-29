@@ -5795,7 +5795,7 @@
       "post": {
         "summary": "处置返现奖励欠额",
         "deprecated": false,
-        "description": "👨‍💼 需要管理员权限（Admin）。仅解除后续返现阻断，不恢复已取消奖励。",
+        "description": "👑 需要超级管理员权限（Root）。仅解除后续返现阻断，不恢复已取消奖励。",
         "tags": [
           "邀请返现"
         ],
@@ -5871,7 +5871,7 @@
       "post": {
         "summary": "处置充值本金欠额",
         "deprecated": false,
-        "description": "👨‍💼 需要管理员权限（Admin）。仅解除后续返现阻断，保留原异常及冲正记录。",
+        "description": "👑 需要超级管理员权限（Root）。仅解除后续返现阻断，保留原异常及冲正记录。",
         "tags": [
           "邀请返现"
         ],

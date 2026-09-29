@@ -141,7 +141,10 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 				result.Reward = *reward
 				return nil
 			}
-			if reward.ReviewStatus != CashbackReviewPending || reward.SettlementStatus != CashbackSettlementFrozen {
+			// Approved rewards that are still frozen (not yet mature, or blocked
+			// by a hard-block reason) can be withdrawn; issued ones cannot.
+			if (reward.ReviewStatus != CashbackReviewPending && reward.ReviewStatus != CashbackReviewApproved) ||
+				reward.SettlementStatus != CashbackSettlementFrozen {
 				return ErrCashbackInvalidState
 			}
 			reward.ReviewStatus = CashbackReviewRejected
@@ -150,6 +153,7 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 			reward.ReviewSource = CashbackReviewManual
 			reward.ReviewedAt = now
 			reward.ReviewReason = reason
+			reward.NextSettlementAttemptAt = 0
 			if err := tx.Save(reward).Error; err != nil {
 				return err
 			}

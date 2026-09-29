@@ -34,6 +34,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { useCashbackReward } from '../hooks/use-cashback'
 import {
@@ -108,6 +110,9 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
   const { t } = useTranslation()
   const query = useCashbackReward(props.open ? props.rewardId : null)
   const [action, setAction] = useState<CashbackDialogAction | null>(null)
+  const isRoot = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
   const detail = query.data
   let reviewSource = '—'
   if (detail?.reward.review_source === 'automatic') {
@@ -481,21 +486,24 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                   {detail.reward.review_status === 'pending' &&
                     detail.reward.settlement_status === 'frozen' &&
                     detail.reward.reward_quota > 0 && (
-                      <>
-                        <Button
-                          type='button'
-                          onClick={() => setAction('approve')}
-                        >
-                          {t('Approve')}
-                        </Button>
-                        <Button
-                          type='button'
-                          variant='destructive'
-                          onClick={() => setAction('reject')}
-                        >
-                          {t('Reject')}
-                        </Button>
-                      </>
+                      <Button
+                        type='button'
+                        onClick={() => setAction('approve')}
+                      >
+                        {t('Approve')}
+                      </Button>
+                    )}
+                  {(detail.reward.review_status === 'pending' ||
+                    detail.reward.review_status === 'approved') &&
+                    detail.reward.settlement_status === 'frozen' &&
+                    detail.reward.reward_quota > 0 && (
+                      <Button
+                        type='button'
+                        variant='destructive'
+                        onClick={() => setAction('reject')}
+                      >
+                        {t('Reject')}
+                      </Button>
                     )}
                   <Button
                     type='button'
@@ -504,7 +512,7 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                   >
                     {t('Record incident')}
                   </Button>
-                  {detail.reward.outstanding_debt_quota > 0 && (
+                  {isRoot && detail.reward.outstanding_debt_quota > 0 && (
                     <Button
                       type='button'
                       variant='outline'
@@ -513,15 +521,16 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                       {t('Resolve reward debt')}
                     </Button>
                   )}
-                  {detail.order.principal_outstanding_debt_quota > 0 && (
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={() => setAction('principal-debt')}
-                    >
-                      {t('Resolve principal debt')}
-                    </Button>
-                  )}
+                  {isRoot &&
+                    detail.order.principal_outstanding_debt_quota > 0 && (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        onClick={() => setAction('principal-debt')}
+                      >
+                        {t('Resolve principal debt')}
+                      </Button>
+                    )}
                 </div>
               </div>
             )}

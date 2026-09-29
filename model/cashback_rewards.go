@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -180,7 +181,8 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			var used int64
 			orders := tx.Model(&CashbackOrderContext{}).Select("top_up_id").Where("campaign_id = ?", campaign.ID)
 			if err := tx.Model(&CashbackReward{}).
-				Where("top_up_id IN (?) AND direction = ? AND beneficiary_id = ? AND reward_quota > 0", orders, CashbackDirectionInvitee, invitee.Id).
+				Where("top_up_id IN (?) AND direction = ? AND beneficiary_id = ? AND reward_quota > 0 AND review_status <> ? AND settlement_status <> ?",
+					orders, CashbackDirectionInvitee, invitee.Id, CashbackReviewRejected, CashbackSettlementCanceled).
 				Count(&used).Error; err != nil {
 				return err
 			}
@@ -280,35 +282,65 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			return err
 		}
 		if reward.ReviewSource == CashbackReviewAutomatic && reward.AvailableAt == topUp.CompleteTime {
-			if common.RedisEnabled && (len(heldFences) == 0 || heldFences[0] == nil || !heldFences[0].owns(invitee.Id)) {
-				return ErrUserQuotaMutationFenceLost
-			}
-			if len(heldFences) > 0 {
-				if err := heldFences[0].verify(); err != nil {
-					return err
-				}
-			}
-			if err := requireCashbackReconciliationHealthyTx(tx); err != nil {
-				return err
-			}
-			blockingReason, currentUsers, err := cashbackHardBlockReasonTx(tx, topUp, &orderContext, &reward)
-			if err != nil {
-				return err
-			}
-			if blockingReason != "" {
-				return errors.New("immediate cashback blocked: " + blockingReason)
-			}
-			if _, err := issueLockedCashbackRewardTx(tx, &reward, currentUsers[reward.BeneficiaryID], topUp.CompleteTime); err != nil {
-				return err
-			}
-			if len(heldFences) > 0 && heldFences[0] != nil {
-				heldFences[0].cashbackIssued = true
-				heldFences[0].cashbackRewardID = reward.ID
-				heldFences[0].cashbackQuota = reward.RewardQuota
-			}
+			issueImmediateCashbackRewardTx(tx, topUp, &orderContext, &reward, heldFences...)
 		}
 	}
 	return nil
+}
+
+// issueImmediateCashbackRewardTx tries to issue an automatically approved
+// reward inside the payment transaction. It never fails the purchase: every
+// mutation runs in a savepoint, and on any failure the reward stays approved
+// and frozen with available_at already reached, so the settlement system task
+// issues it on its next run (which also enforces reconciliation health).
+func issueImmediateCashbackRewardTx(tx *gorm.DB, topUp *TopUp, orderContext *CashbackOrderContext, reward *CashbackReward, heldFences ...*userQuotaMutationFences) {
+	var fences *userQuotaMutationFences
+	if len(heldFences) > 0 {
+		fences = heldFences[0]
+	}
+	if common.RedisEnabled && (fences == nil || !fences.owns(reward.BeneficiaryID)) {
+		deferImmediateCashbackRewardTx(tx, reward.ID, ErrUserQuotaMutationFenceLost)
+		return
+	}
+	issued := *reward
+	err := tx.Transaction(func(sp *gorm.DB) error {
+		if fences != nil {
+			if err := fences.verify(); err != nil {
+				return err
+			}
+		}
+		blockingReason, currentUsers, err := cashbackHardBlockReasonTx(sp, topUp, orderContext, &issued)
+		if err != nil {
+			return err
+		}
+		if blockingReason != "" {
+			return fmt.Errorf("%w: %s", ErrCashbackHardBlocked, blockingReason)
+		}
+		_, err = issueLockedCashbackRewardTx(sp, &issued, currentUsers[issued.BeneficiaryID], topUp.CompleteTime)
+		return err
+	})
+	if err != nil {
+		deferImmediateCashbackRewardTx(tx, reward.ID, err)
+		return
+	}
+	*reward = issued
+	if fences != nil {
+		fences.cashbackIssued = true
+		fences.cashbackRewardID = reward.ID
+		fences.cashbackQuota = reward.RewardQuota
+	}
+}
+
+func deferImmediateCashbackRewardTx(tx *gorm.DB, rewardID int64, cause error) {
+	common.SysError(fmt.Sprintf("immediate cashback reward %d deferred to settlement task: %v", rewardID, cause))
+	err := tx.Transaction(func(sp *gorm.DB) error {
+		return sp.Session(&gorm.Session{SkipHooks: true}).Model(&CashbackReward{}).
+			Where("id = ?", rewardID).
+			Update("last_settlement_error", "immediate issue deferred: "+cause.Error()).Error
+	})
+	if err != nil {
+		common.SysError(fmt.Sprintf("failed to record deferred cashback reward %d: %v", rewardID, err))
+	}
 }
 
 func MarkManualTopUpCashbackCompletionTx(tx *gorm.DB, topUp *TopUp, creditedQuota int) error {
@@ -326,10 +358,15 @@ func calculateCashbackQuota(baseQuota, rateBPS int) (int, error) {
 	return common.WalletQuotaFromDecimalStrict(value)
 }
 
+// cashbackDailyRewardUsedTx sums rewards that were or still may be paid in the
+// rolling window. The window uses paid_at, which shares the DB clock with the
+// completion time used as the cutoff; rejected or canceled rewards were never
+// payable and do not consume the allowance.
 func cashbackDailyRewardUsedTx(tx *gorm.DB, beneficiaryID int, cutoff int64) (int, error) {
 	var used int64
 	if err := tx.Model(&CashbackReward{}).
-		Where("beneficiary_id = ? AND created_at >= ?", beneficiaryID, cutoff).
+		Where("beneficiary_id = ? AND paid_at >= ? AND review_status <> ? AND settlement_status <> ?",
+			beneficiaryID, cutoff, CashbackReviewRejected, CashbackSettlementCanceled).
 		Select("COALESCE(SUM(reward_quota), 0)").
 		Scan(&used).Error; err != nil {
 		return 0, err

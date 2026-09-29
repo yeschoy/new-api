@@ -187,6 +187,10 @@ func Redeem(key string, userId int) (data any, err error) {
 		if redemption.PlanId > 0 {
 			var plan SubscriptionPlan
 			if err := lockForUpdate(tx).Where("id = ? AND enabled = ?", redemption.PlanId, true).First(&plan).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					// Users still see the generic failure; the log tells operators why.
+					return fmt.Errorf("redemption %d targets subscription plan %d which is disabled or deleted", redemption.Id, redemption.PlanId)
+				}
 				return err
 			}
 			subscriptionPlan = &plan

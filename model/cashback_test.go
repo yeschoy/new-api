@@ -1056,8 +1056,8 @@ func TestCashbackInvalidReviewDoesNotFabricateSettlementFailure(t *testing.T) {
 	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
 	require.NoError(t, err)
 
-	_, err = ReviewCashbackReward(reward.ID, CashbackReviewActionReject, "invalid rejection", 999, reward.AvailableAt)
-	assert.ErrorIs(t, err, ErrCashbackInvalidState)
+	_, err = ReviewCashbackReward(reward.ID, CashbackReviewActionReject, "   ", 999, reward.AvailableAt)
+	assert.ErrorIs(t, err, ErrCashbackReviewReason)
 
 	var stored CashbackReward
 	require.NoError(t, DB.First(&stored, reward.ID).Error)
@@ -1065,6 +1065,42 @@ func TestCashbackInvalidReviewDoesNotFabricateSettlementFailure(t *testing.T) {
 	assert.Equal(t, CashbackSettlementFrozen, stored.SettlementStatus)
 	assert.Empty(t, stored.LastSettlementError)
 	assert.Zero(t, stored.NextSettlementAttemptAt)
+}
+
+func TestCashbackApprovedFrozenRewardCanBeWithdrawn(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	saveCashbackTestSetting(t, now-100)
+	_, invitee := createCashbackUsers(t, now-30*24*60*60)
+	order := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInviter).First(&reward).Error)
+	_, err := ReviewCashbackReward(reward.ID, CashbackReviewActionApprove, "reviewed", 999, now)
+	require.NoError(t, err)
+
+	// Simulate a permanently blocked approved reward that the runner keeps retrying.
+	require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&CashbackReward{}).Where("id = ?", reward.ID).
+		Updates(map[string]any{"blocking_reason": "referral_account_disabled", "next_settlement_attempt_at": reward.AvailableAt + cashbackSettlementRetryDelaySeconds}).Error)
+
+	result, err := ReviewCashbackReward(reward.ID, CashbackReviewActionReject, "account closed for abuse", 998, reward.AvailableAt)
+	require.NoError(t, err)
+	assert.Equal(t, CashbackReviewRejected, result.Reward.ReviewStatus)
+	assert.Equal(t, CashbackSettlementCanceled, result.Reward.SettlementStatus)
+	assert.Equal(t, 998, result.Reward.ReviewedBy)
+	assert.Equal(t, CashbackReviewManual, result.Reward.ReviewSource)
+	assert.Zero(t, result.Reward.NextSettlementAttemptAt)
+
+	outcome, err := IssueCashbackReward(reward.ID, reward.AvailableAt)
+	require.NoError(t, err)
+	assert.True(t, outcome.Skipped)
+	due, err := HasMaturedCashbackRewards(reward.AvailableAt + 2*cashbackSettlementRetryDelaySeconds)
+	require.NoError(t, err)
+	assert.False(t, due, "a withdrawn reward must leave the settlement queue")
+
+	// Rejecting again is idempotent; an issued reward can only be reversed through an incident.
+	again, err := ReviewCashbackReward(reward.ID, CashbackReviewActionReject, "account closed for abuse", 998, reward.AvailableAt)
+	require.NoError(t, err)
+	assert.Equal(t, CashbackSettlementCanceled, again.Reward.SettlementStatus)
 }
 
 func TestCashbackIssuanceRollsBackWhenMutationEvidenceFails(t *testing.T) {
@@ -2071,6 +2107,29 @@ func TestCashbackCapsEachBeneficiaryAcrossRollingDay(t *testing.T) {
 	assert.Contains(t, inviterRewards[0].CapReason, "single_cap")
 	assert.Equal(t, 3_000, inviterRewards[1].RewardQuota)
 	assert.Contains(t, inviterRewards[1].CapReason, "daily_cap")
+}
+
+func TestCashbackRejectedRewardDoesNotConsumeDailyCap(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.MaxRewardQuota = 7_000
+	setting.DailyRewardQuota = 10_000
+	require.NoError(t, SaveCashbackSetting(setting))
+	_, invitee := createCashbackUsers(t, now-30*24*60*60)
+
+	first := createCompletedCashbackTopUp(t, invitee, now, now, 100_000, 100_000)
+	var rejected CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", first.Id, CashbackDirectionInviter).First(&rejected).Error)
+	require.Equal(t, 7_000, rejected.RewardQuota)
+	_, err := ReviewCashbackReward(rejected.ID, CashbackReviewActionReject, "not eligible", 999, now)
+	require.NoError(t, err)
+
+	second := createCompletedCashbackTopUp(t, invitee, now+1, now+1, 100_000, 100_000)
+	var next CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", second.Id, CashbackDirectionInviter).First(&next).Error)
+	assert.Equal(t, 7_000, next.RewardQuota)
+	assert.NotContains(t, next.CapReason, "daily_cap")
 }
 
 func TestCashbackRiskFlagsSharedSignalsWithoutAutomaticallyRejecting(t *testing.T) {
@@ -3132,7 +3191,7 @@ func TestCashbackImmediateIssueLosesFenceAfterRewardMutationAndRollsBack(t *test
 	assert.Zero(t, count)
 }
 
-func TestCashbackImmediateIssueFailureRollsBackVerifiedPayment(t *testing.T) {
+func TestCashbackImmediateIssueFailureDefersRewardAndKeepsPayment(t *testing.T) {
 	setupCashbackTestDB(t)
 	now := time.Now().Unix()
 	setting := saveCashbackTestSetting(t, now-100)
@@ -3156,21 +3215,30 @@ func TestCashbackImmediateIssueFailureRollsBackVerifiedPayment(t *testing.T) {
 		}
 	}))
 	_, err := RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
-	require.ErrorIs(t, err, fail)
+	require.NoError(t, err, "a failed immediate cashback issue must not roll back the purchase")
 	require.NoError(t, DB.Callback().Create().Remove(callback))
 	var stored TopUp
 	require.NoError(t, DB.First(&stored, order.Id).Error)
-	assert.Equal(t, common.TopUpStatusPending, stored.Status)
+	assert.Equal(t, common.TopUpStatusSuccess, stored.Status)
 	var wallet User
 	require.NoError(t, DB.First(&wallet, payer.Id).Error)
-	assert.Zero(t, wallet.Quota)
-	var count int64
-	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", order.Id).Count(&count).Error)
-	assert.Zero(t, count)
-	_, err = RechargeEpay(order.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(order.TradeNo))
+	assert.Equal(t, 1_000, wallet.Quota, "only the purchase is credited; the reward mutation was rolled back to its savepoint")
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ? AND direction = ?", order.Id, CashbackDirectionInvitee).First(&reward).Error)
+	assert.Equal(t, CashbackReviewApproved, reward.ReviewStatus)
+	assert.Equal(t, CashbackSettlementFrozen, reward.SettlementStatus)
+	assert.Contains(t, reward.LastSettlementError, "immediate issue deferred")
+	var mutations int64
+	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("reward_id = ?", reward.ID).Count(&mutations).Error)
+	assert.Zero(t, mutations)
+
+	result, err := SettleMaturedCashbackRewards(time.Now().Unix(), 100)
 	require.NoError(t, err)
+	assert.Equal(t, 1, result.Issued)
+	require.NoError(t, DB.First(&reward, reward.ID).Error)
+	assert.Equal(t, CashbackSettlementIssued, reward.SettlementStatus)
 	require.NoError(t, DB.First(&wallet, payer.Id).Error)
-	assert.Greater(t, wallet.Quota, 1_000)
+	assert.Equal(t, 1_000+reward.RewardQuota, wallet.Quota)
 }
 
 func TestOnlineTopUpRefusesChangedReferralBeforeCredit(t *testing.T) {

@@ -121,7 +121,7 @@ type CashbackReward struct {
 	Direction               CashbackDirection        `json:"direction" gorm:"type:varchar(16);not null;uniqueIndex:ux_cashback_topup_direction,priority:2;index"`
 	InviteeID               int                      `json:"invitee_id" gorm:"not null;index"`
 	InviterID               int                      `json:"inviter_id" gorm:"not null;index"`
-	BeneficiaryID           int                      `json:"beneficiary_id" gorm:"not null;index:idx_cashback_beneficiary_created,priority:1;index:idx_cashback_beneficiary_debt,priority:1"`
+	BeneficiaryID           int                      `json:"beneficiary_id" gorm:"not null;index:idx_cashback_beneficiary_created,priority:1;index:idx_cashback_beneficiary_debt,priority:1;index:idx_cashback_beneficiary_paid,priority:1"`
 	BaseQuota               int                      `json:"base_quota" gorm:"type:bigint;not null"`
 	RateBPS                 int                      `json:"rate_bps" gorm:"not null"`
 	CalculatedQuota         int                      `json:"calculated_quota" gorm:"type:bigint;not null"`
@@ -129,7 +129,7 @@ type CashbackReward struct {
 	CapReason               string                   `json:"cap_reason" gorm:"type:varchar(128)"`
 	SettlementDays          int                      `json:"settlement_days" gorm:"not null"`
 	ConfigVersion           int64                    `json:"config_version" gorm:"type:bigint;not null"`
-	PaidAt                  int64                    `json:"paid_at" gorm:"type:bigint;not null;index"`
+	PaidAt                  int64                    `json:"paid_at" gorm:"type:bigint;not null;index;index:idx_cashback_beneficiary_paid,priority:2"`
 	AvailableAt             int64                    `json:"available_at" gorm:"type:bigint;not null;index:idx_cashback_settlement_scan,priority:3"`
 	ReviewStatus            CashbackReviewStatus     `json:"review_status" gorm:"type:varchar(16);not null;index:idx_cashback_settlement_scan,priority:1;index"`
 	ReviewedBy              int                      `json:"reviewed_by" gorm:"index"`

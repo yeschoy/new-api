@@ -217,8 +217,6 @@ func SetApiRouter(router *gin.Engine) {
 			cashbackAdminRoute.GET("/users/:id/recorded-spend", controller.GetCashbackRecordedSpend)
 			cashbackAdminRoute.POST("/rewards/:id/review", middleware.CriticalRateLimit(), controller.ReviewCashbackReward)
 			cashbackAdminRoute.POST("/topups/:id/incident", middleware.CriticalRateLimit(), controller.RecordCashbackIncident)
-			cashbackAdminRoute.POST("/rewards/:id/debt/resolve", middleware.CriticalRateLimit(), controller.ResolveCashbackRewardDebt)
-			cashbackAdminRoute.POST("/orders/:id/principal-debt/resolve", middleware.CriticalRateLimit(), controller.ResolveCashbackPrincipalDebt)
 		}
 
 		cashbackConfigRoute := apiRouter.Group("/cashback")
@@ -229,6 +227,9 @@ func SetApiRouter(router *gin.Engine) {
 			cashbackConfigRoute.GET("/campaigns", controller.ListCashbackCampaigns)
 			cashbackConfigRoute.POST("/campaigns", middleware.CriticalRateLimit(), controller.CreateCashbackCampaign)
 			cashbackConfigRoute.POST("/campaigns/:id/stop", middleware.CriticalRateLimit(), controller.StopCashbackCampaign)
+			// Resolving a debt forgives quota without collecting it, so it needs root.
+			cashbackConfigRoute.POST("/rewards/:id/debt/resolve", middleware.CriticalRateLimit(), controller.ResolveCashbackRewardDebt)
+			cashbackConfigRoute.POST("/orders/:id/principal-debt/resolve", middleware.CriticalRateLimit(), controller.ResolveCashbackPrincipalDebt)
 		}
 
 		optionRoute := apiRouter.Group("/option")
