@@ -44,6 +44,12 @@ Questions to answer:
 
 ---
 
+## Database verification isolation (local development)
+
+- Run the SQLite/MySQL/PostgreSQL verification matrix in disposable Docker containers, including the Go test runner for SQLite. Do not install database formulae, initialize data directories, or start Homebrew database services on the developer's host. Do not borrow an existing host database merely because a local socket is available.
+- Give each container a task-specific database and ephemeral storage. Verify fresh schema, release upgrade, and a second migration there; record image tags, engine versions, and commands. If Docker is unavailable, report the verification as blocked instead of substituting a host installation.
+- Stop/remove only task-owned containers, volumes, and scratch files after the user approves cleanup. Never uninstall pre-existing host software or delete pre-existing data to tidy a test run.
+
 ## Common Mistakes
 
 - Do not call `GetDBTimestamp()` (which queries the global `DB`) inside a GORM transaction. SQLite test setups may have one available connection, so the nested query waits on the transaction's own connection indefinitely. Use `getDBTimestampOn(tx)` for transaction-local database time; `CreateUserSubscriptionFromPlanTx` is an example. This also keeps transactional reads on the same connection across dialects.
