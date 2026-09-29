@@ -28,6 +28,7 @@ tiktoken_cache
 .cursor
 
 electron/node_modules
+.pi/npm/node_modules/
 electron/dist
 /data/
 .gomodcache/
