@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/referral-recharge-cashback.md", "reason": "返现正确性及验证合同"}
+{"file": ".agents/rules/billing.md", "reason": "完整资金安全审查规则"}
+{"file": ".trellis/tasks/09-30-cashback-per-hundred/research/face-value-paths.md", "reason": "面额快照与旧订单降级风险核对"}
+{"file": ".trellis/tasks/09-30-cashback-per-hundred/research/release-upgrade-verification.md", "reason": "真实 v1.0.0-rc.40 三库升级及二次迁移证据"}

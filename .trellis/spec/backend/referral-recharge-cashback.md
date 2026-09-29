@@ -86,7 +86,7 @@ snapshot and overrun the cap.
 | Route | Auth / guard | Contract |
 | --- | --- | --- |
 | `GET /api/cashback/config` | Root | Returns the stored config plus `compliance_confirmed` |
-| `PUT /api/cashback/config` | Root | Replaces the existing required config fields atomically; omitted optional review policy fields preserve the current values |
+| `PUT /api/cashback/config` | Root | Replaces required fields atomically; omitted optional strategy/fixed-amount and review-policy fields preserve current values under the version-row lock |
 | `GET /api/cashback/campaigns` | Root | Lists bounded campaign history |
 | `POST /api/cashback/campaigns` | Root + critical rate limit | Creates a nonoverlapping scheduled campaign with `start_at`, `end_at`, `max_rewards_per_user` |
 | `POST /api/cashback/campaigns/:id/stop` | Root + critical rate limit | Idempotently stops a campaign without modifying its start/end or existing rewards |
@@ -156,12 +156,12 @@ than GORM models.
 
 These cashback tables are registered in the main-database migration list:
 
-- `CashbackOrderContext`: unique `top_up_id`; nullable-by-zero campaign association, normalized `base_quota`, actual
+- `CashbackOrderContext`: unique `top_up_id`; nullable-by-zero campaign association, normalized `base_quota`, immutable checkout `face_amount` (integer) and `quota_per_face_unit` (decimal string), actual
   `credited_quota`, order-local activation eligibility, request risk evidence,
   completion source/provider, incident, cumulative principal reversal, and
   principal debt.
 - `CashbackReward`: unique `(top_up_id, direction)`; review source, relationship, calculation,
-  immutable config/risk snapshots, review/settlement state, retry evidence,
+  explicit `strategy` and `fixed_per_hundred` alongside `rate_bps`, immutable config/risk snapshots, review/settlement state, retry evidence,
   recovery, and reward debt.
 - `CashbackDeviceLink`: unique `(user_id, device_fingerprint_hash)` and reverse
   `(device_fingerprint_hash, user_id)` lookup for correlation.
@@ -216,9 +216,8 @@ typed columns remain authoritative for transitions.
 is replaced as one object. Rates and money use integer basis points and integer
 wallet quota; floating-point money arithmetic is forbidden.
 
-- Both directions default disabled and both rates default to zero.
-- `inviter_rate_bps` and `invitee_rate_bps` are each `0..10000`, their sum is at
-  most `10000`, and an enabled direction has a positive rate.
+- Both directions default disabled, both rates and fixed amounts default to zero, and both strategies default to `rate`. Each direction independently chooses `rate` or `per_hundred`.
+- `inviter_rate_bps` and `invitee_rate_bps` are each `0..10000`; `inviter_fixed_per_hundred` and `invitee_fixed_per_hundred` are integers `0..100`. An enabled direction needs a positive value in its selected strategy. The *selected* nominal returns (rate BPS or fixed amount times 100 BPS) must sum to at most `10000`, even when one direction is disabled. Inactive fields may retain previous values across strategy switches.
 - `settlement_days` is `1..90`, default `7`.
 - `max_reward_quota` and `daily_reward_quota` are
   `0..common.MaxWalletQuota`; both must be positive while either direction is
@@ -236,7 +235,7 @@ wallet quota; floating-point money arithmetic is forbidden.
   high/severe do; `auto_review_immediate_issue` defaults on but acts only for
   auto-approved rewards. Invitee/payer and inviter directions remain independently
   enabled; the latter always needs manual review. Missing new Option keys load
-  these defaults; older PUT clients omit policy fields without resetting them.
+  these defaults; older PUT clients omit policy and strategy/fixed fields without resetting them. Missing strategy Option keys load `rate`; a historical reward with empty strategy is displayed as a percentage, not reclassified or recalculated.
 - Campaigns are explicitly created, never synthesized at migration. Creation
   and early stop serialize on the config version Option row. Order creation
   captures campaign ID only when both server order-placement time and stored
@@ -247,8 +246,7 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 ### Order creation and provider completion
 
-- `base_quota` is the face value selected/input by the user, normalized at order
-  creation. It is not provider money, discounted payment, or credited quota.
+- `base_quota` is the face value selected/input by the user in wallet quota, normalized at order creation. It is not provider money, discounted payment, or credited quota. New online orders also snapshot positive `CashbackRequestMetadata.FaceAmount` and decimal-string `QuotaPerFaceUnit`; their product must agree with `base_quota` within one quota unit. Standard currency-display orders use the requested integer face amount and checkout `common.QuotaPerUnit`. Token-display orders use the normalized credited face (`base_quota`) with factor `1`, not raw requested tokens; Creem product face is its `Quota` with factor `1`. Neither discounted price nor mutable post-checkout conversion settings can reconstruct this evidence.
 - Every newly created online order gets a `CashbackOrderContext`, including
   before first enable. `eligible_after_first_enable` persists the activation
   decision visible in the order-creation transaction; payment completion must
@@ -296,10 +294,7 @@ wallet quota; floating-point money arithmetic is forbidden.
   reward limit. Only inviter rewards require an unchanged valid referral.
   Each eligible direction gets at most one row, enforced by
   `(top_up_id, direction)`.
-- Calculation is
-  `floor(base_quota * rate_bps / 10000)`, then the single-reward and beneficiary
-  rolling-24-hour caps are applied. A zero result is preserved as a canceled,
-  explainable record rather than an issuable zero-value reward.
+- Rate calculation is `floor(base_quota * rate_bps / 10000)`. Fixed calculation is `floor(floor(face_amount / 100) * fixed_per_hundred * quota_per_face_unit)` using checkout evidence, decimal arithmetic and strict bounded wallet conversion. Remainders never carry to another order. Both strategies then use existing single-reward and beneficiary rolling-24-hour caps, risk/review/issuance/refund paths. A zero result is a canceled, explainable record. For a legacy pending order without trusted face evidence, payment succeeds and its fixed-direction reward is canceled with `face_basis_unavailable`; never guess from `TopUp.Money` or current quota conversion. Payment-time setting chooses each new reward and is stored on its row; historical rewards are immutable.
 
 ### Risk, review, and settlement
 
@@ -403,7 +398,7 @@ wallet quota; floating-point money arithmetic is forbidden.
   debt transition. Pending dialogs keep Confirm disabled but remain dismissible
   through Escape, Close, and Cancel; mutation-owned invalidation must still run
   after the dialog unmounts.
-- All visible strings use the seven project locales. Dialog reason fields need
+- The settings form conditionally shows rate or fixed input for each direction, validates selected nominal exposure, and uses the same high-exposure confirmation. The list/detail display fixed rewards as per-100 amounts and historical empty-strategy rows as percentages. All visible strings use the seven project locales. Dialog reason fields need
   labels, validation/error association, keyboard handling, and focus recovery.
   Count copy must choose singular/plural from the raw numeric count before
   applying locale-specific number formatting.
@@ -412,7 +407,7 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 | Condition | Required behavior |
 | --- | --- |
-| Malformed config JSON or invalid cross-field config | `400`; config validation includes the offending `field`; no partial Option update |
+| Malformed config JSON, invalid strategy/fixed range, zero active value, or selected nominal sum above 100% | `400`; config validation includes the offending `field`; no partial Option update |
 | Either direction enabled without compliance or positive caps | `400`; keep the previous complete configuration |
 | Client attempts to send `first_enabled_at` or `version` | Ignore by DTO ownership; server derives both |
 | Invalid reward/list ID, filter enum, user ID, or overlong trade number | `400`, no unbounded query |
@@ -426,6 +421,8 @@ wallet quota; floating-point money arithmetic is forbidden.
 | Post-enable online order lacks its context | Roll back provider completion; callback path must return retryable failure |
 | Manual top-up completion | Credit only the top-up; persist ineligible source when context exists; create no reward |
 | New order predates first enable | Persist an ineligible context; payment succeeds normally and creates no reward |
+| Legacy pending order has no checkout face evidence under a fixed payment-time strategy | Complete purchase; create canceled zero-value fixed reward with `face_basis_unavailable` |
+| New checkout face conversion disagrees with base quota | Reject order/context atomically; never settle by guessing from price |
 | Device signal absent, malformed, too long, or Web Crypto unavailable | Continue auth/payment; snapshot `missing`/`invalid` risk evidence |
 | Approval occurs before `available_at` | Store approval but remain frozen |
 | Scheduler sees a blocked reward | Keep frozen, store blocker/retry time, and do not credit quota |
@@ -446,6 +443,7 @@ wallet quota; floating-point money arithmetic is forbidden.
   The same transaction snapshots the face-value base, creates inviter and
   invitee rewards, and credits the purchased quota. A repeated webhook changes
   nothing.
+- **Good:** Fixed X=20, face=250, factor=500000 creates a 20,000,000-quota inviter calculation (two complete hundreds); a separate face=99 order yields zero, and 60+40 across orders never combines into a hundred. The payer may independently remain rate-based. Payment-time strategy changes affect only new rewards.
 - **Good:** An approved reward reaches T+7. The scheduler locks it, rechecks the
   order, relationship, incident, channel, account status, and debt, then moves
   `frozen -> issued` while crediting `quota` once.
@@ -458,8 +456,7 @@ wallet quota; floating-point money arithmetic is forbidden.
   `device_missing` remains visible to the reviewer.
 - **Base:** An order created before the immutable activation boundary succeeds
   after activation. It remains ineligible and receives no backfill.
-- **Bad:** Calculate cashback from `TopUp.Money`, provider-paid currency, or the
-  credited quota; these meanings differ by provider.
+- **Bad:** Calculate fixed cashback from `TopUp.Money`, provider-paid currency, current conversion settings, or credited quota; these meanings differ by provider or time.
 - **Bad:** Credit the wallet first and create cashback records in a second
   transaction; a crash would make payment and cashback disagree.
 - **Bad:** Treat shared IP/device as an automatic reject or a trusted identity.
@@ -470,15 +467,9 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 ### Backend assertions
 
-- Configuration: defaults; individual/combined rates; compliance; positive
-  caps; immutable first-enable timestamp; atomic version update.
-- Migration: five cashback side tables; no cashback columns on existing
-  business tables; old context/reward rows survive added fields and repeated
-  migration; unique order context, `(top_up_id, direction)`, and mutation
-  event keys.
-- Provider matrix: Epay, Stripe, Creem, Waffo, and Waffo Pancake create the same
-  normalized cashback semantics; forged callbacks are rejected; verified
-  retries are idempotent; manual completion is ineligible.
+- Configuration: defaults; independent strategy/fixed fields; rate/fixed and mixed nominal return bounds; old-client omitted-field preservation under concurrent versioned writes; compliance; positive caps; immutable first-enable timestamp.
+- Migration: cashback side tables without columns on `TopUp`; fresh, representative released-schema upgrade and twice-repeated migration on real SQLite/MySQL/PostgreSQL; old context/reward rows retain data, indexes and uniqueness. New face and reward-strategy columns default safely; historical empty strategy is rate.
+- Provider matrix: Epay, Stripe, Creem, Waffo, and Waffo Pancake create correct checkout face evidence (including token normalization and Creem product quota); fixed 99/100/250 and split 60+40, mixed directions, single/24-hour caps, payment-time switches, legacy missing-basis cancellation and unchanged historical reward; forged callbacks rejected, verified retries idempotent, manual completion ineligible.
 - Transactionality: a missing required context or cashback insert failure rolls
   back provider completion and wallet credit. Run concurrent cap/settlement
   tests and `go test -race` for cashback state.
@@ -551,11 +542,12 @@ err := cashbackTransaction(func(tx *gorm.DB) error {
 ### Configuration ownership
 
 ```go
-// Wrong: transiently stores an enabled direction with an invalid zero rate.
+// Wrong: transiently stores an enabled direction with an invalid zero selected value.
 UpdateOption("cashback_setting.inviter_enabled", "true")
 UpdateOption("cashback_setting.inviter_rate_bps", "500")
 
-// Correct: validate and persist one locked, versioned object.
+// Correct: merge omitted strategy fields under the lock, validate selected
+// nominal return, then persist one locked, versioned object.
 _, stored, err := UpdateCashbackSettingAtomic(candidate, compliance, now)
 ```
 
