@@ -531,3 +531,28 @@
 ### Next Steps
 
 - 部署前保持 CASHBACK_REFUND_REFERENCE_ENABLED=false；核对所有写入节点、历史余额/线下退款与管理员结清假设。若目标为 ClickHouse 24.8 或最低 MySQL/PG 版本，在实际版本上补测。获得用户同意后再清理本任务非业务 /tmp 产物，Trellis 日志保留。
+
+
+## Session 18: 整百返现实现与数据库环境清理
+<!-- trellis-session: v=2 fp=4e0bff71dc8884f7 -->
+
+**Date**: 2026-09-30
+**Task**: 整百返现实现与数据库环境清理
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+完成双向整百返现与三库升级验证；已清理任务测试库和临时文件，停止本机数据库服务、卸载此前已存在的 PostgreSQL，并记录后续数据库验证必须使用 Docker。SQLite 属于本机现有依赖，未卸载。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `90b64b7b5` | feat(cashback): add per-hundred face-value rewards |
+| `4c394ce6b` | feat(console): configure and display per-hundred cashback |
+| `0339e4359` | docs(spec): record per-hundred cashback contract |
+| `d928bdffa` | docs(db): require Docker-isolated local verification |
+
+### Status
+
+[OK] **Completed**
