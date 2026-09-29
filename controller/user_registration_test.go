@@ -94,16 +94,10 @@ func TestRegisterCreatesUsableLoginSession(t *testing.T) {
 			assert.Positive(t, stored.LastLoginAt)
 			var token model.Token
 			require.NoError(t, db.Where("user_id = ?", stored.Id).First(&token).Error)
-			var audit model.Log
-			require.NoError(t, db.Where("user_id = ? AND type = ?", stored.Id, model.LogTypeLogin).First(&audit).Error)
-			var auditOther map[string]interface{}
-			require.NoError(t, common.UnmarshalJsonStr(audit.Other, &auditOther))
-			assert.Equal(t, "password", auditOther["login_method"])
+			audit := requireLoginAuditLog(t, stored.Id)
+			assert.Equal(t, "password", audit.Other.LoginMethod)
 
-			cookies := response.Result().Cookies()
-			require.Len(t, cookies, 1)
-			cookie := cookies[0]
-			assert.Equal(t, service.RefreshCookieName, cookie.Name)
+			cookie := requireRefreshCookie(t, response.Result().Cookies())
 			assert.Empty(t, cookie.Domain)
 			assert.True(t, cookie.HttpOnly)
 			assert.True(t, cookie.Secure)
@@ -172,8 +166,7 @@ func TestRegisterWithoutAutomaticLoginKeepsCreatedAccount(t *testing.T) {
 			var count int64
 			require.NoError(t, db.Model(&model.UserSession{}).Count(&count).Error)
 			assert.Zero(t, count)
-			require.NoError(t, db.Model(&model.Log{}).Where("type = ?", model.LogTypeLogin).Count(&count).Error)
-			assert.Zero(t, count)
+			assert.Zero(t, countLoginAuditLogs(t, 0))
 		})
 	}
 }

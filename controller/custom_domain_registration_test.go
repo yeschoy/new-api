@@ -77,10 +77,8 @@ func TestRegisterOnCustomDomainUsesDomainOwnerOnlyWhenAffIsEmpty(t *testing.T) {
 			require.NotEmpty(t, result.Data.AccessToken)
 			assert.Equal(t, stored.Id, result.Data.User.Id)
 			assert.Equal(t, test.expectedInviter, result.Data.User.InviterId)
-			cookies := response.Result().Cookies()
-			require.Len(t, cookies, 1)
-			assert.Equal(t, service.RefreshCookieName, cookies[0].Name)
-			assert.Empty(t, cookies[0].Domain)
+			refresh := requireRefreshCookie(t, response.Result().Cookies())
+			assert.Empty(t, refresh.Domain)
 			assert.Empty(t, response.Header().Get("Location"))
 		})
 	}
