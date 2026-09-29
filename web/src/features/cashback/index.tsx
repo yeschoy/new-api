@@ -56,7 +56,7 @@ export function Cashback() {
 
   return (
     <>
-      <SectionPageLayout fixedContent>
+      <SectionPageLayout>
         <SectionPageLayout.Title>
           {t('Cashback Review')}
         </SectionPageLayout.Title>

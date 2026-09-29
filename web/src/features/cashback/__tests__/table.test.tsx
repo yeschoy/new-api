@@ -16,11 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { getCashbackRewards, getCashbackSummary } from '../api'
 import { CashbackTable } from '../components/cashback-table'
+import { Cashback } from '../index'
 import type { CashbackRewardPage } from '../types'
+
+vi.mock('../api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../api')>()),
+  getCashbackRewards: vi.fn(),
+  getCashbackSummary: vi.fn(),
+}))
 
 const page: CashbackRewardPage = {
   page: 1,
@@ -68,6 +77,48 @@ const page: CashbackRewardPage = {
 }
 
 describe('cashback table', () => {
+  it('lets admins scroll past the filters to reach loaded orders', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    vi.mocked(getCashbackRewards).mockResolvedValue({
+      success: true,
+      message: '',
+      data: page,
+    })
+    vi.mocked(getCashbackSummary).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        pending_review_quota: 0,
+        awaiting_maturity_quota: 0,
+        issued_quota: 0,
+        recovered_quota: 0,
+        outstanding_reward_debt: 0,
+        outstanding_principal_debt: 0,
+        rejected_or_canceled_count: 0,
+        incident_count: 0,
+        settlement_failure_count: 0,
+        reconciliation_issues: 0,
+        risk_counts: {},
+        inviter_clusters: [],
+        device_clusters: [],
+      },
+    })
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Cashback />
+      </QueryClientProvider>
+    )
+
+    const order = await screen.findByText('cashback-test-order')
+    const content = order.closest('.dopa-section-page__content')
+    expect(content).toHaveClass('overflow-auto')
+    expect(content).not.toHaveClass('overflow-hidden')
+    queryClient.clear()
+  })
+
   it('opens a single reward without exposing a bulk action', () => {
     const onSelect = vi.fn()
     render(
