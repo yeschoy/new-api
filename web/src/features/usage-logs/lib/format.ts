@@ -526,6 +526,10 @@ const AUDIT_TEMPLATES: Record<string, string> = {
   'cashback.review_reject': 'Rejected cashback reward {{reward_id}}',
   'cashback.reward_credited':
     'Referral cashback reward {{reward_id}} credited {{quota}}',
+  'cashback.payer_reward_credited':
+    'Top-up cashback reward {{reward_id}} credited {{quota}} (top-up {{top_up_id}})',
+  'cashback.reward_issued':
+    'Issued cashback reward {{reward_id}}: {{quota}} to user {{beneficiary_id}} via {{source}} (top-up {{top_up_id}})',
   'cashback.incident': 'Recorded {{kind}} incident for top-up {{top_up_id}}',
   'cashback.incident_attempt':
     'Attempted to record a cashback payment incident',

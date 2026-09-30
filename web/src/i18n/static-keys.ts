@@ -263,6 +263,8 @@ export const STATIC_I18N_KEYS = [
   'Approved cashback reward {{reward_id}}',
   'Rejected cashback reward {{reward_id}}',
   'Referral cashback reward {{reward_id}} credited {{quota}}',
+  'Top-up cashback reward {{reward_id}} credited {{quota}} (top-up {{top_up_id}})',
+  'Issued cashback reward {{reward_id}}: {{quota}} to user {{beneficiary_id}} via {{source}} (top-up {{top_up_id}})',
   'Recorded {{kind}} incident for top-up {{top_up_id}}',
   'Attempted to record a cashback payment incident',
   'Resolved cashback reward debt {{reward_id}}',

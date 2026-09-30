@@ -56,6 +56,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { getCurrencyLabel } from '@/lib/currency'
+import {
+  getEditableQuotaStep,
+  parseQuotaFromDollars,
+  quotaUnitsToEditableAmount,
+} from '@/lib/format'
 
 import { updateCashbackConfig } from '../api'
 import {
@@ -102,7 +108,9 @@ type Values = {
   inviterFixedPerHundred: number
   inviteeFixedPerHundred: number
   settlementDays: number
+  /** Display-currency amount (tokens in token display); converted on save. */
   maxRewardQuota: number
+  /** Display-currency amount (tokens in token display); converted on save. */
   dailyRewardQuota: number
   ipAccountThreshold: number
   deviceAccountThreshold: number
@@ -130,8 +138,8 @@ function configToValues(config: CashbackConfig): Values {
     inviterFixedPerHundred: config.inviter_fixed_per_hundred ?? 0,
     inviteeFixedPerHundred: config.invitee_fixed_per_hundred ?? 0,
     settlementDays: config.settlement_days,
-    maxRewardQuota: config.max_reward_quota,
-    dailyRewardQuota: config.daily_reward_quota,
+    maxRewardQuota: quotaUnitsToEditableAmount(config.max_reward_quota),
+    dailyRewardQuota: quotaUnitsToEditableAmount(config.daily_reward_quota),
     ipAccountThreshold: config.ip_account_threshold,
     deviceAccountThreshold: config.device_account_threshold,
     dailyTopUpCountThreshold: config.daily_topup_count_threshold,
@@ -144,7 +152,18 @@ function configToValues(config: CashbackConfig): Values {
   }
 }
 
-function valuesToRequest(values: Values): CashbackConfigUpdate {
+// Caps are edited in the display currency but stored as wallet quota. An
+// untouched value keeps its exact stored quota instead of a rounded round-trip.
+function rewardLimitToQuota(value: number, storedQuota: number): number {
+  return value === quotaUnitsToEditableAmount(storedQuota)
+    ? storedQuota
+    : parseQuotaFromDollars(value)
+}
+
+function valuesToRequest(
+  values: Values,
+  current: CashbackConfig
+): CashbackConfigUpdate {
   return {
     inviter_enabled: values.inviterEnabled,
     invitee_enabled: values.inviteeEnabled,
@@ -155,8 +174,14 @@ function valuesToRequest(values: Values): CashbackConfigUpdate {
     inviter_fixed_per_hundred: values.inviterFixedPerHundred,
     invitee_fixed_per_hundred: values.inviteeFixedPerHundred,
     settlement_days: values.settlementDays,
-    max_reward_quota: values.maxRewardQuota,
-    daily_reward_quota: values.dailyRewardQuota,
+    max_reward_quota: rewardLimitToQuota(
+      values.maxRewardQuota,
+      current.max_reward_quota
+    ),
+    daily_reward_quota: rewardLimitToQuota(
+      values.dailyRewardQuota,
+      current.daily_reward_quota
+    ),
     ip_account_threshold: values.ipAccountThreshold,
     device_account_threshold: values.deviceAccountThreshold,
     daily_topup_count_threshold: values.dailyTopUpCountThreshold,
@@ -183,11 +208,13 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8,
       t('Use no more than two decimal places')
     )
-  const positiveSafeInteger = z.coerce
+  const rewardLimit = z.coerce
     .number({ error: t('Enter a valid quota amount') })
-    .int(t('Quota must be a whole number'))
     .min(0, t('Quota cannot be negative'))
-    .max(MAX_WALLET_QUOTA, t('Quota exceeds the wallet safety limit'))
+    .refine(
+      (value) => parseQuotaFromDollars(value) <= MAX_WALLET_QUOTA,
+      t('Quota exceeds the wallet safety limit')
+    )
   const schema = z
     .object({
       inviterEnabled: z.boolean(),
@@ -211,8 +238,8 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
         .int()
         .min(1, t('Settlement days must be between 1 and 90'))
         .max(90, t('Settlement days must be between 1 and 90')),
-      maxRewardQuota: positiveSafeInteger,
-      dailyRewardQuota: positiveSafeInteger,
+      maxRewardQuota: rewardLimit,
+      dailyRewardQuota: rewardLimit,
       ipAccountThreshold: z.coerce.number().int().min(2).max(100000),
       deviceAccountThreshold: z.coerce.number().int().min(2).max(100000),
       dailyTopUpCountThreshold: z.coerce.number().int().min(1).max(100000),
@@ -288,14 +315,14 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
         })
       }
       if (values.inviterEnabled || values.inviteeEnabled) {
-        if (values.maxRewardQuota <= 0) {
+        if (parseQuotaFromDollars(values.maxRewardQuota) <= 0) {
           context.addIssue({
             code: 'custom',
             path: ['maxRewardQuota'],
             message: t('Set a positive single reward limit before enabling'),
           })
         }
-        if (values.dailyRewardQuota <= 0) {
+        if (parseQuotaFromDollars(values.dailyRewardQuota) <= 0) {
           context.addIssue({
             code: 'custom',
             path: ['dailyRewardQuota'],
@@ -320,10 +347,14 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
     mutationFn: updateCashbackConfig,
   })
   const enabled = form.watch('inviterEnabled') || form.watch('inviteeEnabled')
+  const currencyLabel = getCurrencyLabel()
+  const rewardLimitStep = getEditableQuotaStep()
 
   async function persist(values: Values) {
     try {
-      const response = await mutation.mutateAsync(valuesToRequest(values))
+      const response = await mutation.mutateAsync(
+        valuesToRequest(values, props.config)
+      )
       if (!response.success || !response.data) {
         throw new Error(response.message || 'Failed to save cashback settings')
       }
@@ -670,16 +701,24 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
               name='maxRewardQuota'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('Single reward quota limit')}</FormLabel>
+                  <FormLabel>
+                    {t('Single reward limit ({{currency}})', {
+                      currency: currencyLabel,
+                    })}
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type='number'
                       min={0}
-                      max={MAX_WALLET_QUOTA}
-                      step={1}
+                      step={rewardLimitStep}
                       {...field}
                     />
                   </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Enter the amount in the display currency; it is converted to quota when saved.'
+                    )}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -689,13 +728,16 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
               name='dailyRewardQuota'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('Beneficiary 24-hour reward limit')}</FormLabel>
+                  <FormLabel>
+                    {t('Beneficiary 24-hour reward limit ({{currency}})', {
+                      currency: currencyLabel,
+                    })}
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type='number'
                       min={0}
-                      max={MAX_WALLET_QUOTA}
-                      step={1}
+                      step={rewardLimitStep}
                       {...field}
                     />
                   </FormControl>

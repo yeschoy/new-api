@@ -24,6 +24,7 @@ import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '@/lib/query-client'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { SettingsPageProvider } from '../../components/settings-page-context'
 import type { CashbackConfig } from '../../types'
@@ -277,6 +278,47 @@ describe('cashback settings validation', () => {
         expect.anything()
       )
     )
+  })
+
+  it('edits reward limits in the display currency and saves them as quota', async () => {
+    const originalConfig = useSystemConfigStore.getState().config
+    useSystemConfigStore.setState({
+      config: {
+        ...originalConfig,
+        currency: {
+          ...originalConfig.currency,
+          quotaPerUnit: 500_000,
+          quotaDisplayType: 'CNY',
+          usdExchangeRate: 1,
+        },
+      },
+    })
+    try {
+      updateCashbackConfig.mockResolvedValue({ success: true, data: config })
+      const user = userEvent.setup()
+      renderForm()
+
+      const single = screen.getByLabelText('Single reward limit (CNY)')
+      expect(single).toHaveValue(0.002)
+      await user.clear(single)
+      await user.type(single, '100')
+      await user.click(
+        screen.getByRole('button', { name: 'Save cashback settings' })
+      )
+
+      await waitFor(() =>
+        expect(updateCashbackConfig).toHaveBeenCalledWith(
+          expect.objectContaining({
+            max_reward_quota: 50_000_000,
+            // Untouched limits keep their exact stored quota.
+            daily_reward_quota: 5000,
+          }),
+          expect.anything()
+        )
+      )
+    } finally {
+      useSystemConfigStore.setState({ config: originalConfig })
+    }
   })
 
   it('rejects a combined rate above one hundred percent', async () => {

@@ -418,3 +418,105 @@ test('recharge form refreshes the estimate when custom amount changes without ch
   expect(screen.queryByText(/Estimated cashback:/)).not.toBeInTheDocument()
   expect(onPay).not.toHaveBeenCalled()
 })
+
+function renderCnyRechargeForm(topupAmount: number) {
+  useSystemConfigStore.setState({
+    config: {
+      ...originalConfig,
+      currency: {
+        ...originalConfig.currency,
+        quotaPerUnit: 100,
+        quotaDisplayType: 'CNY',
+        usdExchangeRate: 1,
+      },
+    },
+  })
+  return render(
+    <QueryClientProvider client={client}>
+      <RechargeFormCard
+        topupInfo={{
+          enable_online_topup: true,
+          enable_stripe_topup: false,
+          pay_methods: [{ type: 'alipay', name: 'Alipay' }],
+          min_topup: 1,
+          stripe_min_topup: 1,
+          amount_options: [10, 50, 100, 250],
+          discount: {},
+        }}
+        presetAmounts={[
+          { value: 10 },
+          { value: 50 },
+          { value: 100 },
+          { value: 250 },
+        ]}
+        selectedPreset={topupAmount}
+        onSelectPreset={vi.fn()}
+        topupAmount={topupAmount}
+        onTopupAmountChange={vi.fn()}
+        paymentAmount={topupAmount}
+        calculating={false}
+        onPaymentMethodSelect={vi.fn()}
+        paymentLoading={null}
+        redemptionCode=''
+        onRedemptionCodeChange={vi.fn()}
+        onRedeem={vi.fn()}
+        redeeming={false}
+      />
+    </QueryClientProvider>
+  )
+}
+
+test('per-hundred rule is shown in the display currency and preset cards carry their nominal cashback', async () => {
+  api.defaults.adapter = async (config) => ({
+    config,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      success: true,
+      data: {
+        status: 'estimated',
+        strategy: 'per_hundred',
+        fixed_per_hundred: 3,
+        // floor(250 / 100) * 3 face units * 100 quota per unit
+        reward_quota: 600,
+        as_of: 1,
+      },
+    },
+  })
+  renderCnyRechargeForm(250)
+  expect(await screen.findByText('Estimated cashback: ¥6.00')).toBeVisible()
+  expect(
+    screen.getByText('Campaign rule: ¥3 back for every ¥100 topped up')
+  ).toBeVisible()
+  expect(screen.getByText('Pay ¥10')).toBeVisible()
+  expect(screen.getByText('Pay ¥250')).toBeVisible()
+  expect(await screen.findByText('Cashback ¥3')).toBeVisible()
+  expect(screen.getByText('Cashback ¥6')).toBeVisible()
+  // 10 and 50 never reach a complete hundred.
+  expect(screen.getAllByText(/^Cashback /)).toHaveLength(2)
+})
+
+test('preset cashback hints stay hidden when the payer cannot receive cashback', async () => {
+  api.defaults.adapter = async (config) => ({
+    config,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      success: true,
+      data: {
+        status: 'limit_reached',
+        strategy: 'per_hundred',
+        fixed_per_hundred: 3,
+        reward_quota: 0,
+        as_of: 1,
+      },
+    },
+  })
+  renderCnyRechargeForm(250)
+  expect(
+    await screen.findByText('Your cashback campaign limit has been reached.')
+  ).toBeVisible()
+  expect(screen.queryByText(/^Cashback /)).not.toBeInTheDocument()
+})

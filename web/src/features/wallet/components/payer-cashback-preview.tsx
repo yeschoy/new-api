@@ -1,60 +1,46 @@
-import { useQuery } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { useDebounce } from '@/hooks/use-debounce'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatQuotaWithCurrency, getCurrencyDisplay } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
-import { useAuthStore } from '@/stores/auth-store'
 
-import { getPayerCashbackPreview } from '../api'
+import {
+  usePayerCashbackPreview,
+  type PayerCashbackPreviewState,
+  type PayerCashbackSelection,
+} from '../hooks/use-payer-cashback-preview'
+import { getCashbackQuotaPerFaceUnit } from '../lib/cashback'
 
-type Props = {
-  amount?: number
-  productId?: string
-}
+type Props = PayerCashbackSelection
 
 export function PayerCashbackPreview(props: Props) {
+  const state = usePayerCashbackPreview(props)
+  return <PayerCashbackPreviewView {...props} state={state} />
+}
+
+type ViewProps = PayerCashbackSelection & {
+  state: PayerCashbackPreviewState
+}
+
+export function PayerCashbackPreviewView(props: ViewProps) {
   const { t, i18n } = useTranslation()
-  const userId = useAuthStore((state) => state.auth.user?.id)
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const { config } = getCurrencyDisplay()
-  const debouncedAmount = useDebounce(props.amount, 300)
-  const selectionReady = !!props.productId || props.amount === debouncedAmount
-  // Checkout methods have different minimums. Let the server validate the
-  // selected amount against currently enabled providers instead of assuming
-  // the form's default minimum applies to every method.
-  const valid = props.productId
-    ? true
-    : Number.isSafeInteger(props.amount) && (props.amount ?? -1) >= 0
-  const query = useQuery({
-    queryKey: [
-      'payer-cashback-preview',
-      userId,
-      props.productId ?? null,
-      props.amount ?? null,
-    ],
-    queryFn: async () => {
-      if (props.productId) {
-        return getPayerCashbackPreview({ productId: props.productId })
-      }
-      if (props.amount === undefined) {
-        throw new Error('Preview selection missing')
-      }
-      return getPayerCashbackPreview({ amount: props.amount })
-    },
-    enabled:
-      !!userId &&
-      valid &&
-      selectionReady &&
-      !!(props.productId || props.amount),
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
-    meta: { errorToast: false },
-  })
+  const { config, meta } = getCurrencyDisplay()
+  const { query, userId, valid, selectionReady } = props.state
+  // A raw quota unit can be much smaller than a cent (notably for Creem
+  // products); never round a positive amount up to a fake minimum.
+  const quotaDigits = Math.min(
+    20,
+    Math.max(4, Math.ceil(Math.log10(config.quotaPerUnit)) + 2)
+  )
+  const formatRewardQuota = (quota: number) =>
+    formatQuotaWithCurrency(quota, {
+      locale,
+      digitsSmall: quotaDigits,
+      abbreviate: false,
+    })
 
   let message: string
   if (!valid || !userId) {
@@ -79,13 +65,7 @@ export function PayerCashbackPreview(props: Props) {
           amount: formatQuotaWithCurrency(query.data.reward_quota, {
             locale,
             minimumFractionDigits: 2,
-            // A raw quota unit can be much smaller than a cent (notably for
-            // Creem products); never round a positive estimate up to a fake
-            // minimum currency amount.
-            digitsSmall: Math.min(
-              20,
-              Math.max(4, Math.ceil(Math.log10(config.quotaPerUnit)) + 2)
-            ),
+            digitsSmall: quotaDigits,
             abbreviate: false,
           }),
         })
@@ -119,6 +99,31 @@ export function PayerCashbackPreview(props: Props) {
     selectionReady && !query.isFetching && !query.isError && valid
       ? query.data
       : undefined
+  let fixedRule: string | null = null
+  if (preview?.strategy === 'per_hundred' && preview.status !== 'no_campaign') {
+    if (props.productId) {
+      // Creem products are measured in their own quota, not the top-up amount.
+      fixedRule = t('Campaign rule: {{reward}} for every 100 face units', {
+        reward: formatNumber(preview.fixed_per_hundred, locale),
+      })
+    } else {
+      // The fixed amount is expressed in the same unit as the top-up amount,
+      // so render both sides in the configured display currency.
+      const quotaPerFaceUnit = getCashbackQuotaPerFaceUnit(
+        config.quotaPerUnit,
+        meta.kind === 'tokens'
+      )
+      fixedRule = t(
+        'Campaign rule: {{reward}} back for every {{threshold}} topped up',
+        {
+          threshold: formatRewardQuota(100 * quotaPerFaceUnit),
+          reward: formatRewardQuota(
+            (preview.fixed_per_hundred ?? 0) * quotaPerFaceUnit
+          ),
+        }
+      )
+    }
+  }
   return (
     <Alert className='min-w-0' aria-live='polite'>
       <AlertTitle>{t('Top-up cashback preview')}</AlertTitle>
@@ -130,14 +135,7 @@ export function PayerCashbackPreview(props: Props) {
             })}
           </p>
         )}
-        {preview?.strategy === 'per_hundred' &&
-          preview.status !== 'no_campaign' && (
-            <p>
-              {t('Campaign rule: {{reward}} for every 100 face units', {
-                reward: formatNumber(preview.fixed_per_hundred, locale),
-              })}
-            </p>
-          )}
+        {fixedRule && <p>{fixedRule}</p>}
         <p>{message}</p>
         <p>
           {t(

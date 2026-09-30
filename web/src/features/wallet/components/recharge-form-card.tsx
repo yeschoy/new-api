@@ -34,11 +34,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  formatLocalCurrencyAmount,
+  formatQuotaWithCurrency,
+  getCurrencyDisplay,
+} from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import {
-  formatCurrency,
+  usePayerCashbackPreview,
+  usePayerCashbackRule,
+} from '../hooks/use-payer-cashback-preview'
+import {
+  estimateTopupCashbackQuota,
   getDiscountLabel,
   getPaymentIcon,
   getMinTopupAmount,
@@ -52,7 +61,7 @@ import type {
   WaffoPayMethod,
 } from '../types'
 import { CreemProductsSection } from './creem-products-section'
-import { PayerCashbackPreview } from './payer-cashback-preview'
+import { PayerCashbackPreviewView } from './payer-cashback-preview'
 
 interface RechargeFormCardProps {
   topupInfo: TopupInfo | null
@@ -122,6 +131,10 @@ export function RechargeFormCard({
       prev === '' && topupAmount === 0 ? prev : topupAmount.toString()
     )
   }, [topupAmount])
+
+  const cashbackPreview = usePayerCashbackPreview({ amount: topupAmount })
+  const cashbackRule = usePayerCashbackRule(cashbackPreview)
+  const { config: currencyConfig, meta: currencyMeta } = getCurrencyDisplay()
 
   const handleAmountChange = (value: string) => {
     setLocalAmount(value)
@@ -254,6 +267,16 @@ export function RechargeFormCard({
                         discount,
                         usdExchangeRate
                       )
+                      // Nominal campaign reward before per-order caps; the
+                      // preview below remains the authoritative estimate.
+                      const cashbackQuota = cashbackRule
+                        ? estimateTopupCashbackQuota(
+                            preset.value,
+                            cashbackRule,
+                            currencyConfig.quotaPerUnit,
+                            currencyMeta.kind === 'tokens'
+                          )
+                        : 0
                       return (
                         <Button
                           key={preset.value}
@@ -276,12 +299,29 @@ export function RechargeFormCard({
                               </div>
                             )}
                           </div>
-                          <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
-                            Pay {formatCurrency(actualPrice)}
-                            {hasDiscount && savedAmount > 0 && (
-                              <span className='text-green-600'>
-                                {' '}
-                                • Save {formatCurrency(savedAmount)}
+                          <div className='text-muted-foreground mt-1.5 flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:mt-2'>
+                            <span>
+                              {t('Pay {{amount}}', {
+                                amount: formatLocalCurrencyAmount(actualPrice),
+                              })}
+                              {hasDiscount && savedAmount > 0 && (
+                                <span className='text-green-600'>
+                                  {' • '}
+                                  {t('Save {{amount}}', {
+                                    amount:
+                                      formatLocalCurrencyAmount(savedAmount),
+                                  })}
+                                </span>
+                              )}
+                            </span>
+                            {cashbackQuota > 0 && (
+                              <span className='rounded-sm bg-green-600/10 px-1.5 py-0.5 text-[11px] leading-4 font-medium text-green-700 dark:text-green-400'>
+                                {t('Cashback {{amount}}', {
+                                  amount: formatQuotaWithCurrency(
+                                    cashbackQuota,
+                                    { abbreviate: false }
+                                  ),
+                                })}
                               </span>
                             )}
                           </div>
@@ -317,14 +357,17 @@ export function RechargeFormCard({
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {formatLocalCurrencyAmount(paymentAmount)}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
 
-              <PayerCashbackPreview amount={topupAmount} />
+              <PayerCashbackPreviewView
+                amount={topupAmount}
+                state={cashbackPreview}
+              />
 
               <div className='space-y-2.5 sm:space-y-3'>
                 <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
