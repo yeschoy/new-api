@@ -46,9 +46,90 @@ Questions to answer:
 
 ## Database verification isolation (local development)
 
-- Run the SQLite/MySQL/PostgreSQL verification matrix in disposable Docker containers, including the Go test runner for SQLite. Do not install database formulae, initialize data directories, or start Homebrew database services on the developer's host. Do not borrow an existing host database merely because a local socket is available.
-- Give each container a task-specific database and ephemeral storage. Verify fresh schema, release upgrade, and a second migration there; record image tags, engine versions, and commands. If Docker is unavailable, report the verification as blocked instead of substituting a host installation.
+- Run **all** local database-related tests in task-scoped disposable Docker containers, including SQLite-only tests and their Go test runner. Never install, initialize, reconfigure or start a database service on the developer's host; never modify host database data directories, connect to an existing host database/socket, or use the host as a fallback. Keep test-generated files and caches inside task-owned containers/volumes, not the host checkout.
+- Give each container a task-specific database and ephemeral storage. Exercise all three real engines when the database compatibility rule requires the matrix; for schema/migration changes, verify fresh schema, latest-release upgrade, and a second migration in each. Record image tags, engine versions, and commands. If Docker is unavailable, report verification as blocked instead of substituting a host installation.
 - Stop/remove only task-owned containers, volumes, and scratch files after the user approves cleanup. Never uninstall pre-existing host software or delete pre-existing data to tidy a test run.
+
+## Scenario: Docker Desktop proxy stalls container start during database verification
+
+### 1. Scope / Trigger
+
+On macOS Docker Desktop, `docker info` and `docker create` can succeed while
+`docker start` through the configured `~/.docker/run/docker.sock` hangs. Do not
+mistake a responsive daemon API for working containers, or replace the required
+isolated database matrix with host services.
+
+### 2. Signatures
+
+- Desktop proxy endpoint: `docker context inspect desktop-linux` / `docker info`.
+- If present, the same Desktop engine's raw endpoint is
+  `unix://$HOME/Library/Containers/com.docker.docker/Data/docker.raw.sock`;
+  use `docker -H "unix://$RAW" start <task-owned-container>` and the same
+  `-H` for `exec`, `logs` and `ps` during that verification.
+- The Go runner can select verified task-local source copies with
+  `go test -overlay=/tmp/<task>-overlay.json ./model ...`.
+
+### 3. Contracts
+
+- Check the normal socket first. If only `start` hangs, compare against the
+  raw socket with a task-owned no-port probe; the raw endpoint is a diagnostic
+  fallback, not proof that the Desktop proxy was fixed. Do not change Desktop
+  settings, prune shared caches/images, publish host ports, or touch unrelated
+  containers as part of the fallback.
+- Give MySQL, PostgreSQL and the Go/SQLite runner a task-specific network,
+  database and ephemeral storage. Record image tags, actual server versions,
+  Go version, exact commands, tests and skips; an image tag alone does not
+  establish a running database version.
+- A read-only host bind mounted through this fallback may show stale source
+  content. Compare SHA-256 of every changed Go file on the host and in the
+  runner immediately before testing. If different, copy only task-owned source
+  files into the runner and map them via a Go overlay; verify the copied hashes
+  match the host. Never report stale-code tests as verification.
+- Keep task-owned containers, networks, volumes and overlay files until the
+  user approves cleanup; do not clean unrelated Docker resources.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Desktop proxy responds to `info` but `start` hangs; raw endpoint starts the task probe | Use the raw endpoint consistently for isolated verification; report the proxy as still broken |
+| Both endpoints cannot start a task container | Report the three-database matrix blocked; do not substitute host DBs |
+| Runner source hash differs from host | Stop trusting its results; refresh task-local overlay and recheck hashes before rerun |
+| MySQL/PostgreSQL DSN is absent or a subtest skips | Report the engine unverified, even if the overall Go command exits zero |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a raw-socket probe starts, isolated Go/MySQL/PostgreSQL containers run,
+  host/runner source hashes match, and real engine tests report their versions.
+- Base: the normal proxy starts every container; use it without a fallback.
+- Bad: claim `docker info` proves the matrix passed, run tests against a stale
+  mount, prune shared images to unstick startup, or silently fall back to a
+  pre-existing host database.
+
+### 6. Tests Required
+
+- In the task network, confirm both databases accept connections and query
+  `SELECT VERSION()` / `SHOW server_version`, then run the relevant SQLite,
+  MySQL and PostgreSQL integration subtests from the containerized Go runner.
+- Check that the tests actually ran (not skipped). For migration changes,
+  verify fresh migration, representative released-schema upgrade and repeat
+  migration; explicitly report missing upgrade or minimum-version coverage.
+- Compare host and runner source hashes after the final edit and before the
+  final test. A Go overlay's replacement files must match the committed or
+  staged source, not a previous copy.
+
+### 7. Wrong vs Correct
+
+```sh
+# Wrong: a healthy metadata API and a stale bind mount do not verify behavior.
+docker info && docker start task-db && go test ./model
+
+# Correct when the Desktop proxy stalls but the raw endpoint works:
+RAW="$HOME/Library/Containers/com.docker.docker/Data/docker.raw.sock"
+docker -H "unix://$RAW" start task-db
+# Verify host/runner SHA-256 equality first; use a verified Go overlay if needed.
+docker -H "unix://$RAW" exec task-go go test -overlay=/tmp/task-overlay.json ./model -run 'TestRelevantDatabaseIntegration' -v
+```
 
 ## Common Mistakes
 
