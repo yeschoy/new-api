@@ -3595,8 +3595,10 @@ func TestCashbackCanceledZeroRewardsRemainAuditableButNotPendingReview(t *testin
 
 	all, total, err := ListCashbackRewards(CashbackRewardFilter{}, nil)
 	require.NoError(t, err)
-	assert.EqualValues(t, 4, total)
-	require.Len(t, all, 4)
+	assert.EqualValues(t, 2, total)
+	require.Len(t, all, 2)
+	assert.Equal(t, actionable.ID, all[0].ID)
+	assert.Equal(t, payable.ID, all[1].ID)
 	pending, count, err := ListCashbackRewards(CashbackRewardFilter{ReviewStatus: CashbackReviewPending}, nil)
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, count)
@@ -3608,8 +3610,8 @@ func TestCashbackCanceledZeroRewardsRemainAuditableButNotPendingReview(t *testin
 	assert.Empty(t, conflicting)
 	canceled, count, err := ListCashbackRewards(CashbackRewardFilter{SettlementStatus: CashbackSettlementCanceled}, nil)
 	require.NoError(t, err)
-	assert.EqualValues(t, 2, count)
-	require.Len(t, canceled, 2)
+	assert.Zero(t, count)
+	assert.Empty(t, canceled)
 	for _, original := range []CashbackReward{capped, debt} {
 		detail, err := GetCashbackRewardWithContext(original.ID)
 		require.NoError(t, err)
@@ -3622,13 +3624,56 @@ func TestCashbackCanceledZeroRewardsRemainAuditableButNotPendingReview(t *testin
 	summary, err := GetCashbackAdminSummary()
 	require.NoError(t, err)
 	assert.EqualValues(t, 50, summary.PendingReviewQuota)
-	assert.EqualValues(t, 2, summary.RejectedOrCanceledCount)
+	assert.Zero(t, summary.RejectedOrCanceledCount)
 	var wallet User
 	require.NoError(t, DB.First(&wallet, payer.Id).Error)
 	assert.Equal(t, 3_000, wallet.Quota)
 	var issued int64
 	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("kind = ?", CashbackQuotaMutationIssue).Count(&issued).Error)
 	assert.Zero(t, issued)
+}
+
+func TestCashbackBelowHundredRewardHiddenFromDefaultReviewList(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	setting := saveCashbackTestSetting(t, now-100)
+	setting.InviterEnabled = false
+	setting.InviteeStrategy = operation_setting.CashbackStrategyPerHundred
+	setting.InviteeFixedPerHundred = 3
+	setting.MaxRewardQuota = 2_000_000
+	setting.DailyRewardQuota = 2_000_000
+	require.NoError(t, SaveCashbackSetting(setting))
+	payer := User{Username: "fixed-fifty-payer", Status: common.UserStatusEnabled, CreatedAt: now - 86400}
+	require.NoError(t, DB.Create(&payer).Error)
+
+	short := createCompletedCashbackTopUp(t, payer, now, now, 25_000_000, 25_000_000,
+		CashbackRequestMetadata{FaceAmount: 50, QuotaPerFaceUnit: "500000"})
+	full := createCompletedCashbackTopUp(t, payer, now+1, now+1, 50_000_000, 50_000_000,
+		CashbackRequestMetadata{FaceAmount: 100, QuotaPerFaceUnit: "500000"})
+	var zero, payable CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", short.Id).First(&zero).Error)
+	require.NoError(t, DB.Where("top_up_id = ?", full.Id).First(&payable).Error)
+	require.Zero(t, zero.RewardQuota)
+	require.Equal(t, CashbackSettlementCanceled, zero.SettlementStatus)
+	require.Equal(t, 1_500_000, payable.RewardQuota)
+
+	visible, count, err := ListCashbackRewards(CashbackRewardFilter{}, &common.PageInfo{Page: 1, PageSize: 1})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, count)
+	require.Len(t, visible, 1)
+	assert.Equal(t, payable.ID, visible[0].ID)
+	secondPage, count, err := ListCashbackRewards(CashbackRewardFilter{}, &common.PageInfo{Page: 2, PageSize: 1})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, count)
+	assert.Empty(t, secondPage)
+
+	canceled, count, err := ListCashbackRewards(CashbackRewardFilter{SettlementStatus: CashbackSettlementCanceled}, nil)
+	require.NoError(t, err)
+	assert.Zero(t, count)
+	assert.Empty(t, canceled)
+	detail, err := GetCashbackRewardWithContext(zero.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "below_minimum", detail.Reward.CapReason)
 }
 
 func TestCashbackImmediateIssueKeepsPurchaseAndRewardBehindOneQuotaFence(t *testing.T) {

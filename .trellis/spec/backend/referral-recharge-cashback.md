@@ -332,9 +332,12 @@ wallet quota; floating-point money arithmetic is forbidden.
   Automatic approvals never become manual through configuration changes.
 - A zero-payable reward is canceled before payer auto-review; its persisted
   `review_status=pending` may remain as historical evidence, but a canceled
-  reward is not an actionable review. Admin pending filters and UI exclude
-  canceled/zero-quota rows while retaining calculation, cap and block reasons
-  in detail. Do not fabricate approval to suppress a misleading pending badge.
+  reward is not an actionable review. Every Admin reward-list filter, its
+  pagination/count, and the rejected-or-canceled summary count exclude
+  zero-quota rows, including orders below the fixed per-100 threshold. Keep
+  the record in the database and retain calculation, cap and block reasons
+  through detail lookup by ID for audit. Do not fabricate approval to suppress
+  a misleading pending badge.
 - Reject always requires a non-empty reason. Approving `high` or `severe` risk
   also requires a reason.
 - Issuance requires all of: `approved`, `frozen`, positive reward quota,
@@ -512,7 +515,9 @@ wallet quota; floating-point money arithmetic is forbidden.
 - Review/settlement: reason rules, immediate manual payer approval, legacy
   reviewed-by evidence and bounded early pickup, inviter/automatic hold
   boundaries, hard blockers, task retries, reconciliation stop, wallet maximum,
-  and at-most-once quota credit.
+  and at-most-once quota credit. All list filters/count/pages and the
+  rejected-or-canceled summary count omit zero rewards (including a fixed
+  per-100 order with face 50); reward detail still retains audit evidence.
 - Incident/debt: cumulative partial-to-full refund, decreasing/duplicate rates,
   reward-before-principal recovery, insufficient balances, queued and in-flight
   batch deltas with warm/cold caches, fence-protected cache expiry/rehydration,

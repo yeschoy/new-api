@@ -107,6 +107,8 @@ func ListCashbackRewards(filter CashbackRewardFilter, pageInfo *common.PageInfo)
 			}
 			query = query.Where("settlement_status = ?", filter.SettlementStatus)
 		}
+		// Keep zero-payable audit records out of every review-list page/filter.
+		query = query.Where("reward_quota > 0")
 		if filter.RiskLevel != "" {
 			if !validCashbackRiskLevel(filter.RiskLevel) {
 				return nil, errors.New("invalid cashback risk level filter")
@@ -182,7 +184,7 @@ func GetCashbackAdminSummary() (CashbackAdminSummary, error) {
 		return CashbackAdminSummary{}, err
 	}
 	if err := DB.Model(&CashbackReward{}).
-		Where("review_status = ? OR settlement_status = ?", CashbackReviewRejected, CashbackSettlementCanceled).
+		Where("reward_quota > 0 AND (review_status = ? OR settlement_status = ?)", CashbackReviewRejected, CashbackSettlementCanceled).
 		Count(&summary.RejectedOrCanceledCount).Error; err != nil {
 		return CashbackAdminSummary{}, err
 	}
