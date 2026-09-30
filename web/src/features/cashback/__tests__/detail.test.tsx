@@ -93,6 +93,36 @@ const detail: CashbackRewardDetail = {
 }
 
 describe('cashback detail settlement eligibility', () => {
+  it('shows internal quota alongside CNY only after opening reward details', async () => {
+    vi.mocked(getCashbackReward).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        ...detail,
+        reward: {
+          ...detail.reward,
+          base_quota: 25_000_000,
+          calculated_quota: 1_500_000,
+          reward_quota: 1_500_000,
+        },
+        order: { ...detail.order, credited_quota: 25_000_000 },
+      },
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+      </QueryClientProvider>
+    )
+
+    expect(await screen.findAllByText('Raw Quota: 25,000,000')).toHaveLength(2)
+    expect(screen.getAllByText('Raw Quota: 1,500,000')).toHaveLength(2)
+    expect(screen.getAllByText('¥50')).toHaveLength(2)
+    queryClient.clear()
+  })
+
   it('labels a frozen legacy manual payer as eligible while preserving the original hold date', async () => {
     vi.mocked(getCashbackReward).mockResolvedValue({
       success: true,

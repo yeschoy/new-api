@@ -17,13 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import i18next from 'i18next'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import zh from '@/i18n/locales/zh.json'
 
 import { getCashbackRewards, getCashbackSummary } from '../api'
 import { CashbackTable } from '../components/cashback-table'
 import { Cashback } from '../index'
-import { formatCashbackQuota } from '../lib/format'
 import type { CashbackRewardPage } from '../types'
 
 vi.mock('../api', async (importOriginal) => ({
@@ -78,6 +80,40 @@ const page: CashbackRewardPage = {
 }
 
 describe('cashback table', () => {
+  afterEach(async () => {
+    await act(() => i18next.changeLanguage('en'))
+  })
+
+  it('shows CNY amounts in yuan without exposing raw quota in list rows', async () => {
+    i18next.addResourceBundle('zhCN', 'translation', zh.translation, true, true)
+    await act(() => i18next.changeLanguage('zhCN'))
+
+    render(
+      <CashbackTable
+        page={{
+          ...page,
+          items: [
+            {
+              ...page.items[0],
+              base_quota: 50_500_000,
+              calculated_quota: 1_500_000,
+              reward_quota: 1,
+            },
+          ],
+        }}
+        isLoading={false}
+        isError={false}
+        onSelect={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('101 元')).toBeVisible()
+    expect(screen.getByText('3 元')).toBeVisible()
+    expect(screen.getByText('0.000002 元')).toBeVisible()
+    expect(screen.queryByText('50,500,000')).not.toBeInTheDocument()
+  })
+
   it('lets admins scroll past the filters to reach loaded orders', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -303,7 +339,7 @@ describe('cashback table', () => {
 
     expect(screen.getByText('Canceled')).toBeVisible()
     expect(screen.queryByText('Pending review')).not.toBeInTheDocument()
-    expect(screen.getByText(formatCashbackQuota(50))).toBeVisible()
+    expect(screen.getByText('0.0001 CNY')).toBeVisible()
     expect(screen.queryByText(/2023-11-\d+/)).not.toBeInTheDocument()
   })
 

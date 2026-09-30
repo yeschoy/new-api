@@ -102,6 +102,12 @@ describe('cashback summary', () => {
       expected
     )
     expect(formatCashbackQuota(1, toIntlLocale(language))).toMatch(/[,.]0+2/)
+    expect(formatCashbackQuota(1_500_000, toIntlLocale(language), false)).toBe(
+      '3'
+    )
+    expect(formatCashbackQuota(1, toIntlLocale(language), false)).toMatch(
+      /[,.]0+2/
+    )
   })
 
   it('updates the CNY number formatting when the interface language changes', async () => {

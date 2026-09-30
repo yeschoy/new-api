@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toIntlLocale } from '@/i18n/languages'
+import { formatNumber } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -107,6 +108,23 @@ function DetailRow(props: { label: string; value: ReactNode }) {
       <dt className='text-muted-foreground'>{props.label}</dt>
       <dd className='text-right font-medium break-all'>{props.value}</dd>
     </div>
+  )
+}
+
+function CashbackQuotaDetailValue(props: {
+  quota: number
+  locale: string | undefined
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <span className='block'>
+        {formatCashbackQuota(props.quota, props.locale)}
+      </span>
+      <span className='text-muted-foreground block text-xs'>
+        {t('Raw Quota')}: {formatNumber(props.quota, props.locale)}
+      </span>
+    </>
   )
 }
 
@@ -231,10 +249,12 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                     />
                     <DetailRow
                       label={t('Face value quota')}
-                      value={formatCashbackQuota(
-                        detail.reward.base_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.base_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     <DetailRow
                       label={t('Cashback strategy')}
@@ -254,17 +274,21 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                     />
                     <DetailRow
                       label={t('Calculated reward')}
-                      value={formatCashbackQuota(
-                        detail.reward.calculated_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.calculated_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     <DetailRow
                       label={t('Payable reward')}
-                      value={formatCashbackQuota(
-                        detail.reward.reward_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.reward_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     <DetailRow
                       label={t('Cap reason')}
@@ -272,10 +296,12 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                     />
                     <DetailRow
                       label={t('Actually credited top-up quota')}
-                      value={formatCashbackQuota(
-                        detail.order.credited_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.credited_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     {!(
                       manualPayer &&
@@ -439,38 +465,48 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                     />
                     <DetailRow
                       label={t('Reward recovered')}
-                      value={formatCashbackQuota(
-                        detail.reward.recovered_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.recovered_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     <DetailRow
                       label={t('Reward debt')}
-                      value={formatCashbackQuota(
-                        detail.reward.outstanding_debt_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.outstanding_debt_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     <DetailRow
                       label={t('Principal reversal target')}
-                      value={formatCashbackQuota(
-                        detail.order.principal_reversal_target_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.principal_reversal_target_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     <DetailRow
                       label={t('Principal recovered')}
-                      value={formatCashbackQuota(
-                        detail.order.principal_recovered_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.principal_recovered_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                     <DetailRow
                       label={t('Principal debt')}
-                      value={formatCashbackQuota(
-                        detail.order.principal_outstanding_debt_quota,
-                        locale
-                      )}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.principal_outstanding_debt_quota}
+                          locale={locale}
+                        />
+                      }
                     />
                   </dl>
                 </section>

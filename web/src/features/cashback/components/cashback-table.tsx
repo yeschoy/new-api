@@ -138,17 +138,26 @@ export function CashbackTable(props: CashbackTableProps) {
                   </TableCell>
                   <TableCell>#{reward.beneficiary_id}</TableCell>
                   <TableCell>
-                    <div>{formatCashbackQuota(reward.base_quota, locale)}</div>
+                    <div>
+                      {formatCashbackQuota(reward.base_quota, locale, false)}{' '}
+                      {t('CNY')}
+                    </div>
                     <div className='text-muted-foreground text-xs'>
                       <CashbackStrategyLabel reward={reward} />
                     </div>
                   </TableCell>
                   <TableCell>
                     <div>
-                      {formatCashbackQuota(reward.calculated_quota, locale)}
+                      {formatCashbackQuota(
+                        reward.calculated_quota,
+                        locale,
+                        false
+                      )}{' '}
+                      {t('CNY')}
                     </div>
                     <div className='text-muted-foreground text-xs'>
-                      {formatCashbackQuota(reward.reward_quota, locale)}
+                      {formatCashbackQuota(reward.reward_quota, locale, false)}{' '}
+                      {t('CNY')}
                     </div>
                   </TableCell>
                   <TableCell>

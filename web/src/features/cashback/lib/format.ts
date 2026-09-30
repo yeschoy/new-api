@@ -23,7 +23,8 @@ import { getCurrencyDisplay } from '@/lib/currency'
  */
 export function formatCashbackQuota(
   quota: number | null | undefined,
-  locale?: Intl.LocalesArgument
+  locale?: Intl.LocalesArgument,
+  showSymbol = true
 ): string {
   if (quota == null || !Number.isFinite(quota)) return '-'
   const { config } = getCurrencyDisplay()
@@ -36,7 +37,7 @@ export function formatCashbackQuota(
     )
   )
   return new Intl.NumberFormat(locale, {
-    style: 'currency',
+    style: showSymbol ? 'currency' : 'decimal',
     currency: 'CNY',
     currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: 0,
