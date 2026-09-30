@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	stdErrors "errors"
@@ -384,6 +385,94 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	require.NoError(t, db.Model(&CashbackQuotaMutation{}).Where("reward_id = ? AND kind = ?", manual.ID, CashbackQuotaMutationIssue).Count(&payerMutations).Error)
 	require.EqualValues(t, 1, payerMutations)
 
+	// A reconciliation page must not combine the pre-issuance reward with
+	// post-issuance mutation evidence from a different committed DB state.
+	// Pause immediately after reading the reward page, then issue through the
+	// scheduler's normal settlement path (the scheduler checks separately).
+	snapshotOrder := topUp
+	snapshotOrder.Id = 0
+	snapshotOrder.TradeNo = namespace + "_snapshot_order"
+	require.NoError(t, db.Create(&snapshotOrder).Error)
+	snapshotContext := orderContext
+	snapshotContext.ID = 0
+	snapshotContext.TopUpID = snapshotOrder.Id
+	snapshotContext.TradeNo = snapshotOrder.TradeNo
+	require.NoError(t, db.Create(&snapshotContext).Error)
+	snapshotReward := reward
+	snapshotReward.ID = 0
+	snapshotReward.TopUpID = snapshotOrder.Id
+	snapshotReward.TradeNo = snapshotOrder.TradeNo
+	require.NoError(t, db.Create(&snapshotReward).Error)
+	resetCashbackReconciliationProgress()
+	type pausedReconciliationScan struct{}
+	pauseContext := context.WithValue(t.Context(), pausedReconciliationScan{}, true)
+	readReward, releaseScan := make(chan struct{}), make(chan struct{})
+	var pauseOnce sync.Once
+	const snapshotScanCallback = "test:cashback-reconciliation-snapshot"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(snapshotScanCallback, func(query *gorm.DB) {
+		if query.Statement.Context.Value(pausedReconciliationScan{}) == nil ||
+			!strings.HasSuffix(query.Statement.Table, "cashback_rewards") || query.Error != nil {
+			return
+		}
+		pauseOnce.Do(func() {
+			close(readReward)
+			<-releaseScan
+		})
+	}))
+	snapshotScanRegistered := true
+	t.Cleanup(func() {
+		if snapshotScanRegistered {
+			_ = db.Callback().Query().Remove(snapshotScanCallback)
+		}
+	})
+	type scanResult struct {
+		issues int64
+		err    error
+	}
+	scanDone := make(chan scanResult, 1)
+	go func() {
+		issues, scanErr := cashbackReconciliationInconsistencyCountTx(db.WithContext(pauseContext), true)
+		scanDone <- scanResult{issues, scanErr}
+	}()
+	select {
+	case <-readReward:
+	case <-time.After(10 * time.Second):
+		close(releaseScan)
+		t.Fatal("reconciliation did not read the reward page")
+	}
+	issued, issueErr := issueCashbackReward(snapshotReward.ID, now, false)
+	close(releaseScan)
+	reconciliation := <-scanDone
+	require.NoError(t, issueErr)
+	require.True(t, issued.Issued)
+	require.NoError(t, reconciliation.err)
+	require.Zero(t, reconciliation.issues)
+	require.False(t, cashbackReconciliationProgress.Pinned)
+	var issuedSnapshot CashbackReward
+	require.NoError(t, db.First(&issuedSnapshot, snapshotReward.ID).Error)
+	require.Equal(t, CashbackSettlementIssued, issuedSnapshot.SettlementStatus)
+	var snapshotMutationCount int64
+	require.NoError(t, db.Model(&CashbackQuotaMutation{}).Where("reward_id = ? AND kind = ?", snapshotReward.ID, CashbackQuotaMutationIssue).Count(&snapshotMutationCount).Error)
+	require.EqualValues(t, 1, snapshotMutationCount)
+	require.NoError(t, db.First(&storedInviter, inviter.Id).Error)
+	require.Equal(t, reward.RewardQuota+snapshotReward.RewardQuota, storedInviter.Quota)
+	require.NoError(t, db.Callback().Query().Remove(snapshotScanCallback))
+	snapshotScanRegistered = false
+	resetCashbackReconciliationProgress()
+	// A real committed quota mismatch must still pin the page; the stable
+	// snapshot only prevents a false mismatch across a concurrent commit.
+	require.NoError(t, db.Session(&gorm.Session{SkipHooks: true}).Model(&issueMutations[0]).Update("quota", reward.RewardQuota+1).Error)
+	issues, scanErr := CashbackReconciliationInconsistencyCount()
+	require.NoError(t, scanErr)
+	require.Positive(t, issues)
+	require.True(t, cashbackReconciliationProgress.Pinned)
+	require.NoError(t, db.Session(&gorm.Session{SkipHooks: true}).Model(&issueMutations[0]).Update("quota", reward.RewardQuota).Error)
+	issues, scanErr = CashbackReconciliationInconsistencyCount()
+	require.NoError(t, scanErr)
+	require.Zero(t, issues)
+	require.False(t, cashbackReconciliationProgress.Pinned)
+	resetCashbackReconciliationProgress()
+
 	oldQuotaPerUnit := common.QuotaPerUnit
 	common.QuotaPerUnit = 1_000
 	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
@@ -506,6 +595,13 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	require.NoError(t, db.Create(&campaign).Error)
 	payer := User{Username: namespace + "_campaign_payer", AffCode: "payer_" + namespace[len(namespace)-8:], Status: common.UserStatusEnabled}
 	require.NoError(t, db.Create(&payer).Error)
+	preview, err := PreviewPayerCashback(payer.Id, 1_000, 1, "1000")
+	require.NoError(t, err)
+	require.Equal(t, "estimated", preview.Status)
+	require.Equal(t, 50, preview.RewardQuota)
+	var previewWrites int64
+	require.NoError(t, db.Model(&CashbackReward{}).Where("beneficiary_id = ?", payer.Id).Count(&previewWrites).Error)
+	require.Zero(t, previewWrites)
 	orders := make([]TopUp, 2)
 	for i := range orders {
 		orders[i] = TopUp{UserId: payer.Id, Amount: 1, Money: 1, TradeNo: fmt.Sprintf("%s_campaign_%d", namespace, i),
@@ -535,6 +631,11 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	var payerRewards []CashbackReward
 	require.NoError(t, db.Where("beneficiary_id = ? AND direction = ?", payer.Id, CashbackDirectionInvitee).Find(&payerRewards).Error)
 	require.Len(t, payerRewards, 1)
+	require.Equal(t, preview.RewardQuota, payerRewards[0].RewardQuota)
+	preview, err = PreviewPayerCashback(payer.Id, 1_000, 1, "1000")
+	require.NoError(t, err)
+	require.Equal(t, "limit_reached", preview.Status)
+	require.Zero(t, preview.RewardQuota)
 	require.Equal(t, CashbackReviewAutomatic, payerRewards[0].ReviewSource)
 	require.Equal(t, CashbackSettlementIssued, payerRewards[0].SettlementStatus)
 	var payerWallet User

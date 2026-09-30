@@ -1,6 +1,7 @@
 package model
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -24,6 +25,13 @@ type cashbackReconciliationCursor struct {
 
 var cashbackReconciliationProgress cashbackReconciliationCursor
 
+type cashbackReconciliationPage struct {
+	startRewardID, startOrderID, startMutationID int64
+	nextRewardID, nextOrderID, nextMutationID    int64
+	generation                                   uint64
+	issues                                       int64
+}
+
 type cashbackMutationAggregate struct {
 	RewardID   int64
 	TopUpID    int
@@ -46,64 +54,99 @@ func CashbackReconciliationInconsistencyCount() (int64, error) {
 // can clear a pin after the repair commits. Each call examines at most one page
 // per table; a concurrent cursor change is retryable, never a healthy result.
 func cashbackReconciliationInconsistencyCountTx(tx *gorm.DB, advance bool) (int64, error) {
+	if !advance {
+		page, err := readCashbackReconciliationPageTx(tx)
+		if err != nil {
+			return 0, err
+		}
+		return applyCashbackReconciliationPage(page, false)
+	}
+
+	// A reward and its quota mutation commit together. Under READ COMMITTED
+	// (or separate autocommit SELECTs), reading the reward before that commit
+	// and the mutation after it fabricates a mismatch and pins a healthy page.
+	// Only the read-only reconciliation scan needs a stable snapshot; payment
+	// transactions must retain READ COMMITTED for their rolling cap checks.
+	// Apply the cursor only after the snapshot commits successfully: a failed
+	// commit must not advance past a page that has not been validated.
+	var page cashbackReconciliationPage
+	err := tx.Transaction(func(snapshot *gorm.DB) error {
+		var scanErr error
+		page, scanErr = readCashbackReconciliationPageTx(snapshot)
+		return scanErr
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return 0, err
+	}
+	return applyCashbackReconciliationPage(page, true)
+}
+
+func readCashbackReconciliationPageTx(tx *gorm.DB) (cashbackReconciliationPage, error) {
+	var page cashbackReconciliationPage
 	cashbackReconciliationProgress.Lock()
-	startRewardID := cashbackReconciliationProgress.RewardID
-	startOrderID := cashbackReconciliationProgress.OrderContextID
-	startMutationID := cashbackReconciliationProgress.MutationID
-	generation := cashbackReconciliationProgress.Generation
+	page.startRewardID = cashbackReconciliationProgress.RewardID
+	page.startOrderID = cashbackReconciliationProgress.OrderContextID
+	page.startMutationID = cashbackReconciliationProgress.MutationID
+	page.generation = cashbackReconciliationProgress.Generation
 	cashbackReconciliationProgress.Unlock()
 
 	// Never hold the cursor mutex while waiting for a DB connection: payment
 	// transactions may own the only connection and reconcile inside it.
-	rewards, nextRewardID, err := nextCashbackRewardReconciliationBatch(tx, startRewardID)
+	rewards, nextRewardID, err := nextCashbackRewardReconciliationBatch(tx, page.startRewardID)
 	if err != nil {
-		return 0, err
+		return page, err
 	}
-	orders, nextOrderID, err := nextCashbackOrderReconciliationBatch(tx, startOrderID)
+	orders, nextOrderID, err := nextCashbackOrderReconciliationBatch(tx, page.startOrderID)
 	if err != nil {
-		return 0, err
+		return page, err
 	}
-	mutations, nextMutationID, err := nextCashbackMutationReconciliationBatch(tx, startMutationID)
+	mutations, nextMutationID, err := nextCashbackMutationReconciliationBatch(tx, page.startMutationID)
 	if err != nil {
-		return 0, err
+		return page, err
 	}
 
 	rewardIssues, err := cashbackRewardReconciliationIssues(tx, rewards)
 	if err != nil {
-		return 0, err
+		return page, err
 	}
 	orderIssues, err := cashbackOrderReconciliationIssues(tx, orders)
 	if err != nil {
-		return 0, err
+		return page, err
 	}
 	mutationIssues, err := cashbackMutationReconciliationIssues(tx, mutations)
 	if err != nil {
-		return 0, err
+		return page, err
 	}
-	issues := rewardIssues + orderIssues + mutationIssues
+	page.nextRewardID = nextRewardID
+	page.nextOrderID = nextOrderID
+	page.nextMutationID = nextMutationID
+	page.issues = rewardIssues + orderIssues + mutationIssues
+	return page, nil
+}
 
+func applyCashbackReconciliationPage(page cashbackReconciliationPage, advance bool) (int64, error) {
 	cashbackReconciliationProgress.Lock()
 	defer cashbackReconciliationProgress.Unlock()
-	if issues > 0 {
+	if page.issues > 0 {
 		// Mismatches are sticky. A later page cannot replace an earlier pin;
 		// an older in-flight scan may also discover an earlier mismatch.
-		cashbackReconciliationProgress.RewardID = min(cashbackReconciliationProgress.RewardID, startRewardID)
-		cashbackReconciliationProgress.OrderContextID = min(cashbackReconciliationProgress.OrderContextID, startOrderID)
-		cashbackReconciliationProgress.MutationID = min(cashbackReconciliationProgress.MutationID, startMutationID)
+		cashbackReconciliationProgress.RewardID = min(cashbackReconciliationProgress.RewardID, page.startRewardID)
+		cashbackReconciliationProgress.OrderContextID = min(cashbackReconciliationProgress.OrderContextID, page.startOrderID)
+		cashbackReconciliationProgress.MutationID = min(cashbackReconciliationProgress.MutationID, page.startMutationID)
 		cashbackReconciliationProgress.Pinned = true
 		cashbackReconciliationProgress.Generation++ // Invalidates every in-flight clean scan, even on the same page.
-		return issues, nil
+		return page.issues, nil
 	}
-	if cashbackReconciliationProgress.Generation != generation {
+	if cashbackReconciliationProgress.Generation != page.generation {
 		return 0, errCashbackReconciliationCursorConflict
 	}
 	if cashbackReconciliationProgress.Pinned && !advance {
 		return 0, errCashbackReconciliationCursorConflict
 	}
 	if advance {
-		cashbackReconciliationProgress.RewardID = nextRewardID
-		cashbackReconciliationProgress.OrderContextID = nextOrderID
-		cashbackReconciliationProgress.MutationID = nextMutationID
+		cashbackReconciliationProgress.RewardID = page.nextRewardID
+		cashbackReconciliationProgress.OrderContextID = page.nextOrderID
+		cashbackReconciliationProgress.MutationID = page.nextMutationID
 		cashbackReconciliationProgress.Pinned = false
 		cashbackReconciliationProgress.Generation++
 	}

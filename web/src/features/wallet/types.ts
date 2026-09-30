@@ -33,6 +33,24 @@ export interface ApiResponse<T = unknown> {
  * Standard API response types
  */
 export type TopupInfoResponse = ApiResponse<TopupInfo>
+
+export interface PayerCashbackPreview {
+  status:
+    | 'inactive'
+    | 'no_campaign'
+    | 'ineligible'
+    | 'limit_reached'
+    | 'select_amount'
+    | 'below_minimum'
+    | 'cap_exhausted'
+    | 'estimated'
+  strategy?: 'rate' | 'per_hundred'
+  rate_bps?: number
+  fixed_per_hundred?: number
+  reward_quota: number
+  as_of: number
+}
+export type PayerCashbackPreviewResponse = ApiResponse<PayerCashbackPreview>
 export type RedemptionResponse = ApiResponse<
   number | { type: 'subscription'; plan_id: number; plan_title: string }
 >

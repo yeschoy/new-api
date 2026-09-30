@@ -21,6 +21,103 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// PreviewTopUpCashback returns a point-in-time, read-only payer estimate.
+// Checkout and verified completion never consume this response.
+func PreviewTopUpCashback(c *gin.Context) {
+	query := c.Request.URL.Query()
+	amounts, hasAmount := query["amount"]
+	products, hasProduct := query["product_id"]
+	if hasAmount == hasProduct || len(amounts) > 1 || len(products) > 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+		return
+	}
+	var baseQuota int
+	var faceAmount int64
+	var factor string
+	if hasProduct {
+		if !isCreemTopUpEnabled() || len(products[0]) == 0 || len(products[0]) > 255 {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+			return
+		}
+		var configured []CreemProduct
+		if err := common.Unmarshal([]byte(setting.CreemProducts), &configured); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Preview unavailable"})
+			return
+		}
+		for _, product := range configured {
+			if product.ProductId == products[0] {
+				faceAmount = product.Quota
+				break
+			}
+		}
+		var err error
+		baseQuota, err = cashbackBaseQuotaFromWalletQuota(faceAmount)
+		if err != nil || faceAmount <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+			return
+		}
+		factor = "1"
+	} else {
+		amount, err := strconv.ParseInt(amounts[0], 10, 64)
+		var minAmount int64
+		standardEnabled := false
+		if isEpayTopUpEnabled() {
+			minAmount = getMinTopup()
+			standardEnabled = true
+		}
+		if isStripeTopUpEnabled() {
+			stripeMin := getStripeMinTopup()
+			if !standardEnabled {
+				minAmount = stripeMin
+			} else {
+				minAmount = min(minAmount, stripeMin)
+			}
+			standardEnabled = true
+		}
+		if isWaffoTopUpEnabled() {
+			waffoMin := int64(setting.WaffoMinTopUp)
+			if !standardEnabled {
+				minAmount = waffoMin
+			} else {
+				minAmount = min(minAmount, waffoMin)
+			}
+			standardEnabled = true
+		}
+		if isWaffoPancakeTopUpEnabled() {
+			pancakeMin := int64(setting.WaffoPancakeMinTopUp)
+			if !standardEnabled {
+				minAmount = pancakeMin
+			} else {
+				minAmount = min(minAmount, pancakeMin)
+			}
+			standardEnabled = true
+		}
+		if err != nil || amount < 0 || amount > getMaxTopUpAmount() || (amount > 0 && (!standardEnabled || amount < minAmount)) {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+			return
+		}
+		if amount > 0 {
+			baseQuota, err = cashbackBaseQuotaFromTopUpAmount(amount)
+			if err != nil || baseQuota <= 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+				return
+			}
+			faceAmount = amount
+			factor = decimal.NewFromFloat(common.QuotaPerUnit).String()
+			if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+				faceAmount = int64(baseQuota)
+				factor = "1"
+			}
+		}
+	}
+	preview, err := model.PreviewPayerCashback(c.GetInt("id"), baseQuota, faceAmount, factor)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Preview unavailable"})
+		return
+	}
+	common.ApiSuccess(c, preview)
+}
+
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
 

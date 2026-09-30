@@ -1427,7 +1427,14 @@ func TestCashbackReconciliationAdvancesInBoundedBatchesAndPinsMismatch(t *testin
 	}
 	outside := make(chan scanResult, 1)
 	go func() {
-		count, scanErr := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(ctx, outsideScanKey{}, true)), true)
+		// Exercise cursor locking while waiting for the only connection.
+		// The production snapshot waits at Begin before reaching its query.
+		page, scanErr := readCashbackReconciliationPageTx(DB.WithContext(context.WithValue(ctx, outsideScanKey{}, true)))
+		if scanErr != nil {
+			outside <- scanResult{err: scanErr}
+			return
+		}
+		count, scanErr := applyCashbackReconciliationPage(page, true)
 		outside <- scanResult{count, scanErr}
 	}()
 	select {
@@ -1488,7 +1495,14 @@ func TestCashbackReconciliationConcurrentCleanCannotUnpinMismatch(t *testing.T) 
 	}
 	stale := make(chan scanResult, 1)
 	go func() {
-		issues, err := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(t.Context(), pausedScanKey{}, true)), true)
+		// Force the intentionally interleaved cursor scan without a snapshot;
+		// SQLite cannot commit a writer while a snapshot reader holds its lock.
+		page, err := readCashbackReconciliationPageTx(DB.WithContext(context.WithValue(t.Context(), pausedScanKey{}, true)))
+		if err != nil {
+			stale <- scanResult{err: err}
+			return
+		}
+		issues, err := applyCashbackReconciliationPage(page, true)
 		stale <- scanResult{issues, err}
 	}()
 	<-entered
@@ -1549,7 +1563,12 @@ func TestCashbackReconciliationConcurrentMismatchesKeepEarlierPage(t *testing.T)
 	}
 	early := make(chan scanResult, 1)
 	go func() {
-		issues, err := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(t.Context(), earlyScanKey{}, true)), true)
+		page, err := readCashbackReconciliationPageTx(DB.WithContext(context.WithValue(t.Context(), earlyScanKey{}, true)))
+		if err != nil {
+			early <- scanResult{err: err}
+			return
+		}
+		issues, err := applyCashbackReconciliationPage(page, true)
 		early <- scanResult{issues, err}
 	}()
 	<-earlyEntered
@@ -1559,7 +1578,12 @@ func TestCashbackReconciliationConcurrentMismatchesKeepEarlierPage(t *testing.T)
 	require.Equal(t, rewards[cashbackReconciliationBatchSize-1].ID, cashbackReconciliationProgress.RewardID)
 	late := make(chan scanResult, 1)
 	go func() {
-		issues, err := cashbackReconciliationInconsistencyCountTx(DB.WithContext(context.WithValue(t.Context(), lateScanKey{}, true)), true)
+		page, err := readCashbackReconciliationPageTx(DB.WithContext(context.WithValue(t.Context(), lateScanKey{}, true)))
+		if err != nil {
+			late <- scanResult{err: err}
+			return
+		}
+		issues, err := applyCashbackReconciliationPage(page, true)
 		late <- scanResult{issues, err}
 	}()
 	<-lateEntered
@@ -1584,6 +1608,35 @@ func TestCashbackReconciliationConcurrentMismatchesKeepEarlierPage(t *testing.T)
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, issues, "later mismatch remains discoverable after earlier repair")
 	assert.Equal(t, rewards[cashbackReconciliationBatchSize-1].ID, cashbackReconciliationProgress.RewardID)
+}
+
+func TestCashbackReconciliationFailedSnapshotDoesNotAdvance(t *testing.T) {
+	setupCashbackTestDB(t)
+	cashbackReconciliationProgress.Lock()
+	cashbackReconciliationProgress.RewardID = 99
+	cashbackReconciliationProgress.Unlock()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	const callback = "test:reconciliation-snapshot-commit-failure"
+	reachedLastQuery := false
+	require.NoError(t, DB.Callback().Query().After("gorm:query").Register(callback, func(query *gorm.DB) {
+		if query.Statement.Context != ctx || query.Statement.Table != "cashback_quota_mutations" || query.Error != nil {
+			return
+		}
+		reachedLastQuery = true
+		cancel() // With empty evidence tables this is the final SELECT, before Commit.
+	}))
+	defer func() { _ = DB.Callback().Query().Remove(callback) }()
+	_, err := cashbackReconciliationInconsistencyCountTx(DB.WithContext(ctx), true)
+	require.True(t, reachedLastQuery)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.EqualValues(t, 99, cashbackReconciliationProgress.RewardID, "a failed snapshot cannot wrap the cursor")
+
+	issues, err := CashbackReconciliationInconsistencyCount()
+	require.NoError(t, err)
+	assert.Zero(t, issues)
+	assert.Zero(t, cashbackReconciliationProgress.RewardID)
 }
 
 func TestCashbackReconciliationTransactionRollbackDoesNotAdvanceOrPermanentlyPin(t *testing.T) {
@@ -4061,4 +4114,110 @@ func TestStripeRechargeDuplicateCallbackIsIdempotentWithCashback(t *testing.T) {
 	var rewardCount int64
 	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", topUp.Id).Count(&rewardCount).Error)
 	assert.EqualValues(t, 2, rewardCount)
+}
+
+func TestPayerCashbackPreviewMatchesFaceAndCapsWithoutWriting(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	_, payer := createCashbackUsers(t, now-86400)
+	setting := saveCashbackTestSetting(t, now-300)
+	setting.InviterEnabled = false
+	setting.InviteeRateBPS = 2000
+	setting.MaxRewardQuota = 15_000_000
+	setting.DailyRewardQuota = 25_000_000
+	require.NoError(t, SaveCashbackSetting(setting))
+
+	preview, err := PreviewPayerCashback(payer.Id, 125_000_000, 250, "500000")
+	require.NoError(t, err)
+	assert.Equal(t, "estimated", preview.Status)
+	assert.Equal(t, 15_000_000, preview.RewardQuota)
+	assert.Equal(t, 2000, preview.RateBPS)
+
+	order := createCompletedCashbackTopUp(t, payer, now-100, now-10, 125_000_000, 125_000_000,
+		CashbackRequestMetadata{FaceAmount: 250, QuotaPerFaceUnit: "500000"})
+	var reward CashbackReward
+	require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&reward).Error)
+	assert.Equal(t, preview.RewardQuota, reward.RewardQuota)
+
+	preview, err = PreviewPayerCashback(payer.Id, 125_000_000, 250, "500000")
+	require.NoError(t, err)
+	assert.Equal(t, 10_000_000, preview.RewardQuota)
+	var count int64
+	require.NoError(t, DB.Model(&CashbackReward{}).Count(&count).Error)
+	assert.EqualValues(t, 1, count)
+
+	setting.InviteeStrategy = operation_setting.CashbackStrategyPerHundred
+	setting.InviteeFixedPerHundred = 20
+	require.NoError(t, SaveCashbackSetting(setting))
+	preview, err = PreviewPayerCashback(payer.Id, 50_000_000, 100, "500000")
+	require.NoError(t, err)
+	assert.Equal(t, "estimated", preview.Status)
+	assert.Equal(t, 10_000_000, preview.RewardQuota) // Fixed face, not paid price.
+	assert.Equal(t, 20, preview.FixedPerHundred)
+	preview, err = PreviewPayerCashback(payer.Id, 49_500_000, 99, "500000")
+	require.NoError(t, err)
+	assert.Equal(t, "below_minimum", preview.Status)
+	assert.Zero(t, preview.RewardQuota)
+	// Creem's product quota is its face, not the product's checkout price.
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, 40, preview.RewardQuota)
+	assert.EqualValues(t, 1, count)
+
+	preview, err = PreviewPayerCashback(payer.Id, 0, 0, "")
+	require.NoError(t, err)
+	assert.Equal(t, "select_amount", preview.Status)
+	assert.Zero(t, preview.RewardQuota)
+
+	setting.DailyRewardQuota = 15_000_000
+	require.NoError(t, SaveCashbackSetting(setting))
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "cap_exhausted", preview.Status)
+	assert.Zero(t, preview.RewardQuota)
+
+	setting.DailyRewardQuota = common.MaxWalletQuota
+	require.NoError(t, SaveCashbackSetting(setting))
+	require.NoError(t, DB.Model(&reward).Update("outstanding_debt_quota", 1).Error)
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "ineligible", preview.Status)
+	require.NoError(t, DB.Model(&reward).Update("outstanding_debt_quota", 0).Error)
+	require.NoError(t, DB.Model(&CashbackCampaign{}).Where("id > 0").Update("max_rewards_per_user", 1).Error)
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "limit_reached", preview.Status)
+
+	// Once a positive slot is used, rejecting/canceling it must not create a
+	// second opportunity in either preview or verified settlement.
+	require.NoError(t, DB.Model(&reward).Updates(map[string]any{
+		"review_status": CashbackReviewRejected, "settlement_status": CashbackSettlementCanceled,
+	}).Error)
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "limit_reached", preview.Status)
+	later := createCompletedCashbackTopUp(t, payer, now, now, 250, 250,
+		CashbackRequestMetadata{FaceAmount: 250, QuotaPerFaceUnit: "1"})
+	var laterRewards int64
+	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", later.Id).Count(&laterRewards).Error)
+	assert.Zero(t, laterRewards)
+
+	require.NoError(t, DB.Model(&CashbackCampaign{}).Where("id > 0").Update("max_rewards_per_user", 100).Error)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", payer.Id).Update("status", common.UserStatusDisabled).Error)
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "ineligible", preview.Status)
+	require.NoError(t, DB.Model(&CashbackCampaign{}).Where("id > 0").Update("stopped_at", now-1).Error)
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "no_campaign", preview.Status)
+	assert.Empty(t, preview.Strategy)
+	setting.InviteeEnabled = false
+	require.NoError(t, SaveCashbackSetting(setting))
+	preview, err = PreviewPayerCashback(payer.Id, 250, 250, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "inactive", preview.Status)
+	assert.Empty(t, preview.Strategy)
+	require.NoError(t, DB.Model(&CashbackReward{}).Count(&count).Error)
+	assert.EqualValues(t, 1, count)
 }

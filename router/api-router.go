@@ -119,6 +119,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.DELETE("/passkey", middleware.DisableCache(), controller.PasskeyDelete)
 				selfRoute.GET("/aff", controller.GetAffCode)
 				selfRoute.GET("/topup/info", controller.GetTopUpInfo)
+				selfRoute.GET("/topup/cashback-preview", middleware.UserScopedRateLimit("topup-cashback-preview", 60, 60), controller.PreviewTopUpCashback)
 				selfRoute.GET("/topup/self", controller.GetUserTopUps)
 				selfRoute.POST("/topup", middleware.CriticalRateLimit(), controller.TopUp)
 				selfRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestEpay)

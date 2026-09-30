@@ -85,6 +85,7 @@ snapshot and overrun the cap.
 
 | Route | Auth / guard | Contract |
 | --- | --- | --- |
+| `GET /api/user/topup/cashback-preview?amount=<integer>` or `?product_id=<id>` | Authenticated user + scoped rate limit (60/minute when rate limiting is enabled) | Exactly one selection; response `data: {status, strategy?, rate_bps?, fixed_per_hundred?, reward_quota, as_of}`; `status` is `inactive`, `no_campaign`, `ineligible`, `limit_reached`, `select_amount`, `below_minimum`, `cap_exhausted`, or `estimated`. Only this user's payer estimate; no risk or inviter evidence. |
 | `GET /api/cashback/config` | Root | Returns the stored config plus `compliance_confirmed` |
 | `PUT /api/cashback/config` | Root | Replaces required fields atomically; omitted optional strategy/fixed-amount and review-policy fields preserve current values under the version-row lock |
 | `GET /api/cashback/campaigns` | Root | Lists bounded campaign history |
@@ -243,6 +244,16 @@ wallet quota; floating-point money arithmetic is forbidden.
   must also complete inside the same live campaign. Positive payer rewards
   consume one per-user per-campaign slot even if later canceled or recovered.
   Zero rewards do not count. No campaign never blocks inviter cashback.
+- The authenticated, user-rate-limited `GET /api/user/topup/cashback-preview`
+  returns only a payer-facing, point-in-time rule and estimate for the selected
+  standard face amount or enabled Creem product ID. It reads current campaign,
+  payer eligibility, positive campaign-slot usage, and rolling-24-hour caps
+  without writing, reserving a slot, or exposing risk evidence. Standard USD
+  and token display and Creem product quota follow the order snapshot face
+  basis below, never discounted checkout price. No active campaign, exhausted
+  allowance, ineligibility and service failure are distinct UI outcomes;
+  stale amount responses must not overwrite the current selection. The
+  estimate never becomes payment or issuance input and may change by payment.
 
 ### Order creation and provider completion
 
@@ -349,7 +360,14 @@ wallet quota; floating-point money arithmetic is forbidden.
   unbounded full-history count.
 - `reconciliation_issues` is the issue count from the current bounded page, not
   a full-history total. Repeated clean calls advance the in-process cursor and
-  eventually cycle through all rows.
+  eventually cycle through all rows. Standalone multi-query reconciliation
+  pages use one read-only repeatable-read snapshot: reward state and its issue
+  mutation commit together, so separate READ COMMITTED/autocommit SELECTs can
+  otherwise combine the pre-issue reward with post-issue evidence and falsely
+  pin a healthy page. Advance or unpin the cursor only after the snapshot
+  transaction commits; a failed read or commit must not skip an unchecked page.
+  Do not change provider payment transactions from READ COMMITTED; their
+  locked-user rolling-cap read depends on it.
 - A blocked or failed frozen reward records the reason/error and a retry time.
   For review requests, only fence acquisition/verification and an actual
   issuance attempt are settlement failures; invalid review transitions do not
@@ -419,6 +437,7 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 | Condition | Required behavior |
 | --- | --- |
+| Preview supplies neither/both selectors, duplicate selectors, malformed/out-of-range amount, unknown/disabled Creem product | `400`; no estimate or mutation. A valid selection with no eligible activity returns `200` with a non-estimated status; DB/config read failure returns `503`, never a false zero reward. |
 | Malformed config JSON, invalid strategy/fixed range, zero active value, or selected nominal sum above 100% | `400`; config validation includes the offending `field`; no partial Option update |
 | Either direction enabled without compliance or positive caps | `400`; keep the previous complete configuration |
 | Client attempts to send `first_enabled_at` or `version` | Ignore by DTO ownership; server derives both |
@@ -452,6 +471,9 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 ## 5. Good / Base / Bad Cases
 
+- **Good:** A current payer previews a 250-face fixed-per-hundred order and sees two hundreds of reward under current caps; a discounted checkout does not reduce the estimate, and payment completion independently recalculates it.
+- **Base:** No active campaign or no amount selected returns a distinct status with zero reward; a switch to another amount hides the old query result while the new request is pending.
+- **Bad:** Use a provider's discounted price or a stale amount response as the preview face, or feed an estimate back into settlement as authoritative quota.
 - **Good:** A post-enable Stripe order with both directions enabled settles once.
   The same transaction snapshots the face-value base, creates inviter and
   invitee rewards, and credits the purchased quota. A repeated webhook changes
@@ -482,6 +504,7 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 - Configuration: defaults; independent strategy/fixed fields; rate/fixed and mixed nominal return bounds; old-client omitted-field preservation under concurrent versioned writes; compliance; positive caps; immutable first-enable timestamp.
 - Migration: cashback side tables without columns on `TopUp`; fresh, representative released-schema upgrade and twice-repeated migration on real SQLite/MySQL/PostgreSQL; old context/reward rows retain data, indexes and uniqueness. New face and reward-strategy columns default safely; historical empty strategy is rate.
+- Preview: authenticated selection/invalid/disabled-product cases; compare fixed/rate USD, token and Creem face estimates with verified settlement, positive campaign slots (including later canceled/rejected), 24-hour caps and zero/ineligible/no-campaign states; assert no reward/wallet write. Use real three-dialect integration for query and counting changes, not SQLite alone.
 - Provider matrix: Epay, Stripe, Creem, Waffo, and Waffo Pancake create correct checkout face evidence (including token normalization and Creem product quota); fixed 99/100/250 and split 60+40, mixed directions, single/24-hour caps, payment-time switches, legacy missing-basis cancellation and unchanged historical reward; forged callbacks rejected, verified retries idempotent, manual completion ineligible.
 - Transactionality: a missing required context or cashback insert failure rolls
   back provider completion and wallet credit. Run concurrent cap/settlement
@@ -533,10 +556,23 @@ skip and must never be represented as production-database verification.
   invalidation after order-wide changes.
 - Device header allowlist, stable `v1` signal, storage/Web Crypto failure, and no
   signal on unrelated requests.
+- Wallet preview: stale amount/product requests never show an older reward; inactive,
+  cap exhausted, invalid selection and request failure are distinct; Creem uses
+  product quota instead of price and small positive quotas never round upward.
 - Seven-locale key/placeholder parity, keyboard/focus behavior, narrow layout,
   type-check, lint, and production build.
 
 ## 7. Wrong vs Correct
+
+### Preview is not settlement input
+
+```go
+// Wrong: cached UI estimate decides payout or reserves a campaign slot.
+rewardQuota := request.EstimatedRewardQuota
+// Correct: verified payment completion recalculates under the live campaign,
+// immutable checkout face snapshot, user locks, caps and risk checks.
+err := CompleteTopUpCashbackTx(tx, topUp, creditedQuota, source)
+```
 
 ### Payment transaction ownership
 

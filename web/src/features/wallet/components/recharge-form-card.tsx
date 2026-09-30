@@ -52,6 +52,7 @@ import type {
   WaffoPayMethod,
 } from '../types'
 import { CreemProductsSection } from './creem-products-section'
+import { PayerCashbackPreview } from './payer-cashback-preview'
 
 interface RechargeFormCardProps {
   topupInfo: TopupInfo | null
@@ -124,10 +125,10 @@ export function RechargeFormCard({
 
   const handleAmountChange = (value: string) => {
     setLocalAmount(value)
-    const numValue = Number.parseInt(value) || 0
-    if (numValue >= 0) {
-      onTopupAmountChange(numValue)
-    }
+    const numValue = value === '' ? 0 : Number(value)
+    onTopupAmountChange(
+      Number.isSafeInteger(numValue) && numValue >= 0 ? numValue : 0
+    )
   }
 
   const hasConfigurableTopup =
@@ -140,7 +141,17 @@ export function RechargeFormCard({
     Array.isArray(topupInfo?.pay_methods) && topupInfo.pay_methods.length > 0
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
-  const minTopup = getMinTopupAmount(topupInfo)
+  const minTopup = Math.min(
+    topupInfo?.enable_online_topup ? topupInfo.min_topup : Infinity,
+    topupInfo?.enable_stripe_topup ? topupInfo.stripe_min_topup : Infinity,
+    enableWaffoTopup ? (waffoMinTopup ?? Infinity) : Infinity,
+    enableWaffoPancakeTopup
+      ? (topupInfo?.waffo_pancake_min_topup ?? Infinity)
+      : Infinity
+  )
+  const inputMinTopup = Number.isFinite(minTopup)
+    ? minTopup
+    : getMinTopupAmount(topupInfo)
   const redemptionEnabled = topupInfo?.enable_redemption !== false
 
   if (loading) {
@@ -294,8 +305,8 @@ export function RechargeFormCard({
                     type='number'
                     value={localAmount}
                     onChange={(e) => handleAmountChange(e.target.value)}
-                    min={minTopup}
-                    placeholder={`Minimum ${minTopup}`}
+                    min={inputMinTopup}
+                    placeholder={`Minimum ${inputMinTopup}`}
                     className='h-9 text-base sm:h-10 sm:text-lg'
                   />
                   <div className='bg-muted/30 flex min-h-9 items-center justify-between gap-2 rounded-md border px-3 lg:min-w-52'>
@@ -313,6 +324,8 @@ export function RechargeFormCard({
                 </div>
               </div>
 
+              <PayerCashbackPreview amount={topupAmount} />
+
               <div className='space-y-2.5 sm:space-y-3'>
                 <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
                   {t('Payment Method')}
@@ -322,7 +335,9 @@ export function RechargeFormCard({
                     {topupInfo?.pay_methods?.map((method) => {
                       const minTopup = Math.max(
                         method.min_topup || 0,
-                        getMinTopupAmount(topupInfo)
+                        method.type === 'stripe'
+                          ? (topupInfo?.stripe_min_topup ?? inputMinTopup)
+                          : (topupInfo?.min_topup ?? inputMinTopup)
                       )
                       const disabled = minTopup > topupAmount
                       const disabledReason = disabled

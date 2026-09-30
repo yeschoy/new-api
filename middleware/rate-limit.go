@@ -188,14 +188,16 @@ func ScopedCriticalRateLimit(scope string, maxRequestNum int, duration int64) fu
 }
 
 func UserCriticalRateLimit(scope string) func(c *gin.Context) {
+	return UserScopedRateLimit(scope, common.CriticalRateLimitNum, common.CriticalRateLimitDuration)
+}
+
+// UserScopedRateLimit bounds read-heavy authenticated endpoints without sharing
+// the sensitive-mutation bucket or limiting a different user behind one IP.
+func UserScopedRateLimit(scope string, maxRequestNum int, duration int64) func(c *gin.Context) {
 	if !common.CriticalRateLimitEnable {
 		return defNext
 	}
-	return userRateLimitFactory(
-		common.CriticalRateLimitNum,
-		common.CriticalRateLimitDuration,
-		"UC:"+scope,
-	)
+	return userRateLimitFactory(maxRequestNum, duration, "UC:"+scope)
 }
 
 func DownloadRateLimit() func(c *gin.Context) {

@@ -196,12 +196,8 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			capReason = appendCashbackReason(capReason, "face_basis_unavailable")
 		}
 		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 {
-			var used int64
-			orders := tx.Model(&CashbackOrderContext{}).Select("top_up_id").Where("campaign_id = ?", campaign.ID)
-			if err := tx.Model(&CashbackReward{}).
-				Where("top_up_id IN (?) AND direction = ? AND beneficiary_id = ? AND reward_quota > 0 AND review_status <> ? AND settlement_status <> ?",
-					orders, CashbackDirectionInvitee, invitee.Id, CashbackReviewRejected, CashbackSettlementCanceled).
-				Count(&used).Error; err != nil {
+			used, err := cashbackCampaignPayerRewardsUsedTx(tx, campaign.ID, invitee.Id)
+			if err != nil {
 				return err
 			}
 			if used >= int64(campaign.MaxRewardsPerUser) {
@@ -405,6 +401,18 @@ func calculateCashbackFixedQuota(context *CashbackOrderContext, fixed int) (int,
 		return 0, ErrCashbackInvalidInput
 	}
 	return quota, nil
+}
+
+// A positive reward consumes its campaign slot permanently, even if it is
+// subsequently rejected, canceled by an incident, or recovered.
+func cashbackCampaignPayerRewardsUsedTx(tx *gorm.DB, campaignID int64, payerID int) (int64, error) {
+	orders := tx.Model(&CashbackOrderContext{}).Select("top_up_id").Where("campaign_id = ?", campaignID)
+	var used int64
+	err := tx.Model(&CashbackReward{}).
+		Where("top_up_id IN (?) AND direction = ? AND beneficiary_id = ? AND reward_quota > 0",
+			orders, CashbackDirectionInvitee, payerID).
+		Count(&used).Error
+	return used, err
 }
 
 // cashbackDailyRewardUsedTx sums rewards that were or still may be paid in the
