@@ -18,8 +18,8 @@ Root 表单 -> PUT /api/cashback/config -> 配置版本行锁 + 校验 -> Option
 - 传输和存储字段 `inviter_tiers` / `invitee_tiers` 为有序的 `{threshold_cents:int64, reward_cents:int64}[]`。服务端强制正数、整分、严格递增且无重复门槛，限制档位个数与序列化大小；前端以人民币元输入/格式化并在请求边界精确转成整数分，不通过浮点结果计奖。默认两组为空，只有选中并启用 `tiered` 才要求非空；旧 PUT 缺席保持现值，显式空数组清除未启用/未选中的旧档位。
 - 沿用 `cashback_setting.*` Option 事务，不新建表：每组档位序列化为 JSON 数组放在单独 Option 键，用根模块 `common.Marshal` / `common.Unmarshal`。序列化失败必须在写 DB 前返回错误；扩展 `CashbackSettingOptionValues` / `CashbackSettingOptionKeys`、解析和 `CashbackStrategyUpdate`。`config.GlobalConfig.UpdateFromMap` 对 slice JSON 的反序列化也应覆盖测试，避免 DB 与进程缓存不一致；全量替换而非合并。
 - Root API 仅归一化请求、合并被省略字段并调用原子更新。旧客户端不传档位数组仍保留；新客户端回显两个方向及当前策略。拒绝未知策略、空选中档位、超界/重复/倒序门槛、负数、三位小数（表单层）和溢出。服务端只接受整数分，浮点或字符串错误类型必须安全拒绝。对每个方向取档位最大 `reward_cents / threshold_cents`，与另一方向所选比例、每百元回报或阶梯上界合计不超过 100%，保留现有两个方向的保守名义安全限制及现有高风险确认。
-- 当前标准在线充值的 `FaceAmount` 是整数面额、`QuotaPerFaceUnit` 是下单时精确转换因子。原字段无法在所有配置下区分标准面额和 token/Creem（转换因子可能碰巧相同）；因此给 `CashbackOrderContext` 增加 `face_basis_kind`（`standard` / `other`，旧行默认空）。所有新在线订单由下单入口明确写入，`InsertOnlineTopUp` 拒绝新订单缺失/无效来源；历史行为空保持可读，不推断来源，阶梯策略对缺失证据记可审计的零额记录。比较 `FaceAmount*100` 与门槛分时防溢出。因此 100.50 元门槛在当前仅接受整数面额的标准下单界面最早由 101 元订单触发；不顺带扩大充值输入精度。取最高可达档的 `reward_cents / 100 * QuotaPerFaceUnit`，一次向下取整后走 `WalletQuotaFromDecimalStrict`；校验不超过 `BaseQuota`。不使用折扣后实付金额、前端预估值、支付后即时汇率。零档沿用 `below_minimum` 与 canceled 零额审计记录。
-- 标准 CNY/USD 暂按用户确认的 1:1 面额语义；对于 token 或 Creem 的新 `tiered` 策略明确标记不适用、不得把 quota/product 数量误当 CNY 面额，旧策略仍按已有行为运行。预估返回明确的不适用状态，不默默伪装成零额活动。
+- 当前使用的标准 CNY 在线充值，`FaceAmount` 已是整数面额、`QuotaPerFaceUnit` 是下单时精确转换因子。新策略只依据现有面额证据计奖，不新增 `face_basis_kind` 或其他数据库列；现有历史订单若缺少可信面额/转换因子则零额取消并记录 `face_basis_unavailable`。比较 `FaceAmount*100` 与门槛分时防溢出。因此 100.50 元门槛在当前仅接受整数面额的标准下单界面最早由 101 元订单触发；不顺带扩大充值输入精度。取最高可达档的 `reward_cents / 100 * QuotaPerFaceUnit`，一次向下取整后走 `WalletQuotaFromDecimalStrict`；校验不超过 `BaseQuota`。不使用折扣后实付金额、前端预估值、支付后即时汇率。零档沿用 `below_minimum` 与 canceled 零额审计记录。
+- 用户确认当前站点实际使用 CNY 充值，先前 CNY/USD 面额按 1:1；活动页统一展示 CNY。代币路径与 Creem 不在本次产品范围，不能将产品 quota 当作 CNY 面额：Creem 可凭既有 `PaymentProvider` 排除；非标准订单的单位因子为 `1` 时保守不计阶梯奖（当前标准 CNY 的 `common.QuotaPerUnit` 默认 500000）。未来若开启代币模式、或将标准换算因子设为 `1`，须先另行设计可信面额来源，而非承诺现有阶梯自动支持。付款人预估对此返回明确的不适用状态；旧策略在这些路径仍按已有行为运行。
 
 ## 奖励、预估与向后兼容
 
@@ -34,12 +34,12 @@ Root 表单 -> PUT /api/cashback/config -> 配置版本行锁 + 校验 -> Option
 
 ## 数据库兼容、部署与回滚
 
-- 配置新增两个 Option 键；另在 `CashbackOrderContext` 新增 `face_basis_kind` 列，跨库为有默认空值的短字符串。既有库缺 Option 键按空阶梯/原策略加载，旧行来源为空且保持历史奖励数据不变；老客户端 PUT 不清空新字段，旧记录与已出单快照不可重写。投产遵循先部署支持新列/策略的后端再开放 Root 配置 UI；旧实例不得与已启用新策略的实例混跑。回滚时先把两个方向切回旧策略/停用，再回滚后端；保留新增列、Option 键与历史快照，不做破坏性清理。
-- 任何真实 DB 代码验证仅用任务专用 Docker SQLite/MySQL/PostgreSQL 容器；三库执行配置原子更新、旧配置读取、奖励读写/查询和支付重试，并验证全新库、以最新发布版为代表的旧库升级、两次启动/迁移的幂等、旧行来源默认空、数据和索引/唯一性保留，记录实际版本及最低支持版本覆盖情况。Docker 无法使用时实现可继续准备，但不得声称数据库兼容或任务完成，也不得在宿主机跑 SQLite Go 测试。容器/构建产物仅在用户同意后清理。
+- 配置只新增两个 Option 键，不修改表结构。既有库缺 Option 键按空阶梯/原策略加载；老客户端 PUT 不清空新字段，旧记录与已出单快照不可重写。投产遵循先部署支持新策略的后端再开放 Root 配置 UI；旧实例不得与已启用新策略的实例混跑。回滚时先把两个方向切回旧策略/停用，再回滚后端；保留 Option 键与历史快照，不做破坏性清理。
+- 任何真实 DB 代码验证仅用任务专用 Docker SQLite/MySQL/PostgreSQL 容器；三库执行配置原子更新、旧配置读取、奖励读写/查询和支付重试，确认现有数据/索引未改变，并记录实际版本。无表结构变动，不触发表迁移专项验证；若实施中仍需新增列，先回规划取得确认并覆盖旧库升级与两次迁移。Docker 无法使用时实现可继续准备，但不得声称数据库兼容或任务完成，也不得在宿主机跑 SQLite Go 测试。容器/构建产物仅在用户同意后清理。
 
 ## 主要风险与检查点
 
-1. JSON Option 长度、加载时 slice 更新以及缺席/显式空数组语义，以及新列迁移/历史空值：三库集成、旧库升级与缓存读回验证。
+1. JSON Option 长度、加载时 slice 更新以及缺席/显式空数组语义：三库集成与缓存读回验证；不可悄悄恢复已取消的面额来源列。
 2. 元/分/钱包 quota 的精度、上限与中间乘法溢出：整数/decimal 明确边界、负数/重复/极大输入测试。
 3. 匿名公开接口泄露管理设置或展示失效活动：白名单 DTO 与路由授权测试；长期固定的“国庆期间”文案不可掩盖停用/无活动状态。
 4. 前后端名义提示/预估/支付结果不一致：选档边界和历史版本回归。

@@ -14,9 +14,9 @@
 
 ## 2. 支付计奖与预估（可回滚点）
 
-- [ ] 在 `CashbackOrderContext` 增加默认空的面额来源列，所有新在线订单明确写入标准面额或非标准面额；模型下单入口拒绝新订单缺失来源，但既有数据库旧行保留空值和可读性。接入 `model/cashback_rewards.go` 的支付事务：每方向独立选择策略及最高档；保留零额审计、活动/审核/限额/欠款与幂等流程，不用前端预估作为支付输入。`CashbackReward.validate` 接受新策略且保持旧记录；已有快照包含支付时完整档位。
+- [ ] 移除首轮后端未提交实现中引入的 `face_basis_kind` 列、元数据及所有读写，不增加表结构；仅使用现有订单面额快照、订单支付渠道和单位因子，对当前 CNY 标准充值选档，对 Creem/因子为 `1` 的非标准路径保守不计新策略。接入 `model/cashback_rewards.go` 的支付事务：每方向独立选择策略及最高档；保留零额审计、活动/审核/限额/欠款与幂等流程，不用前端预估作为支付输入。`CashbackReward.validate` 接受新策略且保持旧记录；已有快照包含支付时完整档位。
 - [ ] 扩展 `model/cashback_preview.go` / `controller/topup.go` 及钱包预估 DTO/显示；标准订单以面额为准、token/Creem 对阶梯返回显式不适用，原有策略不变。钱包名义预估与后端同步，防过期响应和错误金额暗示。
-- [ ] 扩展 `model/cashback_test.go`、`model/cashback_integration_test.go` 对支付时间切换、双方向、50/100/200/500/1000、100.50 分边界、重试/限额/审计、新订单来源缺失拒绝与历史空来源安全回退进行回归；尽量集中在原有文件。
+- [ ] 扩展 `model/cashback_test.go`、`model/cashback_integration_test.go` 对支付时间切换、双方向、50/100/200/500/1000、100.50 分边界、重试/限额/审计、旧订单面额缺失及非标准路径不误发进行回归；尽量集中在原有文件。
 
 ## 3. 管理表单、审核展示与公开页
 
@@ -28,7 +28,7 @@
 ## 4. 质量门禁与提交
 
 - [ ] 每轮修改 Go 文件 gofmt；`GOWORK=off go build ./model ./controller ./router`（不替代数据库测试）。
-- [ ] 所有 DB 相关 Go 测试在任务专用 Docker Go runner 内跑；在独立 MySQL/PostgreSQL 实例设置 `TEST_MYSQL_DSN` / `TEST_POSTGRES_DSN`，运行 `TestCashbackProductionDatabaseIntegration` 且核对未 skip，再跑 `go test ./model ./controller -run 'TestCashback...'` 等受影响测试，记录真实 SQLite/MySQL/PostgreSQL 版本。配置 Option 兼容既有库；新增 `face_basis_kind` 列须覆盖全新库、最新发布版代表性旧库升级、至少两次迁移的幂等，确认历史数据、索引及唯一约束未损坏，并检查最低支持版本。Docker 不可用时报告验证受阻，不在宿主机跑 SQLite 测试或声称任务完成。
+- [ ] 所有 DB 相关 Go 测试在任务专用 Docker Go runner 内跑；在独立 MySQL/PostgreSQL 实例设置 `TEST_MYSQL_DSN` / `TEST_POSTGRES_DSN`，运行 `TestCashbackProductionDatabaseIntegration` 且核对未 skip，再跑 `go test ./model ./controller -run 'TestCashback...'` 等受影响测试，记录真实 SQLite/MySQL/PostgreSQL 版本。配置 Option 与奖励读写须兼容既有库；本方案不改模型或迁移。若后续发现必须修改表结构，停止实施并更新规划，不在无验证条件下偷偷引入新列。Docker 不可用时报告验证受阻，不在宿主机跑 SQLite 测试或声称任务完成。
 - [ ] `cd web && bun run test <相关文件>`、`bun run typecheck`、变更文件 `oxlint`/`oxfmt --check`、`bun run build`；再按影响范围运行整套前端测试，列明不相关失败。`cd relaykit && GOWORK=off go build ./...` 仅当更改该模块/API 时运行。
 - [ ] 按 `trellis-check` 做安全/跨层/复用/历史兼容复核，`git diff --check`；只提交本任务文件和 Trellis 规划/契约文件到功能分支，不推 `main`。本任务的构建产物或 Docker 资源仅在用户同意后清理（Trellis 日志无需清理）。
 
