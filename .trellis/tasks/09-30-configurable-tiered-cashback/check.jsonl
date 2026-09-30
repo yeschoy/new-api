@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/referral-recharge-cashback.md", "reason": "Check reward/settlement invariants and legacy compatibility."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Check matrix isolation and actual dialect results."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check preview/i18n and UX regression coverage."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Check API DTO and config persistence boundaries."}
