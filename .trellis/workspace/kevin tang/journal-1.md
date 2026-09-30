@@ -556,3 +556,43 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 19: 充值返现预览与 Docker 三库验收
+<!-- trellis-session: v=2 fp=4a4b8232e6580d95 -->
+
+**Date**: 2026-09-30
+**Task**: 充值返现预览与 Docker 三库验收
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+完成充值人手审即发、零额待审修正与充值页返现预览；修复 PostgreSQL 并发对账误报；Docker 三库定向验收通过，清理了本次测试资源，并规定今后数据库测试必须隔离在 Docker 内。
+
+### Main Changes
+
+- 预览按当前用户、充值面额与活动/上限只读估算，支付成功仍独立结算；零额取消奖励不再误显待审。
+- Docker Desktop 代理启动卡住时通过 raw socket 验证；记录源文件哈希与 Go overlay 防止旧挂载误测。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `62eeb0b2a` | chore(task): plan payer cashback review and preview changes |
+| `d7c02fef0` | feat(cashback): issue manually approved payer rewards without hold |
+| `24909ea3b` | fix(cashback): hide canceled zero rewards from pending review |
+| `b016827c0` | feat(cashback): preview payer rewards with safe reconciliation |
+| `fae3085fa` | docs(db): require Docker-isolated database tests |
+
+### Testing
+
+- [OK] 容器内 Go 1.25.1、SQLite 3.50.4、MySQL 8.0.46、PostgreSQL 16.15：返现三库集成测试及并发回归通过，MySQL/PostgreSQL 重复运行通过。
+- [OK] 规范变更通过 git diff --check；未覆盖最低支持数据库版本或真实最新发布版数据库快照升级。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 按需补最低版本和真实发布版升级验证；其余两个返现子任务与父任务仍待独立归档和集成审查。
