@@ -127,6 +127,7 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 		inviter = User{}
 	}
 	if !validInviter && campaign.ID == 0 {
+		cashbackLogf("topup %d (user %d): no cashback, no valid inviter and no active payer campaign", topUp.Id, invitee.Id)
 		return nil
 	}
 
@@ -201,6 +202,8 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 				return err
 			}
 			if used >= int64(campaign.MaxRewardsPerUser) {
+				cashbackLogf("topup %d (user %d): payer cashback skipped, campaign %d limit of %d rewards reached",
+					topUp.Id, invitee.Id, campaign.ID, campaign.MaxRewardsPerUser)
 				continue
 			}
 		}
@@ -304,6 +307,10 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 		if err := tx.Create(&reward).Error; err != nil {
 			return err
 		}
+		cashbackLogf("reward %d recorded: topup=%d trade_no=%s direction=%s beneficiary=%d strategy=%s calculated=%d reward=%d cap_reason=%q review=%s risk=%s settlement=%s available_at=%s",
+			reward.ID, topUp.Id, topUp.TradeNo, reward.Direction, reward.BeneficiaryID, reward.Strategy,
+			reward.CalculatedQuota, reward.RewardQuota, reward.CapReason, reward.ReviewStatus, reward.RiskLevel,
+			reward.SettlementStatus, cashbackTime(reward.AvailableAt))
 		if reward.ReviewSource == CashbackReviewAutomatic && reward.AvailableAt == topUp.CompleteTime {
 			issueImmediateCashbackRewardTx(tx, topUp, &orderContext, &reward, heldFences...)
 		}

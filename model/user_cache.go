@@ -219,7 +219,7 @@ func syncCreditUserQuotaCache(fences *userQuotaMutationFences, userId int, quota
 	// only knows the purchase delta, so invalidate and rehydrate after cooldown
 	// rather than publishing a stale purchase-only balance.
 	if fences != nil && fences.cashbackIssued {
-		recordCashbackCreditLog(userId, fences.cashbackRewardID, fences.cashbackQuota)
+		recordCashbackCreditLog(userId, fences.cashbackRewardID, fences.cashbackQuota, "immediate")
 		return
 	}
 	if quota <= 0 {

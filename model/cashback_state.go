@@ -249,13 +249,19 @@ func ReviewCashbackReward(rewardID int64, action CashbackReviewAction, reason st
 	if err != nil {
 		if settlementErr != nil {
 			recordCashbackSettlementFailure(rewardID, settlementErr, now)
+		} else {
+			cashbackErrorf("reward %d %s by user %d failed: %v", rewardID, action, reviewerID, err)
 		}
 		return CashbackReviewResult{}, err
 	}
+	cashbackLogf("reward %d %s by user %d: review=%s settlement=%s issued=%t",
+		rewardID, action, reviewerID, result.Reward.ReviewStatus, result.Reward.SettlementStatus, result.Issued)
 	if creditedQuota > 0 {
-		recordCashbackCreditLog(creditedUserID, rewardID, creditedQuota)
+		recordCashbackCreditLog(creditedUserID, rewardID, creditedQuota, "manual_review")
 	}
 	if finalErr != nil {
+		cashbackLogf("reward %d approval blocked: %s; next attempt at %s",
+			rewardID, result.Reward.BlockingReason, cashbackTime(result.Reward.NextSettlementAttemptAt))
 		return result, finalErr
 	}
 	return result, nil
@@ -286,6 +292,7 @@ func issueCashbackReward(rewardID int64, now int64, checkReconciliation bool) (C
 		return CashbackSettlementOutcome{RewardID: rewardID, Skipped: true}, nil
 	}
 	if !cashbackSettlementEligible(&initial, now) {
+		cashbackLogf("reward %d skipped: %s", rewardID, cashbackIneligibleReason(&initial, now))
 		return CashbackSettlementOutcome{RewardID: rewardID, Skipped: true}, nil
 	}
 	if checkReconciliation {
@@ -302,6 +309,8 @@ func issueCashbackReward(rewardID int64, now int64, checkReconciliation bool) (C
 
 	outcome := CashbackSettlementOutcome{RewardID: rewardID}
 	var creditedUserID, creditedQuota int
+	var blockedReason, skippedReason string
+	var nextAttemptAt int64
 	err = DB.Transaction(func(tx *gorm.DB) (txErr error) {
 		defer func() {
 			if txErr == nil {
@@ -314,10 +323,12 @@ func issueCashbackReward(rewardID int64, now int64, checkReconciliation bool) (C
 		}
 		if reward.SettlementStatus == CashbackSettlementIssued {
 			outcome.Skipped = true
+			skippedReason = "already issued"
 			return nil
 		}
 		if !cashbackSettlementEligible(reward, now) {
 			outcome.Skipped = true
+			skippedReason = cashbackIneligibleReason(reward, now)
 			return nil
 		}
 		blockingReason, users, err := cashbackHardBlockReasonTx(tx, topUp, orderContext, reward)
@@ -331,6 +342,8 @@ func issueCashbackReward(rewardID int64, now int64, checkReconciliation bool) (C
 				return err
 			}
 			outcome.Blocked = true
+			blockedReason = blockingReason
+			nextAttemptAt = reward.NextSettlementAttemptAt
 			return nil
 		}
 		issued, issueErr := issueLockedCashbackRewardTx(tx, reward, users[reward.BeneficiaryID], now)
@@ -348,8 +361,13 @@ func issueCashbackReward(rewardID int64, now int64, checkReconciliation bool) (C
 		recordCashbackSettlementFailure(rewardID, err, now)
 		return CashbackSettlementOutcome{}, err
 	}
-	if creditedQuota > 0 {
-		recordCashbackCreditLog(creditedUserID, rewardID, creditedQuota)
+	switch {
+	case creditedQuota > 0:
+		recordCashbackCreditLog(creditedUserID, rewardID, creditedQuota, "settlement")
+	case outcome.Blocked:
+		cashbackLogf("reward %d blocked: %s; next attempt at %s", rewardID, blockedReason, cashbackTime(nextAttemptAt))
+	case outcome.Skipped:
+		cashbackLogf("reward %d skipped: %s", rewardID, skippedReason)
 	}
 	return outcome, nil
 }
@@ -377,6 +395,7 @@ func SettleMaturedCashbackRewards(now int64, batchSize int) (CashbackSettlementR
 		batchSize = 100
 	}
 	if err := requireCashbackReconciliationHealthy(); err != nil {
+		cashbackErrorf("settlement run aborted, no reward issued: %v", err)
 		return CashbackSettlementRunResult{}, err
 	}
 	var ids []int64
@@ -403,6 +422,10 @@ func SettleMaturedCashbackRewards(now int64, batchSize int) (CashbackSettlementR
 		default:
 			result.Skipped++
 		}
+	}
+	if result.Scanned > 0 {
+		cashbackLogf("settlement run: scanned=%d issued=%d blocked=%d skipped=%d failed=%d",
+			result.Scanned, result.Issued, result.Blocked, result.Skipped, result.Failed)
 	}
 	if result.Failed > 0 {
 		return result, fmt.Errorf("%d cashback settlements failed", result.Failed)
@@ -860,6 +883,8 @@ func recordCashbackSettlementFailure(rewardID int64, settlementErr error, now in
 	if rewardID <= 0 || settlementErr == nil {
 		return
 	}
+	cashbackErrorf("reward %d settlement failed: %v; retry after %s",
+		rewardID, settlementErr, cashbackTime(now+cashbackSettlementRetryDelaySeconds))
 	result := DB.Session(&gorm.Session{SkipHooks: true}).Model(&CashbackReward{}).
 		Where("id = ? AND review_status = ? AND settlement_status = ? AND reward_quota > 0 AND (available_at <= ? OR (direction = ? AND (review_source = ? OR (review_source = ? AND reviewed_by > 0))))", rewardID, CashbackReviewApproved, CashbackSettlementFrozen, now, CashbackDirectionInvitee, CashbackReviewManual, "").
 		Updates(map[string]interface{}{
@@ -871,23 +896,96 @@ func recordCashbackSettlementFailure(rewardID int64, settlementErr error, now in
 	}
 }
 
-func recordCashbackCreditLog(userID int, rewardID int64, quota int) {
+// recordCashbackCreditLog runs after the issuing transaction commits. It
+// writes one server log line and one user-visible log row per credited reward.
+// source is "settlement", "manual_review" or "immediate".
+func recordCashbackCreditLog(userID int, rewardID int64, quota int, source string) {
+	var reward CashbackReward
+	if err := DB.Select("id", "top_up_id", "trade_no", "direction").First(&reward, rewardID).Error; err != nil {
+		cashbackErrorf("reward %d credited but its row could not be read for logging: %v", rewardID, err)
+	}
+	cashbackLogf("reward %d issued via %s: beneficiary=%d quota=%d (%s) topup=%d trade_no=%s direction=%s",
+		rewardID, source, userID, quota, logger.LogQuota(quota), reward.TopUpID, reward.TradeNo, reward.Direction)
+
 	username, _ := GetUsernameById(userID, true)
 	params := map[string]interface{}{
 		"reward_id": rewardID,
 		"quota":     logger.LogQuota(quota),
+		"top_up_id": reward.TopUpID,
+		"source":    source,
+	}
+	action := "cashback.reward_credited"
+	content := fmt.Sprintf("Referral cashback reward %d credited %s", rewardID, logger.LogQuota(quota))
+	if reward.Direction == CashbackDirectionInvitee {
+		action = "cashback.payer_reward_credited"
+		content = fmt.Sprintf("Top-up cashback reward %d credited %s (top-up %d)", rewardID, logger.LogQuota(quota), reward.TopUpID)
 	}
 	other := NewLogOther()
-	other.SetPublic("op", map[string]any{"action": "cashback.reward_credited", "params": params})
+	other.SetPublic("op", map[string]any{"action": action, "params": params})
 	log := &Log{
 		UserId:    userID,
 		Username:  username,
 		CreatedAt: common.GetTimestamp(),
 		Type:      LogTypeSystem,
-		Content:   fmt.Sprintf("Referral cashback reward %d credited %s", rewardID, logger.LogQuota(quota)),
+		Content:   content,
 		Other:     other.JSONString(),
 	}
 	if err := createLog(log); err != nil {
-		common.SysLog("failed to record cashback credit log: " + err.Error())
+		cashbackErrorf("failed to record credit log for reward %d: %v", rewardID, err)
+	}
+
+	// Issuance is performed by the system (settlement task, payment callback or
+	// an approval side effect), so the audit row is root-scoped like other
+	// system-level events. Reviewer actions keep their own audit rows.
+	RecordAuditLog(nil, AuditLog{
+		UserId:    userID,
+		Username:  username,
+		ActorRole: common.RoleRootUser,
+		Category:  AuditCategoryOperation,
+		Action:    "cashback.reward_issued",
+		Content:   fmt.Sprintf("Cashback reward %d issued %s to user %d via %s (top-up %d)", rewardID, logger.LogQuota(quota), userID, source, reward.TopUpID),
+		Success:   true,
+		Other: AuditOther{Op: &AuditOperation{Action: "cashback.reward_issued", Params: AuditFields{
+			"reward_id":      rewardID,
+			"top_up_id":      reward.TopUpID,
+			"trade_no":       reward.TradeNo,
+			"direction":      string(reward.Direction),
+			"beneficiary_id": userID,
+			"quota":          logger.LogQuota(quota),
+			"raw_quota":      quota,
+			"source":         source,
+		}}},
+	})
+}
+
+// cashbackLogf writes one searchable "[cashback]" line to the server log.
+func cashbackLogf(format string, args ...any) {
+	common.SysLog("[cashback] " + fmt.Sprintf(format, args...))
+}
+
+func cashbackErrorf(format string, args ...any) {
+	common.SysError("[cashback] " + fmt.Sprintf(format, args...))
+}
+
+func cashbackTime(ts int64) string {
+	if ts <= 0 {
+		return "-"
+	}
+	return time.Unix(ts, 0).Format("2006-01-02 15:04:05")
+}
+
+// cashbackIneligibleReason explains why the settlement task cannot issue a reward yet.
+func cashbackIneligibleReason(reward *CashbackReward, now int64) string {
+	switch {
+	case reward.RewardQuota <= 0:
+		return "reward quota is zero"
+	case reward.ReviewStatus != CashbackReviewApproved:
+		return fmt.Sprintf("review status is %s (needs approval)", reward.ReviewStatus)
+	case reward.SettlementStatus != CashbackSettlementFrozen:
+		return fmt.Sprintf("settlement status is %s", reward.SettlementStatus)
+	case now < reward.AvailableAt:
+		return "not mature until " + cashbackTime(reward.AvailableAt)
+	default:
+		return "not eligible for settlement"
 	}
 }

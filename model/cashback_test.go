@@ -1038,11 +1038,15 @@ func TestCompleteTopUpCreatesIndependentSnapshotRewardsAndSettlesOnce(t *testing
 	require.NoError(t, DB.First(&updatedInvitee, invitee.Id).Error)
 	assert.Equal(t, 10_000, updatedInviter.Quota)
 	assert.Equal(t, 125_000, updatedInvitee.Quota)
-	var creditLogCount int64
+	var inviterCreditLogCount, payerCreditLogCount int64
 	require.NoError(t, LOG_DB.Model(&Log{}).
 		Where("other LIKE ?", `%"action":"cashback.reward_credited"%`).
-		Count(&creditLogCount).Error)
-	assert.EqualValues(t, 2, creditLogCount)
+		Count(&inviterCreditLogCount).Error)
+	require.NoError(t, LOG_DB.Model(&Log{}).
+		Where("other LIKE ?", `%"action":"cashback.payer_reward_credited"%`).
+		Count(&payerCreditLogCount).Error)
+	assert.EqualValues(t, 1, inviterCreditLogCount)
+	assert.EqualValues(t, 1, payerCreditLogCount)
 	var issueMutationCount int64
 	require.NoError(t, DB.Model(&CashbackQuotaMutation{}).Where("kind = ?", CashbackQuotaMutationIssue).Count(&issueMutationCount).Error)
 	assert.EqualValues(t, 2, issueMutationCount)
