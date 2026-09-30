@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -17,26 +18,30 @@ import (
 )
 
 type cashbackConfigUpdateRequest struct {
-	InviterEnabled           *bool   `json:"inviter_enabled"`
-	InviteeEnabled           *bool   `json:"invitee_enabled"`
-	InviterRateBPS           *int    `json:"inviter_rate_bps"`
-	InviteeRateBPS           *int    `json:"invitee_rate_bps"`
-	InviterStrategy          *string `json:"inviter_strategy"`
-	InviteeStrategy          *string `json:"invitee_strategy"`
-	InviterFixedPerHundred   *int    `json:"inviter_fixed_per_hundred"`
-	InviteeFixedPerHundred   *int    `json:"invitee_fixed_per_hundred"`
-	SettlementDays           *int    `json:"settlement_days"`
-	MaxRewardQuota           *int    `json:"max_reward_quota"`
-	DailyRewardQuota         *int    `json:"daily_reward_quota"`
-	IPAccountThreshold       *int    `json:"ip_account_threshold"`
-	DeviceAccountThreshold   *int    `json:"device_account_threshold"`
-	DailyTopUpCountThreshold *int    `json:"daily_topup_count_threshold"`
-	AutoReviewEnabled        *bool   `json:"auto_review_enabled"`
-	LowReviewRequired        *bool   `json:"low_review_required"`
-	MediumReviewRequired     *bool   `json:"medium_review_required"`
-	HighReviewRequired       *bool   `json:"high_review_required"`
-	SevereReviewRequired     *bool   `json:"severe_review_required"`
-	AutoReviewImmediateIssue *bool   `json:"auto_review_immediate_issue"`
+	InviterEnabled           *bool           `json:"inviter_enabled"`
+	InviteeEnabled           *bool           `json:"invitee_enabled"`
+	InviterRateBPS           *int            `json:"inviter_rate_bps"`
+	InviteeRateBPS           *int            `json:"invitee_rate_bps"`
+	InviterStrategy          *string         `json:"inviter_strategy"`
+	InviteeStrategy          *string         `json:"invitee_strategy"`
+	InviterFixedPerHundred   *int            `json:"inviter_fixed_per_hundred"`
+	InviteeFixedPerHundred   *int            `json:"invitee_fixed_per_hundred"`
+	InviterTiers             json.RawMessage `json:"inviter_tiers"`
+	InviteeTiers             json.RawMessage `json:"invitee_tiers"`
+	SettlementDays           *int            `json:"settlement_days"`
+	MaxRewardQuota           *int            `json:"max_reward_quota"`
+	DailyRewardQuota         *int            `json:"daily_reward_quota"`
+	IPAccountThreshold       *int            `json:"ip_account_threshold"`
+	DeviceAccountThreshold   *int            `json:"device_account_threshold"`
+	DailyTopUpCountThreshold *int            `json:"daily_topup_count_threshold"`
+	AutoReviewEnabled        *bool           `json:"auto_review_enabled"`
+	LowReviewRequired        *bool           `json:"low_review_required"`
+	MediumReviewRequired     *bool           `json:"medium_review_required"`
+	HighReviewRequired       *bool           `json:"high_review_required"`
+	SevereReviewRequired     *bool           `json:"severe_review_required"`
+	AutoReviewImmediateIssue *bool           `json:"auto_review_immediate_issue"`
+	inviterTiersParsed       *([]operation_setting.CashbackTier)
+	inviteeTiersParsed       *([]operation_setting.CashbackTier)
 }
 
 func decodeCashbackConfigUpdate(reader io.Reader) (cashbackConfigUpdateRequest, error) {
@@ -46,7 +51,30 @@ func decodeCashbackConfigUpdate(reader io.Reader) (cashbackConfigUpdateRequest, 
 		return request, err
 	}
 	err = common.Unmarshal(data, &request)
-	return request, err
+	if err != nil {
+		return request, err
+	}
+	for _, input := range []struct {
+		raw    json.RawMessage
+		target **[]operation_setting.CashbackTier
+		field  string
+	}{
+		{request.InviterTiers, &request.inviterTiersParsed, "inviter_tiers"},
+		{request.InviteeTiers, &request.inviteeTiersParsed, "invitee_tiers"},
+	} {
+		if input.raw == nil {
+			continue
+		}
+		if len(input.raw) > operation_setting.CashbackMaxTiersJSONBytes || strings.TrimSpace(string(input.raw)) == "null" {
+			return request, &operation_setting.CashbackSettingValidationError{Field: input.field, Message: "invalid cashback tiers"}
+		}
+		var tiers []operation_setting.CashbackTier
+		if err := common.Unmarshal(input.raw, &tiers); err != nil {
+			return request, &operation_setting.CashbackSettingValidationError{Field: input.field, Message: "invalid cashback tiers"}
+		}
+		*input.target = &tiers
+	}
+	return request, nil
 }
 
 func (request cashbackConfigUpdateRequest) candidate() (operation_setting.CashbackSetting, string) {
@@ -97,6 +125,16 @@ type cashbackConfigResponse struct {
 
 var cashbackConfigUpdateMu sync.Mutex
 
+// PublicCashbackOffers deliberately returns only active, display-safe rules.
+func PublicCashbackOffers(c *gin.Context) {
+	offers, err := model.GetCashbackPublicOffers()
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Cashback offers unavailable"})
+		return
+	}
+	common.ApiSuccess(c, offers)
+}
+
 func GetCashbackConfig(c *gin.Context) {
 	setting, err := model.GetCashbackSettingFromDB()
 	if err != nil {
@@ -116,9 +154,13 @@ func UpdateCashbackConfig(c *gin.Context) {
 		var typeErr *json.UnmarshalTypeError
 		if errors.As(err, &typeErr) {
 			switch typeErr.Field {
-			case "inviter_strategy", "invitee_strategy", "inviter_fixed_per_hundred", "invitee_fixed_per_hundred":
+			case "inviter_strategy", "invitee_strategy", "inviter_fixed_per_hundred", "invitee_fixed_per_hundred", "inviter_tiers", "invitee_tiers":
 				field = typeErr.Field
 			}
+		}
+		var validationErr *operation_setting.CashbackSettingValidationError
+		if errors.As(err, &validationErr) {
+			field = validationErr.Field
 		}
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -151,6 +193,7 @@ func UpdateCashbackConfig(c *gin.Context) {
 			Strategy: operation_setting.CashbackStrategyUpdate{
 				InviterStrategy: request.InviterStrategy, InviteeStrategy: request.InviteeStrategy,
 				InviterFixedPerHundred: request.InviterFixedPerHundred, InviteeFixedPerHundred: request.InviteeFixedPerHundred,
+				InviterTiers: request.inviterTiersParsed, InviteeTiers: request.inviteeTiersParsed,
 			},
 		},
 	)
@@ -203,6 +246,12 @@ func cashbackConfigChangedFields(current, next operation_setting.CashbackSetting
 	}
 	if current.InviteeFixedPerHundred != next.InviteeFixedPerHundred {
 		fields = append(fields, "invitee_fixed_per_hundred")
+	}
+	if !slices.Equal(current.InviterTiers, next.InviterTiers) {
+		fields = append(fields, "inviter_tiers")
+	}
+	if !slices.Equal(current.InviteeTiers, next.InviteeTiers) {
+		fields = append(fields, "invitee_tiers")
 	}
 	if current.SettlementDays != next.SettlementDays {
 		fields = append(fields, "settlement_days")

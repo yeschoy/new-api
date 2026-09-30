@@ -321,8 +321,11 @@ func (reward *CashbackReward) validate() error {
 	if reward.BaseQuota <= 0 || reward.BaseQuota > common.MaxWalletQuota || reward.RateBPS < 0 || reward.RateBPS > operation_setting.CashbackRateBasisPoints {
 		return errors.New("invalid cashback reward calculation")
 	}
-	if reward.Strategy != "" && reward.Strategy != operation_setting.CashbackStrategyRate && reward.Strategy != operation_setting.CashbackStrategyPerHundred {
+	if reward.Strategy != "" && reward.Strategy != operation_setting.CashbackStrategyRate && reward.Strategy != operation_setting.CashbackStrategyPerHundred && reward.Strategy != operation_setting.CashbackStrategyTiered {
 		return errors.New("invalid cashback reward strategy")
+	}
+	if reward.Strategy == operation_setting.CashbackStrategyTiered && reward.RateBPS != 0 {
+		return errors.New("invalid tiered cashback rate")
 	}
 	if reward.FixedPerHundred < 0 || reward.FixedPerHundred > 100 ||
 		(reward.Strategy == operation_setting.CashbackStrategyPerHundred && (reward.FixedPerHundred == 0 || reward.RateBPS != 0)) ||

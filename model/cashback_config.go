@@ -33,7 +33,11 @@ func loadCashbackSettingTx(tx *gorm.DB) (operation_setting.CashbackSetting, erro
 }
 
 func SaveCashbackSetting(setting operation_setting.CashbackSetting) error {
-	return UpdateOptionsBulk(operation_setting.CashbackSettingOptionValues(setting))
+	values, err := operation_setting.CashbackSettingOptionValues(setting)
+	if err != nil {
+		return err
+	}
+	return UpdateOptionsBulk(values)
 }
 
 func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, complianceConfirmed bool, now int64, policy ...operation_setting.CashbackReviewPolicyUpdate) (operation_setting.CashbackSetting, operation_setting.CashbackSetting, error) {
@@ -65,6 +69,8 @@ func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, co
 		stored.InviteeStrategy = current.InviteeStrategy
 		stored.InviterFixedPerHundred = current.InviterFixedPerHundred
 		stored.InviteeFixedPerHundred = current.InviteeFixedPerHundred
+		stored.InviterTiers = current.InviterTiers
+		stored.InviteeTiers = current.InviteeTiers
 		stored.AutoReviewEnabled = current.AutoReviewEnabled
 		stored.LowReviewRequired = current.LowReviewRequired
 		stored.MediumReviewRequired = current.MediumReviewRequired
@@ -87,7 +93,10 @@ func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, co
 		if err := operation_setting.ValidateCashbackSetting(stored, complianceConfirmed); err != nil {
 			return err
 		}
-		values = operation_setting.CashbackSettingOptionValues(stored)
+		values, err = operation_setting.CashbackSettingOptionValues(stored)
+		if err != nil {
+			return err
+		}
 		return updateOptionsBulkTx(tx, values)
 	})
 	if err != nil {

@@ -85,7 +85,8 @@ snapshot and overrun the cap.
 
 | Route | Auth / guard | Contract |
 | --- | --- | --- |
-| `GET /api/user/topup/cashback-preview?amount=<integer>` or `?product_id=<id>` | Authenticated user + scoped rate limit (60/minute when rate limiting is enabled) | Exactly one selection; response `data: {status, strategy?, rate_bps?, fixed_per_hundred?, reward_quota, as_of}`; `status` is `inactive`, `no_campaign`, `ineligible`, `limit_reached`, `select_amount`, `below_minimum`, `cap_exhausted`, or `estimated`. Only this user's payer estimate; no risk or inviter evidence. |
+| `GET /api/user/topup/cashback-preview?amount=<integer>` or `?product_id=<id>` | Authenticated user + scoped rate limit (60/minute when rate limiting is enabled) | Exactly one selection; response `data: {status, strategy?, rate_bps?, fixed_per_hundred?, tiers?, matched_tier?, config_version?, reward_quota, as_of}`; `status` adds `not_applicable` for tiered token/Creem face and `rounds_to_zero` when a tier is reached but the exact conversion floors to zero quota; only unreached tiers use `below_minimum`. Only this user's payer estimate; no risk or inviter evidence. |
+| `GET /api/cashback/public-offers` | Anonymous + global API rate limit | Whitelisted `{active,currency:"CNY",inviter?,invitee?}` with only active directions' `strategy` and selected `rate_bps` / `fixed_per_hundred` / `tiers` (cent pairs); payer requires a live campaign. Read errors return 503, never false inactivity. |
 | `GET /api/cashback/config` | Root | Returns the stored config plus `compliance_confirmed` |
 | `PUT /api/cashback/config` | Root | Replaces required fields atomically; omitted optional strategy/fixed-amount and review-policy fields preserve current values under the version-row lock |
 | `GET /api/cashback/campaigns` | Root | Lists bounded campaign history |
@@ -217,8 +218,8 @@ typed columns remain authoritative for transitions.
 is replaced as one object. Rates and money use integer basis points and integer
 wallet quota; floating-point money arithmetic is forbidden.
 
-- Both directions default disabled, both rates and fixed amounts default to zero, and both strategies default to `rate`. Each direction independently chooses `rate` or `per_hundred`.
-- `inviter_rate_bps` and `invitee_rate_bps` are each `0..10000`; `inviter_fixed_per_hundred` and `invitee_fixed_per_hundred` are integers `0..100`. An enabled direction needs a positive value in its selected strategy. The *selected* nominal returns (rate BPS or fixed amount times 100 BPS) must sum to at most `10000`, even when one direction is disabled. Inactive fields may retain previous values across strategy switches.
+- Both directions default disabled, both rates and fixed amounts default to zero, and both strategies default to `rate`. Each direction independently chooses `rate`, `per_hundred`, or `tiered`; each tier list is independently persisted as bounded JSON under its own Option key. The API represents exact CNY cents as integer `{threshold_cents,reward_cents}` pairs. A missing tier key loads empty; omitted PUT tier fields preserve stored lists under the version lock, while explicit `[]` clears them.
+- `inviter_rate_bps` and `invitee_rate_bps` are each `0..10000`; `inviter_fixed_per_hundred` and `invitee_fixed_per_hundred` are integers `0..100`. An enabled direction needs a positive value in its selected strategy. The *selected* nominal returns (rate BPS, fixed amount times 100 BPS, or the maximum exact reward/threshold tier ratio) must sum to at most 100%, even when one direction is disabled. Tier thresholds are strictly increasing positive integer cents, rewards positive and no greater than their threshold, with at most 32 tiers and each cent value at most `common.MaxWalletQuota`; a selected enabled tier strategy requires at least one tier. Inactive fields and unselected tier lists retain previous values across strategy switches.
 - `settlement_days` is `1..90`, default `7`.
 - `max_reward_quota` and `daily_reward_quota` are
   `0..common.MaxWalletQuota`; both must be positive while either direction is
@@ -248,12 +249,16 @@ wallet quota; floating-point money arithmetic is forbidden.
   returns only a payer-facing, point-in-time rule and estimate for the selected
   standard face amount or enabled Creem product ID. It reads current campaign,
   payer eligibility, positive campaign-slot usage, and rolling-24-hour caps
-  without writing, reserving a slot, or exposing risk evidence. Standard USD
-  and token display and Creem product quota follow the order snapshot face
-  basis below, never discounted checkout price. No active campaign, exhausted
+  without writing, reserving a slot, or exposing risk evidence. Standard
+  currency display uses the order face; token display and Creem product quota
+  follow their existing order snapshot, never discounted checkout price. Tiered
+  estimates exclude token/Creem faces. No active campaign, exhausted
   allowance, ineligibility and service failure are distinct UI outcomes;
-  stale amount responses must not overwrite the current selection. The
-  estimate never becomes payment or issuance input and may change by payment.
+  stale amount responses must not overwrite the current selection. A tiered
+  `rounds_to_zero` response retains `matched_tier` and states that the exact
+  reward is below one wallet quota unit, not below the configured face
+  threshold. The estimate never becomes payment or issuance input and may
+  change by payment.
 
 ### Order creation and provider completion
 
@@ -305,7 +310,7 @@ wallet quota; floating-point money arithmetic is forbidden.
   reward limit. Only inviter rewards require an unchanged valid referral.
   Each eligible direction gets at most one row, enforced by
   `(top_up_id, direction)`.
-- Rate calculation is `floor(base_quota * rate_bps / 10000)`. Fixed calculation is `floor(floor(face_amount / 100) * fixed_per_hundred * quota_per_face_unit)` using checkout evidence, decimal arithmetic and strict bounded wallet conversion. Remainders never carry to another order. Both strategies then use existing single-reward and beneficiary rolling-24-hour caps, risk/review/issuance/refund paths. A zero result is a canceled, explainable record. For a legacy pending order without trusted face evidence, payment succeeds and its fixed-direction reward is canceled with `face_basis_unavailable`; never guess from `TopUp.Money` or current quota conversion. Payment-time setting chooses each new reward and is stored on its row; historical rewards are immutable.
+- Rate calculation is `floor(base_quota * rate_bps / 10000)`. Tiered calculation on a supported standard CNY face is the single highest reached tier's fixed reward cents multiplied by the checkout factor and floored once to strict wallet quota; `face_amount*100` comparison is bounded. A face below all thresholds creates a canceled zero reward. Creem (by existing provider) and token/product faces (checkout factor at or below `1`) cancel with `strategy_not_applicable`; a missing checkout face/factor cancels with `face_basis_unavailable`, never guessing from quota. A standard checkout configured with factor `1` is conservatively excluded too: without a provenance field it is indistinguishable from token face and needs a separate design before enabling that mode. Existing rate/fixed strategies keep their behavior. Fixed calculation is `floor(floor(face_amount / 100) * fixed_per_hundred * quota_per_face_unit)` using checkout evidence, decimal arithmetic and strict bounded wallet conversion. Remainders never carry to another order. All strategies then use existing single-reward and beneficiary rolling-24-hour caps, risk/review/issuance/refund paths. A zero result is a canceled, explainable record. For a legacy pending order without trusted face evidence, payment succeeds and its fixed-direction reward is canceled with `face_basis_unavailable`; never guess from `TopUp.Money` or current quota conversion. Payment-time setting chooses each new reward and is stored on its row; historical rewards are immutable.
 
 ### Risk, review, and settlement
 
@@ -435,14 +440,25 @@ wallet quota; floating-point money arithmetic is forbidden.
   labels, validation/error association, keyboard handling, and focus recovery.
   Count copy must choose singular/plural from the raw numeric count before
   applying locale-specific number formatting.
+- The public `/activity` page renders only the whitelisted live offer response;
+  it refreshes on focus and every 30 seconds, including while backgrounded.
+  During a refresh or error it must hide cached active rules. The permanently
+  translated National Day kicker is marketing copy, not activity eligibility;
+  no live offer still renders an explicit inactive state. A reached tier whose
+  exact conversion floors to zero keeps its matched tier in audited detail,
+  except when `strategy_not_applicable` or `face_basis_unavailable` says the
+  face cannot be trusted. Root's cent editor returns focus to Add after deleting
+  a tier with the keyboard.
 
 ## 4. Validation & Error Matrix
 
 | Condition | Required behavior |
 | --- | --- |
 | Preview supplies neither/both selectors, duplicate selectors, malformed/out-of-range amount, unknown/disabled Creem product | `400`; no estimate or mutation. A valid selection with no eligible activity returns `200` with a non-estimated status; DB/config read failure returns `503`, never a false zero reward. |
-| Malformed config JSON, invalid strategy/fixed range, zero active value, or selected nominal sum above 100% | `400`; config validation includes the offending `field`; no partial Option update |
+| Malformed config JSON, invalid strategy/fixed range, duplicate/non-increasing/empty active tiers, overflowing cents, or selected nominal sum above 100% | `400`; config validation includes the offending `field`; no partial Option update |
 | Either direction enabled without compliance or positive caps | `400`; keep the previous complete configuration |
+| Anonymous public offers read when Option table is absent or DB read fails | `503`, never misreport `active:false` |
+| Reached tier whose reward floors below one wallet quota unit | `rounds_to_zero` preview with `matched_tier`; keep an auditable canceled zero reward, not a false below-threshold message |
 | Client attempts to send `first_enabled_at` or `version` | Ignore by DTO ownership; server derives both |
 | Invalid reward/list ID, filter enum, user ID, or overlong trade number | `400`, no unbounded query |
 | Missing reward / top-up | `404` |
@@ -482,6 +498,8 @@ wallet quota; floating-point money arithmetic is forbidden.
   invitee rewards, and credits the purchased quota. A repeated webhook changes
   nothing.
 - **Good:** Fixed X=20, face=250, factor=500000 creates a 20,000,000-quota inviter calculation (two complete hundreds); a separate face=99 order yields zero, and 60+40 across orders never combines into a hundred. The payer may independently remain rate-based. Payment-time strategy changes affect only new rewards.
+- **Good:** Tiered 100.50→2.50 and 200→15 pays 15 on a 200-face order, once per direction; an integer 100-face order remains below the first tier. The public page displays only live CNY rules and withdraws them during refresh, while its National Day kicker stays fixed.
+- **Bad:** Treat `factor=1` product/token quota or a stale public offer as a trusted CNY face, or label a reached tier with zero quota as below the threshold.
 - **Good:** An approved reward reaches T+7. The scheduler locks it, rechecks the
   order, relationship, incident, channel, account status, and debt, then moves
   `frozen -> issued` while crediting `quota` once.
@@ -505,9 +523,10 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 ### Backend assertions
 
-- Configuration: defaults; independent strategy/fixed fields; rate/fixed and mixed nominal return bounds; old-client omitted-field preservation under concurrent versioned writes; compliance; positive caps; immutable first-enable timestamp.
-- Migration: cashback side tables without columns on `TopUp`; fresh, representative released-schema upgrade and twice-repeated migration on real SQLite/MySQL/PostgreSQL; old context/reward rows retain data, indexes and uniqueness. New face and reward-strategy columns default safely; historical empty strategy is rate.
-- Preview: authenticated selection/invalid/disabled-product cases; compare fixed/rate USD, token and Creem face estimates with verified settlement, positive campaign slots (including later canceled/rejected), 24-hour caps and zero/ineligible/no-campaign states; assert no reward/wallet write. Use real three-dialect integration for query and counting changes, not SQLite alone.
+- Configuration: defaults; independent strategy/fixed/tier fields; exact cent parsing, order, count, bounds, mixed nominal return bounds; old-client omitted-field preservation under concurrent versioned writes; compliance; positive caps; immutable first-enable timestamp. Verify Option and in-memory slice replacement on SQLite/MySQL/PostgreSQL.
+- Migration: cashback side tables without columns on `TopUp`; fresh, representative released-schema upgrade and twice-repeated migration on real SQLite/MySQL/PostgreSQL when their schema changes; old context/reward rows retain data, indexes and uniqueness. Historical empty strategy is rate.
+- Tiered compatibility: tiered adds only two Option keys and no tables or columns. Existing `CashbackOrderContext` checkout face/factor and provider remain unchanged; old missing face evidence cannot qualify for tiered. Verify Option, existing order/reward read/write and retry on real SQLite/MySQL/PostgreSQL before rollout; do not claim three-engine compatibility without the matrix.
+- Preview: authenticated selection/invalid/disabled-product cases; tiered standard cent boundaries, `rounds_to_zero` with matched evidence, explicit token/Creem/factor-1 `not_applicable`; compare unchanged fixed/rate currency, token and Creem face estimates with verified settlement, positive campaign slots (including later canceled/rejected), 24-hour caps and zero/ineligible/no-campaign states; assert no reward/wallet write. Public route tests cover anonymous access, Root-only config, limiter, inactive/missing Option state, and no sensitive fields; mounted-page tests cover polling/focus refresh and stale-rule suppression. Use real three-dialect integration for query and counting changes, not SQLite alone.
 - Provider matrix: Epay, Stripe, Creem, Waffo, and Waffo Pancake create correct checkout face evidence (including token normalization and Creem product quota); fixed 99/100/250 and split 60+40, mixed directions, single/24-hour caps, payment-time switches, legacy missing-basis cancellation and unchanged historical reward; forged callbacks rejected, verified retries idempotent, manual completion ineligible.
 - Transactionality: a missing required context or cashback insert failure rolls
   back provider completion and wallet credit. Run concurrent cap/settlement

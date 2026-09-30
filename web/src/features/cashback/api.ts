@@ -21,6 +21,7 @@ import { api } from '@/lib/api'
 import type {
   ApiResponse,
   CashbackIncidentKind,
+  CashbackPublicOffers,
   CashbackReward,
   CashbackRewardDetail,
   CashbackRewardFilters,
@@ -28,6 +29,24 @@ import type {
   CashbackRecordedSpendReport,
   CashbackSummary,
 } from './types'
+
+export async function getPublicCashbackOffers(): Promise<CashbackPublicOffers> {
+  const res = await api.get<ApiResponse<CashbackPublicOffers>>(
+    '/api/cashback/public-offers'
+  )
+  const response = res.data
+  if (
+    !response.success ||
+    !response.data ||
+    response.data.currency !== 'CNY' ||
+    typeof response.data.active !== 'boolean' ||
+    response.data.active !==
+      Boolean(response.data.inviter || response.data.invitee)
+  ) {
+    throw new Error('Unable to read current cashback offers')
+  }
+  return response.data
+}
 
 export async function getCashbackRewards(
   filters: CashbackRewardFilters

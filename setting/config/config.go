@@ -273,9 +273,16 @@ func updateConfigFromMap(config any, configMap map[string]string) error {
 				continue
 			}
 			field.Set(fresh.Elem())
-		case reflect.Slice, reflect.Struct:
-			err := json.Unmarshal([]byte(strValue), field.Addr().Interface())
-			if err != nil {
+		case reflect.Slice:
+			// Unmarshal into a fresh slice so a shorter schedule cannot retain
+			// elements from the previous configuration.
+			fresh := reflect.New(field.Type())
+			if err := common.Unmarshal([]byte(strValue), fresh.Interface()); err != nil {
+				continue
+			}
+			field.Set(fresh.Elem())
+		case reflect.Struct:
+			if err := json.Unmarshal([]byte(strValue), field.Addr().Interface()); err != nil {
 				continue
 			}
 		}

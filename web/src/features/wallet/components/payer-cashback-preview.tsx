@@ -2,6 +2,7 @@ import { isAxiosError } from 'axios'
 import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { formatCashbackCents } from '@/features/cashback/lib/format'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatQuotaWithCurrency, getCurrencyDisplay } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
@@ -108,6 +109,12 @@ export function PayerCashbackPreviewView(props: ViewProps) {
       case 'below_minimum':
         message = t('This amount is below the cashback threshold.')
         break
+      case 'rounds_to_zero':
+        message = t('This tier reward rounds down to zero wallet quota.')
+        break
+      case 'not_applicable':
+        message = t('Tiered cashback is not available for this top-up method.')
+        break
       case 'ineligible':
         message = t('Cashback is not available for this account right now.')
         break
@@ -160,6 +167,34 @@ export function PayerCashbackPreviewView(props: ViewProps) {
           </p>
         )}
         {fixedRule && <p>{fixedRule}</p>}
+        {preview?.strategy === 'tiered' && preview.tiers && (
+          <div>
+            <p>{t('Tiered cashback (CNY per order)')}</p>
+            <ul className='list-inside list-disc'>
+              {preview.tiers.map((tier) => (
+                <li key={tier.threshold_cents}>
+                  {t('Top up {{threshold}} or more: {{reward}} back', {
+                    threshold: formatCashbackCents(
+                      tier.threshold_cents,
+                      locale
+                    ),
+                    reward: formatCashbackCents(tier.reward_cents, locale),
+                  })}
+                </li>
+              ))}
+            </ul>
+            {preview.matched_tier && (
+              <p>
+                {t('Highest tier reached: {{threshold}}', {
+                  threshold: formatCashbackCents(
+                    preview.matched_tier.threshold_cents,
+                    locale
+                  ),
+                })}
+              </p>
+            )}
+          </div>
+        )}
         <p>{message}</p>
         {capNote && <p>{capNote}</p>}
         <p>

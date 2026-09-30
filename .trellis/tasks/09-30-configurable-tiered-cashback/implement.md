@@ -32,6 +32,13 @@
 - [ ] `cd web && bun run test <相关文件>`、`bun run typecheck`、变更文件 `oxlint`/`oxfmt --check`、`bun run build`；再按影响范围运行整套前端测试，列明不相关失败。`cd relaykit && GOWORK=off go build ./...` 仅当更改该模块/API 时运行。
 - [ ] 按 `trellis-check` 做安全/跨层/复用/历史兼容复核，`git diff --check`；只提交本任务文件和 Trellis 规划/契约文件到功能分支，不推 `main`。本任务的构建产物或 Docker 资源仅在用户同意后清理（Trellis 日志无需清理）。
 
+## 验证记录（2026-09-30，待全局门禁复核）
+
+- 所有数据库 Go 测试在任务专用 `tiered-0930-go`（Go 1.25.1）中运行，未使用宿主机数据库。该 runner 的变更 Go 文件与宿主 SHA-256 一致。真实引擎：Go SQLite `sqlite_version()=3.50.4`、MySQL `8.0.46`、PostgreSQL `16.15`。容器与网络仅属本任务，无宿主端口，待用户同意后清理。
+- `go test ./model -run '^TestCashbackProductionDatabaseIntegration$' -count=1 -v`：MySQL/PostgreSQL 子测试及五种渠道子测试均 PASS，未 skip；`go test ./model ./controller ./router ./setting/operation_setting -run '^(TestCashback|TestDefaultCashback|TestValidateCashback|TestParseCashback)' -count=1`：四包 PASS，SQLite 测试位于 runner。`go test -race ./model -run '^(TestConcurrentCashbackSettlementCreditsAtMostOnce|TestCashbackReconciliationConcurrentCleanCannotUnpinMismatch|TestCashbackTieredPaymentUsesHighestOrderFaceTierAndPreservesAudit)$' -count=1`：PASS。首次路由测试发现新夹具重复空邀请代码导致 SQLite 唯一性失败，已为两个用户设不同 `AffCode` 后复测 PASS。
+- `cd relaykit && GOWORK=off go test ./...`（runner）PASS。前端 9 个相关测试文件 `bun run test <paths>` 为 **93/93 PASS**，`bun run typecheck`、变更文件 `oxlint`/`oxfmt --check`、`bun run build`、`git diff --check` PASS；最终无障碍修补后的复核另有 7 文件 69 项通过。
+- 全量 `make test` **FAIL**：初次非 loopback DSN 被现有 controller 测试拒绝；改用任务专用共享网络命名空间中 `127.0.0.1` 的真实 MySQL/PostgreSQL 后，该 controller 三库测试组 PASS。剩余独立失败：middleware 的过期 JWT 两项返回 200 而非 401，以及 model 的 `TestRedemptionDatabaseMatrix/postgres` 在整包顺序下发现此前测试遗留 `tokens` 表；相关文件均未由本任务修改，独立隔离测试 `TestMigrationSchemaStability|TestRedemptionMigration|TestRedemptionDatabaseMatrix` 已 PASS，故不能报告全量通过。完整 `bun run test` 仍报告 132 个失败，主要分布于未修改模块；同数失败在本任务前的测试中已出现，但尚未逐一做基线对照。未修复这些任务外失败，未推送/部署。
+
 ## 停止/回滚点
 
 - 配置验证、支付计奖或三库矩阵不通过：不启用新策略，不合入生产分支；保留旧 `rate` / `per_hundred` 行为。

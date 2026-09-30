@@ -52,6 +52,84 @@ function show(selection: { amount?: number; productId?: string }) {
   )
 }
 
+test('tiered preview shows reached cent tier in CNY even when quota display is USD', async () => {
+  api.defaults.adapter = async (config) => ({
+    config,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      success: true,
+      data: {
+        status: 'estimated',
+        strategy: 'tiered',
+        config_version: 5,
+        tiers: [{ threshold_cents: 10050, reward_cents: 250 }],
+        matched_tier: { threshold_cents: 10050, reward_cents: 250 },
+        reward_quota: 250,
+        as_of: 1,
+      },
+    },
+  })
+  show({ amount: 101 })
+  expect(await screen.findByText(/¥100\.50.*¥2\.50/)).toBeVisible()
+  expect(screen.getByText('Highest tier reached: ¥100.50')).toBeVisible()
+})
+
+test('reached tier that floors to zero quota is not described as below the threshold', async () => {
+  api.defaults.adapter = async (config) => ({
+    config,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      success: true,
+      data: {
+        status: 'rounds_to_zero',
+        strategy: 'tiered',
+        tiers: [{ threshold_cents: 10050, reward_cents: 1 }],
+        matched_tier: { threshold_cents: 10050, reward_cents: 1 },
+        reward_quota: 0,
+        as_of: 1,
+      },
+    },
+  })
+  show({ amount: 101 })
+  expect(await screen.findByText('Highest tier reached: ¥100.50')).toBeVisible()
+  expect(
+    screen.getByText('This tier reward rounds down to zero wallet quota.')
+  ).toBeVisible()
+  expect(
+    screen.queryByText('This amount is below the cashback threshold.')
+  ).not.toBeInTheDocument()
+  expect(screen.queryByText(/Estimated cashback:/)).not.toBeInTheDocument()
+})
+
+test('non-applicable tiered product does not promise a payout', async () => {
+  api.defaults.adapter = async (config) => ({
+    config,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      success: true,
+      data: {
+        status: 'not_applicable',
+        strategy: 'tiered',
+        reward_quota: 0,
+        as_of: 1,
+      },
+    },
+  })
+  show({ productId: 'product-1' })
+  expect(
+    await screen.findByText(
+      'Tiered cashback is not available for this top-up method.'
+    )
+  ).toBeVisible()
+  expect(screen.queryByText(/Estimated cashback:/)).not.toBeInTheDocument()
+})
+
 test('amount switch ignores late estimate from the prior amount', async () => {
   let resolveOld!: (value: unknown) => void
   const oldResponse = new Promise<unknown>((resolve) => {

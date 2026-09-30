@@ -135,6 +135,100 @@ func createCompletedCashbackTopUp(t *testing.T, invitee User, createTime, comple
 	return topUp
 }
 
+func TestCashbackTieredPaymentUsesHighestOrderFaceTierAndPreservesAudit(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	_, payer := createCashbackUsers(t, now-86400)
+	setting := saveCashbackTestSetting(t, now-300)
+	setting.InviterStrategy = operation_setting.CashbackStrategyTiered
+	setting.InviterTiers = []operation_setting.CashbackTier{{ThresholdCents: 10050, RewardCents: 250}, {ThresholdCents: 20000, RewardCents: 1500}, {ThresholdCents: 50000, RewardCents: 4000}}
+	setting.InviteeStrategy = operation_setting.CashbackStrategyTiered
+	setting.InviteeTiers = []operation_setting.CashbackTier{{ThresholdCents: 10000, RewardCents: 100}, {ThresholdCents: 20000, RewardCents: 500}}
+	setting.MaxRewardQuota = common.MaxWalletQuota
+	setting.DailyRewardQuota = common.MaxWalletQuota
+	require.NoError(t, operation_setting.ValidateCashbackSetting(setting, true))
+	require.NoError(t, SaveCashbackSetting(setting))
+
+	for index, tc := range []struct {
+		face           int64
+		inviter, payer int
+	}{
+		{50, 0, 0}, {100, 0, 500000}, {101, 1250000, 500000},
+		{199, 1250000, 500000}, {200, 7500000, 2500000},
+		{500, 20000000, 2500000}, {1000, 20000000, 2500000},
+	} {
+		base := int(tc.face * 500000)
+		order := createCompletedCashbackTopUp(t, payer, now-200+int64(index), now-20+int64(index), base, base,
+			CashbackRequestMetadata{FaceAmount: tc.face, QuotaPerFaceUnit: "500000"})
+		var rewards []CashbackReward
+		require.NoError(t, DB.Where("top_up_id = ?", order.Id).Order("direction").Find(&rewards).Error)
+		require.Len(t, rewards, 2)
+		assert.Equal(t, tc.payer, rewards[0].CalculatedQuota)
+		assert.Equal(t, tc.inviter, rewards[1].CalculatedQuota)
+		for _, reward := range rewards {
+			assert.Equal(t, operation_setting.CashbackStrategyTiered, reward.Strategy)
+			assert.Zero(t, reward.RateBPS)
+			assert.Zero(t, reward.FixedPerHundred)
+			assert.Contains(t, reward.ConfigSnapshot, `"inviter_tiers"`)
+			if reward.CalculatedQuota == 0 {
+				assert.Equal(t, CashbackSettlementCanceled, reward.SettlementStatus)
+				assert.Contains(t, reward.CapReason, "below_minimum")
+			}
+		}
+		if index == 0 {
+			items, count, err := ListCashbackRewards(CashbackRewardFilter{}, &common.PageInfo{Page: 1, PageSize: 10})
+			require.NoError(t, err)
+			assert.Empty(t, items)
+			assert.Zero(t, count)
+		}
+	}
+	setting.InviterTiers = []operation_setting.CashbackTier{{ThresholdCents: 10000, RewardCents: 1}}
+	require.NoError(t, SaveCashbackSetting(setting))
+	var historical CashbackReward
+	require.NoError(t, DB.Where("direction = ?", CashbackDirectionInviter).Order("id asc").First(&historical).Error)
+	assert.Contains(t, historical.ConfigSnapshot, `"reward_cents":250`)
+}
+
+func TestCashbackTieredUnsupportedFaceDoesNotGrantOrGuess(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	_, payer := createCashbackUsers(t, now-86400)
+	setting := saveCashbackTestSetting(t, now-300)
+	setting.InviteeEnabled = false
+	setting.InviterStrategy = operation_setting.CashbackStrategyTiered
+	setting.InviterTiers = []operation_setting.CashbackTier{{ThresholdCents: 100, RewardCents: 10}}
+	require.NoError(t, SaveCashbackSetting(setting))
+	for index, tc := range []struct {
+		provider, method, factor, reason string
+		face, base                       int64
+		missing                          bool
+	}{
+		{PaymentProviderWaffo, PaymentMethodWaffo, "1", "strategy_not_applicable", 100, 100, false},             // token face
+		{PaymentProviderCreem, PaymentMethodCreem, "500000", "strategy_not_applicable", 100, 50_000_000, false}, // provider excluded even with a CNY-like factor
+		{PaymentProviderWaffo, PaymentMethodWaffo, "500000", "face_basis_unavailable", 100, 50_000_000, true},   // legacy missing snapshot
+	} {
+		order := TopUp{UserId: payer.Id, Amount: tc.face, TradeNo: fmt.Sprintf("tier-unsupported-%d", index), PaymentMethod: tc.method, PaymentProvider: tc.provider, CreateTime: now - 100 + int64(index), Status: common.TopUpStatusPending}
+		require.NoError(t, InsertOnlineTopUp(&order, int(tc.base), CashbackRequestMetadata{FaceAmount: tc.face, QuotaPerFaceUnit: tc.factor}))
+		if tc.missing {
+			require.NoError(t, DB.Session(&gorm.Session{SkipHooks: true}).Model(&CashbackOrderContext{}).Where("top_up_id = ?", order.Id).
+				Updates(map[string]any{"face_amount": 0, "quota_per_face_unit": ""}).Error)
+		}
+		require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+			order.Status = common.TopUpStatusSuccess
+			order.CompleteTime = now - 10 + int64(index)
+			if err := tx.Save(&order).Error; err != nil {
+				return err
+			}
+			return CompleteTopUpCashbackTx(tx, &order, 100, CashbackCompletionProviderCallback)
+		}))
+		var reward CashbackReward
+		require.NoError(t, DB.Where("top_up_id = ?", order.Id).First(&reward).Error)
+		assert.Zero(t, reward.RewardQuota)
+		assert.Equal(t, CashbackSettlementCanceled, reward.SettlementStatus)
+		assert.Equal(t, tc.reason, reward.CapReason)
+	}
+}
+
 func TestCashbackFixedPerHundredUsesOrderFaceAndPaymentTimeConfig(t *testing.T) {
 	setupCashbackTestDB(t)
 	now := time.Now().Unix()
@@ -4163,6 +4257,53 @@ func TestStripeRechargeDuplicateCallbackIsIdempotentWithCashback(t *testing.T) {
 	var rewardCount int64
 	require.NoError(t, DB.Model(&CashbackReward{}).Where("top_up_id = ?", topUp.Id).Count(&rewardCount).Error)
 	assert.EqualValues(t, 2, rewardCount)
+}
+
+func TestPayerCashbackTieredPreviewSharesSelectedFaceAndRejectsOtherBasis(t *testing.T) {
+	setupCashbackTestDB(t)
+	now := time.Now().Unix()
+	_, payer := createCashbackUsers(t, now-86400)
+	setting := saveCashbackTestSetting(t, now-300)
+	setting.InviterEnabled = false
+	setting.InviteeStrategy = operation_setting.CashbackStrategyTiered
+	setting.InviteeTiers = []operation_setting.CashbackTier{{ThresholdCents: 10050, RewardCents: 250}, {ThresholdCents: 20000, RewardCents: 1500}}
+	setting.MaxRewardQuota = common.MaxWalletQuota
+	setting.DailyRewardQuota = common.MaxWalletQuota
+	require.NoError(t, SaveCashbackSetting(setting))
+
+	preview, err := PreviewPayerCashback(payer.Id, 50_500_000, 101, "500000")
+	require.NoError(t, err)
+	assert.Equal(t, "estimated", preview.Status)
+	assert.Equal(t, 1_250_000, preview.RewardQuota)
+	assert.Equal(t, setting.InviteeTiers, preview.Tiers)
+	assert.Equal(t, &setting.InviteeTiers[0], preview.MatchedTier)
+	preview, err = PreviewPayerCashback(payer.Id, 50_000_000, 100, "500000")
+	require.NoError(t, err)
+	assert.Equal(t, "below_minimum", preview.Status)
+	assert.Nil(t, preview.MatchedTier)
+	preview, err = PreviewPayerCashback(payer.Id, 101, 101, "1")
+	require.NoError(t, err)
+	assert.Equal(t, "not_applicable", preview.Status)
+	assert.Zero(t, preview.RewardQuota)
+	assert.Empty(t, preview.Tiers)
+
+	context := CashbackOrderContext{FaceAmount: 101, BaseQuota: 50_500_051, QuotaPerFaceUnit: "500000.51"}
+	quota, tier, err := calculateCashbackTieredQuota(&context, setting.InviteeTiers)
+	require.NoError(t, err)
+	assert.Equal(t, 1_250_001, quota)
+	assert.Equal(t, &setting.InviteeTiers[0], tier)
+
+	setting.InviteeTiers = []operation_setting.CashbackTier{{ThresholdCents: 10050, RewardCents: 1}}
+	require.NoError(t, SaveCashbackSetting(setting))
+	preview, err = PreviewPayerCashback(payer.Id, 102, 101, "1.01")
+	require.NoError(t, err)
+	assert.Equal(t, "rounds_to_zero", preview.Status)
+	assert.Zero(t, preview.RewardQuota)
+	assert.Equal(t, &setting.InviteeTiers[0], preview.MatchedTier)
+	preview, err = PreviewPayerCashback(payer.Id, 101, 100, "1.01")
+	require.NoError(t, err)
+	assert.Equal(t, "below_minimum", preview.Status)
+	assert.Nil(t, preview.MatchedTier)
 }
 
 func TestPayerCashbackPreviewMatchesFaceAndCapsWithoutWriting(t *testing.T) {

@@ -3,6 +3,7 @@ package operation_setting
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,9 @@ const (
 	CashbackSettingName        = "cashback_setting"
 	CashbackStrategyRate       = "rate"
 	CashbackStrategyPerHundred = "per_hundred"
+	CashbackStrategyTiered     = "tiered"
+	CashbackMaxTiers           = 32
+	CashbackMaxTiersJSONBytes  = 4096
 	CashbackRateBasisPoints    = 10_000
 	CashbackMinSettlementDays  = 1
 	CashbackMaxSettlementDays  = 90
@@ -24,29 +28,37 @@ const (
 	CashbackDefaultTopUpCount  = 5
 )
 
+// CashbackTier represents an exact CNY face threshold and fixed reward, in cents.
+type CashbackTier struct {
+	ThresholdCents int64 `json:"threshold_cents"`
+	RewardCents    int64 `json:"reward_cents"`
+}
+
 type CashbackSetting struct {
-	InviterEnabled           bool   `json:"inviter_enabled"`
-	InviteeEnabled           bool   `json:"invitee_enabled"`
-	InviterRateBPS           int    `json:"inviter_rate_bps"`
-	InviteeRateBPS           int    `json:"invitee_rate_bps"`
-	InviterStrategy          string `json:"inviter_strategy"`
-	InviteeStrategy          string `json:"invitee_strategy"`
-	InviterFixedPerHundred   int    `json:"inviter_fixed_per_hundred"`
-	InviteeFixedPerHundred   int    `json:"invitee_fixed_per_hundred"`
-	SettlementDays           int    `json:"settlement_days"`
-	MaxRewardQuota           int    `json:"max_reward_quota"`
-	DailyRewardQuota         int    `json:"daily_reward_quota"`
-	IPAccountThreshold       int    `json:"ip_account_threshold"`
-	DeviceAccountThreshold   int    `json:"device_account_threshold"`
-	DailyTopUpCountThreshold int    `json:"daily_topup_count_threshold"`
-	FirstEnabledAt           int64  `json:"first_enabled_at"`
-	Version                  int64  `json:"version"`
-	AutoReviewEnabled        bool   `json:"auto_review_enabled"`
-	LowReviewRequired        bool   `json:"low_review_required"`
-	MediumReviewRequired     bool   `json:"medium_review_required"`
-	HighReviewRequired       bool   `json:"high_review_required"`
-	SevereReviewRequired     bool   `json:"severe_review_required"`
-	AutoReviewImmediateIssue bool   `json:"auto_review_immediate_issue"`
+	InviterEnabled           bool           `json:"inviter_enabled"`
+	InviteeEnabled           bool           `json:"invitee_enabled"`
+	InviterRateBPS           int            `json:"inviter_rate_bps"`
+	InviteeRateBPS           int            `json:"invitee_rate_bps"`
+	InviterStrategy          string         `json:"inviter_strategy"`
+	InviteeStrategy          string         `json:"invitee_strategy"`
+	InviterFixedPerHundred   int            `json:"inviter_fixed_per_hundred"`
+	InviteeFixedPerHundred   int            `json:"invitee_fixed_per_hundred"`
+	InviterTiers             []CashbackTier `json:"inviter_tiers"`
+	InviteeTiers             []CashbackTier `json:"invitee_tiers"`
+	SettlementDays           int            `json:"settlement_days"`
+	MaxRewardQuota           int            `json:"max_reward_quota"`
+	DailyRewardQuota         int            `json:"daily_reward_quota"`
+	IPAccountThreshold       int            `json:"ip_account_threshold"`
+	DeviceAccountThreshold   int            `json:"device_account_threshold"`
+	DailyTopUpCountThreshold int            `json:"daily_topup_count_threshold"`
+	FirstEnabledAt           int64          `json:"first_enabled_at"`
+	Version                  int64          `json:"version"`
+	AutoReviewEnabled        bool           `json:"auto_review_enabled"`
+	LowReviewRequired        bool           `json:"low_review_required"`
+	MediumReviewRequired     bool           `json:"medium_review_required"`
+	HighReviewRequired       bool           `json:"high_review_required"`
+	SevereReviewRequired     bool           `json:"severe_review_required"`
+	AutoReviewImmediateIssue bool           `json:"auto_review_immediate_issue"`
 }
 
 // Nil fields preserve the stored policy when an older client replaces the configuration.
@@ -88,6 +100,8 @@ type CashbackStrategyUpdate struct {
 	InviteeStrategy        *string
 	InviterFixedPerHundred *int
 	InviteeFixedPerHundred *int
+	InviterTiers           *[]CashbackTier
+	InviteeTiers           *[]CashbackTier
 }
 
 func (u CashbackStrategyUpdate) Apply(s *CashbackSetting) {
@@ -102,6 +116,12 @@ func (u CashbackStrategyUpdate) Apply(s *CashbackSetting) {
 	}
 	if u.InviteeFixedPerHundred != nil {
 		s.InviteeFixedPerHundred = *u.InviteeFixedPerHundred
+	}
+	if u.InviterTiers != nil {
+		s.InviterTiers = append([]CashbackTier{}, (*u.InviterTiers)...)
+	}
+	if u.InviteeTiers != nil {
+		s.InviteeTiers = append([]CashbackTier{}, (*u.InviteeTiers)...)
 	}
 }
 
@@ -124,6 +144,8 @@ func DefaultCashbackSetting() CashbackSetting {
 	return CashbackSetting{
 		InviterStrategy:          CashbackStrategyRate,
 		InviteeStrategy:          CashbackStrategyRate,
+		InviterTiers:             []CashbackTier{},
+		InviteeTiers:             []CashbackTier{},
 		SettlementDays:           CashbackDefaultSettlement,
 		IPAccountThreshold:       CashbackDefaultIPThreshold,
 		DeviceAccountThreshold:   CashbackDefaultDeviceLimit,
@@ -153,10 +175,10 @@ func ValidateCashbackSetting(s CashbackSetting, complianceConfirmed bool) error 
 	if s.InviteeRateBPS < 0 || s.InviteeRateBPS > CashbackRateBasisPoints {
 		return cashbackValidationError("invitee_rate_bps", "invitee cashback rate must be between 0 and 10000 basis points")
 	}
-	if s.InviterStrategy != CashbackStrategyRate && s.InviterStrategy != CashbackStrategyPerHundred {
+	if s.InviterStrategy != CashbackStrategyRate && s.InviterStrategy != CashbackStrategyPerHundred && s.InviterStrategy != CashbackStrategyTiered {
 		return cashbackValidationError("inviter_strategy", "invalid inviter cashback strategy")
 	}
-	if s.InviteeStrategy != CashbackStrategyRate && s.InviteeStrategy != CashbackStrategyPerHundred {
+	if s.InviteeStrategy != CashbackStrategyRate && s.InviteeStrategy != CashbackStrategyPerHundred && s.InviteeStrategy != CashbackStrategyTiered {
 		return cashbackValidationError("invitee_strategy", "invalid payer cashback strategy")
 	}
 	if s.InviterFixedPerHundred < 0 || s.InviterFixedPerHundred > 100 {
@@ -165,21 +187,21 @@ func ValidateCashbackSetting(s CashbackSetting, complianceConfirmed bool) error 
 	if s.InviteeFixedPerHundred < 0 || s.InviteeFixedPerHundred > 100 {
 		return cashbackValidationError("invitee_fixed_per_hundred", "payer fixed cashback must be between 0 and 100")
 	}
-	inviterNominal, inviteeNominal := s.InviterRateBPS, s.InviteeRateBPS
-	inviterField, inviteeField := "inviter_rate_bps", "invitee_rate_bps"
-	if s.InviterStrategy == CashbackStrategyPerHundred {
-		inviterNominal, inviterField = s.InviterFixedPerHundred*100, "inviter_fixed_per_hundred"
+	if err := validateCashbackTiers("inviter_tiers", s.InviterTiers); err != nil {
+		return err
 	}
-	if s.InviteeStrategy == CashbackStrategyPerHundred {
-		inviteeNominal, inviteeField = s.InviteeFixedPerHundred*100, "invitee_fixed_per_hundred"
+	if err := validateCashbackTiers("invitee_tiers", s.InviteeTiers); err != nil {
+		return err
 	}
-	if s.InviterEnabled && inviterNominal == 0 {
+	inviterNominal, inviterField := cashbackNominalReturn(s.InviterStrategy, s.InviterRateBPS, s.InviterFixedPerHundred, s.InviterTiers, "inviter")
+	inviteeNominal, inviteeField := cashbackNominalReturn(s.InviteeStrategy, s.InviteeRateBPS, s.InviteeFixedPerHundred, s.InviteeTiers, "invitee")
+	if s.InviterEnabled && inviterNominal.Sign() == 0 {
 		return cashbackValidationError(inviterField, "inviter cashback must be positive when enabled")
 	}
-	if s.InviteeEnabled && inviteeNominal == 0 {
+	if s.InviteeEnabled && inviteeNominal.Sign() == 0 {
 		return cashbackValidationError(inviteeField, "payer cashback must be positive when enabled")
 	}
-	if inviterNominal+inviteeNominal > CashbackRateBasisPoints {
+	if new(big.Rat).Add(inviterNominal, inviteeNominal).Cmp(big.NewRat(1, 1)) > 0 {
 		return cashbackValidationError(inviteeField, "combined cashback nominal return must not exceed 100 percent")
 	}
 	if s.SettlementDays < CashbackMinSettlementDays || s.SettlementDays > CashbackMaxSettlementDays {
@@ -223,7 +245,63 @@ func ValidateCashbackSetting(s CashbackSetting, complianceConfirmed bool) error 
 	return nil
 }
 
-func CashbackSettingOptionValues(s CashbackSetting) map[string]string {
+func validateCashbackTiers(field string, tiers []CashbackTier) error {
+	if len(tiers) > CashbackMaxTiers {
+		return cashbackValidationError(field, "too many cashback tiers")
+	}
+	var previous int64
+	for _, tier := range tiers {
+		if tier.ThresholdCents <= previous || tier.ThresholdCents > common.MaxWalletQuota ||
+			tier.RewardCents <= 0 || tier.RewardCents > common.MaxWalletQuota || tier.RewardCents > tier.ThresholdCents {
+			return cashbackValidationError(field, "cashback tiers require increasing positive bounded cents")
+		}
+		previous = tier.ThresholdCents
+	}
+	return nil
+}
+
+func cashbackNominalReturn(strategy string, rate, fixed int, tiers []CashbackTier, direction string) (*big.Rat, string) {
+	switch strategy {
+	case CashbackStrategyPerHundred:
+		return big.NewRat(int64(fixed), 100), direction + "_fixed_per_hundred"
+	case CashbackStrategyTiered:
+		maximum := new(big.Rat)
+		for _, tier := range tiers {
+			ratio := new(big.Rat).SetFrac64(tier.RewardCents, tier.ThresholdCents)
+			if ratio.Cmp(maximum) > 0 {
+				maximum = ratio
+			}
+		}
+		return maximum, direction + "_tiers"
+	default:
+		return big.NewRat(int64(rate), CashbackRateBasisPoints), direction + "_rate_bps"
+	}
+}
+
+func CashbackSettingOptionValues(s CashbackSetting) (map[string]string, error) {
+	// Serialize both schedules before the first database write.
+	inviter := s.InviterTiers
+	invitee := s.InviteeTiers
+	if inviter == nil {
+		inviter = []CashbackTier{}
+	}
+	if invitee == nil {
+		invitee = []CashbackTier{}
+	}
+	inviterJSON, err := common.Marshal(inviter)
+	if err != nil {
+		return nil, err
+	}
+	inviteeJSON, err := common.Marshal(invitee)
+	if err != nil {
+		return nil, err
+	}
+	if len(inviterJSON) > CashbackMaxTiersJSONBytes {
+		return nil, cashbackValidationError("inviter_tiers", "cashback tier schedule is too large")
+	}
+	if len(inviteeJSON) > CashbackMaxTiersJSONBytes {
+		return nil, cashbackValidationError("invitee_tiers", "cashback tier schedule is too large")
+	}
 	prefix := CashbackSettingName + "."
 	return map[string]string{
 		prefix + "inviter_enabled":             strconv.FormatBool(s.InviterEnabled),
@@ -234,6 +312,8 @@ func CashbackSettingOptionValues(s CashbackSetting) map[string]string {
 		prefix + "invitee_strategy":            s.InviteeStrategy,
 		prefix + "inviter_fixed_per_hundred":   strconv.Itoa(s.InviterFixedPerHundred),
 		prefix + "invitee_fixed_per_hundred":   strconv.Itoa(s.InviteeFixedPerHundred),
+		prefix + "inviter_tiers":               string(inviterJSON),
+		prefix + "invitee_tiers":               string(inviteeJSON),
 		prefix + "settlement_days":             strconv.Itoa(s.SettlementDays),
 		prefix + "max_reward_quota":            strconv.Itoa(s.MaxRewardQuota),
 		prefix + "daily_reward_quota":          strconv.Itoa(s.DailyRewardQuota),
@@ -248,11 +328,11 @@ func CashbackSettingOptionValues(s CashbackSetting) map[string]string {
 		prefix + "high_review_required":        strconv.FormatBool(s.HighReviewRequired),
 		prefix + "severe_review_required":      strconv.FormatBool(s.SevereReviewRequired),
 		prefix + "auto_review_immediate_issue": strconv.FormatBool(s.AutoReviewImmediateIssue),
-	}
+	}, nil
 }
 
 func CashbackSettingOptionKeys() []string {
-	values := CashbackSettingOptionValues(DefaultCashbackSetting())
+	values, _ := CashbackSettingOptionValues(DefaultCashbackSetting())
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)
@@ -298,6 +378,22 @@ func ParseCashbackSettingOptions(values map[string]string) (CashbackSetting, err
 		*target = int(parsed)
 		return nil
 	}
+	parseTiers := func(name string, target *[]CashbackTier) error {
+		value, ok := lookup(name)
+		if !ok {
+			return nil
+		}
+		if len(value) > CashbackMaxTiersJSONBytes || value == "null" {
+			return fmt.Errorf("invalid %s: oversized or null schedule", name)
+		}
+		if err := common.Unmarshal([]byte(value), target); err != nil {
+			return fmt.Errorf("invalid %s: %w", name, err)
+		}
+		if len(*target) > CashbackMaxTiers {
+			return fmt.Errorf("invalid %s: too many tiers", name)
+		}
+		return nil
+	}
 	parseInt64 := func(name string, target *int64) error {
 		value, ok := lookup(name)
 		if !ok {
@@ -330,6 +426,8 @@ func ParseCashbackSettingOptions(values map[string]string) (CashbackSetting, err
 		},
 		func() error { return parseInt("inviter_fixed_per_hundred", &setting.InviterFixedPerHundred) },
 		func() error { return parseInt("invitee_fixed_per_hundred", &setting.InviteeFixedPerHundred) },
+		func() error { return parseTiers("inviter_tiers", &setting.InviterTiers) },
+		func() error { return parseTiers("invitee_tiers", &setting.InviteeTiers) },
 		func() error { return parseInt("settlement_days", &setting.SettlementDays) },
 		func() error { return parseInt("max_reward_quota", &setting.MaxRewardQuota) },
 		func() error { return parseInt("daily_reward_quota", &setting.DailyRewardQuota) },

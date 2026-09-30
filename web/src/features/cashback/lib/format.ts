@@ -18,6 +18,27 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { getCurrencyDisplay } from '@/lib/currency'
 
+/** Exact CNY cents from a checkout rule, never the site's quota/display FX. */
+export function formatCashbackCents(
+  cents: number,
+  locale?: Intl.LocalesArgument
+): string {
+  if (!Number.isSafeInteger(cents)) return '-'
+  const formatter = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'CNY',
+    currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  const yuan = BigInt(cents) / 100n
+  const fraction = String(Math.abs(cents % 100)).padStart(2, '0')
+  return formatter
+    .formatToParts(yuan)
+    .map((part) => (part.type === 'fraction' ? fraction : part.value))
+    .join('')
+}
+
 /** Render cashback wallet quota in CNY regardless of the site's quota display mode.
  * These are quota equivalents, not attested cash payments or refund amounts.
  */

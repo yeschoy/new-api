@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { CashbackStrategy, CashbackTier } from '@/features/cashback/types'
+
 export type SystemOption = {
   key: string
   value: string
@@ -81,8 +83,10 @@ export type CashbackConfig = {
   invitee_enabled: boolean
   inviter_rate_bps: number
   invitee_rate_bps: number
-  inviter_strategy: 'rate' | 'per_hundred'
-  invitee_strategy: 'rate' | 'per_hundred'
+  inviter_strategy: CashbackStrategy
+  invitee_strategy: CashbackStrategy
+  inviter_tiers?: CashbackTier[]
+  invitee_tiers?: CashbackTier[]
   inviter_fixed_per_hundred: number
   invitee_fixed_per_hundred: number
   settlement_days: number

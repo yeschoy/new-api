@@ -19,6 +19,7 @@ type cashbackDirectionConfig struct {
 	RateBPS         int
 	Strategy        string
 	FixedPerHundred int
+	Tiers           []operation_setting.CashbackTier
 }
 
 func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, source CashbackCompletionSource, heldFences ...*userQuotaMutationFences) error {
@@ -147,13 +148,13 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 	if setting.InviterEnabled && validInviter {
 		directions = append(directions, cashbackDirectionConfig{
 			Direction: CashbackDirectionInviter, BeneficiaryID: inviter.Id, RateBPS: setting.InviterRateBPS,
-			Strategy: setting.InviterStrategy, FixedPerHundred: setting.InviterFixedPerHundred,
+			Strategy: setting.InviterStrategy, FixedPerHundred: setting.InviterFixedPerHundred, Tiers: setting.InviterTiers,
 		})
 	}
 	if setting.InviteeEnabled && campaign.ID > 0 {
 		directions = append(directions, cashbackDirectionConfig{
 			Direction: CashbackDirectionInvitee, BeneficiaryID: invitee.Id, RateBPS: setting.InviteeRateBPS,
-			Strategy: setting.InviteeStrategy, FixedPerHundred: setting.InviteeFixedPerHundred,
+			Strategy: setting.InviteeStrategy, FixedPerHundred: setting.InviteeFixedPerHundred, Tiers: setting.InviteeTiers,
 		})
 	}
 	sort.Slice(directions, func(i, j int) bool {
@@ -176,13 +177,24 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 
 		calculatedQuota := 0
 		faceBasisUnavailable := false
-		if direction.Strategy == operation_setting.CashbackStrategyPerHundred {
+		notApplicable := false
+		switch direction.Strategy {
+		case operation_setting.CashbackStrategyPerHundred:
 			if orderContext.FaceAmount == 0 && orderContext.QuotaPerFaceUnit == "" {
 				faceBasisUnavailable = true
 			} else {
 				calculatedQuota, err = calculateCashbackFixedQuota(&orderContext, direction.FixedPerHundred)
 			}
-		} else {
+		case operation_setting.CashbackStrategyTiered:
+			switch cashbackTieredFaceExclusion(&orderContext, topUp.PaymentProvider) {
+			case "face_basis_unavailable":
+				faceBasisUnavailable = true
+			case "strategy_not_applicable":
+				notApplicable = true
+			default:
+				calculatedQuota, _, err = calculateCashbackTieredQuota(&orderContext, direction.Tiers)
+			}
+		default:
 			calculatedQuota, err = calculateCashbackQuota(orderContext.BaseQuota, direction.RateBPS)
 		}
 		if err != nil {
@@ -195,6 +207,9 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 		rewardQuota, capReason := capCashbackQuota(calculatedQuota, dailyUsed, setting)
 		if faceBasisUnavailable {
 			capReason = appendCashbackReason(capReason, "face_basis_unavailable")
+		}
+		if notApplicable {
+			capReason = appendCashbackReason(capReason, "strategy_not_applicable")
 		}
 		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 {
 			used, err := cashbackCampaignPayerRewardsUsedTx(tx, campaign.ID, invitee.Id)
@@ -239,7 +254,7 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			riskLevel = CashbackRiskSevere
 		} else if rewardQuota == 0 {
 			settlementStatus = CashbackSettlementCanceled
-			if !faceBasisUnavailable {
+			if !faceBasisUnavailable && !notApplicable {
 				if calculatedQuota == 0 {
 					capReason = appendCashbackReason(capReason, "below_minimum")
 				} else {
@@ -278,9 +293,10 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			ConfigSnapshot:   string(configSnapshot),
 			BlockingReason:   blockingReason,
 		}
-		if direction.Strategy == operation_setting.CashbackStrategyPerHundred {
+		if direction.Strategy != operation_setting.CashbackStrategyRate {
 			reward.RateBPS = 0
-		} else {
+		}
+		if direction.Strategy != operation_setting.CashbackStrategyPerHundred {
 			reward.FixedPerHundred = 0
 		}
 		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 && setting.AutoReviewEnabled {
@@ -408,6 +424,63 @@ func calculateCashbackFixedQuota(context *CashbackOrderContext, fixed int) (int,
 		return 0, ErrCashbackInvalidInput
 	}
 	return quota, nil
+}
+
+// Without an additional provenance column, a factor of one cannot distinguish
+// token/product quota from a CNY face. Exclude it conservatively; Creem is
+// independently excluded by the existing payment provider on the order.
+func cashbackTieredFaceExclusion(context *CashbackOrderContext, provider string) string {
+	if context == nil || context.FaceAmount <= 0 || context.QuotaPerFaceUnit == "" {
+		return "face_basis_unavailable"
+	}
+	if provider == PaymentProviderCreem {
+		return "strategy_not_applicable"
+	}
+	factor, err := decimal.NewFromString(context.QuotaPerFaceUnit)
+	if err != nil || !factor.GreaterThan(decimal.Zero) {
+		return "face_basis_unavailable"
+	}
+	if !factor.GreaterThan(decimal.NewFromInt(1)) {
+		return "strategy_not_applicable"
+	}
+	return ""
+}
+
+// calculateCashbackTieredQuota chooses the last reached threshold of this
+// order only. Cents and checkout factor stay exact until the single floor.
+func calculateCashbackTieredQuota(context *CashbackOrderContext, tiers []operation_setting.CashbackTier) (int, *operation_setting.CashbackTier, error) {
+	if context == nil || context.FaceAmount <= 0 ||
+		context.FaceAmount > common.MaxWalletQuota || context.BaseQuota <= 0 || context.BaseQuota > common.MaxWalletQuota {
+		return 0, nil, ErrCashbackInvalidInput
+	}
+	factor, err := decimal.NewFromString(context.QuotaPerFaceUnit)
+	if err != nil || !factor.GreaterThan(decimal.Zero) {
+		return 0, nil, ErrCashbackInvalidInput
+	}
+	basis := decimal.NewFromInt(context.FaceAmount).Mul(factor)
+	if basis.LessThan(decimal.NewFromInt(int64(context.BaseQuota-1))) || basis.GreaterThan(decimal.NewFromInt(int64(context.BaseQuota+1))) {
+		return 0, nil, ErrCashbackInvalidInput
+	}
+	faceCents := context.FaceAmount * 100 // FaceAmount <= MaxWalletQuota (2^53-1).
+	var matched *operation_setting.CashbackTier
+	for i := range tiers {
+		if tiers[i].ThresholdCents > faceCents {
+			break
+		}
+		matched = &tiers[i]
+	}
+	if matched == nil {
+		return 0, nil, nil
+	}
+	if matched.RewardCents <= 0 || matched.RewardCents > common.MaxWalletQuota {
+		return 0, nil, ErrCashbackInvalidInput
+	}
+	value := decimal.NewFromInt(matched.RewardCents).Div(decimal.NewFromInt(100)).Mul(factor).Floor()
+	quota, err := common.WalletQuotaFromDecimalStrict(value)
+	if err != nil || quota > context.BaseQuota {
+		return 0, nil, ErrCashbackInvalidInput
+	}
+	return quota, matched, nil
 }
 
 // A positive reward consumes its campaign slot permanently, even if it is

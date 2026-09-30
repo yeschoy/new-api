@@ -42,9 +42,14 @@ export interface PayerCashbackPreview {
     | 'limit_reached'
     | 'select_amount'
     | 'below_minimum'
+    | 'rounds_to_zero'
     | 'cap_exhausted'
     | 'estimated'
-  strategy?: 'rate' | 'per_hundred'
+    | 'not_applicable'
+  strategy?: 'rate' | 'per_hundred' | 'tiered'
+  tiers?: { threshold_cents: number; reward_cents: number }[]
+  matched_tier?: { threshold_cents: number; reward_cents: number }
+  config_version?: number
   rate_bps?: number
   fixed_per_hundred?: number
   /** Rule result before single/24-hour limits. */

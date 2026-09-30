@@ -31,6 +31,40 @@ const perHundred: PayerCashbackRule = {
 }
 
 describe('estimateTopupCashbackQuota', () => {
+  it('selects only the highest reached cent threshold without stacking or extrapolating', () => {
+    const tiered: PayerCashbackRule = {
+      strategy: 'tiered',
+      rateBps: 0,
+      fixedPerHundred: 0,
+      tiers: [
+        { threshold_cents: 10050, reward_cents: 250 },
+        { threshold_cents: 20000, reward_cents: 1500 },
+      ],
+    }
+    expect(estimateTopupCashbackQuota(100, tiered, 500000, false)).toBe(0)
+    expect(estimateTopupCashbackQuota(101, tiered, 500000, false)).toBe(1250000)
+    expect(estimateTopupCashbackQuota(250, tiered, 500000, false)).toBe(7500000)
+    expect(estimateTopupCashbackQuota(1200, tiered, 500000, false)).toBe(
+      7500000
+    )
+    expect(estimateTopupCashbackQuota(250, tiered, 500000, true)).toBe(0)
+    expect(estimateTopupCashbackQuota(250, tiered, 1, false)).toBe(0)
+  })
+
+  it('floors a reached cent reward once with a positive fractional checkout factor', () => {
+    const tiered: PayerCashbackRule = {
+      strategy: 'tiered',
+      rateBps: 0,
+      fixedPerHundred: 0,
+      tiers: [{ threshold_cents: 10050, reward_cents: 101 }],
+    }
+    // 1.01 CNY × 500000.25 quota/CNY = 505000.2525 → 505000.
+    expect(estimateTopupCashbackQuota(101, tiered, 500000.25, false)).toBe(
+      505000
+    )
+    expect(estimateTopupCashbackQuota(100, tiered, 500000.25, false)).toBe(0)
+  })
+
   it('counts only complete hundreds of the top-up amount', () => {
     expect(estimateTopupCashbackQuota(10, perHundred, 500_000, false)).toBe(0)
     expect(estimateTopupCashbackQuota(99, perHundred, 500_000, false)).toBe(0)
@@ -59,6 +93,42 @@ describe('estimateTopupCashbackQuota', () => {
 })
 
 describe('getPayerCashbackRule', () => {
+  it('reads tiered preview with its config version but excludes non-applicable methods', () => {
+    const tiers = [{ threshold_cents: 10050, reward_cents: 250 }]
+    expect(
+      getPayerCashbackRule({
+        status: 'estimated',
+        strategy: 'tiered',
+        tiers,
+        config_version: 7,
+        reward_quota: 1250000,
+        as_of: 1,
+      })
+    ).toMatchObject({
+      strategy: 'tiered',
+      tiers,
+      configVersion: 7,
+    })
+    expect(
+      getPayerCashbackRule({
+        status: 'rounds_to_zero',
+        strategy: 'tiered',
+        tiers,
+        matched_tier: tiers[0],
+        reward_quota: 0,
+        as_of: 1,
+      })
+    ).toMatchObject({ strategy: 'tiered', tiers })
+    expect(
+      getPayerCashbackRule({
+        status: 'not_applicable',
+        strategy: 'tiered',
+        reward_quota: 0,
+        as_of: 1,
+      })
+    ).toBeNull()
+  })
+
   it('only exposes a rule for payers who can receive cashback', () => {
     expect(
       getPayerCashbackRule({

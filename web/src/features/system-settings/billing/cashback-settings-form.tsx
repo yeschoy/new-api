@@ -72,6 +72,14 @@ import {
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import type { CashbackConfig, CashbackConfigUpdate } from '../types'
+import {
+  centsToInput,
+  nominalTierPercent,
+  parseCnyCents,
+  tierInputToCents,
+  type TierInput,
+} from './cashback-tier-amount'
+import { CashbackTierEditor } from './cashback-tier-editor'
 
 const MAX_WALLET_QUOTA = Number.MAX_SAFE_INTEGER
 
@@ -84,6 +92,8 @@ const fieldMap = {
   invitee_strategy: 'inviteeStrategy',
   inviter_fixed_per_hundred: 'inviterFixedPerHundred',
   invitee_fixed_per_hundred: 'inviteeFixedPerHundred',
+  inviter_tiers: 'inviterTiers',
+  invitee_tiers: 'inviteeTiers',
   settlement_days: 'settlementDays',
   max_reward_quota: 'maxRewardQuota',
   daily_reward_quota: 'dailyRewardQuota',
@@ -98,13 +108,15 @@ const fieldMap = {
   auto_review_immediate_issue: 'autoReviewImmediateIssue',
 } as const
 
-type Values = {
+export type Values = {
   inviterEnabled: boolean
   inviteeEnabled: boolean
   inviterRatePercent: number
   inviteeRatePercent: number
-  inviterStrategy: 'rate' | 'per_hundred'
-  inviteeStrategy: 'rate' | 'per_hundred'
+  inviterStrategy: 'rate' | 'per_hundred' | 'tiered'
+  inviteeStrategy: 'rate' | 'per_hundred' | 'tiered'
+  inviterTiers: TierInput[]
+  inviteeTiers: TierInput[]
   inviterFixedPerHundred: number
   inviteeFixedPerHundred: number
   settlementDays: number
@@ -135,6 +147,14 @@ function configToValues(config: CashbackConfig): Values {
     inviteeRatePercent: config.invitee_rate_bps / 100,
     inviterStrategy: config.inviter_strategy ?? 'rate',
     inviteeStrategy: config.invitee_strategy ?? 'rate',
+    inviterTiers: (config.inviter_tiers ?? []).map((tier) => ({
+      threshold: centsToInput(tier.threshold_cents),
+      reward: centsToInput(tier.reward_cents),
+    })),
+    inviteeTiers: (config.invitee_tiers ?? []).map((tier) => ({
+      threshold: centsToInput(tier.threshold_cents),
+      reward: centsToInput(tier.reward_cents),
+    })),
     inviterFixedPerHundred: config.inviter_fixed_per_hundred ?? 0,
     inviteeFixedPerHundred: config.invitee_fixed_per_hundred ?? 0,
     settlementDays: config.settlement_days,
@@ -171,6 +191,8 @@ function valuesToRequest(
     invitee_rate_bps: Math.round(values.inviteeRatePercent * 100),
     inviter_strategy: values.inviterStrategy,
     invitee_strategy: values.inviteeStrategy,
+    inviter_tiers: values.inviterTiers.map(tierInputToCents),
+    invitee_tiers: values.inviteeTiers.map(tierInputToCents),
     inviter_fixed_per_hundred: values.inviterFixedPerHundred,
     invitee_fixed_per_hundred: values.inviteeFixedPerHundred,
     settlement_days: values.settlementDays,
@@ -192,6 +214,26 @@ function valuesToRequest(
     severe_review_required: values.severeReviewRequired,
     auto_review_immediate_issue: values.autoReviewImmediateIssue,
   }
+}
+
+function nominalPercent(
+  values: Values,
+  direction: 'inviter' | 'invitee'
+): number {
+  if (direction === 'inviter') {
+    if (values.inviterStrategy === 'tiered') {
+      return nominalTierPercent(values.inviterTiers)
+    }
+    return values.inviterStrategy === 'rate'
+      ? values.inviterRatePercent
+      : values.inviterFixedPerHundred
+  }
+  if (values.inviteeStrategy === 'tiered') {
+    return nominalTierPercent(values.inviteeTiers)
+  }
+  return values.inviteeStrategy === 'rate'
+    ? values.inviteeRatePercent
+    : values.inviteeFixedPerHundred
 }
 
 export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
@@ -221,8 +263,14 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       inviteeEnabled: z.boolean(),
       inviterRatePercent: percentage,
       inviteeRatePercent: percentage,
-      inviterStrategy: z.enum(['rate', 'per_hundred']),
-      inviteeStrategy: z.enum(['rate', 'per_hundred']),
+      inviterStrategy: z.enum(['rate', 'per_hundred', 'tiered']),
+      inviteeStrategy: z.enum(['rate', 'per_hundred', 'tiered']),
+      inviterTiers: z.array(
+        z.object({ threshold: z.string(), reward: z.string() })
+      ),
+      inviteeTiers: z.array(
+        z.object({ threshold: z.string(), reward: z.string() })
+      ),
       inviterFixedPerHundred: z.coerce
         .number({ error: t('Enter a whole number from 1 to 100') })
         .int(t('Enter a whole number from 1 to 100'))
@@ -295,22 +343,60 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
           message: t('Enter a whole number from 1 to 100'),
         })
       }
-      const inviterNominal =
-        values.inviterStrategy === 'rate'
-          ? values.inviterRatePercent
-          : values.inviterFixedPerHundred
-      const inviteeNominal =
-        values.inviteeStrategy === 'rate'
-          ? values.inviteeRatePercent
-          : values.inviteeFixedPerHundred
-      if (inviterNominal + inviteeNominal > 100) {
+      for (const direction of ['inviter', 'invitee'] as const) {
+        const tiers =
+          direction === 'inviter' ? values.inviterTiers : values.inviteeTiers
+        const path = direction === 'inviter' ? 'inviterTiers' : 'inviteeTiers'
+        const selected =
+          direction === 'inviter'
+            ? values.inviterEnabled && values.inviterStrategy === 'tiered'
+            : values.inviteeEnabled && values.inviteeStrategy === 'tiered'
+        if (tiers.length > 32 || (selected && !tiers.length)) {
+          context.addIssue({
+            code: 'custom',
+            path: [path],
+            message: t('Configure 1 to 32 tiers'),
+          })
+        }
+        let previous = 0
+        tiers.forEach((tier, index) => {
+          const threshold = parseCnyCents(tier.threshold)
+          const reward = parseCnyCents(tier.reward)
+          if (!threshold || threshold <= previous) {
+            context.addIssue({
+              code: 'custom',
+              path: [path, index, 'threshold'],
+              message: t(
+                'Enter increasing positive CNY amounts with at most two decimals'
+              ),
+            })
+          }
+          if (!reward || (threshold && reward > threshold)) {
+            context.addIssue({
+              code: 'custom',
+              path: [path, index, 'reward'],
+              message: t(
+                'Reward must be positive, at most the threshold, with at most two decimals'
+              ),
+            })
+          }
+          if (threshold) previous = threshold
+        })
+      }
+      if (
+        nominalPercent(values, 'inviter') + nominalPercent(values, 'invitee') >
+        100
+      ) {
+        let path = 'inviteeRatePercent'
+        if (values.inviteeStrategy === 'tiered') {
+          path = 'inviteeTiers'
+        }
+        if (values.inviteeStrategy === 'per_hundred') {
+          path = 'inviteeFixedPerHundred'
+        }
         context.addIssue({
           code: 'custom',
-          path: [
-            values.inviteeStrategy === 'rate'
-              ? 'inviteeRatePercent'
-              : 'inviteeFixedPerHundred',
-          ],
+          path: [path],
           message: t('Combined cashback return cannot exceed 100%'),
         })
       }
@@ -388,12 +474,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       props.config.first_enabled_at === 0 &&
       (values.inviterEnabled || values.inviteeEnabled)
     const highRate =
-      (values.inviterStrategy === 'rate'
-        ? values.inviterRatePercent
-        : values.inviterFixedPerHundred) +
-        (values.inviteeStrategy === 'rate'
-          ? values.inviteeRatePercent
-          : values.inviteeFixedPerHundred) >=
+      nominalPercent(values, 'inviter') + nominalPercent(values, 'invitee') >=
       50
     if (firstEnable || highRate) {
       setPendingValues(values)
@@ -512,6 +593,9 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
                       <SelectItem value='per_hundred'>
                         {t('Fixed per 100 of top-up')}
                       </SelectItem>
+                      <SelectItem value='tiered'>
+                        {t('Tiered fixed reward')}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -544,13 +628,16 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
                       <SelectItem value='per_hundred'>
                         {t('Fixed per 100 of top-up')}
                       </SelectItem>
+                      <SelectItem value='tiered'>
+                        {t('Tiered fixed reward')}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            {form.watch('inviterStrategy') === 'rate' ? (
+            {form.watch('inviterStrategy') === 'rate' && (
               <FormField
                 control={form.control}
                 name='inviterRatePercent'
@@ -573,7 +660,15 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
                   </FormItem>
                 )}
               />
-            ) : (
+            )}
+            {form.watch('inviterStrategy') === 'tiered' && (
+              <CashbackTierEditor
+                direction='inviter'
+                form={form}
+                disabled={mutation.isPending}
+              />
+            )}
+            {form.watch('inviterStrategy') === 'per_hundred' && (
               <FormField
                 control={form.control}
                 name='inviterFixedPerHundred'
@@ -599,7 +694,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
                 )}
               />
             )}
-            {form.watch('inviteeStrategy') === 'rate' ? (
+            {form.watch('inviteeStrategy') === 'rate' && (
               <FormField
                 control={form.control}
                 name='inviteeRatePercent'
@@ -624,7 +719,15 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
                   </FormItem>
                 )}
               />
-            ) : (
+            )}
+            {form.watch('inviteeStrategy') === 'tiered' && (
+              <CashbackTierEditor
+                direction='invitee'
+                form={form}
+                disabled={mutation.isPending}
+              />
+            )}
+            {form.watch('inviteeStrategy') === 'per_hundred' && (
               <FormField
                 control={form.control}
                 name='inviteeFixedPerHundred'

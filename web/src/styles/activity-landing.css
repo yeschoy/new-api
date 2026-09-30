@@ -88,6 +88,13 @@ For commercial licensing, please contact support@quantumnous.com
   margin-top: 2rem;
 }
 
+.activity-offer-status {
+  width: min(100% - 48px, 1120px);
+  margin: 2rem auto 0;
+  color: var(--ci-ink);
+  font-weight: 650;
+}
+
 .activity-details {
   display: grid;
   width: min(100% - 48px, 1120px);
@@ -146,6 +153,17 @@ For commercial licensing, please contact support@quantumnous.com
   margin: 1rem 0 0;
   color: var(--ci-muted);
   line-height: 1.75;
+}
+
+.activity-card__rules {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.activity-card__rules ul {
+  margin-top: 0.5rem;
+  color: var(--ci-ink);
+  line-height: 1.8;
 }
 
 .activity-card__link {

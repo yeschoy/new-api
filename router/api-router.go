@@ -209,6 +209,7 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/subscription/epay/notify", controller.SubscriptionEpayNotify)
 		apiRouter.GET("/subscription/epay/return", controller.SubscriptionEpayReturn)
 		apiRouter.POST("/subscription/epay/return", anonymousRequestBodyLimit, controller.SubscriptionEpayReturn)
+		apiRouter.GET("/cashback/public-offers", controller.PublicCashbackOffers)
 		cashbackAdminRoute := apiRouter.Group("/cashback")
 		cashbackAdminRoute.Use(middleware.AdminAuth())
 		{

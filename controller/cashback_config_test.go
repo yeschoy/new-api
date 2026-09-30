@@ -362,6 +362,103 @@ func TestCashbackConfigStrategyUpdatesAreAtomicAndOldClientsPreserveStrategy(t *
 	}
 }
 
+func TestCashbackTieredConfigOmissionClearAndAtomicValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	body := strings.Replace(validCashbackConfigJSON, `"inviter_rate_bps":0,`, `"inviter_rate_bps":0,"inviter_strategy":"tiered","inviter_tiers":[{"threshold_cents":10050,"reward_cents":250},{"threshold_cents":20000,"reward_cents":1500}],`, 1)
+	require.Equal(t, http.StatusOK, runCashbackConfigUpdate(t, body).Code)
+	before, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	require.Len(t, before.InviterTiers, 2)
+	assert.EqualValues(t, 10050, before.InviterTiers[0].ThresholdCents)
+	require.Equal(t, http.StatusOK, runCashbackConfigUpdate(t, validCashbackConfigJSON).Code)
+	preserved, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Equal(t, before.InviterTiers, preserved.InviterTiers)
+
+	for _, tc := range []struct{ field, extra string }{
+		{"inviter_tiers", `"inviter_tiers":[{"threshold_cents":100,"reward_cents":1.001}]`},
+		{"inviter_tiers", `"inviter_tiers":[{"threshold_cents":100,"reward_cents":5},{"threshold_cents":100,"reward_cents":10}]`},
+		{"inviter_tiers", `"inviter_tiers":null`},
+		{"inviter_tiers", `"inviter_tiers":[{"threshold_cents":9223372036854775807,"reward_cents":10}]`},
+		{"invitee_tiers", `"invitee_tiers":[{"threshold_cents":"100","reward_cents":5}]`},
+	} {
+		request := strings.Replace(validCashbackConfigJSON, `"inviter_rate_bps":0,`, `"inviter_rate_bps":0,`+tc.extra+`,`, 1)
+		response := runCashbackConfigUpdate(t, request)
+		assert.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+		assert.Contains(t, response.Body.String(), `"field":"`+tc.field+`"`)
+		current, err := model.GetCashbackSettingFromDB()
+		require.NoError(t, err)
+		assert.Equal(t, preserved, current)
+	}
+	emptyEnabled := strings.Replace(validCashbackConfigJSON, `"inviter_enabled":false,`, `"inviter_enabled":true,`, 1)
+	emptyEnabled = strings.Replace(emptyEnabled, `"inviter_rate_bps":0,`, `"inviter_rate_bps":0,"inviter_strategy":"tiered","inviter_tiers":[],`, 1)
+	response := runCashbackConfigUpdate(t, emptyEnabled)
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	assert.Contains(t, response.Body.String(), `"field":"inviter_tiers"`)
+	cleared := strings.Replace(validCashbackConfigJSON, `"inviter_rate_bps":0,`, `"inviter_rate_bps":0,"inviter_strategy":"rate","inviter_tiers":[],`, 1)
+	require.Equal(t, http.StatusOK, runCashbackConfigUpdate(t, cleared).Code)
+	current, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Empty(t, current.InviterTiers)
+}
+
+func TestPublicCashbackOffersOnlyExposesLiveRules(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	body := strings.Replace(validCashbackConfigJSON, `"inviter_enabled":false,"invitee_enabled":false,`, `"inviter_enabled":true,"invitee_enabled":true,`, 1)
+	body = strings.Replace(body, `"inviter_rate_bps":0,"invitee_rate_bps":0,`, `"inviter_rate_bps":0,"invitee_rate_bps":1000,"inviter_strategy":"tiered","inviter_tiers":[{"threshold_cents":10050,"reward_cents":250}],`, 1)
+	require.Equal(t, http.StatusOK, runCashbackConfigUpdate(t, body).Code)
+	call := func() *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		context, _ := gin.CreateTestContext(recorder)
+		context.Request = httptest.NewRequest(http.MethodGet, "/api/cashback/public-offers", nil)
+		PublicCashbackOffers(context)
+		return recorder
+	}
+	response := call()
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.Contains(t, response.Body.String(), `"active":true`)
+	assert.Contains(t, response.Body.String(), `"inviter":{"strategy":"tiered","tiers":[{"threshold_cents":10050,"reward_cents":250}]}`)
+	assert.NotContains(t, response.Body.String(), `"invitee":`)
+	for _, secret := range []string{"max_reward_quota", "risk", "auto_review", "version", "compliance_confirmed"} {
+		assert.NotContains(t, response.Body.String(), secret)
+	}
+
+	now := time.Now().Unix()
+	campaign := model.CashbackCampaign{StartAt: now - 10, EndAt: now + 3600, MaxRewardsPerUser: 1, CreatedBy: 1}
+	require.NoError(t, model.DB.Create(&campaign).Error)
+	response = call()
+	assert.Contains(t, response.Body.String(), `"invitee":{"strategy":"rate","rate_bps":1000}`)
+	require.NoError(t, model.DB.Model(&campaign).Update("stopped_at", now).Error)
+	response = call()
+	assert.NotContains(t, response.Body.String(), `"invitee":`)
+
+	// An unavailable live-campaign table is an error, not a fabricated inactive offer.
+	require.NoError(t, model.DB.Model(&campaign).Update("stopped_at", 0).Error)
+	require.NoError(t, model.DB.Migrator().DropTable(&model.CashbackCampaign{}))
+	response = call()
+	assert.Equal(t, http.StatusServiceUnavailable, response.Code)
+	assert.NotContains(t, response.Body.String(), `"active":false`)
+}
+
+func TestPublicCashbackOffersFailsClosedWhenOptionsTableIsUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	require.NoError(t, model.DB.Migrator().DropTable(&model.Option{}))
+	setting, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Equal(t, operation_setting.DefaultCashbackSetting(), setting)
+
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(http.MethodGet, "/api/cashback/public-offers", nil)
+	PublicCashbackOffers(context)
+
+	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+	assert.NotContains(t, recorder.Body.String(), `"active":false`)
+}
+
 func TestUpdateCashbackConfigRejectsCombinedRateAboveOneHundredPercent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	setupCashbackConfigControllerTest(t)

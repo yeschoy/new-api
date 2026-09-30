@@ -16,6 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+export type CashbackTier = { threshold_cents: number; reward_cents: number }
+export type CashbackStrategy = 'rate' | 'per_hundred' | 'tiered'
+export type CashbackPublicOffer = {
+  strategy: CashbackStrategy
+  rate_bps?: number
+  fixed_per_hundred?: number
+  tiers?: CashbackTier[]
+}
+export type CashbackPublicOffers = {
+  active: boolean
+  currency: 'CNY'
+  inviter?: CashbackPublicOffer
+  invitee?: CashbackPublicOffer
+}
 export type CashbackDirection = 'inviter' | 'invitee'
 export type CashbackReviewStatus = 'pending' | 'approved' | 'rejected'
 export type CashbackSettlementStatus =
@@ -37,7 +51,7 @@ export type CashbackReward = {
   beneficiary_id: number
   base_quota: number
   rate_bps: number
-  strategy?: 'rate' | 'per_hundred' | ''
+  strategy?: CashbackStrategy | ''
   fixed_per_hundred?: number
   calculated_quota: number
   reward_quota: number

@@ -3,7 +3,7 @@
   "name": "configurable-tiered-cashback",
   "title": "充值人及邀请人可配置阶梯返现",
   "description": "为充值人和邀请人分别配置人民币阶梯返现档位，并按每笔充值达到的最高档计奖。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

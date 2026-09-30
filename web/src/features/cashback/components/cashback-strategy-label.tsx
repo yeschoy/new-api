@@ -26,6 +26,9 @@ type Props = {
 
 export function CashbackStrategyLabel(props: Props) {
   const { t } = useTranslation()
+  if (props.reward.strategy === 'tiered') {
+    return <>{t('Tiered fixed reward')}</>
+  }
   if (props.reward.strategy === 'per_hundred') {
     return (
       <>

@@ -947,6 +947,38 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	require.Equal(t, 30, fixedReward.FixedPerHundred)
 	require.Equal(t, 60_000, fixedReward.CalculatedQuota)
 	require.Equal(t, 60_000, fixedReward.RewardQuota)
+
+	// The Option JSON, cache and reward snapshot round-trip on each real engine.
+	setting.InviterStrategy = operation_setting.CashbackStrategyTiered
+	tiers := []operation_setting.CashbackTier{{ThresholdCents: 10050, RewardCents: 250}, {ThresholdCents: 20000, RewardCents: 1500}}
+	candidate := setting
+	_, stored, err := UpdateCashbackSettingAtomic(candidate, true, now, operation_setting.CashbackReviewPolicyUpdate{Strategy: operation_setting.CashbackStrategyUpdate{
+		InviterStrategy: &candidate.InviterStrategy, InviterTiers: &tiers,
+	}})
+	require.NoError(t, err)
+	require.Equal(t, tiers, stored.InviterTiers)
+	loaded, err := GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	require.Equal(t, tiers, loaded.InviterTiers)
+	require.Equal(t, tiers, operation_setting.GetCashbackSetting().InviterTiers)
+
+	tierPayer := User{Username: namespace + "_tier_payer", AffCode: "tier_" + namespace[len(namespace)-8:], InviterId: inviter.Id, Status: common.UserStatusEnabled}
+	require.NoError(t, db.Create(&tierPayer).Error)
+	tierOrder := TopUp{UserId: tierPayer.Id, Amount: 201, Money: 1, TradeNo: namespace + "_tier_order",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, InsertOnlineTopUp(&tierOrder, 201_000, CashbackRequestMetadata{FaceAmount: 201, QuotaPerFaceUnit: "1000"}))
+	_, err = RechargeEpay(tierOrder.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(tierOrder.TradeNo))
+	require.NoError(t, err)
+	var tierReward CashbackReward
+	require.NoError(t, db.Where("top_up_id = ? AND direction = ?", tierOrder.Id, CashbackDirectionInviter).First(&tierReward).Error)
+	require.Equal(t, operation_setting.CashbackStrategyTiered, tierReward.Strategy)
+	require.Equal(t, 15_000, tierReward.RewardQuota)
+	require.Contains(t, tierReward.ConfigSnapshot, `"threshold_cents":20000`)
+	_, err = RechargeEpay(tierOrder.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(tierOrder.TradeNo))
+	require.NoError(t, err)
+	var count int64
+	require.NoError(t, db.Model(&CashbackReward{}).Where("top_up_id = ?", tierOrder.Id).Count(&count).Error)
+	require.EqualValues(t, 1, count)
 }
 
 func newCashbackIntegrationNamespace(t *testing.T) string {

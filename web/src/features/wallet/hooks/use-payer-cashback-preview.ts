@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
 
 import { useDebounce } from '@/hooks/use-debounce'
 import { useAuthStore } from '@/stores/auth-store'
@@ -79,23 +78,17 @@ export type PayerCashbackPreviewState = ReturnType<
   typeof usePayerCashbackPreview
 >
 
-/**
- * Keeps the last campaign rule proven by a settled preview so per-amount
- * hints do not flicker while a new amount is being checked.
- */
+/** Only a settled preview for the current selection can power preset hints. */
 export function usePayerCashbackRule(
   state: PayerCashbackPreviewState
 ): PayerCashbackRule | null {
-  const [rule, setRule] = useState<PayerCashbackRule | null>(null)
-  const { data, isFetching, isError } = state.query
-  useEffect(() => {
-    if (isError) {
-      setRule(null)
-      return
-    }
-    if (isFetching) return
-    const next = getPayerCashbackRule(data)
-    if (next !== undefined) setRule(next)
-  }, [data, isFetching, isError])
-  return rule
+  if (
+    !state.valid ||
+    !state.selectionReady ||
+    state.query.isFetching ||
+    state.query.isError
+  ) {
+    return null
+  }
+  return getPayerCashbackRule(state.query.data) ?? null
 }

@@ -93,6 +93,134 @@ const detail: CashbackRewardDetail = {
 }
 
 describe('cashback detail settlement eligibility', () => {
+  it('displays the matched tier from the immutable snapshot and checkout face', async () => {
+    vi.mocked(getCashbackReward).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        ...detail,
+        reward: { ...detail.reward, strategy: 'tiered', rate_bps: 0 },
+        order: {
+          ...detail.order,
+          face_amount: 250,
+          quota_per_face_unit: '500000',
+        },
+        config_snapshot: {
+          invitee_tiers: [
+            { threshold_cents: 10050, reward_cents: 250 },
+            { threshold_cents: 20000, reward_cents: 1500 },
+          ],
+        },
+      },
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+      </QueryClientProvider>
+    )
+    expect(await screen.findByText('Tiered fixed reward')).toBeVisible()
+    expect(screen.getByText(/¥200\.00.*¥15\.00/)).toBeVisible()
+    queryClient.clear()
+  })
+
+  it.each([
+    { face: 101, expected: '¥100.50', reached: true },
+    { face: 100, expected: '—', reached: false },
+  ])(
+    'shows the snapshot tier for face $face despite zero calculated quota only when reached',
+    async ({ face, expected, reached }) => {
+      vi.mocked(getCashbackReward).mockResolvedValue({
+        success: true,
+        message: '',
+        data: {
+          ...detail,
+          reward: {
+            ...detail.reward,
+            strategy: 'tiered',
+            rate_bps: 0,
+            calculated_quota: 0,
+            reward_quota: 0,
+            settlement_status: 'canceled',
+          },
+          order: {
+            ...detail.order,
+            face_amount: face,
+            quota_per_face_unit: '1.01',
+          },
+          config_snapshot: {
+            invitee_tiers: [{ threshold_cents: 10050, reward_cents: 1 }],
+          },
+        },
+      })
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      })
+      render(
+        <QueryClientProvider client={queryClient}>
+          <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+        </QueryClientProvider>
+      )
+
+      expect(await screen.findByText('Highest tier reached')).toBeVisible()
+      const row = screen.getByText('Highest tier reached').parentElement
+      if (reached) {
+        expect(row).toHaveTextContent(expected)
+        expect(row).toHaveTextContent('¥0.01')
+      } else {
+        expect(row).toHaveTextContent(expected)
+        expect(row).not.toHaveTextContent('¥100.50')
+      }
+      queryClient.clear()
+    }
+  )
+
+  it.each(['strategy_not_applicable', 'face_basis_unavailable'])(
+    'does not claim a reached tier for a canceled reward with %s',
+    async (reason) => {
+      vi.mocked(getCashbackReward).mockResolvedValue({
+        success: true,
+        message: '',
+        data: {
+          ...detail,
+          reward: {
+            ...detail.reward,
+            strategy: 'tiered',
+            rate_bps: 0,
+            calculated_quota: 0,
+            reward_quota: 0,
+            cap_reason: reason,
+            settlement_status: 'canceled',
+          },
+          order: {
+            ...detail.order,
+            face_amount: 250,
+            quota_per_face_unit: '500000',
+          },
+          config_snapshot: {
+            invitee_tiers: [{ threshold_cents: 20000, reward_cents: 1500 }],
+          },
+        },
+      })
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+      })
+      render(
+        <QueryClientProvider client={queryClient}>
+          <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+        </QueryClientProvider>
+      )
+
+      const row = (await screen.findByText('Highest tier reached'))
+        .parentElement
+      expect(row).toHaveTextContent('—')
+      expect(row).not.toHaveTextContent('¥200.00')
+      queryClient.clear()
+    }
+  )
+
   it('shows internal quota alongside CNY only after opening reward details', async () => {
     vi.mocked(getCashbackReward).mockResolvedValue({
       success: true,

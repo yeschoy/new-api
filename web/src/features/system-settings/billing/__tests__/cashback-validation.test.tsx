@@ -30,6 +30,7 @@ import { SettingsPageProvider } from '../../components/settings-page-context'
 import type { CashbackConfig } from '../../types'
 import { CashbackCampaigns } from '../cashback-campaigns'
 import { CashbackSettingsForm } from '../cashback-settings-form'
+import { parseCnyCents } from '../cashback-tier-amount'
 
 const {
   updateCashbackConfig,
@@ -111,6 +112,133 @@ function renderForm() {
 }
 
 describe('cashback settings validation', () => {
+  it('parses exact cents and rejects sub-cent or unsafe integer values', () => {
+    expect(parseCnyCents('100.50')).toBe(10050)
+    expect(parseCnyCents('0.01')).toBe(1)
+    expect(parseCnyCents('100.001')).toBeNull()
+    expect(parseCnyCents('90071992547409.92')).toBeNull()
+  })
+
+  it('saves independent cent-precise tiers and keeps inactive tier data on a strategy switch', async () => {
+    updateCashbackConfig.mockResolvedValue({ success: true, data: config })
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(
+      screen.getByRole('combobox', { name: 'Inviter cashback strategy' })
+    )
+    await user.click(
+      await screen.findByRole('option', { name: 'Tiered fixed reward' })
+    )
+    await user.click(screen.getByRole('button', { name: 'Add tier' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Threshold (CNY)' }), {
+      target: { value: '100.50' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Reward (CNY)' }), {
+      target: { value: '2.50' },
+    })
+    await user.click(
+      screen.getByRole('combobox', { name: 'Inviter cashback strategy' })
+    )
+    await user.click(
+      await screen.findByRole('option', { name: 'Percentage of top-up' })
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    await waitFor(() => expect(updateCashbackConfig).toHaveBeenCalled())
+    expect(updateCashbackConfig.mock.calls[0][0].inviter_tiers).toEqual([
+      { threshold_cents: 10050, reward_cents: 250 },
+    ])
+  })
+
+  it('edits both directions independently and removes a tier with an accessible button', async () => {
+    updateCashbackConfig.mockResolvedValue({ success: true, data: config })
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(
+      screen.getByRole('combobox', { name: 'Payer cashback strategy' })
+    )
+    await user.click(
+      await screen.findByRole('option', { name: 'Tiered fixed reward' })
+    )
+    await user.click(screen.getByRole('button', { name: 'Add tier' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Threshold (CNY)' }), {
+      target: { value: '200' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Reward (CNY)' }), {
+      target: { value: '15' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Add tier' }))
+    const remove = screen.getByRole('button', {
+      name: 'Remove tier 2 from Payer tiers',
+    })
+    remove.focus()
+    await user.keyboard('{Enter}')
+    expect(
+      screen.getAllByRole('textbox', { name: 'Threshold (CNY)' })
+    ).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Add tier' })).toHaveFocus()
+    await user.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    await waitFor(() => expect(updateCashbackConfig).toHaveBeenCalled())
+    expect(updateCashbackConfig.mock.calls[0][0]).toMatchObject({
+      inviter_tiers: [],
+      invitee_tiers: [{ threshold_cents: 20000, reward_cents: 1500 }],
+    })
+  })
+
+  it('rejects missing, malformed and duplicate tier thresholds before submitting', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await user.click(screen.getByRole('switch', { name: 'Reward the inviter' }))
+    await user.click(
+      screen.getByRole('combobox', { name: 'Inviter cashback strategy' })
+    )
+    await user.click(
+      await screen.findByRole('option', { name: 'Tiered fixed reward' })
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(await screen.findByText('Configure 1 to 32 tiers')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Add tier' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Threshold (CNY)' }), {
+      target: { value: '100.001' },
+    })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Reward (CNY)' }), {
+      target: { value: '2.50' },
+    })
+    await user.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(
+      await screen.findByText(
+        'Enter increasing positive CNY amounts with at most two decimals'
+      )
+    ).toBeVisible()
+    expect(updateCashbackConfig).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Threshold (CNY)' }), {
+      target: { value: '100.50' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Add tier' }))
+    fireEvent.change(
+      screen.getAllByRole('textbox', { name: 'Threshold (CNY)' })[1],
+      { target: { value: '100.50' } }
+    )
+    fireEvent.change(
+      screen.getAllByRole('textbox', { name: 'Reward (CNY)' })[1],
+      { target: { value: '2.00' } }
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(
+      screen.getAllByRole('textbox', { name: 'Threshold (CNY)' })[1]
+    ).toHaveAttribute('aria-invalid', 'true')
+    expect(updateCashbackConfig).not.toHaveBeenCalled()
+  })
+
   it('associates the immutable first-enable label with its read-only value', () => {
     renderForm()
 

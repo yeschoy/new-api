@@ -2,9 +2,11 @@ package operation_setting
 
 import (
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,6 +87,8 @@ func TestCashbackSettingOptionsRoundTrip(t *testing.T) {
 		InviterStrategy:          CashbackStrategyPerHundred,
 		InviteeStrategy:          CashbackStrategyRate,
 		InviterFixedPerHundred:   15,
+		InviterTiers:             []CashbackTier{},
+		InviteeTiers:             []CashbackTier{},
 		SettlementDays:           14,
 		MaxRewardQuota:           90_000,
 		DailyRewardQuota:         180_000,
@@ -95,11 +99,13 @@ func TestCashbackSettingOptionsRoundTrip(t *testing.T) {
 		Version:                  9,
 	}
 
-	parsed, err := ParseCashbackSettingOptions(CashbackSettingOptionValues(original))
+	values, err := CashbackSettingOptionValues(original)
+	require.NoError(t, err)
+	parsed, err := ParseCashbackSettingOptions(values)
 	require.NoError(t, err)
 	assert.Equal(t, original, parsed)
 
-	legacy := CashbackSettingOptionValues(original)
+	legacy := values
 	delete(legacy, CashbackSettingName+".inviter_strategy")
 	delete(legacy, CashbackSettingName+".invitee_strategy")
 	delete(legacy, CashbackSettingName+".inviter_fixed_per_hundred")
@@ -109,6 +115,75 @@ func TestCashbackSettingOptionsRoundTrip(t *testing.T) {
 	assert.Equal(t, CashbackStrategyRate, parsed.InviterStrategy)
 	assert.Equal(t, CashbackStrategyRate, parsed.InviteeStrategy)
 	assert.Zero(t, parsed.InviterFixedPerHundred)
+}
+
+func TestCashbackTierValidationAndOptionRoundTrip(t *testing.T) {
+	valid := DefaultCashbackSetting()
+	valid.InviterEnabled = true
+	valid.InviterStrategy = CashbackStrategyTiered
+	valid.InviterTiers = []CashbackTier{{ThresholdCents: 10050, RewardCents: 250}, {ThresholdCents: 20000, RewardCents: 1500}}
+	valid.InviteeStrategy = CashbackStrategyPerHundred
+	valid.InviteeFixedPerHundred = 10
+	valid.FirstEnabledAt = 1
+	valid.MaxRewardQuota = 100000
+	valid.DailyRewardQuota = 100000
+	require.NoError(t, ValidateCashbackSetting(valid, true))
+	values, err := CashbackSettingOptionValues(valid)
+	require.NoError(t, err)
+	parsed, err := ParseCashbackSettingOptions(values)
+	require.NoError(t, err)
+	assert.Equal(t, valid, parsed)
+	delete(values, CashbackSettingName+".inviter_tiers")
+	parsed, err = ParseCashbackSettingOptions(values)
+	require.NoError(t, err)
+	assert.Empty(t, parsed.InviterTiers)
+
+	for _, tc := range []struct {
+		name  string
+		tiers []CashbackTier
+	}{
+		{"missing", nil},
+		{"duplicate", []CashbackTier{{100, 1}, {100, 2}}},
+		{"unordered", []CashbackTier{{200, 1}, {100, 2}}},
+		{"zero threshold", []CashbackTier{{0, 1}}},
+		{"negative reward", []CashbackTier{{100, -1}}},
+		{"overpaid", []CashbackTier{{100, 101}}},
+		{"overflow", []CashbackTier{{math.MaxInt64, 1}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := valid
+			s.InviterTiers = tc.tiers
+			var validation *CashbackSettingValidationError
+			require.ErrorAs(t, ValidateCashbackSetting(s, true), &validation)
+			assert.Equal(t, "inviter_tiers", validation.Field)
+		})
+	}
+	tooMany := valid
+	tooMany.InviterTiers = make([]CashbackTier, CashbackMaxTiers+1)
+	var validation *CashbackSettingValidationError
+	require.ErrorAs(t, ValidateCashbackSetting(tooMany, true), &validation)
+	assert.Equal(t, "inviter_tiers", validation.Field)
+
+	combined := valid
+	combined.InviteeFixedPerHundred = 95
+	require.ErrorAs(t, ValidateCashbackSetting(combined, true), &validation)
+	assert.Equal(t, "invitee_fixed_per_hundred", validation.Field)
+}
+
+func TestCashbackTierCacheReplacesEntireSchedule(t *testing.T) {
+	cached := DefaultCashbackSetting()
+	manager := config.NewConfigManager()
+	manager.Register(CashbackSettingName, &cached)
+	require.NoError(t, manager.UpdateFromMap(CashbackSettingName, map[string]string{
+		"inviter_tiers": `[{"threshold_cents":10050,"reward_cents":250},{"threshold_cents":20000,"reward_cents":1500}]`,
+	}))
+	require.Len(t, cached.InviterTiers, 2)
+	require.NoError(t, manager.UpdateFromMap(CashbackSettingName, map[string]string{
+		"inviter_tiers": `[{"threshold_cents":50000,"reward_cents":4000}]`,
+	}))
+	assert.Equal(t, []CashbackTier{{50000, 4000}}, cached.InviterTiers)
+	require.NoError(t, manager.UpdateFromMap(CashbackSettingName, map[string]string{"inviter_tiers": `[]`}))
+	assert.Empty(t, cached.InviterTiers)
 }
 
 func TestParseCashbackSettingOptionsRejectsMalformedValues(t *testing.T) {

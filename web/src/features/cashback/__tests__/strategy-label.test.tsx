@@ -20,8 +20,15 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { CashbackStrategyLabel } from '../components/cashback-strategy-label'
+import { formatCashbackCents } from '../lib/format'
 
 describe('cashback strategy display', () => {
+  it('keeps an exact cent even at the maximum safe integer', () => {
+    expect(formatCashbackCents(9007199254740991, 'en-US')).toBe(
+      '¥90,071,992,547,409.91'
+    )
+  })
+
   it('shows the fixed amount instead of a misleading zero percent for per-hundred rewards', () => {
     render(
       <CashbackStrategyLabel
@@ -29,6 +36,14 @@ describe('cashback strategy display', () => {
       />
     )
     expect(screen.getByText('Every 100 of top-up returns 20')).toBeVisible()
+    expect(screen.queryByText('0.00%')).not.toBeInTheDocument()
+  })
+
+  it('labels tiered rewards without reporting a misleading zero percent', () => {
+    render(
+      <CashbackStrategyLabel reward={{ strategy: 'tiered', rate_bps: 0 }} />
+    )
+    expect(screen.getByText('Tiered fixed reward')).toBeVisible()
     expect(screen.queryByText('0.00%')).not.toBeInTheDocument()
   })
 

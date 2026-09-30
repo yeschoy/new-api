@@ -40,7 +40,11 @@ import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { useCashbackReward } from '../hooks/use-cashback'
-import { cashbackFaceQuota, formatCashbackQuota } from '../lib/format'
+import {
+  cashbackFaceQuota,
+  formatCashbackCents,
+  formatCashbackQuota,
+} from '../lib/format'
 import { isManuallyApprovedPayer } from '../lib/settlement'
 import {
   CashbackActionDialog,
@@ -100,6 +104,53 @@ function riskCount(
 ): string | number {
   const value = snapshot[key]
   return typeof value === 'number' && Number.isFinite(value) ? value : '—'
+}
+
+function matchedSnapshotTier(
+  detail: NonNullable<ReturnType<typeof useCashbackReward>['data']>
+) {
+  if (
+    detail.reward.strategy !== 'tiered' ||
+    detail.reward.cap_reason
+      .split(',')
+      .some((reason) =>
+        ['strategy_not_applicable', 'face_basis_unavailable'].includes(reason)
+      )
+  ) {
+    return null
+  }
+  const key =
+    detail.reward.direction === 'inviter' ? 'inviter_tiers' : 'invitee_tiers'
+  const tiers = detail.config_snapshot[key]
+  const face = detail.order.face_amount
+  if (
+    typeof face !== 'number' ||
+    !Number.isSafeInteger(face) ||
+    !Number.isSafeInteger(face * 100) ||
+    !Array.isArray(tiers)
+  ) {
+    return null
+  }
+  let matched: { threshold_cents: number; reward_cents: number } | null = null
+  for (const tier of tiers) {
+    if (
+      !tier ||
+      typeof tier !== 'object' ||
+      !Number.isSafeInteger(tier.threshold_cents) ||
+      tier.threshold_cents <= 0 ||
+      !Number.isSafeInteger(tier.reward_cents) ||
+      tier.reward_cents <= 0
+    ) {
+      continue
+    }
+    if (
+      tier.threshold_cents <= face * 100 &&
+      (!matched || tier.threshold_cents > matched.threshold_cents)
+    ) {
+      matched = tier
+    }
+  }
+  return matched
 }
 
 function DetailRow(props: { label: string; value: ReactNode }) {
@@ -260,6 +311,29 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                       label={t('Cashback strategy')}
                       value={<CashbackStrategyLabel reward={detail.reward} />}
                     />
+                    {detail.reward.strategy === 'tiered' && (
+                      <DetailRow
+                        label={t('Highest tier reached')}
+                        value={(() => {
+                          const tier = matchedSnapshotTier(detail)
+                          return tier
+                            ? t(
+                                'Top up {{threshold}} or more: {{reward}} back',
+                                {
+                                  threshold: formatCashbackCents(
+                                    tier.threshold_cents,
+                                    locale
+                                  ),
+                                  reward: formatCashbackCents(
+                                    tier.reward_cents,
+                                    locale
+                                  ),
+                                }
+                              )
+                            : '—'
+                        })()}
+                      />
+                    )}
                     <DetailRow
                       label={t('Selected top-up amount')}
                       value={(() => {
