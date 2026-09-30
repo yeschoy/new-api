@@ -520,3 +520,31 @@ test('preset cashback hints stay hidden when the payer cannot receive cashback',
   ).toBeVisible()
   expect(screen.queryByText(/^Cashback /)).not.toBeInTheDocument()
 })
+
+test('a capped estimate explains the rule amount and the limit that reduced it', async () => {
+  api.defaults.adapter = async (config) => ({
+    config,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      success: true,
+      data: {
+        status: 'estimated',
+        strategy: 'per_hundred',
+        fixed_per_hundred: 3,
+        calculated_quota: 600,
+        reward_quota: 100,
+        cap_reason: 'single_cap',
+        as_of: 1,
+      },
+    },
+  })
+  renderCnyRechargeForm(250)
+  expect(await screen.findByText('Estimated cashback: ¥1.00')).toBeVisible()
+  expect(
+    screen.getByText(
+      'The rule gives ¥6.00, reduced by the single cashback limit.'
+    )
+  ).toBeVisible()
+})

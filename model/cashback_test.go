@@ -4157,6 +4157,8 @@ func TestPayerCashbackPreviewMatchesFaceAndCapsWithoutWriting(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "estimated", preview.Status)
 	assert.Equal(t, 10_000_000, preview.RewardQuota) // Fixed face, not paid price.
+	assert.Equal(t, 10_000_000, preview.CalculatedQuota)
+	assert.Empty(t, preview.CapReason)
 	assert.Equal(t, 20, preview.FixedPerHundred)
 	preview, err = PreviewPayerCashback(payer.Id, 49_500_000, 99, "500000")
 	require.NoError(t, err)

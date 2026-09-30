@@ -2735,6 +2735,8 @@
     "Error Type (optional)": "Error Type (optional)",
     "Estimate only. Eligibility and final cashback are determined when payment succeeds.": "Estimate only. Eligibility and final cashback are determined when payment succeeds.",
     "Estimated cashback: {{amount}}": "Estimated cashback: {{amount}}",
+    "The rule gives {{calculated}}, reduced by the single cashback limit.": "The rule gives {{calculated}}, reduced by the single cashback limit.",
+    "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.": "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.",
     "Estimated cost": "Estimated cost",
     "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.": "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.",
     "Estimated from the recorded model base price; provider official pricing has not been independently verified.": "Estimated from the recorded model base price; provider official pricing has not been independently verified.",

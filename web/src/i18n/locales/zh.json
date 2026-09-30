@@ -2735,6 +2735,8 @@
     "Error Type (optional)": "错误类型（可选）",
     "Estimate only. Eligibility and final cashback are determined when payment succeeds.": "仅供预估；实际资格与返现金额以支付成功时的结算为准。",
     "Estimated cashback: {{amount}}": "预计返现：{{amount}}",
+    "The rule gives {{calculated}}, reduced by the single cashback limit.": "按活动规则应返 {{calculated}}，已按单笔返现上限封顶。",
+    "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.": "按活动规则应返 {{calculated}}，已按你 24 小时内剩余的返现额度封顶。",
     "Estimated cost": "预计成本",
     "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.": "根据已记录的模型基价估算。参考币种按模型所属厂商识别，尚未经厂商官方价格独立核验。",
     "Estimated from the recorded model base price; provider official pricing has not been independently verified.": "按请求当时记录的模型基准价估算，未单独核验厂商官方价格。",

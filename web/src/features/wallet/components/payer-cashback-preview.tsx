@@ -43,6 +43,7 @@ export function PayerCashbackPreviewView(props: ViewProps) {
     })
 
   let message: string
+  let capNote: string | null = null
   if (!valid || !userId) {
     message = t('Select a valid amount to preview cashback.')
   } else if (!props.productId && props.amount === 0) {
@@ -60,16 +61,39 @@ export function PayerCashbackPreviewView(props: ViewProps) {
     message = t('Cashback estimate is temporarily unavailable.')
   } else {
     switch (query.data.status) {
-      case 'estimated':
+      case 'estimated': {
+        const amountOptions = {
+          locale,
+          minimumFractionDigits: 2,
+          digitsSmall: quotaDigits,
+          abbreviate: false,
+        }
         message = t('Estimated cashback: {{amount}}', {
-          amount: formatQuotaWithCurrency(query.data.reward_quota, {
-            locale,
-            minimumFractionDigits: 2,
-            digitsSmall: quotaDigits,
-            abbreviate: false,
-          }),
+          amount: formatQuotaWithCurrency(
+            query.data.reward_quota,
+            amountOptions
+          ),
         })
+        const capReasons = (query.data.cap_reason ?? '').split(',')
+        const calculated = query.data.calculated_quota ?? 0
+        if (calculated > query.data.reward_quota) {
+          const values = {
+            calculated: formatQuotaWithCurrency(calculated, amountOptions),
+          }
+          if (capReasons.includes('single_cap')) {
+            capNote = t(
+              'The rule gives {{calculated}}, reduced by the single cashback limit.',
+              values
+            )
+          } else if (capReasons.includes('daily_cap')) {
+            capNote = t(
+              'The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.',
+              values
+            )
+          }
+        }
         break
+      }
       case 'no_campaign':
         message = t('No active cashback campaign for this top-up.')
         break
@@ -137,6 +161,7 @@ export function PayerCashbackPreviewView(props: ViewProps) {
         )}
         {fixedRule && <p>{fixedRule}</p>}
         <p>{message}</p>
+        {capNote && <p>{capNote}</p>}
         <p>
           {t(
             'Estimate only. Eligibility and final cashback are determined when payment succeeds.'

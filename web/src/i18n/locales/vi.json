@@ -2735,6 +2735,8 @@
     "Error Type (optional)": "Loại lỗi (tùy chọn)",
     "Estimate only. Eligibility and final cashback are determined when payment succeeds.": "Chỉ là ước tính. Điều kiện và tiền thưởng thực tế được xác định khi thanh toán thành công.",
     "Estimated cashback: {{amount}}": "Hoàn thưởng dự kiến: {{amount}}",
+    "The rule gives {{calculated}}, reduced by the single cashback limit.": "Theo thể lệ được hoàn {{calculated}}, đã bị giới hạn bởi mức tối đa mỗi phần thưởng.",
+    "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.": "Theo thể lệ được hoàn {{calculated}}, đã bị giới hạn bởi hạn mức hoàn còn lại trong 24 giờ.",
     "Estimated cost": "Chi phí ước tính",
     "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.": "Ước tính từ giá gốc đã ghi nhận. Tiền tệ tham chiếu được xác định theo dòng mô hình; giá chính thức của nhà cung cấp chưa được kiểm chứng độc lập.",
     "Estimated from the recorded model base price; provider official pricing has not been independently verified.": "Ước tính từ giá cơ sở của mô hình được ghi lại; giá chính thức của nhà cung cấp chưa được xác minh riêng.",

@@ -47,7 +47,11 @@ export interface PayerCashbackPreview {
   strategy?: 'rate' | 'per_hundred'
   rate_bps?: number
   fixed_per_hundred?: number
+  /** Rule result before single/24-hour limits. */
+  calculated_quota?: number
   reward_quota: number
+  /** Comma-separated limits that reduced the estimate: single_cap, daily_cap. */
+  cap_reason?: string
   as_of: number
 }
 export type PayerCashbackPreviewResponse = ApiResponse<PayerCashbackPreview>

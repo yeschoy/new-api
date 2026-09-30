@@ -14,7 +14,9 @@ type CashbackPayerPreview struct {
 	Strategy        string `json:"strategy,omitempty"`
 	RateBPS         int    `json:"rate_bps,omitempty"`
 	FixedPerHundred int    `json:"fixed_per_hundred,omitempty"`
+	CalculatedQuota int    `json:"calculated_quota,omitempty"`
 	RewardQuota     int    `json:"reward_quota"`
+	CapReason       string `json:"cap_reason,omitempty"` // limits that reduced the estimate: single_cap, daily_cap
 	AsOf            int64  `json:"as_of"`
 }
 
@@ -103,7 +105,8 @@ func PreviewPayerCashback(userID, baseQuota int, faceAmount int64, factor string
 		if err != nil {
 			return err
 		}
-		preview.RewardQuota, _ = capCashbackQuota(calculated, dailyUsed, setting)
+		preview.CalculatedQuota = calculated
+		preview.RewardQuota, preview.CapReason = capCashbackQuota(calculated, dailyUsed, setting)
 		if preview.RewardQuota == 0 {
 			preview.Status = "cap_exhausted"
 		} else {

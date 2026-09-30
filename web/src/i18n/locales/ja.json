@@ -2735,6 +2735,8 @@
     "Error Type (optional)": "エラータイプ（任意）",
     "Estimate only. Eligibility and final cashback are determined when payment succeeds.": "見込み額です。実際の対象資格と還元額は決済成功時の精算で決まります。",
     "Estimated cashback: {{amount}}": "還元見込み：{{amount}}",
+    "The rule gives {{calculated}}, reduced by the single cashback limit.": "ルール上の還元額は {{calculated}} ですが、1件あたりの上限により減額されています。",
+    "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.": "ルール上の還元額は {{calculated}} ですが、24時間の残り還元枠により減額されています。",
     "Estimated cost": "推定コスト",
     "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.": "記録された基本料金からの概算です。参考通貨はモデルの系列に基づき判定しており、提供元の公式料金は個別に確認していません。",
     "Estimated from the recorded model base price; provider official pricing has not been independently verified.": "リクエスト時に記録されたモデル基準価格からの推定です。提供元の公式価格は個別に確認していません。",

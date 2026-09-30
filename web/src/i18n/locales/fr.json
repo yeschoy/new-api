@@ -2735,6 +2735,8 @@
     "Error Type (optional)": "Type d'erreur (optionnel)",
     "Estimate only. Eligibility and final cashback are determined when payment succeeds.": "Estimation uniquement. Éligibilité et bonus définitif déterminés après paiement réussi.",
     "Estimated cashback: {{amount}}": "Bonus estimé : {{amount}}",
+    "The rule gives {{calculated}}, reduced by the single cashback limit.": "La règle donne {{calculated}}, réduit par le plafond par récompense.",
+    "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.": "La règle donne {{calculated}}, réduit par votre allocation restante sur 24 h.",
     "Estimated cost": "Coût estimé",
     "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.": "Estimation selon le tarif de base enregistré. La devise de référence dépend de la famille du modèle ; le tarif officiel du fournisseur n’a pas été vérifié indépendamment.",
     "Estimated from the recorded model base price; provider official pricing has not been independently verified.": "Estimation fondée sur le prix de base enregistré du modèle ; le tarif officiel du fournisseur n’a pas été vérifié séparément.",

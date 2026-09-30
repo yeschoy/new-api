@@ -2735,6 +2735,8 @@
     "Error Type (optional)": "錯誤類型（可選）",
     "Estimate only. Eligibility and final cashback are determined when payment succeeds.": "僅供預估；實際資格與回饋金額以付款成功時的結算為準。",
     "Estimated cashback: {{amount}}": "預估回饋：{{amount}}",
+    "The rule gives {{calculated}}, reduced by the single cashback limit.": "依活動規則應返 {{calculated}}，已按單筆返現上限封頂。",
+    "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.": "依活動規則應返 {{calculated}}，已按你 24 小時內剩餘的返現額度封頂。",
     "Estimated cost": "預計成本",
     "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.": "根據已記錄的模型基價估算。參考幣別按模型所屬廠商識別，尚未經廠商官方價格獨立核驗。",
     "Estimated from the recorded model base price; provider official pricing has not been independently verified.": "依請求當時記錄的模型基準價估算，未另行核驗供應商官方價格。",

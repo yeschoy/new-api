@@ -2735,6 +2735,8 @@
     "Error Type (optional)": "Тип ошибки (необязательно)",
     "Estimate only. Eligibility and final cashback are determined when payment succeeds.": "Только оценка. Право на бонус и итоговая сумма определяются после успешной оплаты.",
     "Estimated cashback: {{amount}}": "Ожидаемый бонус: {{amount}}",
+    "The rule gives {{calculated}}, reduced by the single cashback limit.": "По правилу положено {{calculated}}, сумма ограничена лимитом одной выплаты.",
+    "The rule gives {{calculated}}, reduced by your remaining 24-hour cashback allowance.": "По правилу положено {{calculated}}, сумма ограничена остатком лимита за 24 часа.",
     "Estimated cost": "Примерная стоимость",
     "Estimated from the recorded base price. The reference currency follows the model family; provider official pricing has not been independently verified.": "Оценка по записанному базовому тарифу. Валюта определяется по семейству модели; официальный тариф поставщика отдельно не проверялся.",
     "Estimated from the recorded model base price; provider official pricing has not been independently verified.": "Оценка по сохранённой базовой цене модели; официальная цена поставщика отдельно не проверялась.",
