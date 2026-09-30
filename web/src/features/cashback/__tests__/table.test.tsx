@@ -23,6 +23,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { getCashbackRewards, getCashbackSummary } from '../api'
 import { CashbackTable } from '../components/cashback-table'
 import { Cashback } from '../index'
+import { formatCashbackQuota } from '../lib/format'
 import type { CashbackRewardPage } from '../types'
 
 vi.mock('../api', async (importOriginal) => ({
@@ -154,6 +155,32 @@ describe('cashback table', () => {
     expect(screen.getByText(label)).toBeVisible()
   })
 
+  it('shows a fixed-per-100 reward as a fixed return rather than zero percent', () => {
+    render(
+      <CashbackTable
+        page={{
+          ...page,
+          items: [
+            {
+              ...page.items[0],
+              base_quota: 50_500_000,
+              strategy: 'per_hundred',
+              fixed_per_hundred: 6,
+              rate_bps: 0,
+            },
+          ],
+        }}
+        isLoading={false}
+        isError={false}
+        onSelect={vi.fn()}
+        onPageChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Every 100 of top-up returns 6')).toBeVisible()
+    expect(screen.queryByText('0.00%')).not.toBeInTheDocument()
+  })
+
   it('shows an automatically reviewed severe payer reward without hiding its risk', () => {
     render(
       <CashbackTable
@@ -276,7 +303,7 @@ describe('cashback table', () => {
 
     expect(screen.getByText('Canceled')).toBeVisible()
     expect(screen.queryByText('Pending review')).not.toBeInTheDocument()
-    expect(screen.getByText('50')).toBeVisible()
+    expect(screen.getByText(formatCashbackQuota(50))).toBeVisible()
     expect(screen.queryByText(/2023-11-\d+/)).not.toBeInTheDocument()
   })
 

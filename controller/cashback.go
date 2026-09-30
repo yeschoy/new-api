@@ -24,6 +24,8 @@ type cashbackRewardListItem struct {
 	BeneficiaryID           int                            `json:"beneficiary_id"`
 	BaseQuota               int                            `json:"base_quota"`
 	RateBPS                 int                            `json:"rate_bps"`
+	Strategy                string                         `json:"strategy"`
+	FixedPerHundred         int                            `json:"fixed_per_hundred"`
 	CalculatedQuota         int                            `json:"calculated_quota"`
 	RewardQuota             int                            `json:"reward_quota"`
 	CapReason               string                         `json:"cap_reason"`
@@ -61,6 +63,8 @@ type cashbackOrderContextDTO struct {
 	PaymentProvider               string                         `json:"payment_provider"`
 	BaseQuota                     int                            `json:"base_quota"`
 	CreditedQuota                 int                            `json:"credited_quota"`
+	FaceAmount                    int64                          `json:"face_amount"`
+	QuotaPerFaceUnit              string                         `json:"quota_per_face_unit"`
 	RequestIP                     string                         `json:"request_ip"`
 	RequestUserAgentHash          string                         `json:"request_user_agent_hash"`
 	DeviceFingerprintHash         string                         `json:"device_fingerprint_hash"`
@@ -384,7 +388,8 @@ func cashbackRewardToListItem(reward *model.CashbackReward) cashbackRewardListIt
 	return cashbackRewardListItem{
 		ID: reward.ID, TopUpID: reward.TopUpID, TradeNo: reward.TradeNo, Direction: reward.Direction,
 		InviteeID: reward.InviteeID, InviterID: reward.InviterID, BeneficiaryID: reward.BeneficiaryID,
-		BaseQuota: reward.BaseQuota, RateBPS: reward.RateBPS, CalculatedQuota: reward.CalculatedQuota,
+		BaseQuota: reward.BaseQuota, RateBPS: reward.RateBPS, Strategy: reward.Strategy, FixedPerHundred: reward.FixedPerHundred,
+		CalculatedQuota: reward.CalculatedQuota,
 		RewardQuota: reward.RewardQuota, CapReason: reward.CapReason, SettlementDays: reward.SettlementDays,
 		ConfigVersion: reward.ConfigVersion, PaidAt: reward.PaidAt, AvailableAt: reward.AvailableAt,
 		ReviewStatus: reward.ReviewStatus, ReviewedBy: reward.ReviewedBy, ReviewSource: source, ReviewedAt: reward.ReviewedAt,
@@ -402,6 +407,7 @@ func cashbackOrderContextToDTO(order *model.CashbackOrderContext) cashbackOrderC
 	return cashbackOrderContextDTO{
 		ID: order.ID, TopUpID: order.TopUpID, CampaignID: order.CampaignID, TradeNo: order.TradeNo, UserID: order.UserID,
 		PaymentProvider: order.PaymentProvider, BaseQuota: order.BaseQuota, CreditedQuota: order.CreditedQuota,
+		FaceAmount: order.FaceAmount, QuotaPerFaceUnit: order.QuotaPerFaceUnit,
 		RequestIP: order.RequestIP, RequestUserAgentHash: order.RequestUserAgentHash,
 		DeviceFingerprintHash: order.DeviceFingerprintHash, DeviceHashShort: model.CashbackDeviceHashShort(order.DeviceFingerprintHash),
 		DeviceSignalStatus: order.DeviceSignalStatus, EligibleAfterFirstEnable: order.EligibleAfterFirstEnable,

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { getCashbackReward } from '../api'
 import { CashbackDetailSheet } from '../components/cashback-detail-sheet'
+import { formatCashbackQuota } from '../lib/format'
 import type { CashbackRewardDetail } from '../types'
 
 // jsdom has no Web Animations API; Base UI's scroll viewport queries it asynchronously.
@@ -148,7 +149,7 @@ describe('cashback detail settlement eligibility', () => {
     expect(screen.queryByText('Pending review')).not.toBeInTheDocument()
     expect(screen.getByText('daily_cap_exhausted')).toBeVisible()
     expect(screen.getByText('no_payable_cashback_quota')).toBeVisible()
-    expect(screen.getByText('50')).toBeVisible()
+    expect(screen.getByText(formatCashbackQuota(50))).toBeVisible()
     expect(
       screen.queryByRole('button', { name: 'Approve' })
     ).not.toBeInTheDocument()

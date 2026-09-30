@@ -55,6 +55,34 @@ func setupCashbackConfigControllerTest(t *testing.T) {
 	})
 }
 
+func TestCashbackRewardListItemPreservesFixedStrategyAndLegacyRate(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		reward          model.CashbackReward
+		strategy        string
+		fixedPerHundred int
+		rateBPS         int
+	}{
+		{name: "fixed per hundred", reward: model.CashbackReward{Strategy: "per_hundred", FixedPerHundred: 6, RateBPS: 0}, strategy: "per_hundred", fixedPerHundred: 6},
+		{name: "historical rate", reward: model.CashbackReward{RateBPS: 1250}, rateBPS: 1250},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			item := cashbackRewardToListItem(&tc.reward)
+			encoded, err := common.Marshal(item)
+			require.NoError(t, err)
+			var wire struct {
+				Strategy        string `json:"strategy"`
+				FixedPerHundred int    `json:"fixed_per_hundred"`
+				RateBPS         int    `json:"rate_bps"`
+			}
+			require.NoError(t, common.Unmarshal(encoded, &wire))
+			assert.Equal(t, tc.strategy, wire.Strategy)
+			assert.Equal(t, tc.fixedPerHundred, wire.FixedPerHundred)
+			assert.Equal(t, tc.rateBPS, wire.RateBPS)
+		})
+	}
+}
+
 const validCashbackConfigJSON = `{
 	"inviter_enabled":false,"invitee_enabled":false,
 	"inviter_rate_bps":0,"invitee_rate_bps":0,

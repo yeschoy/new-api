@@ -21,11 +21,14 @@ import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toIntlLocale } from '@/i18n/languages'
 
 import { useCashbackSummary } from '../hooks/use-cashback'
+import { formatCashbackQuota } from '../lib/format'
 
 export function CashbackSummary() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const query = useCashbackSummary()
 
   if (query.isPending) {
@@ -75,7 +78,7 @@ export function CashbackSummary() {
               </CardTitle>
             </CardHeader>
             <CardContent className='text-2xl font-semibold tabular-nums'>
-              {value.toLocaleString()}
+              {formatCashbackQuota(value, locale)}
             </CardContent>
           </Card>
         ))}
@@ -116,7 +119,8 @@ export function CashbackSummary() {
           {query.data.settlement_failure_count.toLocaleString()}
         </span>
         <span>
-          {t('Recovered quota')}: {query.data.recovered_quota.toLocaleString()}
+          {t('Recovered quota')}:{' '}
+          {formatCashbackQuota(query.data.recovered_quota, locale)}
         </span>
       </div>
       {(query.data.inviter_clusters.length > 0 ||
@@ -149,7 +153,7 @@ export function CashbackSummary() {
                           }
                         )}{' '}
                         · {t('Payable reward')}:{' '}
-                        {cluster.reward_quota.toLocaleString()}
+                        {formatCashbackQuota(cluster.reward_quota, locale)}
                       </span>
                     </li>
                   ))}

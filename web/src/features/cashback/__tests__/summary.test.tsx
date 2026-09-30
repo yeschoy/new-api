@@ -16,12 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import i18next from 'i18next'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { toIntlLocale } from '@/i18n/languages'
+import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { CashbackSummary } from '../components/cashback-summary'
+import { formatCashbackQuota } from '../lib/format'
 
-const summaryMocks = vi.hoisted(() => ({ rewardCount: 6 }))
+const summaryMocks = vi.hoisted(() => ({ rewardCount: 6, issuedQuota: 300 }))
 
 vi.mock('../hooks/use-cashback', () => ({
   useCashbackSummary: () => ({
@@ -30,7 +35,7 @@ vi.mock('../hooks/use-cashback', () => ({
     data: {
       pending_review_quota: 100,
       awaiting_maturity_quota: 200,
-      issued_quota: 300,
+      issued_quota: summaryMocks.issuedQuota,
       recovered_quota: 50,
       outstanding_reward_debt: 10,
       outstanding_principal_debt: 20,
@@ -55,8 +60,62 @@ vi.mock('../hooks/use-cashback', () => ({
 }))
 
 describe('cashback summary', () => {
+  const originalConfig = useSystemConfigStore.getState().config
+
   beforeEach(() => {
     summaryMocks.rewardCount = 6
+    summaryMocks.issuedQuota = 300
+  })
+
+  afterEach(async () => {
+    useSystemConfigStore.setState({ config: originalConfig })
+    await act(() => i18next.changeLanguage('en'))
+  })
+
+  it('shows cashback totals in CNY even when quota display is USD', () => {
+    summaryMocks.issuedQuota = 1_500_000
+    useSystemConfigStore.getState().setConfig({
+      currency: {
+        ...originalConfig.currency,
+        quotaDisplayType: 'USD',
+        usdExchangeRate: 7,
+      },
+    })
+
+    render(<CashbackSummary />)
+
+    expect(screen.getByText('¥21')).toBeVisible()
+    expect(screen.queryByText('$3')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['zhCN', '¥3'],
+    ['zhTW', '¥3'],
+    ['en', '¥3'],
+    ['fr', '3\u00a0¥'],
+    ['ru', '3\u00a0¥'],
+    ['ja', '￥3'],
+    ['vi', '3\u00a0¥'],
+    ['invalid_locale', '¥3'],
+  ])('formats quota as CNY for %s', (language, expected) => {
+    expect(formatCashbackQuota(1_500_000, toIntlLocale(language))).toBe(
+      expected
+    )
+    expect(formatCashbackQuota(1, toIntlLocale(language))).toMatch(/[,.]0+2/)
+  })
+
+  it('updates the CNY number formatting when the interface language changes', async () => {
+    summaryMocks.issuedQuota = 1_500_000
+    i18next.addResourceBundle('ja', 'translation', {
+      'Issued cashback quota': '発行済み返金額',
+    })
+    render(<CashbackSummary />)
+    expect(screen.getByText('¥3')).toBeVisible()
+
+    await act(() => i18next.changeLanguage('ja'))
+
+    expect(screen.getByText('￥3')).toBeVisible()
+    expect(screen.queryByText('¥3')).not.toBeInTheDocument()
   })
 
   it('shows the identities behind inviter and device risk clusters', () => {

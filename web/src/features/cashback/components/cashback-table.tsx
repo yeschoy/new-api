@@ -35,7 +35,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { toIntlLocale } from '@/i18n/languages'
 
+import { formatCashbackQuota } from '../lib/format'
 import { isManuallyApprovedPayer } from '../lib/settlement'
 import type { CashbackRewardPage } from '../types'
 import { CashbackStatusBadge } from './cashback-status-badge'
@@ -54,7 +56,8 @@ function formatTime(timestamp: number): string {
 }
 
 export function CashbackTable(props: CashbackTableProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const rows = props.page?.items ?? []
   const currentPage = props.page?.page ?? 1
   const pageSize = props.page?.page_size ?? 20
@@ -135,15 +138,17 @@ export function CashbackTable(props: CashbackTableProps) {
                   </TableCell>
                   <TableCell>#{reward.beneficiary_id}</TableCell>
                   <TableCell>
-                    <div>{reward.base_quota.toLocaleString()}</div>
+                    <div>{formatCashbackQuota(reward.base_quota, locale)}</div>
                     <div className='text-muted-foreground text-xs'>
                       <CashbackStrategyLabel reward={reward} />
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div>{reward.calculated_quota.toLocaleString()}</div>
+                    <div>
+                      {formatCashbackQuota(reward.calculated_quota, locale)}
+                    </div>
                     <div className='text-muted-foreground text-xs'>
-                      {reward.reward_quota.toLocaleString()}
+                      {formatCashbackQuota(reward.reward_quota, locale)}
                     </div>
                   </TableCell>
                   <TableCell>
