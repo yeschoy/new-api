@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { readFileSync } from 'node:fs'
 
 import { QueryClient } from '@tanstack/react-query'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
@@ -106,6 +106,23 @@ describe('landing interactions and price layout', () => {
     expect(readFileSync('src/styles/ci-landing.css', 'utf8')).toMatch(
       /\.ci-handoffRoot button\.ci-communityTrigger\s*{[^}]*color:\s*var\(--primary-foreground\)/
     )
+  })
+
+  it('offers the public cashback activity page from the home navigation', async () => {
+    await renderApp(
+      <CiLandingPage
+        isAuthenticated={false}
+        models={models}
+        maxSavingsPercent={0}
+      />,
+      client
+    )
+
+    expect(
+      within(
+        screen.getByRole('navigation', { name: 'Main navigation' })
+      ).getByRole('link', { name: 'Offers' })
+    ).toHaveAttribute('href', '/activity')
   })
 
   it('shows the signed-in account menu and overview entry instead of sign-in links', async () => {
@@ -233,7 +250,7 @@ describe('landing interactions and price layout', () => {
       if (fallbackText) {
         expect(logo).toHaveTextContent(fallbackText)
       } else {
-        expect(logo?.querySelector('svg')).not.toBeNull()
+        await waitFor(() => expect(logo?.querySelector('svg')).not.toBeNull())
       }
     }
   )

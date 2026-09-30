@@ -21,6 +21,7 @@ import {
   ArrowRight,
   BookOpen,
   Boxes,
+  Gift,
   Menu,
   MonitorDown,
   Moon,
@@ -40,7 +41,7 @@ import { CommunityHelp } from './community-help'
 
 type MarketingHeaderProps = {
   isAuthenticated: boolean
-  currentPage?: 'home' | 'client'
+  currentPage?: 'home' | 'client' | 'activity'
 }
 
 export function MarketingHeader(props: MarketingHeaderProps) {
@@ -100,6 +101,17 @@ export function MarketingHeader(props: MarketingHeaderProps) {
                 aria-hidden='true'
               />
               <span>{t('Client')}</span>
+            </Link>
+            <Link
+              className='ci-navItem'
+              to='/activity'
+              aria-current={
+                props.currentPage === 'activity' ? 'page' : undefined
+              }
+              onClick={() => setNavOpen(false)}
+            >
+              <Gift className='ci-mobileNavIcon' size={18} aria-hidden='true' />
+              <span>{t('Offers')}</span>
             </Link>
           </div>
           <div className='ci-mobileNavActions'>
