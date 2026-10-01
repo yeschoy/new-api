@@ -596,3 +596,26 @@
 ### Next Steps
 
 - 按需补最低版本和真实发布版升级验证；其余两个返现子任务与父任务仍待独立归档和集成审查。
+
+
+## Session 20: 订阅套餐按适用分组扣费
+<!-- trellis-session: v=2 fp=8927dc0ba7f985c3 -->
+
+**Date**: 2026-10-01
+**Task**: 订阅套餐按适用分组扣费
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+实现套餐独立适用分组与按真实分组隔离预扣、动态生效、重试/幂等保护和前端展示；Docker 三库双版本矩阵及聚焦测试通过；全量测试存在基线失败；仅清理获授权的任务容器、网络与翻译临时脚本改动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `97ade2774` | feat(subscription): restrict plan quota to its applicable group |
+| `d7b95ada5` | docs(trellis): record subscription group billing contract |
+
+### Status
+
+[OK] **Completed**

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
-- **Last Active**: 2026-09-30
+- **Total Sessions**: 20
+- **Last Active**: 2026-10-01
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~598 | Active |
+| `journal-1.md` | ~621 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-10-01 | 订阅套餐按适用分组扣费 | `97ade2774`, `d7b95ada5` | `feat/recharge-cashback` |
 | 19 | 2026-09-30 | 充值返现预览与 Docker 三库验收 | `62eeb0b2a`, `d7c02fef0`, `24909ea3b`, `b016827c0`, `fae3085fa` | `feat/recharge-cashback` |
 | 18 | 2026-09-30 | 整百返现实现与数据库环境清理 | `90b64b7b5`, `4c394ce6b`, `0339e4359`, `d928bdffa` | `feat/recharge-cashback` |
 | 17 | 2026-09-27 | 充值返现参考报表验收与归档 | `efabd53fd`, `6cf6d9f25` | `feat/recharge-cashback` |
