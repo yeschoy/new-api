@@ -20,6 +20,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
 | [Referral recharge cashback](./referral-recharge-cashback.md) | Transactional rewards, review, settlement, incidents, and API contracts | Implemented |
+| [Subscription group billing](./subscription-group-billing.md) | Applicable group, funding priority, reservation and retry isolation | Implemented; tested on SQLite, MySQL 5.7/8.0 and PostgreSQL 9.6/16 |
 
 ---
 
