@@ -26,7 +26,7 @@ import {
 
 import { Moved } from './components/moved'
 import { tk } from './i18n/i18n'
-import { useBrandTitle } from './lib/queries'
+import { useBrandTab } from './lib/queries'
 import { SignInPage } from './pages/auth/sign-in-page'
 import { SignUpPage } from './pages/auth/sign-up-page'
 import { ChatPage } from './pages/chat/chat-page'
@@ -43,7 +43,7 @@ import { RouterRankingsPage } from './sites/router/rankings/router-rankings-page
 
 function RootLayout() {
   const location = useLocation()
-  useBrandTitle()
+  useBrandTab()
 
   useEffect(() => {
     window.scrollTo(0, 0)

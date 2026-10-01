@@ -53,12 +53,28 @@ export function useBrand(): { name: string; logo: string | null } {
   }
 }
 
-/** Names the browser tab after the brand, in the current language. */
-export function useBrandTitle() {
-  const { name } = useBrand()
+/** The tab icon that ships with the site (index.html). */
+const SITE_ICON = '/favicon.svg'
+
+/** Names the browser tab after the brand, in the current language, with the operator's logo as its icon when one is set. */
+export function useBrandTab() {
+  const { name, logo } = useBrand()
   useEffect(() => {
     document.title = name
   }, [name])
+  useEffect(() => {
+    let icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (!icon) {
+      if (!logo) return
+      icon = document.createElement('link')
+      icon.rel = 'icon'
+      document.head.appendChild(icon)
+    }
+    icon.setAttribute('href', logo ?? SITE_ICON)
+    // The operator's logo may be any image type; the bundled one is SVG.
+    if (logo) icon.removeAttribute('type')
+    else icon.setAttribute('type', 'image/svg+xml')
+  }, [logo])
 }
 
 export function useCurrency() {
@@ -97,7 +113,8 @@ export function useCatalog() {
     })
   }, [query.data, lang, t])
   const groupRatio = query.data?.group_ratio ?? {}
-  return { ...query, models, groupRatio }
+  const usableGroups = useMemo(() => Object.keys(query.data?.usable_group ?? {}), [query.data])
+  return { ...query, models, groupRatio, usableGroups }
 }
 
 export function useRankings(period: RankingPeriod) {

@@ -22,7 +22,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { setLang } from '@/i18n/i18n'
 import { api } from '@/lib/api'
 
-import { useBrand, useBrandTitle } from '../queries'
+import { useBrand, useBrandTab } from '../queries'
 
 function wrapper(props: { children: React.ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -54,12 +54,18 @@ describe('useBrand', () => {
   })
 })
 
-describe('useBrandTitle', () => {
+describe('useBrandTab', () => {
   it('names the browser tab after the brand, in the current language', async () => {
-    renderHook(() => useBrandTitle(), { wrapper })
+    renderHook(() => useBrandTab(), { wrapper })
     expect(document.title).toBe('野菜')
 
     await act(() => setLang('en'))
     expect(document.title).toBe('yeschoy')
+  })
+
+  it('shows the operator’s logo as the tab icon when one is set', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { success: true, data: { logo: 'https://cdn.example.com/logo.png' } } })
+    renderHook(() => useBrandTab(), { wrapper })
+    await waitFor(() => expect(document.querySelector('link[rel="icon"]')?.getAttribute('href')).toBe('https://cdn.example.com/logo.png'))
   })
 })

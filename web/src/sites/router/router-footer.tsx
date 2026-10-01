@@ -20,6 +20,8 @@ import { Link } from 'react-router'
 
 import { BrandMark } from '@/components/brand-mark'
 import { useI18n } from '@/i18n/i18n'
+import { useAuth } from '@/lib/auth-store'
+import { showNavModule, type NavModule } from '@/lib/nav-modules'
 import { useBrand, useStatus } from '@/lib/queries'
 
 type FooterLink = { label: string; to: string; external?: boolean }
@@ -59,7 +61,13 @@ export function RouterFooter() {
   const brand = useBrand()
   const { t } = useI18n()
   const { data: status } = useStatus()
-  const legal: FooterLink[] = [{ label: t('关于'), to: '/about' }]
+  const auth = useAuth()
+  const shown = (module: NavModule) => showNavModule(status?.HeaderNavModules, module, auth.status === 'authenticated')
+  const product: FooterLink[] = [{ label: t('对话'), to: '/chat' }]
+  if (shown('rankings')) product.push({ label: t('排行榜'), to: '/rankings' })
+  if (shown('pricing')) product.push({ label: t('定价'), to: '/settings/credits' })
+  const legal: FooterLink[] = []
+  if (shown('about')) legal.push({ label: t('关于'), to: '/about' })
   if (status?.privacy_policy_enabled) legal.push({ label: t('隐私政策'), to: '/privacy-policy' })
   if (status?.user_agreement_enabled) legal.push({ label: t('用户协议'), to: '/user-agreement' })
 
@@ -75,19 +83,12 @@ export function RouterFooter() {
             © {new Date().getFullYear()} {brand.name}
           </div>
         </div>
-        <FooterColumn
-          title={t('产品')}
-          links={[
-            { label: t('对话'), to: '/chat' },
-            { label: t('排行榜'), to: '/rankings' },
-            { label: t('定价'), to: '/settings/credits' },
-          ]}
-        />
-        <FooterColumn title={t('公司')} links={legal} />
+        <FooterColumn title={t('产品')} links={product} />
+        {legal.length ? <FooterColumn title={t('公司')} links={legal} /> : null}
         <FooterColumn
           title={t('开发者')}
           links={[
-            ...(status?.docs_link
+            ...(status?.docs_link && shown('docs')
               ? [{ label: t('文档'), to: status.docs_link, external: true }]
               : []),
             { label: t('API 密钥'), to: '/settings/keys' },

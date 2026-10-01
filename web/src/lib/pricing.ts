@@ -35,6 +35,19 @@ export function currencyDisplay(status: SiteStatus | undefined): CurrencyDisplay
   }
 }
 
+/**
+ * The groups a visitor can call a model through, as /api/pricing means them: a
+ * model open to "all" works in every group the visitor can use; otherwise its
+ * own groups that the visitor can use. "auto" only routes between groups and has
+ * no price of its own. Never empty, so the price table always has a row.
+ */
+export function pricedGroups(enableGroups: string[], usableGroups: string[]): string[] {
+  const usable = usableGroups.filter((group) => group !== 'auto')
+  if (enableGroups.includes('all')) return usable
+  const allowed = enableGroups.filter((group) => usable.includes(group))
+  return allowed.length ? allowed : enableGroups
+}
+
 export function isTokenPriced(model: PricingModel): boolean {
   return model.quota_type === 0
 }

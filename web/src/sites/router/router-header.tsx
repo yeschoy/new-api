@@ -27,6 +27,7 @@ import { UserMenu } from '@/components/user-menu'
 import { useI18n } from '@/i18n/i18n'
 import { useAuth } from '@/lib/auth-store'
 import { cn } from '@/lib/format'
+import { showNavModule, type NavModule } from '@/lib/nav-modules'
 import { useBrand, useStatus } from '@/lib/queries'
 import { useTheme } from '@/site/theme'
 
@@ -52,12 +53,11 @@ export function RouterHeader() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const links: Array<{ label: string; to: string; external?: boolean }> = [
-    { label: t('对话'), to: '/chat' },
-    { label: t('排行榜'), to: '/rankings' },
-    { label: t('定价'), to: '/settings/credits' },
-  ]
-  if (status?.docs_link) {
+  const shown = (module: NavModule) => showNavModule(status?.HeaderNavModules, module, auth.status === 'authenticated')
+  const links: Array<{ label: string; to: string; external?: boolean }> = [{ label: t('对话'), to: '/chat' }]
+  if (shown('rankings')) links.push({ label: t('排行榜'), to: '/rankings' })
+  if (shown('pricing')) links.push({ label: t('定价'), to: '/settings/credits' })
+  if (status?.docs_link && shown('docs')) {
     links.push({ label: t('文档'), to: status.docs_link, external: true })
   }
 

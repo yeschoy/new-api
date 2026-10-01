@@ -25,7 +25,7 @@ import { tk, useI18n } from '@/i18n/i18n'
 import { apiSample, type SampleLanguage } from '@/lib/api-sample'
 import { cn, compactNumber, contextLabel, shortDate } from '@/lib/format'
 import { inputsOf } from '@/lib/model-filters'
-import { formatAmount, isTokenPriced, priceSummary, usdPerMillion } from '@/lib/pricing'
+import { formatAmount, isTokenPriced, priceSummary, pricedGroups, usdPerMillion } from '@/lib/pricing'
 import { useCatalog, useCurrency, useRankings, useStatus } from '@/lib/queries'
 
 import { RouterShell } from '../router-shell'
@@ -51,7 +51,7 @@ export function RouterModelPage() {
   const { t } = useI18n()
   const { name = '' } = useParams()
   const modelName = decodeURIComponent(name)
-  const { models, groupRatio, isLoading } = useCatalog()
+  const { models, groupRatio, usableGroups, isLoading } = useCatalog()
   const { data: status } = useStatus()
   const currency = useCurrency()
   const week = useRankings('week')
@@ -167,7 +167,7 @@ export function RouterModelPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {model.enable_groups.map((group) => {
+                    {pricedGroups(model.enable_groups, usableGroups).map((group) => {
                       const ratio = groupRatio[group] ?? 1
                       const cache = usdPerMillion(model, 'cache', ratio)
                       return (

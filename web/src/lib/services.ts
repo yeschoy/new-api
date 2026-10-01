@@ -48,6 +48,8 @@ export type SiteStatus = {
   email_verification?: boolean
   turnstile_check?: boolean
   github_oauth?: boolean
+  /** The admin's header-navigation switches, as a JSON string (see showNavModule). */
+  HeaderNavModules?: string
   /** New API keys go in the auto group, which routes each request to a usable group. */
   default_use_auto_group?: boolean
   setup?: boolean
