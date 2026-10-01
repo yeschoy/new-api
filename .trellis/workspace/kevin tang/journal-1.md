@@ -619,3 +619,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 21: 首页返现活动限时展示与狂蹬卡活动页
+<!-- trellis-session: v=2 fp=e3fc077435281b39 -->
+
+**Date**: 2026-10-02
+**Task**: 首页返现活动限时展示与狂蹬卡活动页
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+首页在北京时间10月8日零点自动恢复，活动页展示两款狂蹬卡；七语言与回归测试，已归档。相关测试26项通过、类型检查和构建通过；全仓lint既有错误，浏览器实测受工具缺失阻断。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8f1aabf77` | feat(home): show cashback campaign until Oct 8 and feature Power Cards |
+| `efdbe7ffa` | docs(trellis): record campaign landing contract and implementation plan |
+
+### Status
+
+[OK] **Completed**
