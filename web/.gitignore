@@ -2,3 +2,6 @@ node_modules
 dist
 *.local
 .env
+
+# The repository root ignores every "logs" folder (server log output); the log pages are source code.
+!src/pages/logs/
