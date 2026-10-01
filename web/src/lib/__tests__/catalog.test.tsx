@@ -21,6 +21,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 
 import { setLang } from '@/i18n/i18n'
 import { api } from '@/lib/api'
+import { authStore } from '@/lib/auth-store'
 
 import { useCatalog } from '../queries'
 
@@ -41,6 +42,7 @@ async function catalogOf(pricing: object) {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  authStore.clear()
   setLang('zh')
   window.localStorage.clear()
 })
@@ -75,5 +77,22 @@ describe('useCatalog', () => {
       ],
     })
     expect(result.current.models.map((model) => model.vendorIcon)).toEqual(['Custom.Icon', 'Grok', 'Doubao.Color'])
+  })
+
+  it('asks again when someone signs in, since models and prices depend on the account', async () => {
+    await catalogOf({ data: [{ model_name: 'm', ...price }] })
+    const pricingCalls = () => vi.mocked(api.get).mock.calls.filter((call) => call[0] === '/api/pricing').length
+    expect(pricingCalls()).toBe(1)
+
+    act(() => {
+      authStore.applyBundle({
+        user: { id: 5, username: 'u5', role: 1 },
+        access_token: 'tok-5',
+        token_type: 'Bearer',
+        access_expires_at: 9_999_999_999,
+        session: { sid: 's5', current: true, login_method: 'password', expires_at: 9_999_999_999 },
+      })
+    })
+    await waitFor(() => expect(pricingCalls()).toBe(2))
   })
 })

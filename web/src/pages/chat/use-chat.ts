@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type SetStateAction, useCallback, useEffect, useRef, useState } from 'react'
 
 import { t } from '@/i18n/i18n'
+import { useAuth } from '@/lib/auth-store'
 import { streamChatCompletion, type ChatCompletionBody, type ReasoningEffort } from '@/lib/chat-stream'
 
 export type ChatMessage = {
@@ -48,11 +49,19 @@ export type ChatSettings = {
 
 export const DEFAULT_SETTINGS: ChatSettings = { reasoningEffort: null, maxTokens: null, systemPrompt: '' }
 
-const STORAGE_KEY = 'chat-conversations'
+/** History from before it was kept per account; dropped so it can't surface under any account. */
+const SHARED_KEY = 'chat-conversations'
 
-function loadConversations(): Conversation[] {
+/** Each account keeps its own history, so a shared browser never shows one account's chats to another. */
+function storageKeyOf(userId: number | null): string | null {
+  return userId === null ? null : `${SHARED_KEY}:${userId}`
+}
+
+function loadConversations(key: string | null): Conversation[] {
+  if (!key) return []
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]')
+    window.localStorage.removeItem(SHARED_KEY)
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? '[]')
     if (!Array.isArray(parsed)) return []
     return (parsed as Conversation[])
       .filter((c) => c && typeof c.id === 'string' && Array.isArray(c.messages))
@@ -62,9 +71,10 @@ function loadConversations(): Conversation[] {
   }
 }
 
-function saveConversations(list: Conversation[]) {
+function saveConversations(key: string | null, list: Conversation[]) {
+  if (!key) return
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+    window.localStorage.setItem(key, JSON.stringify(list))
   } catch {
     // Quota exceeded or storage disabled: history just won't survive a reload.
   }
@@ -94,27 +104,43 @@ function buildBody(model: string, settings: ChatSettings, history: ChatMessage[]
  * active thread, model + sampling settings, and a cancellable stream.
  */
 export function useChat(defaultModel: string) {
-  const [conversations, setConversations] = useState<Conversation[]>(loadConversations)
+  const auth = useAuth()
+  const storageKey = storageKeyOf(auth.user?.id ?? null)
+  // The list remembers whose it is, so it is only ever saved under that account.
+  const [history, setHistory] = useState(() => ({ key: storageKey, list: loadConversations(storageKey) }))
   const [activeId, setActiveId] = useState<string | null>(null)
   const [pickedModel, setPickedModel] = useState<string | null>(null)
   const [settings, setSettings] = useState<ChatSettings>(DEFAULT_SETTINGS)
   const [streaming, setStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
-  const latestRef = useRef(conversations)
+  const latestRef = useRef(history)
+
+  // Another account signed in: switch to its own history.
+  if (history.key !== storageKey) {
+    setHistory({ key: storageKey, list: loadConversations(storageKey) })
+    setActiveId(null)
+  }
+  const conversations = history.list
+  const setConversations = useCallback((update: SetStateAction<Conversation[]>) => {
+    setHistory((h) => ({ key: h.key, list: typeof update === 'function' ? update(h.list) : update }))
+  }, [])
 
   const model = pickedModel || defaultModel
   const active = conversations.find((c) => c.id === activeId) ?? null
 
   // Persist once a reply settles rather than on every streamed token.
   useEffect(() => {
-    latestRef.current = conversations
-    if (!streaming) saveConversations(conversations)
-  }, [conversations, streaming])
+    latestRef.current = history
+    if (!streaming) saveConversations(history.key, history.list)
+  }, [history, streaming])
+
+  // A reply still streaming for the previous account stops when the account changes.
+  useEffect(() => () => abortRef.current?.abort(), [storageKey])
 
   useEffect(
     () => () => {
       abortRef.current?.abort()
-      saveConversations(latestRef.current)
+      saveConversations(latestRef.current.key, latestRef.current.list)
     },
     []
   )
@@ -131,7 +157,7 @@ export function useChat(defaultModel: string) {
   const select = useCallback((id: string) => {
     abortRef.current?.abort()
     setActiveId(id)
-    const found = latestRef.current.find((c) => c.id === id)
+    const found = latestRef.current.list.find((c) => c.id === id)
     if (found?.model) setPickedModel(found.model)
   }, [])
 
@@ -141,7 +167,7 @@ export function useChat(defaultModel: string) {
       setActiveId(null)
     }
     setConversations((list) => list.filter((c) => c.id !== id))
-  }, [activeId])
+  }, [activeId, setConversations])
 
   const send = useCallback(
     async (text: string) => {
@@ -197,7 +223,7 @@ export function useChat(defaultModel: string) {
         setStreaming(false)
       }
     },
-    [active, model, settings, streaming]
+    [active, model, settings, setConversations, streaming]
   )
 
   return {

@@ -85,7 +85,7 @@ describe('useChat', () => {
     const reply = result.current.active?.messages[1]
     expect(reply).toMatchObject({ role: 'assistant', content: '你好', reasoning: '想', model: 'gpt-test' })
     expect(result.current.streaming).toBe(false)
-    const stored = JSON.parse(window.localStorage.getItem('chat-conversations') ?? '[]')
+    const stored = JSON.parse(window.localStorage.getItem('chat-conversations:1') ?? '[]')
     expect(stored[0].messages[1].content).toBe('你好')
   })
 
@@ -130,5 +130,25 @@ describe('useChat', () => {
       { role: 'user', content: 'two' },
     ])
     expect(result.current.conversations).toHaveLength(1)
+  })
+
+  it('keeps each account’s history to itself', async () => {
+    fetchMock.mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"好"}}]}\n\n', 'data: [DONE]\n\n']))
+    const { result } = renderHook(() => useChat('gpt-test'))
+    await act(() => result.current.send('secret plan'))
+    expect(result.current.conversations).toHaveLength(1)
+
+    act(() => {
+      authStore.applyBundle({
+        user: { id: 2, username: 'other', role: 1 },
+        access_token: 'tok-2',
+        token_type: 'Bearer',
+        access_expires_at: 0,
+        session: { sid: 's2', current: true, login_method: 'password', expires_at: 0 },
+      })
+    })
+    await waitFor(() => expect(result.current.conversations).toHaveLength(0))
+    expect(result.current.active).toBeNull()
+    expect(window.localStorage.getItem('chat-conversations')).toBeNull()
   })
 })

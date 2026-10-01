@@ -21,6 +21,7 @@ import { useEffect, useMemo } from 'react'
 
 import { useI18n } from '@/i18n/i18n'
 
+import { useAuth } from './auth-store'
 import { guessIcon } from './model-icons'
 import { currencyDisplay } from './pricing'
 import {
@@ -72,8 +73,10 @@ export type CatalogModel = PricingModel & {
 
 export function useCatalog() {
   const { lang, t } = useI18n()
+  // The server filters models and group prices by the account, so each viewer has their own copy.
+  const viewer = useAuth().user?.id ?? null
   const query = useQuery({
-    queryKey: ['pricing'],
+    queryKey: ['pricing', viewer],
     queryFn: getPricing,
     staleTime: 5 * 60_000,
     retry: false,

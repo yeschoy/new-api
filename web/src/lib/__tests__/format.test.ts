@@ -16,9 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { setLang } from '@/i18n/i18n'
+import { localeOf, setLang } from '@/i18n/i18n'
 
-import { bucketLabel, shortDate } from '../format'
+import { bucketLabel, dateTime, shortDate } from '../format'
 
 afterEach(() => {
   setLang('zh')
@@ -61,5 +61,15 @@ describe('bucketLabel', () => {
 
   it('keeps hourly labels as the server wrote them', () => {
     expect(bucketLabel('2026-09-17T07:00:00Z', '15:00')).toBe('15:00')
+  })
+})
+
+describe('dateTime', () => {
+  const noon = Date.UTC(2026, 8, 23, 12) / 1000
+
+  it('writes console times in the active language', () => {
+    setLang('en')
+    expect(dateTime(noon)).toBe(new Date(noon * 1000).toLocaleString(localeOf('en'), { hour12: false }))
+    expect(dateTime(noon)).not.toBe(new Date(noon * 1000).toLocaleString('zh-CN', { hour12: false }))
   })
 })

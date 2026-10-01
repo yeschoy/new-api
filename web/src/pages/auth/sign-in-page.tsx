@@ -42,6 +42,7 @@ export function SignInPage() {
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const [step, setStep] = useState<'password' | 'two-factor'>('password')
+  const [flowToken, setFlowToken] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const redirect = safeRedirect(params.get('redirect'))
@@ -56,10 +57,15 @@ export function SignInPage() {
       const result =
         step === 'password'
           ? await login({ username, password, encrypt: Boolean(status?.password_login_encryption_enabled) })
-          : await loginTwoFactor(code)
-      if (result.kind === 'signed-in') navigate(redirect, { replace: true })
-      else if (result.kind === 'two-factor') setStep('two-factor')
-      else setError(result.message)
+          : await loginTwoFactor(code, flowToken)
+      if (result.kind === 'signed-in') {
+        navigate(redirect, { replace: true })
+      } else if (result.kind === 'two-factor') {
+        setFlowToken(result.flowToken)
+        setStep('two-factor')
+      } else {
+        setError(result.message)
+      }
     } catch (err) {
       setError(errorMessage(err, t('登录失败')))
     } finally {

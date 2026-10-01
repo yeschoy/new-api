@@ -66,7 +66,8 @@ export function bucketLabel(ts: string, label: string, lang: Lang = getLang()): 
   return date.toLocaleDateString(localeOf(lang), { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
-export function dateTime(seconds: number): string {
+/** Console timestamps (keys, logs, top-ups) in the active language. */
+export function dateTime(seconds: number, lang: Lang = getLang()): string {
   if (!seconds) return '—'
-  return new Date(seconds * 1000).toLocaleString('zh-CN', { hour12: false })
+  return new Date(seconds * 1000).toLocaleString(localeOf(lang), { hour12: false })
 }

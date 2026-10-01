@@ -18,13 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect } from 'react'
 import {
-  Navigate,
   Outlet,
   createBrowserRouter,
   useLocation,
   type RouteObject,
 } from 'react-router'
 
+import { Moved } from './components/moved'
 import { tk } from './i18n/i18n'
 import { useBrandTitle } from './lib/queries'
 import { SignInPage } from './pages/auth/sign-in-page'
@@ -58,23 +58,23 @@ export const routes: RouteObject[] = [
     children: [
       { path: '/', element: <RouterHome /> },
       { path: '/models/:name', element: <RouterModelPage /> },
-      { path: '/pricing', element: <Navigate to='/settings/credits' replace /> },
+      { path: '/pricing', element: <Moved to='/settings/credits' /> },
       { path: '/rankings', element: <RouterRankingsPage /> },
       { path: '/chat', element: <ChatPage /> },
-      { path: '/playground', element: <Navigate to='/chat' replace /> },
+      { path: '/playground', element: <Moved to='/chat' /> },
       { path: '/sign-in', element: <SignInPage /> },
-      { path: '/login', element: <Navigate to='/sign-in' replace /> },
+      { path: '/login', element: <Moved to='/sign-in' /> },
       { path: '/sign-up', element: <SignUpPage /> },
-      { path: '/register', element: <Navigate to='/sign-up' replace /> },
+      { path: '/register', element: <Moved to='/sign-up' /> },
       { path: '/settings/keys', element: <KeysPage /> },
-      { path: '/keys', element: <Navigate to='/settings/keys' replace /> },
+      { path: '/keys', element: <Moved to='/settings/keys' /> },
       { path: '/settings/credits', element: <CreditsPage /> },
-      { path: '/wallet', element: <Navigate to='/settings/credits' replace /> },
+      { path: '/wallet', element: <Moved to='/settings/credits' /> },
       { path: '/activity', element: <ActivityPage /> },
-      { path: '/usage-logs', element: <Navigate to='/activity' replace /> },
+      { path: '/usage-logs', element: <Moved to='/activity' /> },
       { path: '/settings/profile', element: <ProfilePage /> },
-      { path: '/settings', element: <Navigate to='/settings/keys' replace /> },
-      { path: '/dashboard', element: <Navigate to='/settings/keys' replace /> },
+      { path: '/settings', element: <Moved to='/settings/keys' /> },
+      { path: '/dashboard', element: <Moved to='/settings/keys' /> },
       { path: '/about', element: <ContentPage source='/api/about' title={tk('关于')} /> },
       { path: '/user-agreement', element: <ContentPage source='/api/user-agreement' title={tk('用户协议')} /> },
       { path: '/privacy-policy', element: <ContentPage source='/api/privacy-policy' title={tk('隐私政策')} /> },

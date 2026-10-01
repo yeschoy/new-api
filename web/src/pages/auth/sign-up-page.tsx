@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 
 import { AuthCard, AuthField, AuthSubmit } from '@/components/auth-card'
@@ -27,6 +27,17 @@ import { useStatus } from '@/lib/queries'
 import { register } from '@/lib/services'
 
 import { safeRedirect } from './sign-in-page'
+
+/** Where an invite code waits, under the old site's key, in case the visitor leaves and comes back to sign up. */
+const INVITE_KEY = 'aff'
+
+function rememberedInviteCode(): string {
+  try {
+    return window.localStorage.getItem(INVITE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
 
 export function SignUpPage() {
   const { t } = useI18n()
@@ -44,6 +55,16 @@ export function SignUpPage() {
   const [busy, setBusy] = useState(false)
   const redirect = safeRedirect(params.get('redirect'))
   const needsEmail = Boolean(status?.email_verification)
+  const linkInviteCode = params.get('aff')?.trim() ?? ''
+
+  useEffect(() => {
+    if (!linkInviteCode) return
+    try {
+      window.localStorage.setItem(INVITE_KEY, linkInviteCode)
+    } catch {
+      // Storage disabled: the code in the address is still sent below.
+    }
+  }, [linkInviteCode])
 
   if (auth.status === 'authenticated') return <Navigate to={redirect} replace />
 
@@ -66,11 +87,13 @@ export function SignUpPage() {
     if (password.length < 8) return setError(t('密码至少 8 位'))
     if (password !== confirm) return setError(t('两次输入的密码不一致'))
     setBusy(true)
+    const inviteCode = linkInviteCode || rememberedInviteCode()
     try {
       const result = await register({
         username,
         password,
         ...(needsEmail ? { email, verification_code: code } : {}),
+        ...(inviteCode ? { aff_code: inviteCode } : {}),
       })
       if (result.kind === 'signed-in') navigate(redirect, { replace: true })
       else if (result.kind === 'registered') navigate(`/sign-in?redirect=${encodeURIComponent(redirect)}`, { replace: true })

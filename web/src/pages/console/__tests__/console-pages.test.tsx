@@ -105,6 +105,15 @@ describe('console pages', () => {
     expect(screen.getAllByRole('link', { name: /充值额度/ }).length).toBeGreaterThan(0)
   })
 
+  it('shows why the key list failed instead of an empty list', async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) =>
+      url === '/api/token/' ? { data: { success: false, message: '数据库连接失败' } } : ok(RESPONSES[url] ?? {})
+    )
+    renderPage(<KeysPage />)
+    expect(await screen.findByText('数据库连接失败')).toBeInTheDocument()
+    expect(screen.queryByText('还没有 API 密钥，创建一个开始调用模型。')).toBeNull()
+  })
+
   it('shows the balance and redeem form', async () => {
     renderPage(<CreditsPage />)
     expect(await screen.findByText('$10')).toBeInTheDocument()
@@ -170,5 +179,21 @@ describe('key actions', () => {
     expect(await screen.findByText('sk-FULLKEY')).toBeInTheDocument()
     expect(post).toHaveBeenCalledWith('/api/token/', { name: 'ci', remain_quota: 1_000_000, unlimited_quota: false, expired_time: -1 })
     expect(post).toHaveBeenCalledWith('/api/token/9/key')
+  })
+
+  it('puts new keys in the auto group when the site defaults to it', async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) =>
+      ok(url === '/api/status' ? { quota_per_unit: 500_000, default_use_auto_group: true } : (RESPONSES[url] ?? {}))
+    )
+    const post = vi.spyOn(api, 'post').mockImplementation(async (url: string) =>
+      url === '/api/token/' ? ok({ id: 9, name: 'ci' }) : ok({ key: 'FULLKEY' })
+    )
+    const user = userEvent.setup()
+    renderPage(<KeysPage />)
+    await user.click(await screen.findByRole('button', { name: /创建密钥/ }))
+    await user.type(screen.getByPlaceholderText('例如：生产环境'), 'ci')
+    await user.click(screen.getByRole('button', { name: '创建' }))
+    expect(await screen.findByText('sk-FULLKEY')).toBeInTheDocument()
+    expect(post).toHaveBeenCalledWith('/api/token/', { name: 'ci', remain_quota: 0, unlimited_quota: true, expired_time: -1, group: 'auto' })
   })
 })

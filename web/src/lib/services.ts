@@ -48,6 +48,8 @@ export type SiteStatus = {
   email_verification?: boolean
   turnstile_check?: boolean
   github_oauth?: boolean
+  /** New API keys go in the auto group, which routes each request to a usable group. */
+  default_use_auto_group?: boolean
   setup?: boolean
   user_agreement_enabled?: boolean
   privacy_policy_enabled?: boolean
@@ -191,7 +193,8 @@ export async function getRankings(
 // ── Auth ──────────────────────────────────────────────────────────────────
 export type LoginResult =
   | { kind: 'signed-in' }
-  | { kind: 'two-factor' }
+  /** The password was right; the 2FA code must be sent back with this flow token. */
+  | { kind: 'two-factor'; flowToken: string }
   | { kind: 'error'; message: string }
 
 export async function login(input: {
@@ -202,7 +205,7 @@ export async function login(input: {
   const passwordFields = input.encrypt
     ? await encryptPassword(input.password)
     : { password: input.password }
-  const res = await api.post<ApiEnvelope<AuthBundle | { require_2fa?: boolean }>>(
+  const res = await api.post<ApiEnvelope<AuthBundle | { require_2fa?: boolean; flow_token?: string }>>(
     '/api/user/login',
     { username: input.username, ...passwordFields },
     { validateStatus: () => true }
@@ -212,17 +215,18 @@ export async function login(input: {
     authStore.applyBundle(body.data)
     return { kind: 'signed-in' }
   }
-  if (body?.success && (body.data as { require_2fa?: boolean })?.require_2fa) {
-    return { kind: 'two-factor' }
+  const pending = body?.data as { require_2fa?: boolean; flow_token?: string } | undefined
+  if (body?.success && pending?.require_2fa) {
+    return { kind: 'two-factor', flowToken: pending.flow_token ?? '' }
   }
   if (input.encrypt) clearPasswordEncryptionCache()
   return { kind: 'error', message: body?.message || 'Sign in failed' }
 }
 
-export async function loginTwoFactor(code: string): Promise<LoginResult> {
+export async function loginTwoFactor(code: string, flowToken: string): Promise<LoginResult> {
   const res = await api.post<ApiEnvelope<AuthBundle>>(
     '/api/user/login/2fa',
-    { code },
+    { code, flow_token: flowToken },
     { validateStatus: () => true }
   )
   if (res.data?.success && isAuthBundle(res.data.data)) {
@@ -237,6 +241,8 @@ export async function register(input: {
   password: string
   email?: string
   verification_code?: string
+  /** The inviter's code, from a ?aff= invite link. */
+  aff_code?: string
 }): Promise<LoginResult | { kind: 'registered' }> {
   const res = await api.post<ApiEnvelope<unknown>>(
     '/api/user/register',
@@ -288,6 +294,8 @@ export async function listKeys(page = 1, size = 50) {
   const res = await api.get<
     ApiEnvelope<{ items: ApiKey[]; total: number } | ApiKey[]>
   >('/api/token/', { params: { p: page, page_size: size } })
+  // Failures come back as HTTP 200 with success: false; surface them instead of an empty list.
+  if (!res.data?.success) throw new Error(res.data?.message || '')
   const data = res.data.data
   return Array.isArray(data) ? { items: data, total: data.length } : data
 }
@@ -297,6 +305,7 @@ export async function createKey(input: {
   remain_quota: number
   unlimited_quota: boolean
   expired_time: number
+  group?: string
 }) {
   const res = await api.post<ApiEnvelope<unknown>>('/api/token/', input)
   return res.data

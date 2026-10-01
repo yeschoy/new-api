@@ -24,6 +24,7 @@ import { useI18n } from '@/i18n/i18n'
 import { errorMessage } from '@/lib/api'
 import { unwrap } from '@/lib/console-api'
 import { cn } from '@/lib/format'
+import { useStatus } from '@/lib/queries'
 import { createKey, revealKey, type ApiKey } from '@/lib/services'
 
 import { withKeyPrefix } from './console-helpers'
@@ -34,6 +35,7 @@ import { Button, Field, Notice, TextInput } from './console-ui'
 export function CreateKeyDialog(props: { onClose: () => void }) {
   const { t } = useI18n()
   const money = useMoney()
+  const { data: status } = useStatus()
   const queryClient = useQueryClient()
   const titleId = useId()
   const nameId = useId()
@@ -56,7 +58,13 @@ export function CreateKeyDialog(props: { onClose: () => void }) {
 
   const create = useMutation({
     mutationFn: async (remainQuota: number) => {
-      const body = await createKey({ name: name.trim(), remain_quota: remainQuota, unlimited_quota: unlimited, expired_time: -1 })
+      const body = await createKey({
+        name: name.trim(),
+        remain_quota: remainQuota,
+        unlimited_quota: unlimited,
+        expired_time: -1,
+        ...(status?.default_use_auto_group ? { group: 'auto' } : {}),
+      })
       const key = unwrap(body, t('创建失败')) as ApiKey | null
       void queryClient.invalidateQueries({ queryKey: ['console'] })
       if (!key?.id) return ''
