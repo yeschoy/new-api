@@ -29,6 +29,110 @@ import (
 	"gorm.io/gorm"
 )
 
+// Billing preference chooses only subscriptions matching the resolved request group.
+// These databases and the Go runner must be task-owned Docker containers.
+func TestSubscriptionGroupFundingPreferences(t *testing.T) {
+	for _, dialect := range []struct {
+		name string
+		env  string
+		open func(string) gorm.Dialector
+		kind common.DatabaseType
+	}{
+		{"sqlite", "", func(dsn string) gorm.Dialector { return sqlite.Open(dsn) }, common.DatabaseTypeSQLite},
+		{"mysql", "TEST_SUBSCRIPTION_GROUP_MYSQL_DSN", func(dsn string) gorm.Dialector { return mysql.Open(dsn) }, common.DatabaseTypeMySQL},
+		{"postgres", "TEST_SUBSCRIPTION_GROUP_POSTGRES_DSN", func(dsn string) gorm.Dialector {
+			return postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true})
+		}, common.DatabaseTypePostgreSQL},
+	} {
+		t.Run(dialect.name, func(t *testing.T) {
+			dsn := ":memory:"
+			if dialect.env != "" {
+				dsn = os.Getenv(dialect.env)
+				if dsn == "" {
+					t.Skip("task-owned DSN not configured")
+				}
+			}
+			db, err := gorm.Open(dialect.open(dsn), &gorm.Config{})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			sqlDB.SetMaxOpenConns(1)
+			t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+			tables, err := db.Migrator().GetTables()
+			require.NoError(t, err)
+			require.Empty(t, tables, "must use an empty disposable database")
+			oldDB, oldLog := model.DB, model.LOG_DB
+			oldMain, oldLogKind := common.MainDatabaseType(), common.LogDatabaseType()
+			model.DB, model.LOG_DB = db, db
+			common.SetDatabaseTypes(dialect.kind, dialect.kind)
+			defer func() {
+				model.DB, model.LOG_DB = oldDB, oldLog
+				common.SetDatabaseTypes(oldMain, oldLogKind)
+			}()
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+			now := model.GetDBTimestamp()
+			for i, tc := range []struct {
+				name, pref, group, applicable string
+				wallet, used                  int
+				wantSource                    string
+				wantFailure, allowOverflow    bool
+			}{
+				{"subscription first matched", "subscription_first", "deepflash", "deepflash", 50, 0, BillingSourceSubscription, false, false},
+				{"subscription first unrelated strict", "subscription_first", "other", "deepflash", 50, 0, BillingSourceWallet, false, false},
+				{"subscription first unrelated strict wallet empty", "subscription_first", "other", "deepflash", 0, 0, "", true, false},
+				{"subscription first matched exhausted strict", "subscription_first", "deepflash", "deepflash", 50, 95, "", true, false},
+				{"subscription first matched exhausted allows wallet", "subscription_first", "deepflash", "deepflash", 50, 95, BillingSourceWallet, false, true},
+				{"subscription only unrelated", "subscription_only", "other", "deepflash", 50, 0, "", true, false},
+				{"wallet first unmatched", "wallet_first", "other", "deepflash", 50, 0, BillingSourceWallet, false, false},
+				{"wallet first insufficient wallet matched", "wallet_first", "deepflash", "deepflash", 5, 0, BillingSourceSubscription, false, false},
+				{"wallet only matched", "wallet_only", "deepflash", "deepflash", 50, 0, BillingSourceWallet, false, false},
+				{"legacy unrestricted", "subscription_first", "other", "", 50, 0, BillingSourceSubscription, false, false},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					user := &model.User{Username: "scope-" + tc.name, AffCode: fmt.Sprintf("scope-%d", i), Quota: tc.wallet, Group: "default"}
+					require.NoError(t, db.Create(user).Error)
+					token := &model.Token{UserId: user.Id, Key: fmt.Sprintf("scope-token-%d", i), RemainQuota: 100}
+					require.NoError(t, db.Create(token).Error)
+					plan := &model.SubscriptionPlan{Title: "scope", Enabled: true, ApplicableGroup: tc.applicable, DurationUnit: "month", DurationValue: 1}
+					require.NoError(t, db.Create(plan).Error)
+					sub := &model.UserSubscription{UserId: user.Id, PlanId: plan.Id, Status: "active", StartTime: now - 1, EndTime: now + 3600, AmountTotal: 100, AmountUsed: int64(tc.used), AllowWalletOverflow: tc.allowOverflow}
+					require.NoError(t, db.Create(sub).Error)
+					ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+					info := &relaycommon.RelayInfo{UserId: user.Id, RequestId: fmt.Sprintf("scope-%d", user.Id), TokenId: token.Id, TokenKey: token.Key, OriginModelName: "shared-model", UsingGroup: tc.group, ForcePreConsume: true}
+					info.UserSetting.BillingPreference = tc.pref
+					session, apiErr := NewBillingSession(ctx, info, 20)
+					if tc.wantFailure {
+						require.NotNil(t, apiErr)
+						assert.Equal(t, types.ErrorCodeInsufficientUserQuota, apiErr.GetErrorCode())
+						assert.Nil(t, session)
+					} else {
+						require.Nil(t, apiErr)
+						require.NotNil(t, session)
+						assert.Equal(t, tc.wantSource, session.funding.Source())
+						if tc.wantSource == BillingSourceSubscription {
+							assert.Equal(t, sub.Id, info.SubscriptionId)
+						}
+					}
+					var actual model.User
+					require.NoError(t, db.First(&actual, user.Id).Error)
+					wantWallet := tc.wallet
+					if tc.wantSource == BillingSourceWallet {
+						wantWallet -= 20
+					}
+					assert.Equal(t, wantWallet, actual.Quota)
+					require.NoError(t, db.First(token, token.Id).Error)
+					wantToken := 80
+					if tc.wantFailure {
+						wantToken = 100
+					}
+					assert.Equal(t, wantToken, token.RemainQuota, "failed subscription pre-consume must roll back the token before fallback")
+				})
+			}
+			require.NoError(t, db.Migrator().DropTable(&model.SubscriptionPreConsumeRecord{}, &model.UserSubscription{}, &model.SubscriptionPlan{}, &model.Token{}, &model.User{}))
+		})
+	}
+}
+
 // The configured DSNs must point at isolated test databases. Each dialect runs
 // the real reservation, settlement and log paths with the same billing cases.
 func TestFixedPriceBillingDatabaseMatrix(t *testing.T) {

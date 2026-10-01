@@ -275,6 +275,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
               {totalAmount > 0 ? formatQuota(totalAmount) : t('Unlimited')}
             </span>
           </div>
+          <div className='flex items-center justify-between gap-2'>
+            <span className='text-muted-foreground text-sm'>
+              {t('Applicable Group')}
+            </span>
+            {plan.applicable_group ? (
+              <GroupBadge group={plan.applicable_group} />
+            ) : (
+              <span className='text-sm'>{t('All groups')}</span>
+            )}
+          </div>
           {plan.upgrade_group && (
             <div className='flex items-center justify-between'>
               <span className='text-muted-foreground text-sm'>

@@ -17,6 +17,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestReservedSubscriptionCannotRetryIntoAnotherGroup(t *testing.T) {
+	for _, tc := range []struct {
+		name, scope, selected string
+		allowed               bool
+	}{
+		{"scoped same group via another channel", "deepflash", "deepflash", true},
+		{"scoped cross-group retry", "deepflash", "other", false},
+		{"scoped unresolved group", "deepflash", "auto", false},
+		{"unrestricted cross-group retry", "", "other", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := &RelayInfo{SubscriptionApplicableGroup: tc.scope}
+			assert.Equal(t, tc.allowed, info.AllowsBillingGroup(tc.selected))
+		})
+	}
+}
+
 func TestRelayInfoGetFinalRequestRelayFormatPrefersExplicitFinal(t *testing.T) {
 	info := &RelayInfo{
 		RelayFormat:             types.RelayFormatOpenAI,

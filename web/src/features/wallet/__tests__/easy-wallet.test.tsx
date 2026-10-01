@@ -33,6 +33,7 @@ import { useConsoleModeStore } from '@/stores/console-mode-store'
 import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 import { renderApp } from '@/test-utils/render-app'
 
+import { SubscriptionPlansCard } from '../components/subscription-plans-card'
 import { useRedemption } from '../hooks/use-redemption'
 import { Wallet } from '../index'
 
@@ -142,7 +143,11 @@ describe('easy wallet redemption', () => {
   })
 
   it.each([
-    { data: 500, expected: 'Redemption successful! Added:', refreshFails: false },
+    {
+      data: 500,
+      expected: 'Redemption successful! Added:',
+      refreshFails: false,
+    },
     {
       data: { type: 'subscription', plan_id: 7, plan_title: 'Pro' },
       expected: 'Subscription redeemed: Pro',
@@ -183,6 +188,69 @@ describe('easy wallet redemption', () => {
       ).toBeVisible()
     }
   )
+
+  it('shows the current scope of an active subscription even if its plan is no longer for sale', async () => {
+    const adapter = api.defaults.adapter
+    api.defaults.adapter = async (config) => {
+      const path = new URL(config.url ?? '', 'http://localhost').pathname
+      if (path === '/api/subscription/plans') {
+        return {
+          data: { success: true, data: [] },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }
+      }
+      if (path === '/api/subscription/self') {
+        return {
+          data: {
+            success: true,
+            data: {
+              billing_preference: 'subscription_first',
+              subscriptions: [
+                {
+                  applicable_group: 'deepflash',
+                  subscription: {
+                    id: 17,
+                    plan_id: 8,
+                    status: 'active',
+                    end_time: Date.now() / 1000 + 3600,
+                    amount_total: 500000,
+                    amount_used: 0,
+                  },
+                },
+              ],
+              all_subscriptions: [
+                {
+                  applicable_group: 'deepflash',
+                  subscription: {
+                    id: 17,
+                    plan_id: 8,
+                    status: 'active',
+                    end_time: Date.now() / 1000 + 3600,
+                    amount_total: 500000,
+                    amount_used: 0,
+                  },
+                },
+              ],
+            },
+          },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }
+      }
+      if (typeof adapter === 'function') return adapter(config)
+      throw new Error('Missing adapter')
+    }
+
+    await renderApp(<SubscriptionPlansCard topupInfo={null} />, client)
+
+    expect(await screen.findByText(/Applicable Group/)).toBeVisible()
+    expect(screen.getByText('deepflash')).toBeVisible()
+  })
 
   it('hides the redemption action when compliance disables redemption', async () => {
     redemptionEnabled = false

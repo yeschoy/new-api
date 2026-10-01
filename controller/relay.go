@@ -282,6 +282,9 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 	if channel == nil {
 		return nil, types.NewError(fmt.Errorf("分组 %s 下模型 %s 的可用渠道不存在（retry）", selectGroup, info.OriginModelName), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
+	if !info.AllowsBillingGroup(selectGroup) {
+		return nil, types.NewError(fmt.Errorf("订阅预扣分组 %s 与重试分组 %s 不一致", info.SubscriptionApplicableGroup, selectGroup), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+	}
 
 	info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
 

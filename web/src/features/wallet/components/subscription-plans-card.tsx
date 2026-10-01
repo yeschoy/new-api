@@ -21,6 +21,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { GroupBadge } from '@/components/group-badge'
 import {
   StatusBadge,
   dotColorMap,
@@ -511,6 +512,16 @@ export function SubscriptionPlansCard({
                           </span>
                         )}
                       </div>
+                      {isActive && (
+                        <div className='text-muted-foreground mt-1 flex items-center gap-2'>
+                          {t('Applicable Group')}:
+                          {sub.applicable_group ? (
+                            <GroupBadge group={sub.applicable_group} />
+                          ) : (
+                            t('All groups')
+                          )}
+                        </div>
+                      )}
                       {totalAmount > 0 && isActive && (
                         <Progress value={usagePercent} className='mt-2 h-1.5' />
                       )}
@@ -549,6 +560,7 @@ export function SubscriptionPlansCard({
                 totalAmount > 0
                   ? `${t('Total Quota')}: ${formatQuota(totalAmount)}`
                   : `${t('Total Quota')}: ${t('Unlimited')}`,
+                `${t('Applicable Group')}: ${plan.applicable_group || t('All groups')}`,
                 limit > 0 ? `${t('Purchase Limit')}: ${limit}` : null,
                 plan.upgrade_group
                   ? `${t('Upgrade Group')}: ${plan.upgrade_group}`

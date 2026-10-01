@@ -297,6 +297,13 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 				}
 				billingPrepared = true
 			} else {
+				selectedGroup := common.GetContextKeyString(c, appconstant.ContextKeyUsingGroup)
+				if autoGroup := common.GetContextKeyString(c, appconstant.ContextKeyAutoGroup); autoGroup != "" {
+					selectedGroup = autoGroup
+				}
+				if !info.AllowsBillingGroup(selectedGroup) {
+					return types.NewError(fmt.Errorf("订阅预扣分组 %s 与重试分组 %s 不一致", info.SubscriptionApplicableGroup, selectedGroup), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+				}
 				info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
 				if apiErr = service.PrepareTieredBillingForSelectedGroup(c, info); apiErr != nil {
 					return apiErr

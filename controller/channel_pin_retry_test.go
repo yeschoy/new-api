@@ -8,7 +8,9 @@ import (
 	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"net/http"
@@ -17,13 +19,17 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/dto"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestShouldRetryHonorsPinRetryMode(t *testing.T) {
@@ -104,6 +110,201 @@ func newPinRetryContext() *gin.Context {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	return c
+}
+
+// The distributor chooses a real group before pricing. A reserved subscription
+// must keep that group on a retry, even when auto can route the same model elsewhere.
+func TestAutoGroupSubscriptionFundingAndRetryRouting(t *testing.T) {
+	require.NoError(t, i18n.Init())
+	db := modelManagementDB(t, "sqlite", "")
+	require.NoError(t, db.AutoMigrate(&model.Token{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+	previousGroups := setting.UserUsableGroups2JSONString()
+	previousRatio := ratio_setting.GroupRatio2JSONString()
+	previousMax := setting.GetMaxTokenAutoGroups()
+	previousRetry := common.RetryTimes
+	t.Cleanup(func() {
+		require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(previousGroups))
+		require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(previousRatio))
+		require.NoError(t, setting.UpdateMaxTokenAutoGroups(fmt.Sprint(previousMax)))
+		common.RetryTimes = previousRetry
+	})
+	require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(`{"default":"Default","deepflash":"Deepflash","other":"Other"}`))
+	require.NoError(t, setting.UpdateMaxTokenAutoGroups("2"))
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"group_ratio_setting.group_ratio": `{"default":1,"deepflash":1,"other":1}`,
+	}))
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{"scope-route":0.001}`))
+	common.RetryTimes = 0
+	for _, ch := range []model.Channel{
+		{Id: 9101, Name: "deepflash-route", Type: constant.ChannelTypeOpenAI, Key: "test-key", Status: common.ChannelStatusEnabled, Models: "scope-route", Group: "deepflash"},
+		{Id: 9102, Name: "other-route", Type: constant.ChannelTypeOpenAI, Key: "test-key", Status: common.ChannelStatusEnabled, Models: "scope-route", Group: "other"},
+	} {
+		require.NoError(t, db.Create(&ch).Error)
+		require.NoError(t, ch.AddAbilities(db))
+	}
+	model.InitChannelCache()
+
+	for i, tc := range []struct {
+		name, tokenGroup, firstGroup string
+		autoGroups                   []string
+		pin                          bool
+		wantSource, retryGroup       string
+		wantFirst, wantRetry         int
+		wantRejected                 bool
+	}{
+		{"auto selects unrelated group", "auto", "other", []string{"other", "deepflash"}, false, service.BillingSourceWallet, "deepflash", 9102, 9101, false},
+		{"pinned real group", "deepflash", "deepflash", nil, true, service.BillingSourceSubscription, "deepflash", 9101, 9101, false},
+		{"pinned auto has no resolved group", "auto", "auto", []string{"deepflash", "other"}, true, "", "", 9101, 0, true},
+		{"auto retry cannot submit in another group", "auto", "deepflash", []string{"deepflash", "other"}, false, service.BillingSourceSubscription, "other", 9101, 9102, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.name == "auto retry cannot submit in another group" {
+				common.RetryTimes = 1
+			}
+			user := &model.User{Username: "scope-route-" + strings.ReplaceAll(tc.name, " ", "-"), AffCode: fmt.Sprintf("scope-route-aff-%d", i), Group: "default", Quota: 10000, Status: common.UserStatusEnabled}
+			require.NoError(t, db.Create(user).Error)
+			token := &model.Token{UserId: user.Id, Key: fmt.Sprintf("scope-route-%d", user.Id), RemainQuota: 10000, Status: common.TokenStatusEnabled}
+			require.NoError(t, db.Create(token).Error)
+			plan := &model.SubscriptionPlan{Title: "deepflash-only", ApplicableGroup: "deepflash", Enabled: true, DurationUnit: "month", DurationValue: 1}
+			require.NoError(t, db.Create(plan).Error)
+			now := model.GetDBTimestamp()
+			sub := &model.UserSubscription{UserId: user.Id, PlanId: plan.Id, Status: "active", StartTime: now - 1, EndTime: now + 3600, AmountTotal: 10000}
+			require.NoError(t, db.Create(sub).Error)
+
+			var info *relaycommon.RelayInfo
+			var billedQuota int
+			router := gin.New()
+			router.POST("/v1/chat/completions", func(c *gin.Context) {
+				common.SetContextKey(c, constant.ContextKeyUserId, user.Id)
+				common.SetContextKey(c, constant.ContextKeyUserGroup, "default")
+				common.SetContextKey(c, constant.ContextKeyUsingGroup, tc.tokenGroup)
+				common.SetContextKey(c, constant.ContextKeyTokenGroup, tc.tokenGroup)
+				common.SetContextKey(c, constant.ContextKeyTokenAutoGroups, tc.autoGroups)
+				common.SetContextKey(c, constant.ContextKeyTokenCrossGroupRetry, true)
+				common.SetContextKey(c, constant.ContextKeyTokenId, token.Id)
+				common.SetContextKey(c, constant.ContextKeyTokenKey, token.Key)
+				if tc.pin {
+					service.GetChannelConstraints(c).AddPin(dto.ChannelPin{ChannelId: 9101, Source: dto.PinSourceOriginTask, Rank: dto.PinRankOriginTask, RetryMode: dto.PinRetrySameChannel})
+				}
+				c.Next()
+			}, middleware.Distribute(), func(c *gin.Context) {
+				assert.Equal(t, tc.wantFirst, c.GetInt("channel_id"))
+				var err error
+				format := types.RelayFormatOpenAI
+				if tc.name == "auto retry cannot submit in another group" {
+					format = types.RelayFormatTask
+				}
+				info, err = relaycommon.GenRelayInfo(c, format, nil, nil)
+				require.NoError(t, err)
+				assert.Equal(t, tc.tokenGroup, info.TokenGroup, "token routing preference must not become the selected auto group")
+				info.UserSetting.BillingPreference = "subscription_first"
+				info.ForcePreConsume = true
+				price, err := helper.ModelPriceHelperPerCall(c, info)
+				require.NoError(t, err)
+				info.PriceData = price
+				billedQuota = price.Quota
+				assert.Positive(t, billedQuota)
+				assert.Equal(t, tc.firstGroup, info.UsingGroup)
+				apiErr := service.PreConsumeBilling(c, billedQuota, info)
+				if tc.tokenGroup == "auto" && tc.pin {
+					require.NotNil(t, apiErr, "unresolved pinned auto group must not fall back to the wallet")
+					assert.Equal(t, types.ErrorCodeUpdateDataError, apiErr.GetErrorCode())
+					c.Status(apiErr.StatusCode)
+					return
+				}
+				require.Nil(t, apiErr)
+				assert.Equal(t, tc.wantSource, info.BillingSource)
+				if tc.wantSource == service.BillingSourceSubscription {
+					assert.Equal(t, sub.Id, info.SubscriptionId)
+					assert.Equal(t, "deepflash", info.SubscriptionApplicableGroup)
+				}
+				if tc.name == "auto retry cannot submit in another group" {
+					// A channel going offline after the first upstream failure makes
+					// the real auto selector advance to the next group on retry.
+					refunded := make(chan struct{}, 1)
+					const callback = "scope_route_refund_observed"
+					require.NoError(t, db.Callback().Update().After("gorm:commit_or_rollback_transaction").Register(callback, func(tx *gorm.DB) {
+						if tx.Statement.Table == "tokens" && tx.Error == nil {
+							select {
+							case refunded <- struct{}{}:
+							default:
+							}
+						}
+					}))
+					t.Cleanup(func() { require.NoError(t, db.Callback().Update().Remove(callback)) })
+					attempts := 0
+					outcome, taskErr := executeTaskSubmissionWith(c, info, func(c *gin.Context, info *relaycommon.RelayInfo) (*relay.TaskSubmitResult, *dto.TaskError) {
+						attempts++
+						assert.Equal(t, tc.firstGroup, info.UsingGroup)
+						info.InitChannelMeta(c) // the real task submitter refreshes channel metadata on entry
+						require.NoError(t, db.Model(&model.Channel{}).Where("id = ?", tc.wantFirst).Update("status", common.ChannelStatusManuallyDisabled).Error)
+						return nil, &dto.TaskError{StatusCode: http.StatusBadGateway, Message: "upstream unavailable"}
+					})
+					require.Nil(t, outcome)
+					require.NotNil(t, taskErr)
+					assert.Equal(t, "get_channel_failed", taskErr.Code)
+					assert.Equal(t, 2, attempts, "same-group retries may submit, but the other-group candidate must not")
+					assert.Equal(t, tc.wantFirst, c.GetInt("channel_id"))
+					assert.Equal(t, tc.firstGroup, info.UsingGroup)
+					select {
+					case <-refunded:
+					case <-time.After(5 * time.Second):
+						t.Fatal("subscription refund did not finish")
+					}
+					c.Status(http.StatusBadGateway)
+					return
+				}
+				// A non-restricted wallet or a pin may still select its next
+				// candidate. This check runs at the same pre-submit boundary.
+				info.InitChannelMeta(c)
+				retry := &service.RetryParam{Ctx: c, TokenGroup: info.TokenGroup, ModelName: info.OriginModelName, RequestPath: c.Request.URL.Path, Retry: common.GetPointer(0)}
+				channel, selectErr := getChannel(c, info, retry)
+				if tc.wantRejected {
+					require.Nil(t, channel)
+					require.NotNil(t, selectErr)
+					assert.Contains(t, selectErr.Error(), tc.retryGroup)
+					assert.Equal(t, tc.wantFirst, c.GetInt("channel_id"))
+					assert.Equal(t, tc.firstGroup, info.UsingGroup)
+				} else {
+					require.Nil(t, selectErr)
+					require.NotNil(t, channel)
+					assert.Equal(t, tc.wantRetry, channel.Id)
+					assert.Equal(t, tc.retryGroup, info.UsingGroup)
+				}
+				require.NoError(t, info.Billing.Settle(billedQuota))
+			})
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"scope-route"}`))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(recorder, request)
+			if tc.wantRejected {
+				assert.NotEqual(t, http.StatusOK, recorder.Code, "restricted or unresolved group must reject before submission")
+			} else {
+				require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+			}
+			require.NotNil(t, info, "the real distributor must select the channel before billing")
+			require.NoError(t, db.First(user, user.Id).Error)
+			require.NoError(t, db.First(&sub, sub.Id).Error)
+			if tc.name == "auto retry cannot submit in another group" {
+				require.NoError(t, db.First(token, token.Id).Error)
+				assert.Equal(t, 10000, token.RemainQuota, "failed scoped retry restores the token reservation")
+			}
+			if tc.wantSource == service.BillingSourceWallet {
+				assert.Equal(t, 10000-billedQuota, user.Quota)
+				assert.Zero(t, sub.AmountUsed)
+			} else if tc.wantSource == service.BillingSourceSubscription {
+				assert.Equal(t, 10000, user.Quota)
+				if tc.name == "auto retry cannot submit in another group" {
+					assert.Zero(t, sub.AmountUsed, "failed request refunds only its originally selected subscription")
+				} else {
+					assert.EqualValues(t, billedQuota, sub.AmountUsed)
+				}
+			} else {
+				assert.Equal(t, 10000, user.Quota)
+				assert.Zero(t, sub.AmountUsed)
+			}
+		})
+	}
 }
 
 func TestRequestPolicyConfigReturnsSettingsWithoutMigration(t *testing.T) {

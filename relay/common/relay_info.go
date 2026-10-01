@@ -145,6 +145,9 @@ type RelayInfo struct {
 	BillingSource string
 	// SubscriptionId is the user_subscriptions.id used when BillingSource == "subscription"
 	SubscriptionId int
+	// SubscriptionApplicableGroup is the scope observed when the reservation was made.
+	// A cross-group retry must not spend a restricted subscription in another group.
+	SubscriptionApplicableGroup string
 	// SubscriptionPreConsumed is the amount pre-consumed on subscription item (quota units or 1)
 	SubscriptionPreConsumed int64
 	// SubscriptionPostDelta is the post-consume delta applied to amount_used (quota units; can be negative).
@@ -212,6 +215,12 @@ type RelayInfo struct {
 	*ResponsesUsageInfo
 	*ChannelMeta
 	*TaskRelayInfo
+}
+
+// AllowsBillingGroup keeps a scoped subscription on its reserved group across retries.
+// Unrestricted subscriptions and wallet funding do not constrain routing.
+func (info *RelayInfo) AllowsBillingGroup(group string) bool {
+	return info.SubscriptionApplicableGroup == "" || info.SubscriptionApplicableGroup == group
 }
 
 // UpdateImageCount replaces the billable quantity without changing the frozen

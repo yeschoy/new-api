@@ -397,6 +397,41 @@ export function SubscriptionsMutateDrawer({
                 />
               </div>
 
+              <FormField
+                control={form.control}
+                name='applicable_group'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Applicable Group')}</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        options={[
+                          { value: '__all__', label: t('All groups') },
+                          ...groupOptions
+                            .filter((g) => g !== 'auto')
+                            .map((g) => ({
+                              value: g,
+                              label: g,
+                            })),
+                        ]}
+                        onValueChange={(v) =>
+                          field.onChange(v === '__all__' ? '' : v)
+                        }
+                        value={field.value || '__all__'}
+                        className='w-full'
+                        placeholder={t('All groups')}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Changes to this group affect active subscriptions immediately.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
                 <FormField
                   control={form.control}

@@ -58,13 +58,15 @@ func GetSubscriptionSelf(c *gin.Context) {
 	// Get all subscriptions (including expired)
 	allSubscriptions, err := model.GetAllUserSubscriptions(userId)
 	if err != nil {
-		allSubscriptions = []model.SubscriptionSummary{}
+		common.ApiError(c, err)
+		return
 	}
 
 	// Get active subscriptions for backward compatibility
 	activeSubscriptions, err := model.GetAllActiveUserSubscriptions(userId)
 	if err != nil {
-		activeSubscriptions = []model.SubscriptionSummary{}
+		common.ApiError(c, err)
+		return
 	}
 
 	common.ApiSuccess(c, gin.H{
@@ -138,6 +140,18 @@ type AdminUpsertSubscriptionPlanRequest struct {
 	Plan model.SubscriptionPlan `json:"plan"`
 }
 
+func validateApplicableGroup(plan *model.SubscriptionPlan) bool {
+	plan.ApplicableGroup = strings.TrimSpace(plan.ApplicableGroup)
+	if plan.ApplicableGroup == "" {
+		return true
+	}
+	if plan.ApplicableGroup == "auto" {
+		return false
+	}
+	_, ok := ratio_setting.GetGroupRatioCopy()[plan.ApplicableGroup]
+	return ok
+}
+
 func AdminCreateSubscriptionPlan(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
 		return
@@ -198,6 +212,10 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 			common.ApiErrorMsg(c, "降级分组不存在")
 			return
 		}
+	}
+	if !validateApplicableGroup(&req.Plan) {
+		common.ApiErrorMsg(c, "适用分组不存在或不是有效真实分组")
+		return
 	}
 	req.Plan.QuotaResetPeriod = model.NormalizeResetPeriod(req.Plan.QuotaResetPeriod)
 	if req.Plan.QuotaResetPeriod == model.SubscriptionResetCustom && req.Plan.QuotaResetCustomSeconds <= 0 {
@@ -273,6 +291,10 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			return
 		}
 	}
+	if !validateApplicableGroup(&req.Plan) {
+		common.ApiErrorMsg(c, "适用分组不存在或不是有效真实分组")
+		return
+	}
 	req.Plan.QuotaResetPeriod = model.NormalizeResetPeriod(req.Plan.QuotaResetPeriod)
 	if req.Plan.QuotaResetPeriod == model.SubscriptionResetCustom && req.Plan.QuotaResetCustomSeconds <= 0 {
 		common.ApiErrorMsg(c, "自定义重置周期需大于0秒")
@@ -297,6 +319,7 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"max_purchase_per_user":      req.Plan.MaxPurchasePerUser,
 			"total_amount":               req.Plan.TotalAmount,
 			"upgrade_group":              req.Plan.UpgradeGroup,
+			"applicable_group":           req.Plan.ApplicableGroup,
 			"downgrade_group":            req.Plan.DowngradeGroup,
 			"quota_reset_period":         req.Plan.QuotaResetPeriod,
 			"quota_reset_custom_seconds": req.Plan.QuotaResetCustomSeconds,

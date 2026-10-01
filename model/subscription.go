@@ -36,6 +36,9 @@ const (
 var (
 	ErrSubscriptionOrderNotFound      = errors.New("subscription order not found")
 	ErrSubscriptionOrderStatusInvalid = errors.New("subscription order status invalid")
+	ErrNoActiveSubscription           = errors.New("no active subscription")
+	ErrNoApplicableSubscription       = errors.New("no applicable subscription")
+	ErrSubscriptionQuotaInsufficient  = errors.New("subscription quota insufficient")
 )
 
 const (
@@ -175,6 +178,9 @@ type SubscriptionPlan struct {
 	// Upgrade user group after purchase (empty = no change)
 	UpgradeGroup string `json:"upgrade_group" gorm:"type:varchar(64);default:''"`
 
+	// Empty means the quota is usable in every accessible billing group. This is not a permission grant.
+	ApplicableGroup string `json:"applicable_group" gorm:"type:varchar(64);not null;default:''"`
+
 	// Downgrade user group on expiry (empty = revert to the group held before purchase)
 	DowngradeGroup string `json:"downgrade_group" gorm:"type:varchar(64);default:''"`
 
@@ -293,8 +299,21 @@ func (s *UserSubscription) BeforeUpdate(tx *gorm.DB) error {
 }
 
 type SubscriptionSummary struct {
-	Subscription *UserSubscription `json:"subscription"`
+	Subscription    *UserSubscription `json:"subscription"`
+	ApplicableGroup string            `json:"applicable_group"`
 }
+
+// SubscriptionQuotaError retains the overflow decision observed with the plan during pre-consume.
+type SubscriptionQuotaError struct {
+	AllowWalletOverflow bool
+	Amount              int64
+}
+
+func (e *SubscriptionQuotaError) Error() string {
+	return fmt.Sprintf("subscription quota insufficient, need=%d", e.Amount)
+}
+
+func (e *SubscriptionQuotaError) Unwrap() error { return ErrSubscriptionQuotaInsufficient }
 
 type SubscriptionResetResult struct {
 	PlanId           int    `json:"plan_id"`
@@ -391,7 +410,7 @@ func getSubscriptionPlanByIdTx(tx *gorm.DB, id int) (*SubscriptionPlan, error) {
 		return nil, errors.New("invalid plan id")
 	}
 	key := subscriptionPlanCacheKey(id)
-	if key != "" {
+	if tx == nil && key != "" {
 		if cached, found, err := getSubscriptionPlanCache().Get(key); err == nil && found {
 			cached.NormalizeDefaults()
 			return &cached, nil
@@ -406,7 +425,9 @@ func getSubscriptionPlanByIdTx(tx *gorm.DB, id int) (*SubscriptionPlan, error) {
 		return nil, err
 	}
 	plan.NormalizeDefaults()
-	_ = getSubscriptionPlanCache().SetWithTTL(key, plan, subscriptionPlanCacheTTL())
+	if tx == nil {
+		_ = getSubscriptionPlanCache().SetWithTTL(key, plan, subscriptionPlanCacheTTL())
+	}
 	return &plan, nil
 }
 
@@ -866,41 +887,7 @@ func GetAllActiveUserSubscriptions(userId int) ([]SubscriptionSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	return buildSubscriptionSummaries(subs), nil
-}
-
-// HasActiveUserSubscription returns whether the user has any active subscription.
-// This is a lightweight existence check to avoid heavy pre-consume transactions.
-func HasActiveUserSubscription(userId int) (bool, error) {
-	if userId <= 0 {
-		return false, errors.New("invalid userId")
-	}
-	now := common.GetTimestamp()
-	var count int64
-	if err := DB.Model(&UserSubscription{}).
-		Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", now).
-		Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-// UserActiveSubscriptionsAllowWalletOverflow returns whether wallet balance may be used
-// after the user's subscription quota is exhausted. A single active subscription that
-// disallows wallet overflow (allow_wallet_overflow = false) blocks the fallback.
-func UserActiveSubscriptionsAllowWalletOverflow(userId int) (bool, error) {
-	if userId <= 0 {
-		return false, errors.New("invalid userId")
-	}
-	now := common.GetTimestamp()
-	var strictCount int64
-	if err := DB.Model(&UserSubscription{}).
-		Where("user_id = ? AND status = ? AND end_time > ? AND allow_wallet_overflow = ?",
-			userId, "active", now, false).
-		Count(&strictCount).Error; err != nil {
-		return false, err
-	}
-	return strictCount == 0, nil
+	return buildSubscriptionSummaries(subs)
 }
 
 // GetAllUserSubscriptions returns all subscriptions (active and expired) for a user.
@@ -915,21 +902,35 @@ func GetAllUserSubscriptions(userId int) ([]SubscriptionSummary, error) {
 	if err != nil {
 		return nil, err
 	}
-	return buildSubscriptionSummaries(subs), nil
+	return buildSubscriptionSummaries(subs)
 }
 
-func buildSubscriptionSummaries(subs []UserSubscription) []SubscriptionSummary {
+func buildSubscriptionSummaries(subs []UserSubscription) ([]SubscriptionSummary, error) {
 	if len(subs) == 0 {
-		return []SubscriptionSummary{}
+		return []SubscriptionSummary{}, nil
+	}
+	planIds := make([]int, 0, len(subs))
+	for _, sub := range subs {
+		planIds = append(planIds, sub.PlanId)
+	}
+	var plans []SubscriptionPlan
+	if err := DB.Select("id", "applicable_group").Where("id IN ?", planIds).Find(&plans).Error; err != nil {
+		return nil, err
+	}
+	groups := make(map[int]string, len(plans))
+	for _, plan := range plans {
+		groups[plan.Id] = plan.ApplicableGroup
 	}
 	result := make([]SubscriptionSummary, 0, len(subs))
 	for _, sub := range subs {
+		group, ok := groups[sub.PlanId]
+		if !ok {
+			return nil, fmt.Errorf("subscription plan %d not found", sub.PlanId)
+		}
 		subCopy := sub
-		result = append(result, SubscriptionSummary{
-			Subscription: &subCopy,
-		})
+		result = append(result, SubscriptionSummary{Subscription: &subCopy, ApplicableGroup: group})
 	}
-	return result
+	return result, nil
 }
 
 // AdminInvalidateUserSubscription marks a user subscription as cancelled and ends it immediately.
@@ -1139,6 +1140,7 @@ func AdminResetPlanSubscriptions(planId int, advanceResetTime bool) (*Subscripti
 
 type SubscriptionPreConsumeResult struct {
 	UserSubscriptionId int
+	ApplicableGroup    string
 	PreConsumed        int64
 	AmountTotal        int64
 	AmountUsedBefore   int64
@@ -1249,6 +1251,8 @@ type SubscriptionPreConsumeRecord struct {
 	RequestId          string `json:"request_id" gorm:"type:varchar(64);uniqueIndex"`
 	UserId             int    `json:"user_id" gorm:"index"`
 	UserSubscriptionId int    `json:"user_subscription_id" gorm:"index"`
+	BillingGroup       string `json:"billing_group" gorm:"type:varchar(64);not null;default:''"`
+	ApplicableGroup    string `json:"applicable_group" gorm:"type:varchar(64);not null;default:''"`
 	PreConsumed        int64  `json:"pre_consumed" gorm:"type:bigint;not null;default:0"`
 	Status             string `json:"status" gorm:"type:varchar(32);index"` // consumed/refunded
 	CreatedAt          int64  `json:"created_at" gorm:"bigint"`
@@ -1303,8 +1307,38 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 	return tx.Save(sub).Error
 }
 
-// PreConsumeUserSubscription pre-consumes from any active subscription total quota.
-func PreConsumeUserSubscription(requestId string, userId int, modelName string, quotaType int, amount int64) (*SubscriptionPreConsumeResult, error) {
+// replaySubscriptionPreConsumeTx preserves the original funding scope even if the plan changed.
+func replaySubscriptionPreConsumeTx(tx *gorm.DB, record *SubscriptionPreConsumeRecord, userId int, group string, result *SubscriptionPreConsumeResult) error {
+	if record.Status == "refunded" {
+		return errors.New("subscription pre-consume already refunded")
+	}
+	if record.UserId != userId || record.BillingGroup != "" && record.BillingGroup != group {
+		return errors.New("subscription pre-consume request identity or group mismatch")
+	}
+	var sub UserSubscription
+	if err := tx.Where("id = ?", record.UserSubscriptionId).First(&sub).Error; err != nil {
+		return err
+	}
+	plan, err := getSubscriptionPlanByIdTx(tx, sub.PlanId)
+	if err != nil {
+		return err
+	}
+	// Pre-upgrade records did not capture the request's group. A plan that became
+	// restricted cannot safely replay one of those reservations.
+	if record.BillingGroup == "" && plan.ApplicableGroup != "" {
+		return errors.New("legacy subscription pre-consume group is unknown")
+	}
+	result.UserSubscriptionId = sub.Id
+	result.ApplicableGroup = record.ApplicableGroup
+	result.PreConsumed = record.PreConsumed
+	result.AmountTotal = sub.AmountTotal
+	result.AmountUsedBefore = sub.AmountUsed
+	result.AmountUsedAfter = sub.AmountUsed
+	return nil
+}
+
+// PreConsumeUserSubscription pre-consumes from one active plan applicable to the actual billing group.
+func PreConsumeUserSubscription(requestId string, userId int, modelName string, group string, quotaType int, amount int64) (*SubscriptionPreConsumeResult, error) {
 	if userId <= 0 {
 		return nil, errors.New("invalid userId")
 	}
@@ -1313,6 +1347,9 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 	}
 	if amount <= 0 {
 		return nil, errors.New("amount must be > 0")
+	}
+	if group == "" || group == "auto" {
+		return nil, errors.New("actual billing group is required")
 	}
 	now := GetDBTimestamp()
 
@@ -1325,19 +1362,7 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 			return query.Error
 		}
 		if query.RowsAffected > 0 {
-			if existing.Status == "refunded" {
-				return errors.New("subscription pre-consume already refunded")
-			}
-			var sub UserSubscription
-			if err := tx.Where("id = ?", existing.UserSubscriptionId).First(&sub).Error; err != nil {
-				return err
-			}
-			returnValue.UserSubscriptionId = sub.Id
-			returnValue.PreConsumed = existing.PreConsumed
-			returnValue.AmountTotal = sub.AmountTotal
-			returnValue.AmountUsedBefore = sub.AmountUsed
-			returnValue.AmountUsedAfter = sub.AmountUsed
-			return nil
+			return replaySubscriptionPreConsumeTx(tx, &existing, userId, group, returnValue)
 		}
 
 		var subs []UserSubscription
@@ -1345,16 +1370,37 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 			Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", now).
 			Order("end_time asc, id asc").
 			Find(&subs).Error; err != nil {
-			return errors.New("no active subscription")
+			return err
+		}
+		// Locking the user's active subscriptions serializes their reservations.
+		// Re-read the idempotency key with a current (locking) read after that lock:
+		// a concurrent reservation may have committed since the first read, and
+		// MySQL repeatable-read would otherwise keep showing the older snapshot.
+		var concurrent SubscriptionPreConsumeRecord
+		query = lockForUpdate(tx).Where("request_id = ?", requestId).Limit(1).Find(&concurrent)
+		if query.Error != nil {
+			return query.Error
+		}
+		if query.RowsAffected > 0 {
+			return replaySubscriptionPreConsumeTx(tx, &concurrent, userId, group, returnValue)
 		}
 		if len(subs) == 0 {
-			return errors.New("no active subscription")
+			return ErrNoActiveSubscription
 		}
+		matched := false
+		allowOverflow := true
 		for _, candidate := range subs {
 			sub := candidate
 			plan, err := getSubscriptionPlanByIdTx(tx, sub.PlanId)
 			if err != nil {
 				return err
+			}
+			if plan.ApplicableGroup != "" && plan.ApplicableGroup != group {
+				continue
+			}
+			matched = true
+			if !sub.AllowWalletOverflow {
+				allowOverflow = false
 			}
 			if err := maybeResetUserSubscriptionWithPlanTx(tx, &sub, plan, now); err != nil {
 				return err
@@ -1370,22 +1416,15 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 				RequestId:          requestId,
 				UserId:             userId,
 				UserSubscriptionId: sub.Id,
+				BillingGroup:       group,
+				ApplicableGroup:    plan.ApplicableGroup,
 				PreConsumed:        amount,
 				Status:             "consumed",
 			}
 			if err := tx.Create(record).Error; err != nil {
-				var dup SubscriptionPreConsumeRecord
-				if err2 := tx.Where("request_id = ?", requestId).First(&dup).Error; err2 == nil {
-					if dup.Status == "refunded" {
-						return errors.New("subscription pre-consume already refunded")
-					}
-					returnValue.UserSubscriptionId = sub.Id
-					returnValue.PreConsumed = dup.PreConsumed
-					returnValue.AmountTotal = sub.AmountTotal
-					returnValue.AmountUsedBefore = sub.AmountUsed
-					returnValue.AmountUsedAfter = sub.AmountUsed
-					return nil
-				}
+				// A remaining unique-key conflict (for example, a reused key from
+				// another user) rolls back the whole transaction; never infer an
+				// insert from MySQL's clientFoundRows-dependent RowsAffected.
 				return err
 			}
 			sub.AmountUsed += amount
@@ -1393,13 +1432,17 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 				return err
 			}
 			returnValue.UserSubscriptionId = sub.Id
+			returnValue.ApplicableGroup = plan.ApplicableGroup
 			returnValue.PreConsumed = amount
 			returnValue.AmountTotal = sub.AmountTotal
 			returnValue.AmountUsedBefore = usedBefore
 			returnValue.AmountUsedAfter = sub.AmountUsed
 			return nil
 		}
-		return fmt.Errorf("subscription quota insufficient, need=%d", amount)
+		if !matched {
+			return ErrNoApplicableSubscription
+		}
+		return &SubscriptionQuotaError{AllowWalletOverflow: allowOverflow, Amount: amount}
 	})
 	if err != nil {
 		return nil, err
@@ -1425,7 +1468,7 @@ func RefundSubscriptionPreConsume(requestId string) error {
 			record.Status = "refunded"
 			return tx.Save(&record).Error
 		}
-		if err := PostConsumeUserSubscriptionDelta(record.UserSubscriptionId, -record.PreConsumed); err != nil {
+		if err := postConsumeUserSubscriptionDeltaTx(tx, record.UserSubscriptionId, -record.PreConsumed); err != nil {
 			return err
 		}
 		record.Status = "refunded"
@@ -1524,17 +1567,21 @@ func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error
 		return nil
 	}
 	return DB.Transaction(func(tx *gorm.DB) error {
-		var sub UserSubscription
-		if err := lockForUpdate(tx).
-			Where("id = ?", userSubscriptionId).
-			First(&sub).Error; err != nil {
-			return err
-		}
-		newUsed := max(sub.AmountUsed+delta, 0)
-		if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
-			return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
-		}
-		sub.AmountUsed = newUsed
-		return tx.Save(&sub).Error
+		return postConsumeUserSubscriptionDeltaTx(tx, userSubscriptionId, delta)
 	})
+}
+
+func postConsumeUserSubscriptionDeltaTx(tx *gorm.DB, userSubscriptionId int, delta int64) error {
+	var sub UserSubscription
+	if err := lockForUpdate(tx).
+		Where("id = ?", userSubscriptionId).
+		First(&sub).Error; err != nil {
+		return err
+	}
+	newUsed := max(sub.AmountUsed+delta, 0)
+	if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
+		return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
+	}
+	sub.AmountUsed = newUsed
+	return tx.Save(&sub).Error
 }

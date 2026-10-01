@@ -25,6 +25,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestApplicableSubscriptionGroupValidation(t *testing.T) {
+	previous := config.GlobalConfig.ExportAllConfigs()
+	t.Cleanup(func() { require.NoError(t, config.GlobalConfig.LoadFromDB(previous)) })
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"group_ratio_setting.group_ratio": `{"default":1,"deepflash":1}`,
+	}))
+	for _, tc := range []struct {
+		input, normalized string
+		allowed           bool
+	}{
+		{"", "", true},
+		{" deepflash ", "deepflash", true},
+		{"missing", "missing", false},
+		{"auto", "auto", false},
+	} {
+		plan := &model.SubscriptionPlan{ApplicableGroup: tc.input}
+		assert.Equal(t, tc.allowed, validateApplicableGroup(plan), tc.input)
+		assert.Equal(t, tc.normalized, plan.ApplicableGroup)
+	}
+}
+
 func TestUpdateOptionRejectsInvalidTaskBillingExpressions(t *testing.T) {
 	const pluginKey = "billing-save-probe"
 	const modelName = "billing-save-model"
