@@ -1,0 +1,70 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { useMemo } from 'react'
+
+import { useCatalog, useRankings } from '@/lib/queries'
+
+import { RouterShell } from '../router-shell'
+import { HeroStats, RouterHero, heroStats } from './router-hero'
+import { FeaturedApps, FeaturedModels, RecentModels } from './router-sections'
+import { WorldMap } from './world-map'
+
+export function RouterHome() {
+  const { models } = useCatalog()
+  const rankings = useRankings('week')
+  const ranked = rankings.data?.models ?? []
+
+  const vendorCount = useMemo(() => new Set(models.map((m) => m.vendor)).size, [models])
+
+  const stats = useMemo(
+    () =>
+      heroStats({
+        weeklyTokens: ranked.reduce((sum, row) => sum + row.total_tokens, 0),
+        modelCount: models.length,
+        vendorCount,
+      }),
+    [models.length, ranked, vendorCount]
+  )
+
+  return (
+    <RouterShell>
+      <div className='relative overflow-x-clip'>
+        {/* The map sits behind the headline, buttons and figures. */}
+        <WorldMap className='world-map-frame pointer-events-none absolute inset-x-0 top-4 mx-auto aspect-[360/138] w-full max-w-[1440px]' />
+        {/* On wide screens the block sits over the Pacific: 10% of the map's width right of centre. */}
+        <div className='relative mx-auto w-fit lg:left-[min(10%,144px)]'>
+          <RouterHero />
+          <HeroStats stats={stats} />
+        </div>
+      </div>
+      {/* Positioned so the cards paint above the bottom of the map. */}
+      <div className='relative'>
+        <FeaturedModels
+          rows={ranked}
+          catalog={models}
+          modelCount={models.length}
+          vendorCount={vendorCount}
+        />
+        <FeaturedApps />
+        <RecentModels models={models} />
+        <div className='h-32' />
+      </div>
+    </RouterShell>
+  )
+}

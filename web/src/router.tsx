@@ -1,0 +1,87 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { useEffect } from 'react'
+import {
+  Outlet,
+  createBrowserRouter,
+  useLocation,
+  type RouteObject,
+} from 'react-router'
+
+import { Moved } from './components/moved'
+import { tk } from './i18n/i18n'
+import { useBrandTab } from './lib/queries'
+import { SignInPage } from './pages/auth/sign-in-page'
+import { SignUpPage } from './pages/auth/sign-up-page'
+import { ChatPage } from './pages/chat/chat-page'
+import { ActivityPage } from './pages/console/activity-page'
+import { CreditsPage } from './pages/console/credits-page'
+import { KeysPage } from './pages/console/keys-page'
+import { ProfilePage } from './pages/console/profile-page'
+import { ContentPage } from './pages/content-page'
+import { NotFoundPage } from './pages/not-found'
+import { SetupPage } from './pages/setup-page'
+import { RouterHome } from './sites/router/home/router-home'
+import { RouterModelPage } from './sites/router/models/router-model-page'
+import { RouterRankingsPage } from './sites/router/rankings/router-rankings-page'
+
+function RootLayout() {
+  const location = useLocation()
+  useBrandTab()
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+
+  return <Outlet />
+}
+
+export const routes: RouteObject[] = [
+  {
+    element: <RootLayout />,
+    children: [
+      { path: '/', element: <RouterHome /> },
+      { path: '/models/:name', element: <RouterModelPage /> },
+      { path: '/pricing', element: <Moved to='/settings/credits' /> },
+      { path: '/rankings', element: <RouterRankingsPage /> },
+      { path: '/chat', element: <ChatPage /> },
+      { path: '/playground', element: <Moved to='/chat' /> },
+      { path: '/sign-in', element: <SignInPage /> },
+      { path: '/login', element: <Moved to='/sign-in' /> },
+      { path: '/sign-up', element: <SignUpPage /> },
+      { path: '/register', element: <Moved to='/sign-up' /> },
+      { path: '/settings/keys', element: <KeysPage /> },
+      { path: '/keys', element: <Moved to='/settings/keys' /> },
+      { path: '/settings/credits', element: <CreditsPage /> },
+      { path: '/wallet', element: <Moved to='/settings/credits' /> },
+      { path: '/activity', element: <ActivityPage /> },
+      { path: '/usage-logs', element: <Moved to='/activity' /> },
+      { path: '/settings/profile', element: <ProfilePage /> },
+      { path: '/settings', element: <Moved to='/settings/keys' /> },
+      { path: '/dashboard', element: <Moved to='/settings/keys' /> },
+      { path: '/about', element: <ContentPage source='/api/about' title={tk('关于')} /> },
+      { path: '/user-agreement', element: <ContentPage source='/api/user-agreement' title={tk('用户协议')} /> },
+      { path: '/privacy-policy', element: <ContentPage source='/api/privacy-policy' title={tk('隐私政策')} /> },
+      { path: '/setup', element: <SetupPage /> },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+]
+
+export const router = createBrowserRouter(routes)
