@@ -102,7 +102,7 @@ describe('console pages', () => {
     expect(screen.getByRole('heading', { name: 'API 密钥' })).toBeInTheDocument()
     expect(screen.getByText('$1.5')).toBeInTheDocument()
     expect(screen.getByText('剩余 $1')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: /充值额度/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: /钱包/ }).length).toBeGreaterThan(0)
   })
 
   it('shows why the key list failed instead of an empty list', async () => {

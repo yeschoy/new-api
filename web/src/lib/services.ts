@@ -50,6 +50,10 @@ export type SiteStatus = {
   github_oauth?: boolean
   /** The admin's header-navigation switches, as a JSON string (see showNavModule). */
   HeaderNavModules?: string
+  /** The admin's console menu switches, as JSON (see consoleModuleOn). */
+  SidebarModulesAdmin?: string
+  /** Usage data for the analytics pages is being collected. */
+  enable_data_export?: boolean
   /** New API keys go in the auto group, which routes each request to a usable group. */
   default_use_auto_group?: boolean
   setup?: boolean

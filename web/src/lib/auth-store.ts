@@ -28,6 +28,8 @@ export type AuthUser = {
   used_quota?: number
   request_count?: number
   group?: string
+  /** The user's own console menu preference, as JSON (see consoleModuleOn). */
+  sidebar_modules?: string
 }
 
 export type LoginSession = {
