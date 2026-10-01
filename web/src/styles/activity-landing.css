@@ -109,8 +109,10 @@ For commercial licensing, please contact support@quantumnous.com
   min-height: 310px;
   flex-direction: column;
   align-items: flex-start;
+  min-width: 0;
   padding: clamp(1.5rem, 3vw, 2.5rem);
   overflow: hidden;
+  overflow-wrap: anywhere;
   border: 1px solid var(--ci-border-subtle);
   border-radius: 26px;
   background: color-mix(in srgb, var(--ci-surface) 86%, transparent);
@@ -170,6 +172,7 @@ For commercial licensing, please contact support@quantumnous.com
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  max-width: 100%;
   margin-top: auto;
   padding-top: 1.5rem;
   color: var(--ci-ink);

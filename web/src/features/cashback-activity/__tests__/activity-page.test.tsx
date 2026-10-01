@@ -23,7 +23,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CashbackActivityPage } from '@/features/cashback-activity'
 import zh from '@/i18n/locales/zh.json'
-import { Route } from '@/routes/activity'
 import { useAuthStore } from '@/stores/auth-store'
 import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 import { renderApp } from '@/test-utils/render-app'
@@ -52,9 +51,8 @@ afterEach(async () => {
   await act(() => i18next.changeLanguage('en'))
 })
 
-describe('public cashback activity page', () => {
-  it('registers a public route and links guests to registration without claiming fixed rewards', async () => {
-    expect(Route.options.component).toBe(CashbackActivityPage)
+describe('public cashback campaign content', () => {
+  it('links guests to registration without claiming fixed rewards', async () => {
     await renderApp(<CashbackActivityPage />, client)
 
     expect(
@@ -87,7 +85,11 @@ describe('public cashback activity page', () => {
       within(
         screen.getByRole('navigation', { name: 'Main navigation' })
       ).getByRole('link', { name: 'Offers' })
-    ).toHaveAttribute('aria-current', 'page')
+    ).not.toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /home$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
   })
 
   it('updates the navigation and both offer descriptions when language changes', async () => {

@@ -42,6 +42,7 @@ import { CommunityHelp } from './community-help'
 type MarketingHeaderProps = {
   isAuthenticated: boolean
   currentPage?: 'home' | 'client' | 'activity'
+  showModelsLink?: boolean
 }
 
 export function MarketingHeader(props: MarketingHeaderProps) {
@@ -54,7 +55,12 @@ export function MarketingHeader(props: MarketingHeaderProps) {
   return (
     <header className='ci-header'>
       <div className='ci-headerInner'>
-        <a className='ci-logo' aria-label={`${PRODUCT_NAME} home`} href='/#top'>
+        <a
+          className='ci-logo'
+          aria-label={`${PRODUCT_NAME} home`}
+          aria-current={props.currentPage === 'home' ? 'page' : undefined}
+          href='/#top'
+        >
           <CiMark size={22} withWordmark />
         </a>
         <nav
@@ -63,18 +69,20 @@ export function MarketingHeader(props: MarketingHeaderProps) {
           aria-label={t('Main navigation')}
         >
           <div className='ci-navLinks'>
-            <a
-              className='ci-navItem'
-              href='/#models'
-              onClick={() => setNavOpen(false)}
-            >
-              <Boxes
-                className='ci-mobileNavIcon'
-                size={18}
-                aria-hidden='true'
-              />
-              <span>{t('Models')}</span>
-            </a>
+            {props.currentPage === 'home' && props.showModelsLink !== false && (
+              <a
+                className='ci-navItem'
+                href='/#models'
+                onClick={() => setNavOpen(false)}
+              >
+                <Boxes
+                  className='ci-mobileNavIcon'
+                  size={18}
+                  aria-hidden='true'
+                />
+                <span>{t('Models')}</span>
+              </a>
+            )}
             {props.isAuthenticated ? (
               <Link
                 className='ci-navItem'
