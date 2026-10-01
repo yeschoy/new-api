@@ -440,12 +440,18 @@ wallet quota; floating-point money arithmetic is forbidden.
   labels, validation/error association, keyboard handling, and focus recovery.
   Count copy must choose singular/plural from the raw numeric count before
   applying locale-specific number formatting.
-- The public `/activity` page renders only the whitelisted live offer response;
+- The default `/` page (only when no administrator custom home is configured)
+  presents the public cashback campaign until 2026-10-08 00:00 Beijing time;
+  at that instant it returns to the original product landing, including when
+  left open. This date controls presentation only, never payment eligibility.
+  While mounted, the campaign renders only the whitelisted live offer response;
   it refreshes on focus and every 30 seconds, including while backgrounded.
   During a refresh or error it must hide cached active rules. The permanently
   translated National Day kicker is marketing copy, not activity eligibility;
-  no live offer still renders an explicit inactive state. A reached tier whose
-  exact conversion floors to zero keeps its matched tier in audited detail,
+  no live offer still renders an explicit inactive state. `/activity` instead
+  introduces DeepSeek and GPT subscription cards without asserting plan terms.
+  A reached tier whose exact conversion floors to zero keeps its matched tier
+  in audited detail,
   except when `strategy_not_applicable` or `face_basis_unavailable` says the
   face cannot be trusted. Root's cent editor returns focus to Add after deleting
   a tier with the keyboard.
