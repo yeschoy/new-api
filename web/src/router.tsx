@@ -25,6 +25,7 @@ import {
 } from 'react-router'
 
 import { Moved } from './components/moved'
+import { Toaster } from './components/ui'
 import { tk } from './i18n/i18n'
 import { useBrandTab } from './lib/queries'
 import { SecurityPage } from './pages/account/security-page'
@@ -70,7 +71,12 @@ function RootLayout() {
     window.scrollTo(0, 0)
   }, [location.pathname])
 
-  return <Outlet />
+  return (
+    <>
+      <Outlet />
+      <Toaster />
+    </>
+  )
 }
 
 export const routes: RouteObject[] = [

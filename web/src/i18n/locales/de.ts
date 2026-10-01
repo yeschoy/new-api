@@ -374,6 +374,7 @@ const TABLE: Record<string, string> = {
   新手指南: 'Einsteigerleitfaden',
   '这个页面正在从旧网站搬过来，很快就好。': 'Diese Seite wird gerade von der alten Website übernommen und ist bald fertig.',
   重置密码: 'Passwort zurücksetzen',
+  确认: 'Bestätigen',
 }
 
 export default TABLE

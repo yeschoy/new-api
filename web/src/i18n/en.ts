@@ -21,7 +21,7 @@ For commercial licensing, please contact support@quantumnous.com
  * English for every Chinese UI string passed to `t()`. Keys are the Chinese
  * text exactly as written in the code; `{name}` placeholders must match.
  */
-export const EN: Record<string, string> = {
+const CORE: Record<string, string> = {
   模型: 'Models',
   切换语言: 'Language',
   对话: 'Chat',
@@ -374,4 +374,10 @@ export const EN: Record<string, string> = {
   新手指南: 'Beginner’s guide',
   '这个页面正在从旧网站搬过来，很快就好。': 'This page is being brought over from the old site and will be ready soon.',
   重置密码: 'Reset password',
+  确认: 'Confirm',
 }
+
+// Pages built in parallel keep their English in src/i18n/en/<area>.ts until it is folded into CORE above.
+const AREAS = import.meta.glob<Record<string, string>>('./en/*.ts', { eager: true, import: 'default' })
+
+export const EN: Record<string, string> = Object.assign({}, CORE, ...Object.values(AREAS))
