@@ -642,3 +642,26 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 22: 返现自动审核逐项风险配置
+<!-- trellis-session: v=2 fp=319fbcce2a353bf2 -->
+
+**Date**: 2026-10-02
+**Task**: 返现自动审核逐项风险配置
+**Branch**: `feat/recharge-cashback`
+
+### Summary
+
+实现23项风险标记可配置转人工及Root/Admin界面；任务隔离Docker验证SQLite 3.50.4、MySQL 5.7.44/8.0.46、PostgreSQL 9.6.24/16.15通过；make test仅middleware两项过期JWT测试失败，已记录为独立问题；用户同意后清理任务容器、网络和卷。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3910c2bc4` | feat(cashback): route selected risk flags to manual review |
+| `24354d223` | docs(trellis): record cashback risk review task and verification |
+
+### Status
+
+[OK] **Completed**
