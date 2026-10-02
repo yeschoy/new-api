@@ -18,15 +18,17 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 
+import { Notice } from '@/components/ui'
 import { tk, useI18n } from '@/i18n/i18n'
-import { RequireAuth } from '@/components/require-auth'
 import { errorMessage } from '@/lib/api'
-import { useAuth } from '@/lib/auth-store'
-import { getTopUpInfo, listTopUps, type TopUpRecord } from '@/lib/console-api'
+import { listTopUps, type TopUpRecord } from '@/lib/console-api'
 import { dateTime } from '@/lib/format'
+import { BalancePanel } from '@/pages/wallet/balance-panel'
+import { TopUpPanel } from '@/pages/wallet/topup-panel'
+import { useWalletInfo } from '@/pages/wallet/wallet-hooks'
 
-import { useConsoleKey, useMoney, useSelf } from './console-hooks'
-import { ConsoleLayout } from './console-layout'
+import { useConsoleKey, useMoney } from './console-hooks'
+import { ConsolePage } from './console-page'
 import { Table, TableMessage, Td, Tr, type Column } from './console-table'
 import { Panel, Tag, type TagTone } from './console-ui'
 import { RedeemPanel } from './credits-redeem'
@@ -57,69 +59,46 @@ const PAY_METHODS: Record<string, string> = {
   balance: tk('余额'),
 }
 
-/** Balance, redeem-code top-up and recent top-up orders. */
+/** The wallet: balance, online top-up, redemption codes and top-up orders. */
 export function CreditsPage() {
+  const { t } = useI18n()
   return (
-    <RequireAuth framed>
-      <CreditsContent />
-    </RequireAuth>
+    <ConsolePage active='credits' title={t('钱包')} description={t('余额用于支付模型调用费用，按实际用量实时扣除。')}>
+      <WalletContent />
+    </ConsolePage>
   )
 }
 
-function CreditsContent() {
+function WalletContent() {
   const { t } = useI18n()
   const money = useMoney()
-  const auth = useAuth()
-  const self = useSelf()
-  const user = self.data ?? auth.user
-  const info = useQuery({ queryKey: useConsoleKey('topup-info'), queryFn: getTopUpInfo, retry: false })
+  const info = useWalletInfo()
   const topups = useQuery({ queryKey: useConsoleKey('topups'), queryFn: () => listTopUps(1, 10), retry: false })
   const records = topups.data?.items ?? []
 
   return (
-    <ConsoleLayout active='credits' title={t('充值额度')} description={t('余额用于支付模型调用费用，按实际用量实时扣除。')}>
-      <div className='flex flex-col gap-4'>
-        <Panel>
-          <div className='flex flex-wrap items-end justify-between gap-6'>
-            <div>
-              <div className='text-or-muted text-[13px]'>{t('可用余额')}</div>
-              <div className='mt-1 text-[40px] leading-[48px] font-semibold tracking-[-0.02em] tabular-nums'>
-                {user ? money.format(user.quota) : '—'}
-              </div>
-            </div>
-            <dl className='flex gap-10'>
-              <Stat label={t('已用额度')} value={user ? money.format(user.used_quota) : '—'} />
-              <Stat label={t('请求次数')} value={user ? (user.request_count ?? 0).toLocaleString('zh-CN') : '—'} />
-            </dl>
-          </div>
-        </Panel>
+    <div className='flex flex-col gap-4'>
+      <BalancePanel />
 
-        <RedeemPanel info={info.data} />
+      {info.data ? <TopUpPanel info={info.data} /> : null}
+      {info.isError ? <Notice tone='error'>{errorMessage(info.error, t('获取充值信息失败'))}</Notice> : null}
 
-        <Panel title={t('充值记录')} flush>
-          <Table columns={TOPUP_COLUMNS} minWidth={760}>
-            {topups.isLoading ? <TableMessage colSpan={TOPUP_COLUMNS.length}>{t('加载中…')}</TableMessage> : null}
-            {topups.isError ? (
-              <TableMessage colSpan={TOPUP_COLUMNS.length}>{errorMessage(topups.error, t('充值记录加载失败'))}</TableMessage>
-            ) : null}
-            {topups.isSuccess && records.length === 0 ? (
-              <TableMessage colSpan={TOPUP_COLUMNS.length}>{t('暂无在线充值记录')}</TableMessage>
-            ) : null}
-            {records.map((record) => (
-              <TopUpRow key={record.id} record={record} format={money.formatUsd} />
-            ))}
-          </Table>
-        </Panel>
-      </div>
-    </ConsoleLayout>
-  )
-}
+      <RedeemPanel info={info.data} />
 
-function Stat(props: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className='text-or-muted text-[13px]'>{props.label}</dt>
-      <dd className='mt-1 text-[18px] font-semibold tabular-nums'>{props.value}</dd>
+      <Panel title={t('充值记录')} flush>
+        <Table columns={TOPUP_COLUMNS} minWidth={760}>
+          {topups.isLoading ? <TableMessage colSpan={TOPUP_COLUMNS.length}>{t('加载中…')}</TableMessage> : null}
+          {topups.isError ? (
+            <TableMessage colSpan={TOPUP_COLUMNS.length}>{errorMessage(topups.error, t('充值记录加载失败'))}</TableMessage>
+          ) : null}
+          {topups.isSuccess && records.length === 0 ? (
+            <TableMessage colSpan={TOPUP_COLUMNS.length}>{t('暂无在线充值记录')}</TableMessage>
+          ) : null}
+          {records.map((record) => (
+            <TopUpRow key={record.id} record={record} format={money.formatUsd} />
+          ))}
+        </Table>
+      </Panel>
     </div>
   )
 }

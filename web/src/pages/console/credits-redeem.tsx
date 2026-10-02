@@ -22,7 +22,7 @@ import { useId, useState } from 'react'
 
 import { useI18n } from '@/i18n/i18n'
 import { errorMessage } from '@/lib/api'
-import { onlineTopUpEnabled, unwrap, type TopUpInfo } from '@/lib/console-api'
+import { unwrap, type TopUpInfo } from '@/lib/console-api'
 import { redeemCode } from '@/lib/services'
 
 import { useMoney } from './console-hooks'
@@ -84,9 +84,6 @@ export function RedeemPanel(props: { info?: TopUpInfo }) {
         </div>
         {result ? <Notice tone={result.tone}>{result.text}</Notice> : null}
         {closed ? <Notice tone='info'>{t('本站暂未开放兑换码充值，请联系管理员。')}</Notice> : null}
-        {onlineTopUpEnabled(props.info) ? (
-          <Notice tone='info'>{t('在线支付通道正在接入中，暂时请使用兑换码充值。')}</Notice>
-        ) : null}
       </form>
     </Panel>
   )
