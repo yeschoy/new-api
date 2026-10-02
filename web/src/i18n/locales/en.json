@@ -6611,6 +6611,15 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Desktop Notices": "Desktop Notices",
+    "Desktop notices JSON": "Desktop notices JSON",
+    "Save desktop notices": "Save desktop notices",
+    "Announcements shown in the desktop app. A JSON array; each entry needs a title, ids must be unique, and expired entries are hidden automatically.": "Announcements shown in the desktop app. A JSON array; each entry needs a title, ids must be unique, and expired entries are hidden automatically.",
+    "Desktop notices must be valid JSON": "Desktop notices must be valid JSON",
+    "Desktop notices must be a JSON array": "Desktop notices must be a JSON array",
+    "Desktop notice #{{position}} must be a JSON object": "Desktop notice #{{position}} must be a JSON object",
+    "Desktop notice #{{position}} is missing a title": "Desktop notice #{{position}} is missing a title",
+    "Desktop notice #{{position}} reuses id \"{{id}}\"": "Desktop notice #{{position}} reuses id \"{{id}}\""
   }
 }

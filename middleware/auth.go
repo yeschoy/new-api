@@ -279,7 +279,8 @@ func dashboardSessionRouteAllowed(c *gin.Context, identity service.AuthIdentity)
 			"/api/token/",
 			"/api/token/search",
 			"/api/token/auto-groups",
-			"/api/token/:id":
+			"/api/token/:id",
+			"/api/desktop/v2/notices":
 			return true
 		}
 	case http.MethodPost:

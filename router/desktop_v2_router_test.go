@@ -51,6 +51,7 @@ func TestDesktopV2BootstrapAdvertisesExistingOwnersWithoutChangingV1(t *testing.
 	assert.Contains(t, v2.Body.String(), `"device_authorization_available":false`)
 	assert.Contains(t, v2.Body.String(), `"official_usd_cny_rate":6.75`)
 	assert.Contains(t, v2.Body.String(), `"wallet_url":"https://yeschoy.com/wallet/"`)
+	assert.Contains(t, v2.Body.String(), `"announcements_path":"/api/desktop/v2/notices"`)
 }
 
 func TestDesktopV2SensitiveRoutesRequireExpectedAuthority(t *testing.T) {
@@ -80,6 +81,11 @@ func TestDesktopV2SensitiveRoutesRequireExpectedAuthority(t *testing.T) {
 	revoke := httptest.NewRecorder()
 	router.ServeHTTP(revoke, httptest.NewRequest(http.MethodDelete, "/api/desktop/v2/sessions/current", nil))
 	assert.Equal(t, http.StatusUnauthorized, revoke.Code)
+
+	notices := httptest.NewRecorder()
+	router.ServeHTTP(notices, httptest.NewRequest(http.MethodGet, "/api/desktop/v2/notices", nil))
+	assert.Equal(t, http.StatusUnauthorized, notices.Code)
+	assert.NotContains(t, notices.Body.String(), `"notices"`)
 }
 
 func TestDesktopV2UnsupportedMethodsDoNotFallThroughToCapabilities(t *testing.T) {

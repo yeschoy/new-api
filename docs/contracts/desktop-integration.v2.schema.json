@@ -73,7 +73,8 @@
           "type": "string",
           "format": "uri",
           "pattern": "^https://"
-        }
+        },
+        "announcements_path": { "const": "/api/desktop/v2/notices" }
       }
     }
   }

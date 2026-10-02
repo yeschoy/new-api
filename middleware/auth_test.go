@@ -146,6 +146,7 @@ func TestDesktopSessionUsesClosedDashboardRouteScope(t *testing.T) {
 	router.GET("/api/pricing", TryUserAuth(), accepted)
 	router.GET("/api/token/:id", UserAuth(), accepted)
 	router.DELETE("/api/desktop/v2/sessions/current", UserAuth(), accepted)
+	router.GET("/api/desktop/v2/notices", UserAuth(), accepted)
 	router.DELETE("/api/user/self", UserAuth(), accepted)
 	router.POST("/api/desktop/v2/device-authorizations/decision", UserAuth(), accepted)
 	router.GET("/api/status", TryUserAuth(), accepted)
@@ -161,6 +162,7 @@ func TestDesktopSessionUsesClosedDashboardRouteScope(t *testing.T) {
 		{name: "account read is allowed", method: http.MethodGet, path: "/api/user/self", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "pricing read is allowed", method: http.MethodGet, path: "/api/pricing", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "tool key management is allowed", method: http.MethodGet, path: "/api/token/7", token: desktopToken, wantStatus: http.StatusNoContent},
+		{name: "desktop notices read is allowed", method: http.MethodGet, path: "/api/desktop/v2/notices", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "desktop logout is allowed", method: http.MethodDelete, path: "/api/desktop/v2/sessions/current", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "account deletion is denied", method: http.MethodDelete, path: "/api/user/self", token: desktopToken, wantStatus: http.StatusForbidden},
 		{name: "device approval is denied", method: http.MethodPost, path: "/api/desktop/v2/device-authorizations/decision", token: desktopToken, wantStatus: http.StatusForbidden},

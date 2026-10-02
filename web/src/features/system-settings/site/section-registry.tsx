@@ -23,6 +23,7 @@ import {
   serializeHeaderNavModules,
   serializeSidebarModulesAdmin,
 } from '../maintenance/config'
+import { DesktopNoticesSection } from '../maintenance/desktop-notices-section'
 import { HeaderNavigationSection } from '../maintenance/header-navigation-section'
 import { NoticeSection } from '../maintenance/notice-section'
 import { SidebarModulesSection } from '../maintenance/sidebar-modules-section'
@@ -56,6 +57,13 @@ const SITE_SECTIONS = [
     titleKey: 'System Notice',
     build: (settings: SiteSettings) => (
       <NoticeSection defaultValue={settings.Notice ?? ''} />
+    ),
+  },
+  {
+    id: 'desktop-notices',
+    titleKey: 'Desktop Notices',
+    build: (settings: SiteSettings) => (
+      <DesktopNoticesSection defaultValue={settings.DesktopNotices ?? '[]'} />
     ),
   },
   {
