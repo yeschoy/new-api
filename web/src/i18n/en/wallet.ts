@@ -19,6 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 
 /** English for the wallet (/settings/credits): top-up, redemption, subscriptions, invitations, orders. */
 const EN_WALLET: Record<string, string> = {
+  // Balance
+  '近 {days} 天节省 {amount}（{percent}%）': 'Saved {amount} in the last {days} days ({percent}%)',
+  实际支付: 'You paid',
+  按原价计: 'At list prices',
+
   // Online top-up
   在线充值: 'Add credits',
   充值数量: 'Amount',
