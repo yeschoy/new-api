@@ -24,7 +24,8 @@ Read current OWASP Authentication Cheat Sheet and Session Management Cheat Sheet
 
 - Do not call this validated for three DB dialects or completed security verification. With user-enabled Docker, start task-owned isolated runner + MySQL/PostgreSQL and rerun real focused + full `make test`; verify source hashes/server versions and absence of skips. No cleanup without consent.
 - Full frontend suite/lint not green. Review unrelated failures separately; do not mix them into the origin/main merge without scope decision.
-- Merge commit `c0ab13a39` was made before mandatory DB tests at the user's request; **do not mark the Trellis task complete or claim three-dialect/security verification**. This verification note is an ignored Trellis artifact requiring path-specific `git add -f` in a separate task commit. Task-scoped script and frontend logs are uncommitted intermediate artifacts (do not add to Git); retain until cleanup permission. Do not push.
+- Merge commit `c0ab13a39` was made before mandatory DB tests at the user's request; **do not mark the Trellis task complete or claim three-dialect/security verification**. Task-scoped script and frontend logs are uncommitted intermediate artifacts (do not add to Git); retain until cleanup permission.
+- After the early commit, the user separately requested a push. Verified a clean `feat/recharge-cashback` worktree and a fast-forward from `origin/feat/recharge-cashback=0941a43ba`; pushed `99bab7a51` to **that feature branch only** (`git push origin HEAD:refs/heads/feat/recharge-cashback`). Remote `main` was neither pushed nor deployed. Mandatory backend tests and frontend full-suite failures remain open; the push is not a verification or approval to merge into `main`.
 
 ## Independent check-agent review (same day)
 

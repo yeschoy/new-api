@@ -14,5 +14,5 @@
 
 ## Execution status (user-requested early commit)
 
-- Local merge commit `c0ab13a39` exists on the feature branch; it has not been pushed. Do not rebase/amend it or mark the task complete while the Docker-only backend matrix and full frontend-suite investigation remain open.
+- Merge commit `c0ab13a39` exists on the feature branch; after the user separately requested a push, `origin/feat/recharge-cashback` was fast-forwarded to `99bab7a51`. Nothing was pushed to `main`. Do not rebase/amend it or mark the task complete while the Docker-only backend matrix and full frontend-suite investigation remain open.
 - Resume Phase 2 verification when Docker is available: rerun expired JWT middleware tests, `make test`, MySQL/PostgreSQL minimum-version integration, then document results. Frontend full suite/lint currently fail; focused regressions pass. See `research/verification.md`.
