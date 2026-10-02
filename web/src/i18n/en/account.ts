@@ -22,6 +22,37 @@ const EN_ACCOUNT: Record<string, string> = {
   // Shared auth pieces
   或: 'or',
   请先完成人机验证: 'Complete the human check first',
+  我已阅读并同意: 'I have read and agree to the',
+  和: 'and',
+  '登录设备过多。请在已登录的设备上打开账户安全，退出其他设备后再试；若无法访问已登录设备，可重置密码以退出全部设备。':
+    'Too many devices are signed in. On a signed-in device, open Security and sign out the others, then try again. If you can’t reach one, reset your password to sign out everywhere.',
+  '近期登录次数过多，请稍后再试。': 'Too many sign-ins recently. Please try again later.',
+  '登录已过期，请重新登录': 'This sign-in has expired. Please start again.',
+
+  // Sign-in options
+  '忘记密码？': 'Forgot password?',
+  '管理员已关闭所有登录方式，请联系管理员。': 'Sign-in is switched off on this site. Please contact the administrator.',
+  '使用 {provider} 继续': 'Continue with {provider}',
+  使用微信继续: 'Continue with WeChat',
+  '无法发起授权，请稍后重试': 'Could not start the authorization. Please try again later.',
+  微信登录: 'Sign in with WeChat',
+  '扫码关注公众号，回复“验证码”获取验证码。':
+    'Scan the QR code to follow our official account, then send it “验证码” to receive your code.',
+  微信公众号二维码: 'WeChat official account QR code',
+  '管理员尚未上传公众号二维码。': 'The administrator hasn’t uploaded the QR code yet.',
+  '{provider} 登录': 'Sign in with {provider}',
+  '点击下方按钮，在 Telegram 中确认登录。': 'Click the button below and confirm in Telegram.',
+  'Telegram 组件加载失败，请检查网络后重试。': 'The Telegram widget failed to load. Check your connection and try again.',
+  '使用 Passkey 登录': 'Sign in with a passkey',
+  '此设备不支持 Passkey': 'This device doesn’t support passkeys',
+  'Passkey 登录已取消': 'Passkey sign-in was cancelled',
+  'Passkey 登录失败': 'Passkey sign-in failed',
+  'Passkey 操作失败': 'The passkey operation failed',
+  请输入一个未使用过的备用码: 'Enter one of your unused backup codes',
+  备用码: 'Backup code',
+  改用备用码: 'Use a backup code',
+  改用验证器验证码: 'Use an authenticator code',
+  '密码最多 20 位': 'Password must be at most 20 characters',
 
   // Password recovery
   '输入注册邮箱，我们会发送一封重置密码的邮件。': 'Enter the email you signed up with and we’ll send you a link to reset your password.',

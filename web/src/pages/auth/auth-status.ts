@@ -55,18 +55,3 @@ export type AuthStatus = SiteStatus & {
 export function useAuthStatus(): AuthStatus | undefined {
   return useStatus().data as AuthStatus | undefined
 }
-
-/** Whether any sign-in besides the password is switched on. */
-export function hasThirdPartySignIn(status: AuthStatus | undefined): boolean {
-  if (!status) return false
-  return Boolean(
-    status.github_oauth ||
-      status.discord_oauth ||
-      status.oidc_enabled ||
-      status.linuxdo_oauth ||
-      status.telegram_oauth ||
-      status.wechat_login ||
-      status.passkey_login ||
-      (status.custom_oauth_providers?.length ?? 0) > 0
-  )
-}
