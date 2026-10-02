@@ -25,10 +25,12 @@ import { errorMessage } from '@/lib/api'
 import { KEY_STATUS_DISABLED, KEY_STATUS_ENABLED, setKeyStatus, unwrap } from '@/lib/console-api'
 import { deleteKey } from '@/lib/services'
 
+import { KeyMenu } from './key-menu'
 import type { KeyDetail } from './keys-api'
+import type { FullKey } from './use-full-key'
 
-/** Enable / disable and delete (asked inline first) for one key. */
-export function KeyActions(props: { apiKey: KeyDetail }) {
+/** Enable / disable, delete (asked inline first) and the "more" menu for one key. */
+export function KeyActions(props: { apiKey: KeyDetail; full: FullKey }) {
   const { t } = useI18n()
   const key = props.apiKey
   const queryClient = useQueryClient()
@@ -83,6 +85,7 @@ export function KeyActions(props: { apiKey: KeyDetail }) {
             >
               {t('删除')}
             </Button>
+            <KeyMenu full={props.full} />
           </>
         )}
       </div>

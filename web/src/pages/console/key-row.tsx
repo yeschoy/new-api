@@ -64,7 +64,7 @@ export function KeyRow(props: KeyRowProps) {
         <UsageTimes apiKey={key} now={props.now} />
       </Td>
       <Td right>
-        <KeyActions apiKey={key} />
+        <KeyActions apiKey={key} full={full} />
       </Td>
     </Tr>
   )

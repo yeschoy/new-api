@@ -65,7 +65,7 @@ export function KeyCard(props: KeyRowProps) {
         </Detail>
       </dl>
       <div className='mt-2'>
-        <KeyActions apiKey={key} />
+        <KeyActions apiKey={key} full={full} />
       </div>
     </li>
   )

@@ -102,7 +102,7 @@ export function openChatLink(url: string, type: ChatLinkType) {
     window.open(url, '_blank', 'noopener')
     return
   }
-  window.location.href = url
+  window.open(url, '_self')
 }
 
 /** Hands the key to the FluentRead extension; false when the extension is not on the page. */

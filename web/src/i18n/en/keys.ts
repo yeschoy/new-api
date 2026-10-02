@@ -53,6 +53,21 @@ const EN_KEYS: Record<string, string> = {
   密钥已删除: 'Key deleted',
   密钥已禁用: 'Key disabled',
   密钥已启用: 'Key enabled',
+  更多操作: 'More actions',
+  复制连接信息: 'Copy connection info',
+  连接信息已复制: 'Connection info copied',
+  '填入 CC Switch': 'Import to CC Switch',
+  在应用中使用: 'Use in an app',
+  '已将密钥发送到流畅阅读。': 'Sent the key to FluentRead.',
+  '未检测到流畅阅读扩展，请确认已安装并启用。': 'FluentRead extension not found. Make sure it is installed and enabled.',
+  主模型: 'Primary model',
+  'Haiku 模型': 'Haiku model',
+  'Sonnet 模型': 'Sonnet model',
+  'Opus 模型': 'Opus model',
+  请选择主模型: 'Choose a primary model',
+  '打开 CC Switch': 'Open CC Switch',
+  应用: 'App',
+  选择或输入模型名称: 'Choose or type a model name',
 }
 
 export default EN_KEYS
