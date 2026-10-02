@@ -28,7 +28,7 @@ import { redeemCode } from '@/lib/services'
 import { useMoney } from './console-hooks'
 import { Button, Notice, Panel, TextInput } from './console-ui'
 
-/** "充值" card: redeem-code form plus notes derived from /api/user/topup/info. */
+/** "兑换码" card: the code form, or a notice while /api/user/topup/info has codes switched off. */
 export function RedeemPanel(props: { info?: TopUpInfo }) {
   const { t } = useI18n()
   const money = useMoney()
@@ -60,9 +60,16 @@ export function RedeemPanel(props: { info?: TopUpInfo }) {
   }
 
   const link = props.info?.topup_link
+  if (closed) {
+    return (
+      <Panel title={t('兑换码')}>
+        <Notice tone='info'>{t('本站暂未开放兑换码充值，请联系管理员。')}</Notice>
+      </Panel>
+    )
+  }
   return (
     <Panel
-      title={t('充值')}
+      title={t('兑换码')}
       extra={
         link ? (
           <a href={link} target='_blank' rel='noopener noreferrer' className='text-or-primary flex items-center gap-1 text-[13px] hover:underline'>
@@ -76,14 +83,13 @@ export function RedeemPanel(props: { info?: TopUpInfo }) {
           {t('输入兑换码，额度将立即计入账户余额。')}
         </label>
         <div className='flex flex-col gap-2 sm:flex-row'>
-          <TextInput id={inputId} value={code} onChange={setCode} placeholder={t('兑换码')} disabled={closed} className='font-geist' />
-          <Button type='submit' variant='primary' busy={redeem.isPending} disabled={closed}>
+          <TextInput id={inputId} value={code} onChange={setCode} placeholder={t('兑换码')} className='font-geist' />
+          <Button type='submit' variant='primary' busy={redeem.isPending}>
             <Ticket className='size-4' aria-hidden='true' />
             {t('兑换')}
           </Button>
         </div>
         {result ? <Notice tone={result.tone}>{result.text}</Notice> : null}
-        {closed ? <Notice tone='info'>{t('本站暂未开放兑换码充值，请联系管理员。')}</Notice> : null}
       </form>
     </Panel>
   )

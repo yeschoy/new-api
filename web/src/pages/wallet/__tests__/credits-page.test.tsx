@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { cleanup, screen } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 
 import { api } from '@/lib/api'
 import { authStore } from '@/lib/auth-store'
@@ -73,6 +73,20 @@ describe('wallet page', () => {
     expect(await screen.findByRole('heading', { name: '钱包' })).toBeInTheDocument()
     expect(await screen.findByLabelText('充值数量')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '支付宝' })).toBeInTheDocument()
+  })
+
+  it('scrolls to the orders when a payment sends the user back with ?show_history', async () => {
+    answer({ '/api/user/topup/self': { items: [], total: 0 } })
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      renderPage(<CreditsPage />, '/settings/credits?show_history=true')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+      expect(scrollIntoView.mock.contexts[0]).toHaveAttribute('id', 'orders')
+    } finally {
+      // jsdom has no scrollIntoView of its own.
+      Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+    }
   })
 
   it('no longer says online payment is still being set up', async () => {

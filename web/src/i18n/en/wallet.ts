@@ -40,10 +40,19 @@ const EN_WALLET: Record<string, string> = {
   支付请求失败: 'Could not start the payment',
   支付地址无效: 'The payment address is not valid',
 
-  // Invitations and orders (API errors)
+  // Top-up orders
+  全站充值记录: 'All users’ top-ups',
+  搜索订单号: 'Search order number',
+  没有找到匹配的订单: 'No matching orders',
+  复制订单号: 'Copy order number',
+  '确认补单？': 'Complete this order?',
+  补单: 'Complete',
+  补单成功: 'Order completed',
+  补单失败: 'Could not complete the order',
+
+  // Invitations (API errors)
   获取邀请码失败: 'Could not load your invite code',
   转入失败: 'Could not transfer',
-  补单失败: 'Could not complete the order',
 }
 
 export default EN_WALLET
