@@ -28,6 +28,7 @@ import {
 
 const defaultSiteSettings: SiteSettings = {
   Notice: '',
+  DesktopNotices: '[]',
   SystemName: DEFAULT_SYSTEM_NAME,
   Logo: '',
   Footer: '',

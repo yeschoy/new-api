@@ -6611,6 +6611,15 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Desktop Notices": "デスクトップのお知らせ",
+    "Desktop notices JSON": "デスクトップのお知らせ JSON",
+    "Save desktop notices": "デスクトップのお知らせを保存",
+    "Announcements shown in the desktop app. A JSON array; each entry needs a title, ids must be unique, and expired entries are hidden automatically.": "デスクトップアプリに表示されるお知らせです。JSON 配列で指定し、各項目には title が必要です。id は重複できず、期限切れの項目は自動的に非表示になります。",
+    "Desktop notices must be valid JSON": "デスクトップのお知らせは有効な JSON である必要があります",
+    "Desktop notices must be a JSON array": "デスクトップのお知らせは JSON 配列である必要があります",
+    "Desktop notice #{{position}} must be a JSON object": "{{position}} 件目のお知らせは JSON オブジェクトである必要があります",
+    "Desktop notice #{{position}} is missing a title": "{{position}} 件目のお知らせに title がありません",
+    "Desktop notice #{{position}} reuses id \"{{id}}\"": "{{position}} 件目のお知らせの id「{{id}}」が重複しています"
   }
 }

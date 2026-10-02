@@ -6611,6 +6611,15 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Desktop Notices": "Annonces de l’application de bureau",
+    "Desktop notices JSON": "JSON des annonces de bureau",
+    "Save desktop notices": "Enregistrer les annonces de bureau",
+    "Announcements shown in the desktop app. A JSON array; each entry needs a title, ids must be unique, and expired entries are hidden automatically.": "Annonces affichées dans l’application de bureau. Un tableau JSON ; chaque entrée doit avoir un title, les id doivent être uniques et les entrées expirées sont masquées automatiquement.",
+    "Desktop notices must be valid JSON": "Les annonces de bureau doivent être un JSON valide",
+    "Desktop notices must be a JSON array": "Les annonces de bureau doivent être un tableau JSON",
+    "Desktop notice #{{position}} must be a JSON object": "L’annonce n° {{position}} doit être un objet JSON",
+    "Desktop notice #{{position}} is missing a title": "L’annonce n° {{position}} n’a pas de title",
+    "Desktop notice #{{position}} reuses id \"{{id}}\"": "L’annonce n° {{position}} réutilise l’id « {{id}} »"
   }
 }

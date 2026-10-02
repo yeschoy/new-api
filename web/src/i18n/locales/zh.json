@@ -6611,6 +6611,15 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Desktop Notices": "桌面端公告",
+    "Desktop notices JSON": "桌面端公告 JSON",
+    "Save desktop notices": "保存桌面端公告",
+    "Announcements shown in the desktop app. A JSON array; each entry needs a title, ids must be unique, and expired entries are hidden automatically.": "在桌面助手中展示的公告。值为 JSON 数组；每条必须有 title，id 不能重复，过期的公告会自动隐藏。",
+    "Desktop notices must be valid JSON": "桌面端公告必须是合法的 JSON",
+    "Desktop notices must be a JSON array": "桌面端公告必须是 JSON 数组",
+    "Desktop notice #{{position}} must be a JSON object": "第 {{position}} 条桌面端公告必须是 JSON 对象",
+    "Desktop notice #{{position}} is missing a title": "第 {{position}} 条桌面端公告缺少 title",
+    "Desktop notice #{{position}} reuses id \"{{id}}\"": "第 {{position}} 条桌面端公告的 id「{{id}}」重复"
   }
 }

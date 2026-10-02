@@ -6611,6 +6611,15 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Desktop Notices": "Объявления в настольном приложении",
+    "Desktop notices JSON": "JSON объявлений настольного приложения",
+    "Save desktop notices": "Сохранить объявления",
+    "Announcements shown in the desktop app. A JSON array; each entry needs a title, ids must be unique, and expired entries are hidden automatically.": "Объявления, показываемые в настольном приложении. JSON-массив; у каждой записи должен быть title, id должны быть уникальными, просроченные записи скрываются автоматически.",
+    "Desktop notices must be valid JSON": "Объявления должны быть корректным JSON",
+    "Desktop notices must be a JSON array": "Объявления должны быть JSON-массивом",
+    "Desktop notice #{{position}} must be a JSON object": "Объявление №{{position}} должно быть JSON-объектом",
+    "Desktop notice #{{position}} is missing a title": "У объявления №{{position}} нет title",
+    "Desktop notice #{{position}} reuses id \"{{id}}\"": "Объявление №{{position}} повторяет id «{{id}}»"
   }
 }

@@ -6611,6 +6611,15 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Desktop Notices": "Thông báo ứng dụng máy tính",
+    "Desktop notices JSON": "JSON thông báo ứng dụng máy tính",
+    "Save desktop notices": "Lưu thông báo ứng dụng máy tính",
+    "Announcements shown in the desktop app. A JSON array; each entry needs a title, ids must be unique, and expired entries are hidden automatically.": "Thông báo hiển thị trong ứng dụng máy tính. Là một mảng JSON; mỗi mục cần có title, id không được trùng và mục hết hạn sẽ tự động bị ẩn.",
+    "Desktop notices must be valid JSON": "Thông báo phải là JSON hợp lệ",
+    "Desktop notices must be a JSON array": "Thông báo phải là một mảng JSON",
+    "Desktop notice #{{position}} must be a JSON object": "Thông báo thứ {{position}} phải là một đối tượng JSON",
+    "Desktop notice #{{position}} is missing a title": "Thông báo thứ {{position}} thiếu title",
+    "Desktop notice #{{position}} reuses id \"{{id}}\"": "Thông báo thứ {{position}} trùng id \"{{id}}\""
   }
 }

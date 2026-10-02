@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,23 +43,23 @@ func setupDashboardAuthMiddlewareTest(t *testing.T) {
 
 func issueExpiredDashboardAccessToken(t *testing.T, identity service.AuthIdentity) string {
 	t.Helper()
-	claims := jwt.MapClaims{
-		"iss":       "new-api",
-		"aud":       []string{"new-api-dashboard"},
-		"sub":       fmt.Sprintf("%d", identity.UserID),
-		"token_use": "access",
-		"sid":       identity.SessionID,
-		"uv":        identity.UserAuthVersion,
-		"sv":        identity.SessionVersion,
-		"exp":       time.Now().Add(-time.Minute).Unix(),
-		"nbf":       time.Now().Add(-2 * time.Minute).Unix(),
-		"iat":       time.Now().Add(-2 * time.Minute).Unix(),
-	}
+	issued, _, err := service.IssueAccessToken(identity)
+	require.NoError(t, err)
+	parsed, _, err := jwt.NewParser().ParseUnverified(issued, jwt.MapClaims{})
+	require.NoError(t, err)
+	claims, ok := parsed.Claims.(jwt.MapClaims)
+	require.True(t, ok)
+	claims["exp"] = time.Now().Add(-time.Minute).Unix()
+	claims["nbf"] = time.Now().Add(-2 * time.Minute).Unix()
+	claims["iat"] = time.Now().Add(-2 * time.Minute).Unix()
 	mac := hmac.New(sha256.New, []byte(common.SessionSecret))
-	_, err := mac.Write([]byte("new-api/auth/access/v1"))
+	_, err = mac.Write([]byte("new-api/auth/access/v1"))
 	require.NoError(t, err)
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(mac.Sum(nil))
 	require.NoError(t, err)
+	_, internal, parseErr := service.ParseDashboardAccessToken(token)
+	require.True(t, internal, "expired access tokens must not fall through to PAT authentication")
+	require.ErrorIs(t, parseErr, service.ErrAuthTokenExpired)
 	return token
 }
 
@@ -146,6 +145,7 @@ func TestDesktopSessionUsesClosedDashboardRouteScope(t *testing.T) {
 	router.GET("/api/pricing", TryUserAuth(), accepted)
 	router.GET("/api/token/:id", UserAuth(), accepted)
 	router.DELETE("/api/desktop/v2/sessions/current", UserAuth(), accepted)
+	router.GET("/api/desktop/v2/notices", UserAuth(), accepted)
 	router.DELETE("/api/user/self", UserAuth(), accepted)
 	router.POST("/api/desktop/v2/device-authorizations/decision", UserAuth(), accepted)
 	router.GET("/api/status", TryUserAuth(), accepted)
@@ -161,6 +161,7 @@ func TestDesktopSessionUsesClosedDashboardRouteScope(t *testing.T) {
 		{name: "account read is allowed", method: http.MethodGet, path: "/api/user/self", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "pricing read is allowed", method: http.MethodGet, path: "/api/pricing", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "tool key management is allowed", method: http.MethodGet, path: "/api/token/7", token: desktopToken, wantStatus: http.StatusNoContent},
+		{name: "desktop notices read is allowed", method: http.MethodGet, path: "/api/desktop/v2/notices", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "desktop logout is allowed", method: http.MethodDelete, path: "/api/desktop/v2/sessions/current", token: desktopToken, wantStatus: http.StatusNoContent},
 		{name: "account deletion is denied", method: http.MethodDelete, path: "/api/user/self", token: desktopToken, wantStatus: http.StatusForbidden},
 		{name: "device approval is denied", method: http.MethodPost, path: "/api/desktop/v2/device-authorizations/decision", token: desktopToken, wantStatus: http.StatusForbidden},
