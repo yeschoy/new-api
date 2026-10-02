@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useI18n } from '@/i18n/i18n'
 import type { KeyRowProps } from '@/pages/console/key-row'
 
+import { CHECKBOX } from './bulk-actions'
 import { KeyActions } from './key-actions'
 import { ExpiryInfo, GroupInfo, LimitTags, QuotaInfo, StatusTag, UsageTimes } from './key-cells'
 import { KeyValue } from './key-value'
@@ -43,6 +44,13 @@ export function KeyCard(props: KeyRowProps) {
   return (
     <li aria-label={name} className='border-or-line border-t px-4 py-3 first:border-t-0'>
       <div className='flex min-w-0 items-center gap-2'>
+        <input
+          type='checkbox'
+          className={CHECKBOX}
+          checked={props.selected}
+          onChange={(event) => props.onSelect(event.target.checked)}
+          aria-label={t('选择 {name}', { name })}
+        />
         <span className='min-w-0 truncate font-medium'>{name}</span>
         <StatusTag status={key.status} />
       </div>

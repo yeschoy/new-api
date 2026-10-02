@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useI18n } from '@/i18n/i18n'
+import { CHECKBOX } from '@/pages/keys/bulk-actions'
 import { KeyActions } from '@/pages/keys/key-actions'
 import { ExpiryInfo, GroupInfo, LimitTags, QuotaInfo, StatusTag, UsageTimes } from '@/pages/keys/key-cells'
 import { KeyValue } from '@/pages/keys/key-value'
@@ -29,6 +30,8 @@ export type KeyRowProps = {
   apiKey: KeyDetail
   groups: Map<string, UserGroup>
   now: number
+  selected: boolean
+  onSelect: (checked: boolean) => void
 }
 
 /** One key in the table: name and limits, masked key with reveal / copy, group, credit, times and actions. */
@@ -36,13 +39,23 @@ export function KeyRow(props: KeyRowProps) {
   const { t } = useI18n()
   const key = props.apiKey
   const full = useFullKey(key.id)
+  const name = key.name || t('未命名')
 
   return (
     <Tr>
+      <Td className='w-10 pr-0'>
+        <input
+          type='checkbox'
+          className={CHECKBOX}
+          checked={props.selected}
+          onChange={(event) => props.onSelect(event.target.checked)}
+          aria-label={t('选择 {name}', { name })}
+        />
+      </Td>
       <Td>
         <div className='flex items-center gap-2'>
           <span className='max-w-[180px] truncate font-medium' title={key.name}>
-            {key.name || t('未命名')}
+            {name}
           </span>
           <StatusTag status={key.status} />
         </div>

@@ -46,9 +46,14 @@ function SearchBox(props: { label: string; value: string; onChange: (value: stri
 
 /**
  * Name and key search (sent once typing pauses) and the status filter, which
- * like on the old page narrows the keys of the current page.
+ * like on the old page narrows the keys of the current page; `children` sits at the end.
  */
-export function KeysToolbar(props: { status: string; onStatus: (status: string) => void; onSearch: (terms: SearchTerms) => void }) {
+export function KeysToolbar(props: {
+  status: string
+  onStatus: (status: string) => void
+  onSearch: (terms: SearchTerms) => void
+  children?: React.ReactNode
+}) {
   const { t } = useI18n()
   const [keyword, setKeyword] = useState('')
   const [token, setToken] = useState('')
@@ -70,6 +75,7 @@ export function KeysToolbar(props: { status: string; onStatus: (status: string) 
         options={STATUS_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
         className='w-full sm:w-[140px]'
       />
+      {props.children ? <div className='ml-auto'>{props.children}</div> : null}
     </div>
   )
 }

@@ -68,6 +68,18 @@ const EN_KEYS: Record<string, string> = {
   '打开 CC Switch': 'Open CC Switch',
   应用: 'App',
   选择或输入模型名称: 'Choose or type a model name',
+  全选本页: 'Select all on this page',
+  '已复制 {count} 个密钥': 'Copied {count} keys',
+  '已删除 {count} 个密钥': 'Deleted {count} keys',
+  '已选 {count} 个': '{count} selected',
+  复制所选: 'Copy selected',
+  '确认删除所选的 {count} 个密钥？': 'Delete the {count} selected keys?',
+  删除所选: 'Delete selected',
+  取消选择: 'Clear selection',
+  已删除全部密钥: 'All keys deleted',
+  '确认删除全部 {count} 个密钥？': 'Delete all {count} keys?',
+  删除全部密钥: 'Delete all keys',
+  '选择 {name}': 'Select {name}',
 }
 
 export default EN_KEYS

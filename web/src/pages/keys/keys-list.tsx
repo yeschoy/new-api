@@ -26,6 +26,7 @@ import type { KeyDetail, UserGroup } from './keys-api'
 import { PHONE_QUERY, useMediaQuery } from './use-media-query'
 
 const COLUMNS: Column[] = [
+  { label: '' },
   { label: tk('名称') },
   { label: tk('密钥') },
   { label: tk('分组') },
@@ -72,6 +73,8 @@ export function KeysList(props: {
   groups: Map<string, UserGroup>
   now: number
   empty: React.ReactNode
+  selected: ReadonlySet<number>
+  onSelect: (id: number, checked: boolean) => void
 }) {
   const phone = useMediaQuery(PHONE_QUERY)
   const message = hasMessage(props.state, props.items.length) ? (
@@ -85,7 +88,14 @@ export function KeysList(props: {
         {props.items.length ? (
           <ul>
             {props.items.map((apiKey) => (
-              <KeyCard key={apiKey.id} apiKey={apiKey} groups={props.groups} now={props.now} />
+              <KeyCard
+                key={apiKey.id}
+                apiKey={apiKey}
+                groups={props.groups}
+                now={props.now}
+                selected={props.selected.has(apiKey.id)}
+                onSelect={(checked) => props.onSelect(apiKey.id, checked)}
+              />
             ))}
           </ul>
         ) : null}
@@ -98,7 +108,14 @@ export function KeysList(props: {
       <Table columns={COLUMNS} minWidth={980}>
         {message ? <TableMessage colSpan={COLUMNS.length}>{message}</TableMessage> : null}
         {props.items.map((apiKey) => (
-          <KeyRow key={apiKey.id} apiKey={apiKey} groups={props.groups} now={props.now} />
+          <KeyRow
+            key={apiKey.id}
+            apiKey={apiKey}
+            groups={props.groups}
+            now={props.now}
+            selected={props.selected.has(apiKey.id)}
+            onSelect={(checked) => props.onSelect(apiKey.id, checked)}
+          />
         ))}
       </Table>
     </Panel>

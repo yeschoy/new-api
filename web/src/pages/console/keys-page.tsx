@@ -24,6 +24,7 @@ import { Button } from '@/components/ui'
 import { useI18n } from '@/i18n/i18n'
 import { useStatus } from '@/lib/queries'
 import { AccelerationUrls } from '@/pages/keys/acceleration-urls'
+import { BulkBar, DeleteAllKeys, SelectAll } from '@/pages/keys/bulk-actions'
 import { fetchKeys, getUserGroups, type KeyQuery } from '@/pages/keys/keys-api'
 import { KeysFooter } from '@/pages/keys/keys-footer'
 import { KeysList } from '@/pages/keys/keys-list'
@@ -66,11 +67,16 @@ export function KeysPage() {
   )
 }
 
+const NONE: ReadonlySet<number> = new Set()
+
 /** Signed-in part of the page: the queries only run once the visitor is known. */
 function KeysContent(props: { create: React.ReactNode }) {
   const { t } = useI18n()
   const [view, setView] = useState<KeyQuery>({ page: 1, size: 20, keyword: '', token: '' })
   const [statusFilter, setStatusFilter] = useState('')
+  // Ticks belong to what is on screen: another page, search or filter starts with none.
+  const viewKey = `${view.page}|${view.size}|${view.keyword}|${view.token}|${statusFilter}`
+  const [selection, setSelection] = useState<{ view: string; ids: ReadonlySet<number> }>({ view: '', ids: NONE })
   const now = useNow()
   const keys = useQuery({
     queryKey: useConsoleKey('keys', view),
@@ -81,6 +87,18 @@ function KeysContent(props: { create: React.ReactNode }) {
   const groupMap = useMemo(() => new Map((groups.data ?? []).map((group) => [group.name, group])), [groups.data])
   const items = keys.data?.items ?? []
   const shown = statusFilter ? items.filter((item) => String(item.status) === statusFilter) : items
+  const selectedIds = selection.view === viewKey ? selection.ids : NONE
+  const selected = shown.filter((item) => selectedIds.has(item.id))
+  const searching = Boolean(view.keyword || view.token)
+
+  function select(ids: number[], checked: boolean) {
+    const next = new Set(selectedIds)
+    for (const id of ids) {
+      if (checked) next.add(id)
+      else next.delete(id)
+    }
+    setSelection({ view: viewKey, ids: next })
+  }
 
   // Deleting the last key on a later page would leave an empty page behind.
   useEffect(() => {
@@ -106,7 +124,10 @@ function KeysContent(props: { create: React.ReactNode }) {
   return (
     <>
       <AccelerationUrls />
-      <KeysToolbar status={statusFilter} onStatus={setStatusFilter} onSearch={onSearch} />
+      <KeysToolbar status={statusFilter} onStatus={setStatusFilter} onSearch={onSearch}>
+        <SelectAll shown={shown.length} selected={selected.length} onChange={(all) => select(shown.map((item) => item.id), all)} />
+      </KeysToolbar>
+      {selected.length ? <BulkBar selected={selected} onDone={() => setSelection({ view: viewKey, ids: NONE })} /> : null}
       <KeysList
         items={shown}
         state={{
@@ -114,11 +135,13 @@ function KeysContent(props: { create: React.ReactNode }) {
           error: keys.error,
           loaded: keys.isSuccess,
           pageCount: items.length,
-          searching: Boolean(view.keyword || view.token),
+          searching,
         }}
         groups={groupMap}
         now={now}
         empty={empty}
+        selected={selectedIds}
+        onSelect={(id, checked) => select([id], checked)}
       />
       <KeysFooter
         page={view.page}
@@ -126,7 +149,9 @@ function KeysContent(props: { create: React.ReactNode }) {
         total={keys.data?.total ?? 0}
         onPage={(page) => setView((current) => ({ ...current, page }))}
         onSize={(size) => setView((current) => ({ ...current, size, page: 1 }))}
-      />
+      >
+        <DeleteAllKeys total={searching ? 0 : (keys.data?.total ?? 0)} />
+      </KeysFooter>
     </>
   )
 }
