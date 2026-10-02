@@ -126,9 +126,25 @@ const EN_WALLET: Record<string, string> = {
   每月: 'monthly',
   '每 {span}': 'every {span}',
 
-  // Invitations (API errors)
+  // Invitations
+  邀请奖励: 'Invite rewards',
+  '好友通过你的链接注册后，你会获得奖励，奖励可以随时转入余额。':
+    'Earn rewards when friends sign up through your link, and move them into your balance any time.',
+  待转入: 'Waiting',
+  累计奖励: 'Earned in total',
+  邀请人数: 'Invited',
+  邀请链接: 'Invite link',
+  复制链接: 'Copy link',
+  转入余额: 'Move to balance',
+  '管理员确认合规条款前，邀请奖励暂不能转入余额。': 'Rewards can’t be moved into your balance until the administrator confirms the payment terms.',
+  可转入: 'Available to move',
+  转入金额: 'Amount to move',
+  '最少转入 {amount}': 'Move at least {amount}',
+  超过可转入的奖励: 'That’s more than your rewards',
+  转入: 'Move',
+  已转入余额: 'Moved to your balance',
   获取邀请码失败: 'Could not load your invite code',
-  转入失败: 'Could not transfer',
+  转入失败: 'Could not move the rewards',
 }
 
 export default EN_WALLET

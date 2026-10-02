@@ -86,6 +86,13 @@ describe('wallet page', () => {
     expect(screen.getByRole('article', { name: 'Pro' })).toBeInTheDocument()
   })
 
+  it('shows the user’s invite link', async () => {
+    answer()
+    renderPage(<CreditsPage />)
+    expect(await screen.findByRole('heading', { name: '邀请奖励' })).toBeInTheDocument()
+    expect(await screen.findByDisplayValue(`${window.location.origin}/sign-up?aff=AB12`)).toBeInTheDocument()
+  })
+
   it('scrolls to the orders when a payment sends the user back with ?show_history', async () => {
     answer({ '/api/user/topup/self': { items: [], total: 0 } })
     const scrollIntoView = vi.fn()

@@ -47,7 +47,8 @@ export function answerGets(responses: Record<string, unknown>) {
   return vi.spyOn(api, 'get').mockImplementation(async (url: string) => ok(responses[url] ?? {}))
 }
 
-export function signIn(user: AuthUser = USER) {
+/** Signs `user` in; extra fields stand for what /api/user/self reports beyond AuthUser. */
+export function signIn(user: AuthUser & Record<string, unknown> = USER) {
   authStore.applyBundle({
     user,
     access_token: 'token',
