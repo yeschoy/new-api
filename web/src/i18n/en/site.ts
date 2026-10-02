@@ -79,6 +79,21 @@ const EN_SITE: Record<string, string> = {
   '没有授予任何访问权限，可以关闭此页面。': 'No access was granted. You can close this page.',
   '此次授权允许桌面助手读取和管理你的 API 密钥，但不会透露你的密码。':
     'This approval lets the desktop app read and manage your API keys, but never reveals your password.',
+
+  // Error pages
+  返回: 'Go back',
+  未经授权的访问: 'Unauthorized access',
+  '请使用有相应权限的账号登录后再访问。': 'Please log in with the appropriate credentials to access this page.',
+  禁止访问: 'Access forbidden',
+  '糟糕！出错了': 'Oops! Something went wrong',
+  请求过于频繁: 'Too many requests',
+  '对于由此造成的不便，我们深表歉意。': 'We apologize for the inconvenience.',
+  '请稍后再试。': 'Please try again later.',
+  '请稍等片刻再试。': 'Please wait a moment before trying again.',
+  '如果问题持续出现，请到 GitHub Issues 反馈。': 'If this keeps happening, please report it on GitHub Issues.',
+  反馈问题: 'Report an issue',
+  网站正在维护中: 'The site is under maintenance',
+  '网站暂时无法访问，我们很快就会恢复。': 'The site is not available at the moment. We’ll be back online shortly.',
 }
 
 export default EN_SITE
