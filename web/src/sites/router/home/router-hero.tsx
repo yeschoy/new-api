@@ -62,13 +62,12 @@ export function RouterHero() {
         >
           {t('获取 API Key')}
         </Link>
-        {/* No download address yet, so the button goes nowhere for now. */}
-        <button
-          type='button'
+        <Link
+          to='/client'
           className='bg-or-primary text-or-bg flex h-11 min-w-[205px] items-center justify-center gap-2 rounded-[6px] px-4 text-[14px] whitespace-nowrap font-medium transition-opacity hover:opacity-90'
         >
           {t('下载客户端一键接入')}
-        </button>
+        </Link>
       </div>
     </section>
   )
