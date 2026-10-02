@@ -47,6 +47,23 @@ export function authFailure(body: { code?: string; message?: string } | undefine
   return body?.message || fallback
 }
 
+// Codes of a failed Telegram binding (controller/telegram.go telegramBindFailure).
+const TELEGRAM_BIND_CODES: Record<string, string> = {
+  TELEGRAM_BIND_DISABLED: tk('管理员未开启 Telegram 绑定。'),
+  TELEGRAM_BIND_INVALID_REQUEST: tk('Telegram 授权无效或已过期。'),
+  TELEGRAM_BIND_FLOW_INVALID: tk('本次绑定请求已过期或已被使用。'),
+  TELEGRAM_BIND_SESSION_INVALID: tk('发起绑定的登录状态已失效，请重新登录。'),
+  TELEGRAM_BIND_ALREADY_BOUND: tk('该 Telegram 账号已被其他账户绑定。'),
+  TELEGRAM_BIND_USER_DELETED: tk('该账户已不存在。'),
+  TELEGRAM_BIND_USER_DISABLED: tk('该账户已被禁用。'),
+}
+
+export function telegramBindFailure(code: string | undefined): string {
+  const known = code ? TELEGRAM_BIND_CODES[code] : undefined
+  if (known) return t(known)
+  return t('Telegram 绑定失败，请重试。')
+}
+
 /** Applies the session from a sign-in answer, or throws its reason. */
 function signInWith(body: ApiEnvelope<unknown> | undefined, fallback: string) {
   if (!body?.success || !isAuthBundle(body.data)) throw new Error(authFailure(body, fallback))
