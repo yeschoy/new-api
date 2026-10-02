@@ -18,59 +18,27 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { KeyRound, Plus } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { tk, useI18n } from '@/i18n/i18n'
-import { RequireAuth } from '@/components/require-auth'
-import { errorMessage } from '@/lib/api'
+import { Button } from '@/components/ui'
+import { useI18n } from '@/i18n/i18n'
 import { useStatus } from '@/lib/queries'
-import { listKeys } from '@/lib/services'
+import { AccelerationUrls } from '@/pages/keys/acceleration-urls'
+import { fetchKeys, getUserGroups, type KeyQuery } from '@/pages/keys/keys-api'
+import { KeysFooter } from '@/pages/keys/keys-footer'
+import { KeysList } from '@/pages/keys/keys-list'
+import { KeysToolbar, type SearchTerms } from '@/pages/keys/keys-toolbar'
+import { useNow } from '@/pages/keys/time-labels'
 
 import { useConsoleKey } from './console-hooks'
-import { ConsoleLayout } from './console-layout'
-import { Pager, Table, TableMessage, type Column } from './console-table'
-import { Button, Panel } from './console-ui'
+import { ConsolePage } from './console-page'
 import { CreateKeyDialog } from './key-create-dialog'
-import { KeyRow } from './key-row'
 
-const PAGE_SIZE = 20
-
-const COLUMNS: Column[] = [
-  { label: tk('名称') },
-  { label: tk('密钥') },
-  { label: tk('额度上限'), right: true },
-  { label: tk('已用'), right: true },
-  { label: tk('创建时间') },
-  { label: tk('操作'), right: true },
-]
-
-/** API keys: list, reveal / copy, enable / disable, delete, create. */
+/** API keys: search, filter and page through keys; reveal / copy, enable / disable, delete, create. */
 export function KeysPage() {
-  return (
-    <RequireAuth framed>
-      <KeysContent />
-    </RequireAuth>
-  )
-}
-
-function KeysContent() {
   const { t } = useI18n()
   const { data: status } = useStatus()
-  const [page, setPage] = useState(1)
   const [creating, setCreating] = useState(false)
-  const queryKey = useConsoleKey('keys', page)
-  const keys = useQuery({
-    queryKey,
-    queryFn: () => listKeys(page, PAGE_SIZE),
-    placeholderData: keepPreviousData,
-  })
-  const items = keys.data?.items ?? []
-  const total = keys.data?.total ?? 0
-
-  // Deleting the last key on a later page would leave an empty page behind.
-  useEffect(() => {
-    if (page > 1 && keys.isSuccess && !keys.isPlaceholderData && items.length === 0) setPage(page - 1)
-  }, [page, keys.isSuccess, keys.isPlaceholderData, items.length])
 
   const baseUrl = `${(status?.server_address || window.location.origin).replace(/\/+$/, '')}/v1`
   const create = (
@@ -81,7 +49,7 @@ function KeysContent() {
   )
 
   return (
-    <ConsoleLayout
+    <ConsolePage
       active='keys'
       title={t('API 密钥')}
       description={
@@ -92,30 +60,73 @@ function KeysContent() {
       }
       actions={create}
     >
-      <Panel flush>
-        <Table columns={COLUMNS} minWidth={880}>
-          {keys.isLoading ? <TableMessage colSpan={COLUMNS.length}>{t('加载中…')}</TableMessage> : null}
-          {keys.isError ? (
-            <TableMessage colSpan={COLUMNS.length}>
-              <span className='text-or-red'>{errorMessage(keys.error, t('密钥加载失败'))}</span>
-            </TableMessage>
-          ) : null}
-          {keys.isSuccess && items.length === 0 ? (
-            <TableMessage colSpan={COLUMNS.length}>
-              <div className='flex flex-col items-center gap-3'>
-                <KeyRound className='size-6' aria-hidden='true' />
-                <span>{t('还没有 API 密钥，创建一个开始调用模型。')}</span>
-                {create}
-              </div>
-            </TableMessage>
-          ) : null}
-          {items.map((apiKey) => (
-            <KeyRow key={apiKey.id} apiKey={apiKey} />
-          ))}
-        </Table>
-      </Panel>
-      <Pager page={page} size={PAGE_SIZE} total={total} onChange={setPage} />
+      <KeysContent create={create} />
       {creating ? <CreateKeyDialog onClose={() => setCreating(false)} /> : null}
-    </ConsoleLayout>
+    </ConsolePage>
+  )
+}
+
+/** Signed-in part of the page: the queries only run once the visitor is known. */
+function KeysContent(props: { create: React.ReactNode }) {
+  const { t } = useI18n()
+  const [view, setView] = useState<KeyQuery>({ page: 1, size: 20, keyword: '', token: '' })
+  const [statusFilter, setStatusFilter] = useState('')
+  const now = useNow()
+  const keys = useQuery({
+    queryKey: useConsoleKey('keys', view),
+    queryFn: () => fetchKeys(view),
+    placeholderData: keepPreviousData,
+  })
+  const groups = useQuery({ queryKey: useConsoleKey('key-groups'), queryFn: getUserGroups, staleTime: 60_000 })
+  const groupMap = useMemo(() => new Map((groups.data ?? []).map((group) => [group.name, group])), [groups.data])
+  const items = keys.data?.items ?? []
+  const shown = statusFilter ? items.filter((item) => String(item.status) === statusFilter) : items
+
+  // Deleting the last key on a later page would leave an empty page behind.
+  useEffect(() => {
+    if (view.page > 1 && keys.isSuccess && !keys.isPlaceholderData && items.length === 0) {
+      setView((current) => ({ ...current, page: current.page - 1 }))
+    }
+  }, [view.page, keys.isSuccess, keys.isPlaceholderData, items.length])
+
+  const onSearch = useCallback((terms: SearchTerms) => {
+    setView((current) =>
+      current.keyword === terms.keyword && current.token === terms.token ? current : { ...current, ...terms, page: 1 }
+    )
+  }, [])
+
+  const empty = (
+    <div className='flex flex-col items-center gap-3'>
+      <KeyRound className='size-6' aria-hidden='true' />
+      <span>{t('还没有 API 密钥，创建一个开始调用模型。')}</span>
+      {props.create}
+    </div>
+  )
+
+  return (
+    <>
+      <AccelerationUrls />
+      <KeysToolbar status={statusFilter} onStatus={setStatusFilter} onSearch={onSearch} />
+      <KeysList
+        items={shown}
+        state={{
+          loading: keys.isLoading,
+          error: keys.error,
+          loaded: keys.isSuccess,
+          pageCount: items.length,
+          searching: Boolean(view.keyword || view.token),
+        }}
+        groups={groupMap}
+        now={now}
+        empty={empty}
+      />
+      <KeysFooter
+        page={view.page}
+        size={view.size}
+        total={keys.data?.total ?? 0}
+        onPage={(page) => setView((current) => ({ ...current, page }))}
+        onSize={(size) => setView((current) => ({ ...current, size, page: 1 }))}
+      />
+    </>
   )
 }

@@ -88,6 +88,14 @@ export async function deleteKeys(ids: number[]): Promise<number> {
   return unwrap(res.data, t('删除失败')) ?? ids.length
 }
 
+/** The full key (sk-…) behind a masked one. */
+export async function revealOne(id: number): Promise<string> {
+  const res = await api.post<ApiEnvelope<{ key?: string } | null>>(`/api/token/${id}/key`)
+  const key = withKeyPrefix(unwrap(res.data, t('获取密钥失败'))?.key ?? '')
+  if (!key || key.includes('*')) throw new Error(t('获取密钥失败'))
+  return key
+}
+
 /** Full keys (sk-…) of up to 100 keys, by id. */
 export async function revealKeys(ids: number[]): Promise<Record<number, string>> {
   const res = await api.post<ApiEnvelope<{ keys?: Record<string, string> }>>('/api/token/batch/keys', { ids })

@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
-import { deleteAllKeys, fetchKeys, getAutoGroupConfig, getUserGroups, getUserModels, revealKeys } from '../keys-api'
+import { deleteAllKeys, fetchKeys, getAutoGroupConfig, getUserGroups, getUserModels, revealKeys, revealOne } from '../keys-api'
 
 const ok = (data: unknown) => ({ data: { success: true, message: '', data } })
 const failed = (message: string) => ({ data: { success: false, message } })
@@ -70,6 +70,24 @@ describe('account groups and models', () => {
   it('treats a missing model list as empty', async () => {
     vi.spyOn(api, 'get').mockResolvedValue(ok({}))
     expect(await getUserModels()).toEqual([])
+  })
+})
+
+describe('revealing one key', () => {
+  it('returns the full key with its sk- prefix', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue(ok({ key: 'full' }))
+    expect(await revealOne(5)).toBe('sk-full')
+    expect(post).toHaveBeenCalledWith('/api/token/5/key')
+  })
+
+  it('surfaces the server message when the key cannot be shown', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue(failed('令牌不存在'))
+    await expect(revealOne(5)).rejects.toThrow('令牌不存在')
+  })
+
+  it('refuses a masked value', async () => {
+    vi.spyOn(api, 'post').mockResolvedValue(ok({ key: 'ab****cd' }))
+    await expect(revealOne(5)).rejects.toThrow('获取密钥失败')
   })
 })
 
