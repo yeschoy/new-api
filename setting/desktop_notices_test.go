@@ -63,6 +63,33 @@ func TestActiveDesktopNoticesFiltersExpiredAndMalformedEntries(t *testing.T) {
 	assert.Equal(t, "forever", notices[1].ID)
 }
 
+func TestActiveDesktopNoticesRejectsInvalidStoredEntriesAndDuplicateIDs(t *testing.T) {
+	now := time.UnixMilli(1_800_000_000_000)
+	raw := `[
+		{"id":"expired","title":"expired","expiresAtEpochMs":1799999999999},
+		{"id":"expired","title":"active after expired"},
+		{"id":"bad-severity","title":"bad","severity":"critical"},
+		{"id":"bad-time","title":"bad","publishedAtEpochMs":-1},
+		{"id":"bad-link","title":"bad","action":{"kind":"link","url":"javascript:alert(1)"}},
+		{"id":"duplicate","title":"first"},
+		{"id":"duplicate","title":"second"},
+		{"title":"without id"},
+		{"title":"another without id"},
+		null
+	]`
+	notices := ActiveDesktopNotices(raw, now)
+	require.Len(t, notices, 4)
+	assert.Equal(t, []string{"active after expired", "first", "without id", "another without id"},
+		[]string{notices[0].Title, notices[1].Title, notices[2].Title, notices[3].Title})
+}
+
+func TestActiveDesktopNoticesSkipsOversizedStoredEntry(t *testing.T) {
+	raw := `[{"title":"` + strings.Repeat("x", desktopNoticeMaxTitleLength+1) + `"},{"title":"valid"}]`
+	notices := ActiveDesktopNotices(raw, time.Now())
+	require.Len(t, notices, 1)
+	assert.Equal(t, "valid", notices[0].Title)
+}
+
 func TestActiveDesktopNoticesReturnsEmptyListForBadJSON(t *testing.T) {
 	notices := ActiveDesktopNotices("[{", time.Now())
 

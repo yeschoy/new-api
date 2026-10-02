@@ -175,3 +175,13 @@ for ClickHouse ordering do not substitute for a live ClickHouse integration run.
 ### Wrong vs Correct
 - Wrong: paginate raw rows and collapse only the current page.
 - Correct: select final outcomes, preserve display order, count, then paginate.
+
+## Dashboard JWT test fixtures
+
+When testing expired, tampered, or otherwise invalid dashboard access tokens, first
+issue a real token through `service.IssueAccessToken` and mutate only the claim
+or signature under test. Do not hardcode the issuer or audience in test helpers:
+stale values cause `ParseDashboardAccessToken` to classify the fixture as an
+external credential, so an intended rejection test exercises the wrong path.
+For expired-token tests, assert that classification remains internal and that
+parsing returns `ErrAuthTokenExpired` before testing middleware behavior.

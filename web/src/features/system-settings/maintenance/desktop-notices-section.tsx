@@ -97,10 +97,15 @@ export function DesktopNoticesSection(props: DesktopNoticesSectionProps) {
     if (values.DesktopNotices === props.defaultValue) {
       return
     }
-    await updateOption.mutateAsync({
+    const result = await updateOption.mutateAsync({
       key: 'DesktopNotices',
       value: values.DesktopNotices,
     })
+    if (!result.success) {
+      form.setError('DesktopNotices', {
+        message: result.message || t('Failed to update setting'),
+      })
+    }
   }
 
   return (
@@ -125,6 +130,10 @@ export function DesktopNoticesSection(props: DesktopNoticesSectionProps) {
                     placeholder={DESKTOP_NOTICES_EXAMPLE}
                     spellCheck={false}
                     {...field}
+                    onChange={(event) => {
+                      field.onChange(event)
+                      form.clearErrors('DesktopNotices')
+                    }}
                   />
                 </FormControl>
                 <FormDescription>

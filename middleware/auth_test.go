@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,23 +43,23 @@ func setupDashboardAuthMiddlewareTest(t *testing.T) {
 
 func issueExpiredDashboardAccessToken(t *testing.T, identity service.AuthIdentity) string {
 	t.Helper()
-	claims := jwt.MapClaims{
-		"iss":       "new-api",
-		"aud":       []string{"new-api-dashboard"},
-		"sub":       fmt.Sprintf("%d", identity.UserID),
-		"token_use": "access",
-		"sid":       identity.SessionID,
-		"uv":        identity.UserAuthVersion,
-		"sv":        identity.SessionVersion,
-		"exp":       time.Now().Add(-time.Minute).Unix(),
-		"nbf":       time.Now().Add(-2 * time.Minute).Unix(),
-		"iat":       time.Now().Add(-2 * time.Minute).Unix(),
-	}
+	issued, _, err := service.IssueAccessToken(identity)
+	require.NoError(t, err)
+	parsed, _, err := jwt.NewParser().ParseUnverified(issued, jwt.MapClaims{})
+	require.NoError(t, err)
+	claims, ok := parsed.Claims.(jwt.MapClaims)
+	require.True(t, ok)
+	claims["exp"] = time.Now().Add(-time.Minute).Unix()
+	claims["nbf"] = time.Now().Add(-2 * time.Minute).Unix()
+	claims["iat"] = time.Now().Add(-2 * time.Minute).Unix()
 	mac := hmac.New(sha256.New, []byte(common.SessionSecret))
-	_, err := mac.Write([]byte("new-api/auth/access/v1"))
+	_, err = mac.Write([]byte("new-api/auth/access/v1"))
 	require.NoError(t, err)
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(mac.Sum(nil))
 	require.NoError(t, err)
+	_, internal, parseErr := service.ParseDashboardAccessToken(token)
+	require.True(t, internal, "expired access tokens must not fall through to PAT authentication")
+	require.ErrorIs(t, parseErr, service.ErrAuthTokenExpired)
 	return token
 }
 

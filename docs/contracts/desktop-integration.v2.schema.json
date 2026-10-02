@@ -34,7 +34,8 @@
         "models_path",
         "pricing_path",
         "tool_keys_path",
-        "wallet_url"
+        "wallet_url",
+        "announcements_path"
       ],
       "properties": {
         "schema_version": { "const": 2 },

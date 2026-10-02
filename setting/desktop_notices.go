@@ -126,19 +126,29 @@ func ActiveDesktopNotices(raw string, now time.Time) []DesktopNotice {
 		return notices
 	}
 	nowMs := now.UnixMilli()
+	seenIDs := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		if len(notices) >= DesktopNoticesMaxServed {
 			break
+		}
+		if common.GetJsonType(item) != "object" {
+			continue
 		}
 		var notice DesktopNotice
 		if err := common.Unmarshal(item, &notice); err != nil {
 			continue
 		}
-		if strings.TrimSpace(notice.Title) == "" {
+		if err := validateDesktopNotice(notice); err != nil {
 			continue
 		}
 		if notice.ExpiresAtEpochMs != 0 && notice.ExpiresAtEpochMs < nowMs {
 			continue
+		}
+		if notice.ID != "" {
+			if _, duplicate := seenIDs[notice.ID]; duplicate {
+				continue
+			}
+			seenIDs[notice.ID] = struct{}{}
 		}
 		notices = append(notices, notice)
 	}
