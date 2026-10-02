@@ -53,6 +53,32 @@ const EN_SITE: Record<string, string> = {
   'Windows 10 或更高版本': 'Windows 10 or later',
   'macOS 通用版 DMG': 'Universal macOS DMG',
   'Intel 与 Apple 芯片': 'Intel and Apple silicon',
+
+  // Desktop app authorization page
+  官方桌面端连接: 'Official desktop connection',
+  '连接{brand}桌面助手': 'Connect {brand} Desktop',
+  '桌面助手正在请求在这台电脑上使用你的{brand}账号。': 'The desktop app is asking to use your {brand} account on this computer.',
+  '只有当这个连接由你在官方桌面助手中发起时，才继续操作。': 'Only continue if you started this connection in the official desktop app.',
+  桌面助手显示的验证码: 'Code shown in the app',
+  '连接前，请确认验证码与桌面助手中显示的一致。': 'Make sure this code matches before you connect.',
+  查看余额与用量: 'View balance and usage',
+  '配置你的 AI 应用': 'Configure your AI apps',
+  创建可随时撤销的登录: 'Create a revocable session',
+  缺少连接验证码: 'The connection code is missing',
+  '请从桌面助手重新打开此页面。': 'Open this page again from the desktop app to continue.',
+  这次连接请求已经过期: 'This connection request has expired',
+  '请回到桌面助手，重新发起连接。': 'Return to the desktop app and start the connection again.',
+  暂时无法确认连接: 'Could not confirm this connection',
+  '请检查网络后重试，目前没有授予任何访问权限。': 'Check your connection and try again. No access was granted.',
+  暂不连接: 'Do not connect',
+  '正在连接…': 'Connecting…',
+  连接这台电脑: 'Connect this computer',
+  已同意连接: 'Connection approved',
+  已拒绝连接: 'Connection declined',
+  '现在可以关闭此页面，回到桌面助手继续使用。': 'You can close this page and return to the desktop app.',
+  '没有授予任何访问权限，可以关闭此页面。': 'No access was granted. You can close this page.',
+  '此次授权允许桌面助手读取和管理你的 API 密钥，但不会透露你的密码。':
+    'This approval lets the desktop app read and manage your API keys, but never reveals your password.',
 }
 
 export default EN_SITE
