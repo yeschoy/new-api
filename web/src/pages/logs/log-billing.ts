@@ -91,10 +91,15 @@ export function tieredSummary(other: LogOther | null, options: { includeUnusedCa
     const price = tier.prices[variable.key]
     if (price === undefined || !Number.isFinite(price) || price < 0) continue
     if (variable.cache && !showCache) continue
-    const label = variable.key === 'cc' && other.claude === true ? tk('缓存写入 (5m)') : variable.label
-    entries.push({ key: variable.key, label, price })
+    entries.push({ key: variable.key, label: priceLabel(variable.key, other.claude === true), price })
   }
   return { tiers, tier, entries }
+}
+
+/** The name of a price variable (pass it through t()); Claude's plain cache write is the 5-minute one. */
+export function priceLabel(key: string, claude: boolean): string {
+  if (key === 'cc' && claude) return tk('缓存写入 (5m)')
+  return PRICE_VARS.find((variable) => variable.key === key)?.label ?? key
 }
 
 export type LineItem = { key: string; label: string; quantity: number; unitPrice: number; cost: number }

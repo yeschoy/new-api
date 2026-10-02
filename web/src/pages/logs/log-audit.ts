@@ -111,7 +111,7 @@ export function auditContent(other: LogOther | null): string | null {
 /** Channel fields an update changed (stable tokens recorded by the backend). */
 const CHANNEL_FIELDS: Record<string, string> = {
   status: tk('状态'),
-  models: tk('模型|表头'),
+  models: tk('模型'),
   group: tk('分组'),
   type: tk('类型'),
   base_url: tk('接口地址'),
