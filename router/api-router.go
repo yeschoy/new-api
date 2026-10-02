@@ -475,4 +475,5 @@ func registerDesktopRoutes(apiRouter *gin.RouterGroup) {
 	desktopV2Route.POST("/device-authorizations/decision", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.DecideDesktopDeviceAuthorization)
 	desktopV2Route.POST("/sessions/refresh", middleware.CriticalRateLimit(), middleware.DisableCache(), middleware.AnonymousRequestBodyLimit(), controller.RefreshDesktopSession)
 	desktopV2Route.DELETE("/sessions/current", middleware.UserAuth(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.RevokeCurrentDesktopSession)
+	desktopV2Route.GET("/notices", middleware.UserAuth(), middleware.DisableCache(), controller.GetDesktopNotices)
 }

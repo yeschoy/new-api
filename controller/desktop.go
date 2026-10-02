@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-gonic/gin"
 )
@@ -74,6 +76,7 @@ type desktopV2BootstrapData struct {
 	PricingPath                  string  `json:"pricing_path"`
 	ToolKeysPath                 string  `json:"tool_keys_path"`
 	WalletURL                    string  `json:"wallet_url"`
+	AnnouncementsPath            string  `json:"announcements_path"`
 }
 
 type desktopDeviceAuthorizationCreateRequest struct {
@@ -121,6 +124,18 @@ func GetDesktopBootstrapV2(c *gin.Context) {
 			PricingPath:                  "/api/pricing",
 			ToolKeysPath:                 "/api/token/",
 			WalletURL:                    serverAddress + "/wallet/",
+			AnnouncementsPath:            "/api/desktop/v2/notices",
+		},
+	})
+}
+
+// GetDesktopNotices serves the active DesktopNotices entries. Configuration
+// problems degrade to an empty list so the desktop client never sees a 500.
+func GetDesktopNotices(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"notices": setting.GetActiveDesktopNotices(time.Now()),
 		},
 	})
 }

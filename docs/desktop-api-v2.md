@@ -8,7 +8,7 @@ v2 为官方桌面助手补齐网页登录授权和桌面会话，同时复用 N
 - 用户在网站登录后，核对短验证码并明确同意或拒绝。
 - 待确认请求只在 Redis 保留 5 分钟；Redis 未启用时，启动握手会明确标记设备授权不可用。
 - 授权成功后复用已有 `user_sessions` 会话表。没有新增业务表，也不需要数据库迁移。
-- 服务端根据现有会话的 `login_method` 识别桌面会话；桌面访问令牌只允许调用本文列出的账户、用量、模型、价格、工具密钥与桌面退出接口，其他控制台接口统一返回 `AUTH_DESKTOP_SCOPE_DENIED`。
+- 服务端根据现有会话的 `login_method` 识别桌面会话；桌面访问令牌只允许调用本文列出的账户、用量、模型、价格、工具密钥、公告与桌面退出接口，其他控制台接口统一返回 `AUTH_DESKTOP_SCOPE_DENIED`。
 - 桌面端获得的访问令牌和刷新令牌只应保存到系统安全存储（macOS Keychain 或 Windows Credential Manager），不得写入日志、普通配置文件或崩溃报告。
 
 ## 1. 启动握手
@@ -107,7 +107,40 @@ v2 为官方桌面助手补齐网页登录授权和桌面会话，同时复用 N
 
 退出会立即把当前 `user_sessions` 记录标记为撤销。它不影响用户在浏览器或其他电脑上的会话。
 
-## 4. 复用的现有接口
+## 4. 公告
+
+- 方法：`GET`
+- 路径：`/api/desktop/v2/notices`（启动握手中的 `announcements_path`）
+- 鉴权：`Authorization: Bearer <access_token>`，与 `/api/user/self` 相同；未登录返回 401
+
+公告来自配置项 `DesktopNotices`（`options` 表，默认 `[]`），由 root 在「系统设置 → 站点 → 桌面端公告」中编辑，或调用 `PUT /api/option/`（`{"key":"DesktopNotices","value":"[...]"}`）。值为 JSON 数组，每条格式：
+
+```json
+{
+  "id": "唯一且不变的标识，≤64 字符",
+  "title": "必填，≤120 字符",
+  "body": "纯文本，\n 分段，≤2000 字符",
+  "severity": "info | warning",
+  "publishedAtEpochMs": 1790000000000,
+  "expiresAtEpochMs": 0,
+  "banner": true,
+  "action": { "kind": "wallet", "label": "去充值" }
+}
+```
+
+`action` 也可以是 `{"kind":"link","label":"查看细则","url":"https://yeschoy.com/..."}`。除 `title` 外都可选。
+
+保存时校验：必须是 JSON 数组（空字符串视为无公告），每条为对象且 `title` 非空，非空 `id` 不得重复，并检查上述长度、`severity`、`action.kind` 以及 link 的 http(s) 地址；不合法时拒绝保存并返回错误信息。
+
+响应：
+
+```json
+{ "success": true, "data": { "notices": [] } }
+```
+
+服务端按配置顺序返回，去掉 `expiresAtEpochMs` 非 0 且早于当前时间的条目，最多 30 条。配置为空或无法解析时返回空列表而不是 500；单条无法解析或缺少 `title` 的条目会被跳过。
+
+## 5. 复用的现有接口
 
 桌面端登录后使用 Bearer 访问：
 
@@ -123,7 +156,7 @@ v2 为官方桌面助手补齐网页登录授权和桌面会话，同时复用 N
 
 价格对比必须使用同一批实际用量：以用量记录中的模型、输入/输出 token、缓存和倍率计算野菜API实际费用，再以相同用量乘对应官网单价并按固定汇率 `6.75` 换算。不得拿不同时间段或不同模型估算“节省金额”。
 
-## 5. 部署检查清单
+## 6. 部署检查清单
 
 本次代码不修改部署环境。技术人员上线时只需确认：
 
