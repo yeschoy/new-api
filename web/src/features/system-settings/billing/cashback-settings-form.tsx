@@ -37,6 +37,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Form,
   FormControl,
@@ -101,10 +103,7 @@ const fieldMap = {
   device_account_threshold: 'deviceAccountThreshold',
   daily_topup_count_threshold: 'dailyTopUpCountThreshold',
   auto_review_enabled: 'autoReviewEnabled',
-  low_review_required: 'lowReviewRequired',
-  medium_review_required: 'mediumReviewRequired',
-  high_review_required: 'highReviewRequired',
-  severe_review_required: 'severeReviewRequired',
+  auto_review_risk_flags: 'autoReviewRiskFlags',
   auto_review_immediate_issue: 'autoReviewImmediateIssue',
 } as const
 
@@ -128,10 +127,7 @@ export type Values = {
   deviceAccountThreshold: number
   dailyTopUpCountThreshold: number
   autoReviewEnabled: boolean
-  lowReviewRequired: boolean
-  mediumReviewRequired: boolean
-  highReviewRequired: boolean
-  severeReviewRequired: boolean
+  autoReviewRiskFlags: string[] | null
   autoReviewImmediateIssue: boolean
 }
 
@@ -164,10 +160,7 @@ function configToValues(config: CashbackConfig): Values {
     deviceAccountThreshold: config.device_account_threshold,
     dailyTopUpCountThreshold: config.daily_topup_count_threshold,
     autoReviewEnabled: config.auto_review_enabled,
-    lowReviewRequired: config.low_review_required,
-    mediumReviewRequired: config.medium_review_required,
-    highReviewRequired: config.high_review_required,
-    severeReviewRequired: config.severe_review_required,
+    autoReviewRiskFlags: config.auto_review_risk_flags,
     autoReviewImmediateIssue: config.auto_review_immediate_issue,
   }
 }
@@ -208,10 +201,9 @@ function valuesToRequest(
     device_account_threshold: values.deviceAccountThreshold,
     daily_topup_count_threshold: values.dailyTopUpCountThreshold,
     auto_review_enabled: values.autoReviewEnabled,
-    low_review_required: values.lowReviewRequired,
-    medium_review_required: values.mediumReviewRequired,
-    high_review_required: values.highReviewRequired,
-    severe_review_required: values.severeReviewRequired,
+    ...(values.autoReviewRiskFlags !== null
+      ? { auto_review_risk_flags: values.autoReviewRiskFlags }
+      : {}),
     auto_review_immediate_issue: values.autoReviewImmediateIssue,
   }
 }
@@ -292,10 +284,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
       deviceAccountThreshold: z.coerce.number().int().min(2).max(100000),
       dailyTopUpCountThreshold: z.coerce.number().int().min(1).max(100000),
       autoReviewEnabled: z.boolean(),
-      lowReviewRequired: z.boolean(),
-      mediumReviewRequired: z.boolean(),
-      highReviewRequired: z.boolean(),
-      severeReviewRequired: z.boolean(),
+      autoReviewRiskFlags: z.array(z.string()).nullable(),
       autoReviewImmediateIssue: z.boolean(),
     })
     .superRefine((values, context) => {
@@ -433,6 +422,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
     mutationFn: updateCashbackConfig,
   })
   const enabled = form.watch('inviterEnabled') || form.watch('inviteeEnabled')
+  const selectedRiskFlags = form.watch('autoReviewRiskFlags')
   const currencyLabel = getCurrencyLabel()
   const rewardLimitStep = getEditableQuotaStep()
 
@@ -476,7 +466,7 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
     const highRate =
       nominalPercent(values, 'inviter') + nominalPercent(values, 'invitee') >=
       50
-    if (firstEnable || highRate) {
+    if (firstEnable || highRate || values.autoReviewRiskFlags?.length === 0) {
       setPendingValues(values)
       setConfirmationOpen(true)
       return
@@ -938,39 +928,79 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
                 </SettingsSwitchItem>
               )}
             />
-            <div className='grid gap-x-6 sm:grid-cols-2'>
-              {(
-                [
-                  ['lowReviewRequired', t('Manual review: low risk')],
-                  ['mediumReviewRequired', t('Manual review: medium risk')],
-                  ['highReviewRequired', t('Manual review: high risk')],
-                  ['severeReviewRequired', t('Manual review: severe risk')],
-                ] as const
-              ).map(([name, label]) => (
-                <FormField
-                  key={name}
-                  control={form.control}
-                  name={name}
-                  render={({ field }) => (
-                    <SettingsSwitchItem>
-                      <SettingsSwitchContent>
-                        <FormLabel>{label}</FormLabel>
-                      </SettingsSwitchContent>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={
-                            mutation.isPending ||
-                            !form.watch('autoReviewEnabled')
-                          }
-                        />
-                      </FormControl>
-                    </SettingsSwitchItem>
+            {selectedRiskFlags === null ? (
+              <Alert>
+                <AlertTitle>
+                  {t('Per-flag review policy is not configured')}
+                </AlertTitle>
+                <AlertDescription>
+                  {t(
+                    'Until you activate a risk policy, all payer rewards require manual review, even when automatic review is enabled.'
                   )}
-                />
-              ))}
-            </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <p className='text-muted-foreground text-sm'>
+                {t(
+                  'Selected risk flags route positive payer rewards to manual review. An empty selection allows automatic approval when the master switch is on; payment safety checks still apply.'
+                )}
+              </p>
+            )}
+            {selectedRiskFlags === null && (
+              <Button
+                type='button'
+                variant='outline'
+                disabled={mutation.isPending}
+                onClick={() =>
+                  form.setValue('autoReviewRiskFlags', [], {
+                    shouldDirty: true,
+                  })
+                }
+              >
+                {t('Activate per-flag review policy')}
+              </Button>
+            )}
+            {selectedRiskFlags !== null && (
+              <fieldset
+                className='grid gap-3 sm:grid-cols-2'
+                disabled={mutation.isPending}
+                aria-invalid={!!form.formState.errors.autoReviewRiskFlags}
+                aria-describedby={
+                  form.formState.errors.autoReviewRiskFlags
+                    ? 'cashback-risk-flags-error'
+                    : undefined
+                }
+              >
+                <legend className='mb-2 font-medium'>
+                  {t('Risk flags requiring manual review')}
+                </legend>
+                {props.config.available_auto_review_risk_flags.map((flag) => (
+                  <label key={flag} className='flex items-center gap-2 text-sm'>
+                    <Checkbox
+                      checked={selectedRiskFlags.includes(flag)}
+                      onCheckedChange={(checked) => {
+                        const next = checked
+                          ? [...selectedRiskFlags, flag]
+                          : selectedRiskFlags.filter((item) => item !== flag)
+                        form.setValue('autoReviewRiskFlags', next, {
+                          shouldDirty: true,
+                        })
+                      }}
+                    />
+                    {t(flag)}
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {form.formState.errors.autoReviewRiskFlags?.message && (
+              <p
+                id='cashback-risk-flags-error'
+                role='alert'
+                className='text-destructive text-sm'
+              >
+                {form.formState.errors.autoReviewRiskFlags.message}
+              </p>
+            )}
             <FormField
               control={form.control}
               name='autoReviewImmediateIssue'
@@ -1025,9 +1055,13 @@ export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
               {t('Confirm cashback risk settings')}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t(
-                'Enabling cashback or setting a high combined nominal return creates wallet exposure. Confirm the limits and review workflow before saving.'
-              )}
+              {pendingValues?.autoReviewRiskFlags?.length === 0
+                ? t(
+                    'No risk flags are selected. With automatic payer review enabled, eligible positive rewards may be approved without risk-based manual review. Payment and wallet safety checks still apply. Confirm this policy before saving.'
+                  )
+                : t(
+                    'Enabling cashback or setting a high combined nominal return creates wallet exposure. Confirm the limits and review workflow before saving.'
+                  )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

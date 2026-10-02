@@ -117,6 +117,48 @@ func TestCashbackSettingOptionsRoundTrip(t *testing.T) {
 	assert.Zero(t, parsed.InviterFixedPerHundred)
 }
 
+func TestCashbackReviewRiskOptionDistinguishesMissingAndExplicitEmpty(t *testing.T) {
+	setting := DefaultCashbackSetting()
+	key := CashbackSettingName + ".auto_review_risk_flags"
+	values, err := CashbackSettingOptionValues(setting)
+	require.NoError(t, err)
+	assert.NotContains(t, values, key)
+	parsed, err := ParseCashbackSettingOptions(values)
+	require.NoError(t, err)
+	assert.Nil(t, parsed.AutoReviewRiskFlags)
+
+	setting.AutoReviewRiskFlags = []string{}
+	values, err = CashbackSettingOptionValues(setting)
+	require.NoError(t, err)
+	assert.Equal(t, `[]`, values[key])
+	parsed, err = ParseCashbackSettingOptions(values)
+	require.NoError(t, err)
+	require.NotNil(t, parsed.AutoReviewRiskFlags)
+	assert.Empty(t, parsed.AutoReviewRiskFlags)
+
+	setting.AutoReviewRiskFlags = []string{"user_agent_changed", "device_missing"}
+	values, err = CashbackSettingOptionValues(setting)
+	require.NoError(t, err)
+	assert.Equal(t, `["device_missing","user_agent_changed"]`, values[key])
+	parsed, err = ParseCashbackSettingOptions(values)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"device_missing", "user_agent_changed"}, parsed.AutoReviewRiskFlags)
+	for _, invalid := range []string{`null`, `"new_account"`, `["unknown"]`, `["device_missing","device_missing"]`, `[1]`} {
+		values[key] = invalid
+		_, err := ParseCashbackSettingOptions(values)
+		require.Error(t, err, invalid)
+	}
+	assert.Len(t, CashbackAutoReviewRiskFlags(), 23)
+
+	cached := DefaultCashbackSetting()
+	manager := config.NewConfigManager()
+	manager.Register(CashbackSettingName, &cached)
+	require.NoError(t, manager.UpdateFromMap(CashbackSettingName, map[string]string{"auto_review_risk_flags": `["device_missing","login_ip_mismatch"]`}))
+	require.NoError(t, manager.UpdateFromMap(CashbackSettingName, map[string]string{"auto_review_risk_flags": `[]`}))
+	require.NotNil(t, cached.AutoReviewRiskFlags)
+	assert.Empty(t, cached.AutoReviewRiskFlags)
+}
+
 func TestCashbackTierValidationAndOptionRoundTrip(t *testing.T) {
 	valid := DefaultCashbackSetting()
 	valid.InviterEnabled = true

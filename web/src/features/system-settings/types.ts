@@ -96,10 +96,8 @@ export type CashbackConfig = {
   device_account_threshold: number
   daily_topup_count_threshold: number
   auto_review_enabled: boolean
-  low_review_required: boolean
-  medium_review_required: boolean
-  high_review_required: boolean
-  severe_review_required: boolean
+  auto_review_risk_flags: string[] | null
+  available_auto_review_risk_flags: string[]
   auto_review_immediate_issue: boolean
   first_enabled_at: number
   version: number
@@ -108,8 +106,14 @@ export type CashbackConfig = {
 
 export type CashbackConfigUpdate = Omit<
   CashbackConfig,
-  'first_enabled_at' | 'version' | 'compliance_confirmed'
->
+  | 'first_enabled_at'
+  | 'version'
+  | 'compliance_confirmed'
+  | 'available_auto_review_risk_flags'
+  | 'auto_review_risk_flags'
+> & {
+  auto_review_risk_flags?: string[]
+}
 
 export type CashbackCampaign = {
   id: number

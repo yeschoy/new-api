@@ -93,6 +93,63 @@ const detail: CashbackRewardDetail = {
 }
 
 describe('cashback detail settlement eligibility', () => {
+  it('shows only matched policy flags as the reason for manual routing', async () => {
+    vi.mocked(getCashbackReward).mockResolvedValue({
+      success: true,
+      message: '',
+      data: {
+        ...detail,
+        reward: {
+          ...detail.reward,
+          review_status: 'pending',
+          reviewed_by: 0,
+          risk_flags: ['device_missing', 'login_ip_mismatch'],
+        },
+        risk_snapshot: {
+          auto_review_decision: 'selected_flags',
+          auto_review_matched_flags: ['device_missing'],
+        },
+      },
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+      </QueryClientProvider>
+    )
+    const heading = await screen.findByText('Automatic review routing')
+    const section = heading.closest('section')
+    expect(section).toHaveTextContent(
+      'Selected risk flags sent this reward to manual review.'
+    )
+    expect(section).toHaveTextContent('device_missing')
+    expect(section).not.toHaveTextContent('login_ip_mismatch')
+    queryClient.clear()
+  })
+
+  it('leaves the routing section absent for historical rewards without a decision snapshot', async () => {
+    vi.mocked(getCashbackReward).mockResolvedValue({
+      success: true,
+      message: '',
+      data: detail,
+    })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CashbackDetailSheet rewardId={7} open onOpenChange={vi.fn()} />
+      </QueryClientProvider>
+    )
+    expect(await screen.findByText('Risk evidence')).toBeVisible()
+    expect(
+      screen.queryByText('Automatic review routing')
+    ).not.toBeInTheDocument()
+    queryClient.clear()
+  })
+
   it('displays the matched tier from the immutable snapshot and checkout face', async () => {
     vi.mocked(getCashbackReward).mockResolvedValue({
       success: true,

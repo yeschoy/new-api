@@ -188,10 +188,7 @@ func TestUpdateCashbackConfigPreservesReviewPolicyForOldClients(t *testing.T) {
 	current, err := model.GetCashbackSettingFromDB()
 	require.NoError(t, err)
 	assert.False(t, current.AutoReviewEnabled)
-	assert.False(t, current.LowReviewRequired)
-	assert.False(t, current.MediumReviewRequired)
-	assert.True(t, current.HighReviewRequired)
-	assert.True(t, current.SevereReviewRequired)
+	assert.Nil(t, current.AutoReviewRiskFlags)
 	assert.True(t, current.AutoReviewImmediateIssue)
 
 	body := `{"inviter_enabled":false,"invitee_enabled":false,"inviter_rate_bps":0,"invitee_rate_bps":0,
@@ -203,18 +200,63 @@ func TestUpdateCashbackConfigPreservesReviewPolicyForOldClients(t *testing.T) {
 	current, err = model.GetCashbackSettingFromDB()
 	require.NoError(t, err)
 	assert.True(t, current.AutoReviewEnabled)
-	assert.True(t, current.MediumReviewRequired)
-	assert.False(t, current.HighReviewRequired)
-	assert.True(t, current.SevereReviewRequired)
+	assert.Nil(t, current.AutoReviewRiskFlags)
 	assert.False(t, current.AutoReviewImmediateIssue)
 	response = runCashbackConfigUpdate(t, validCashbackConfigJSON)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	stored, err := model.GetCashbackSettingFromDB()
 	require.NoError(t, err)
 	assert.Equal(t, current.AutoReviewEnabled, stored.AutoReviewEnabled)
-	assert.Equal(t, current.MediumReviewRequired, stored.MediumReviewRequired)
-	assert.Equal(t, current.HighReviewRequired, stored.HighReviewRequired)
+	assert.Nil(t, stored.AutoReviewRiskFlags)
+	var absent int64
+	require.NoError(t, model.DB.Model(&model.Option{}).Where(map[string]any{"key": "cashback_setting.auto_review_risk_flags"}).Count(&absent).Error)
+	assert.Zero(t, absent)
 	assert.Equal(t, current.AutoReviewImmediateIssue, stored.AutoReviewImmediateIssue)
+}
+
+func TestCashbackConfigRiskFlagsExplicitActivationAndValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupCashbackConfigControllerTest(t)
+	request := func(flags string) *httptest.ResponseRecorder {
+		return runCashbackConfigUpdate(t, strings.Replace(validCashbackConfigJSON, `"inviter_rate_bps":0,`, `"inviter_rate_bps":0,"auto_review_risk_flags":`+flags+`,`, 1))
+	}
+	require.Equal(t, http.StatusOK, request(`[]`).Code)
+	stored, err := model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	require.NotNil(t, stored.AutoReviewRiskFlags)
+	assert.Empty(t, stored.AutoReviewRiskFlags)
+	require.Equal(t, http.StatusOK, request(`["user_agent_changed","login_ip_mismatch"]`).Code)
+	// A pre-upgrade client still sends the legacy switches but omits the new policy.
+	require.Equal(t, http.StatusOK, runCashbackConfigUpdate(t, strings.Replace(validCashbackConfigJSON,
+		`"inviter_rate_bps":0,`, `"inviter_rate_bps":0,"high_review_required":false,"severe_review_required":false,`, 1)).Code)
+	stored, err = model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"login_ip_mismatch", "user_agent_changed"}, stored.AutoReviewRiskFlags)
+	getRecorder := httptest.NewRecorder()
+	getContext, _ := gin.CreateTestContext(getRecorder)
+	getContext.Request = httptest.NewRequest(http.MethodGet, "/api/cashback/config", nil)
+	GetCashbackConfig(getContext)
+	require.Equal(t, http.StatusOK, getRecorder.Code)
+	var getResponse struct {
+		Data struct {
+			AutoReviewRiskFlags          []string `json:"auto_review_risk_flags"`
+			AvailableAutoReviewRiskFlags []string `json:"available_auto_review_risk_flags"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(getRecorder.Body.Bytes(), &getResponse))
+	assert.Equal(t, stored.AutoReviewRiskFlags, getResponse.Data.AutoReviewRiskFlags)
+	assert.Len(t, getResponse.Data.AvailableAutoReviewRiskFlags, 23)
+	assert.NotContains(t, getRecorder.Body.String(), `"high_review_required"`)
+	before := stored.Version
+	for _, flags := range []string{`null`, `"new_account"`, `{}`, `["unknown"]`, `["device_missing","device_missing"]`, `[1]`, `[null]`, `[` + strings.Repeat(" ", operation_setting.CashbackMaxRiskFlagsJSONBytes) + `]`} {
+		response := request(flags)
+		assert.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+		assert.Contains(t, response.Body.String(), `"field":"auto_review_risk_flags"`)
+	}
+	stored, err = model.GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	assert.Equal(t, before, stored.Version)
+	assert.Equal(t, []string{"login_ip_mismatch", "user_agent_changed"}, stored.AutoReviewRiskFlags)
 }
 
 func TestCashbackCampaignCreateAndStop(t *testing.T) {

@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -263,6 +264,25 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 			}
 			blockingReason = "no_payable_cashback_quota"
 		}
+		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 {
+			switch {
+			case !setting.AutoReviewEnabled:
+				riskSnapshot.AutoReviewDecision = "master_disabled"
+			case setting.AutoReviewRiskFlags == nil:
+				riskSnapshot.AutoReviewDecision = "policy_unconfigured"
+			default:
+				for _, flag := range riskSnapshot.Flags {
+					if slices.Contains(setting.AutoReviewRiskFlags, flag) {
+						riskSnapshot.AutoReviewMatchedFlags = append(riskSnapshot.AutoReviewMatchedFlags, flag)
+					}
+				}
+				if len(riskSnapshot.AutoReviewMatchedFlags) > 0 {
+					riskSnapshot.AutoReviewDecision = "selected_flags"
+				} else {
+					riskSnapshot.AutoReviewDecision = "automatic"
+				}
+			}
+		}
 		riskJSON, err := common.Marshal(riskSnapshot)
 		if err != nil {
 			return err
@@ -299,25 +319,12 @@ func CompleteTopUpCashbackTx(tx *gorm.DB, topUp *TopUp, creditedQuota int, sourc
 		if direction.Strategy != operation_setting.CashbackStrategyPerHundred {
 			reward.FixedPerHundred = 0
 		}
-		if direction.Direction == CashbackDirectionInvitee && rewardQuota > 0 && setting.AutoReviewEnabled {
-			reviewRequired := true
-			switch riskLevel {
-			case CashbackRiskLow:
-				reviewRequired = setting.LowReviewRequired
-			case CashbackRiskMedium:
-				reviewRequired = setting.MediumReviewRequired
-			case CashbackRiskHigh:
-				reviewRequired = setting.HighReviewRequired
-			case CashbackRiskSevere:
-				reviewRequired = setting.SevereReviewRequired
-			}
-			if !reviewRequired {
-				reward.ReviewStatus = CashbackReviewApproved
-				reward.ReviewSource = CashbackReviewAutomatic
-				reward.ReviewedAt = topUp.CompleteTime
-				if setting.AutoReviewImmediateIssue {
-					reward.AvailableAt = topUp.CompleteTime
-				}
+		if riskSnapshot.AutoReviewDecision == "automatic" {
+			reward.ReviewStatus = CashbackReviewApproved
+			reward.ReviewSource = CashbackReviewAutomatic
+			reward.ReviewedAt = topUp.CompleteTime
+			if setting.AutoReviewImmediateIssue {
+				reward.AvailableAt = topUp.CompleteTime
 			}
 		}
 		if err := tx.Create(&reward).Error; err != nil {

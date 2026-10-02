@@ -67,10 +67,12 @@ const config: CashbackConfig = {
   device_account_threshold: 2,
   daily_topup_count_threshold: 5,
   auto_review_enabled: false,
-  low_review_required: false,
-  medium_review_required: false,
-  high_review_required: true,
-  severe_review_required: true,
+  auto_review_risk_flags: null,
+  available_auto_review_risk_flags: [
+    'device_missing',
+    'login_ip_mismatch',
+    'open_debt',
+  ],
   auto_review_immediate_issue: true,
   first_enabled_at: 0,
   version: 1,
@@ -96,7 +98,7 @@ afterEach(() => {
   queryClient = null
 })
 
-function renderForm() {
+function renderForm(initialConfig: CashbackConfig = config) {
   actionsContainer = document.createElement('div')
   document.body.append(actionsContainer)
   queryClient = new QueryClient({
@@ -105,7 +107,7 @@ function renderForm() {
   render(
     <QueryClientProvider client={queryClient}>
       <SettingsPageProvider actionsContainer={actionsContainer}>
-        <CashbackSettingsForm config={config} />
+        <CashbackSettingsForm config={initialConfig} />
       </SettingsPageProvider>
     </QueryClientProvider>
   )
@@ -369,12 +371,106 @@ describe('cashback settings validation', () => {
       screen.getByRole('button', { name: 'Save cashback settings' })
     )
 
+    expect(
+      await screen.findByText('Malformed cashback configuration')
+    ).toHaveAttribute('role', 'alert')
+  })
+
+  it('shows a rejected risk policy as an accessible field error', async () => {
+    updateCashbackConfig.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        data: {
+          field: 'auto_review_risk_flags',
+          message: 'Invalid risk selection',
+        },
+      },
+    })
+    renderForm()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Activate per-flag review policy' })
+    )
+    fireEvent.click(screen.getByRole('checkbox', { name: 'device_missing' }))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Malformed cashback configuration'
+      'Invalid risk selection'
+    )
+    expect(
+      screen.getByRole('group', { name: 'Risk flags requiring manual review' })
+    ).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('saves unrelated settings without activating an unconfigured review policy', async () => {
+    updateCashbackConfig.mockResolvedValue({ success: true, data: config })
+    renderForm()
+    fireEvent.change(
+      screen.getByRole('spinbutton', { name: 'Settlement delay (days)' }),
+      { target: { value: '8' } }
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    await waitFor(() => expect(updateCashbackConfig).toHaveBeenCalled())
+    expect(updateCashbackConfig.mock.calls[0][0]).not.toHaveProperty(
+      'auto_review_risk_flags'
+    )
+    expect(
+      screen.getByText('Per-flag review policy is not configured')
+    ).toBeVisible()
+  })
+
+  it('requires explicit confirmation before activating an empty risk selection', async () => {
+    updateCashbackConfig.mockResolvedValue({
+      success: true,
+      data: { ...config, auto_review_risk_flags: [] },
+    })
+    renderForm()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Activate per-flag review policy' })
+    )
+    expect(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    ).toBeEnabled()
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    expect(await screen.findByText(/No risk flags are selected/)).toBeVisible()
+    expect(updateCashbackConfig).not.toHaveBeenCalled()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    )
+    expect(updateCashbackConfig).not.toHaveBeenCalled()
+    await user.click(
+      screen.getByRole('button', { name: 'Save cashback settings' })
+    )
+    await user.click(
+      await screen.findByRole('button', { name: 'Confirm and save' })
+    )
+    await waitFor(() =>
+      expect(updateCashbackConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ auto_review_risk_flags: [] }),
+        expect.anything()
+      )
     )
   })
 
-  it('sends all risk bands and immediate issuance independently when automatic payer review is enabled', async () => {
+  it('loads independent saved selections and supports keyboard toggling', async () => {
+    renderForm({ ...config, auto_review_risk_flags: ['open_debt'] })
+    const selected = screen.getByRole('checkbox', { name: 'open_debt' })
+    expect(selected).toHaveAttribute('aria-checked', 'true')
+    selected.focus()
+    await userEvent.setup().keyboard(' ')
+    expect(selected).toHaveAttribute('aria-checked', 'false')
+    expect(
+      screen.getByRole('checkbox', { name: 'device_missing' })
+    ).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('sends independently selected flags and immediate issuance when automatic payer review is enabled', async () => {
     updateCashbackConfig.mockResolvedValue({ success: true, data: config })
     renderForm()
 
@@ -382,8 +478,9 @@ describe('cashback settings validation', () => {
       screen.getByRole('switch', { name: 'Enable automatic payer review' })
     )
     fireEvent.click(
-      screen.getByRole('switch', { name: 'Manual review: high risk' })
+      screen.getByRole('button', { name: 'Activate per-flag review policy' })
     )
+    fireEvent.click(screen.getByRole('checkbox', { name: 'device_missing' }))
     fireEvent.click(
       screen.getByRole('switch', {
         name: 'Issue automatically approved payer rewards immediately',
@@ -397,10 +494,7 @@ describe('cashback settings validation', () => {
       expect(updateCashbackConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           auto_review_enabled: true,
-          low_review_required: false,
-          medium_review_required: false,
-          high_review_required: false,
-          severe_review_required: true,
+          auto_review_risk_flags: ['device_missing'],
           auto_review_immediate_issue: false,
         }),
         expect.anything()

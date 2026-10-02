@@ -589,8 +589,29 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 	setting.InviteeEnabled, setting.InviteeRateBPS = true, 500
 	setting.MaxRewardQuota, setting.DailyRewardQuota = 10_000, 10_000
 	setting.FirstEnabledAt, setting.Version = now-20, 1
-	setting.AutoReviewEnabled, setting.HighReviewRequired, setting.SevereReviewRequired = true, false, false
+	setting.AutoReviewEnabled = true
 	require.NoError(t, SaveCashbackSetting(setting))
+	policyKey := operation_setting.CashbackSettingName + ".auto_review_risk_flags"
+	loadedPolicy, err := GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	require.Nil(t, loadedPolicy.AutoReviewRiskFlags)
+	// A legacy replacement updates the version without activating the absent policy.
+	_, setting, err = UpdateCashbackSettingAtomic(setting, true, now)
+	require.NoError(t, err)
+	var policyRows int64
+	require.NoError(t, db.Model(&Option{}).Where(map[string]any{"key": policyKey}).Count(&policyRows).Error)
+	require.Zero(t, policyRows)
+	emptyPolicy := []string{}
+	_, setting, err = UpdateCashbackSettingAtomic(setting, true, now, operation_setting.CashbackReviewPolicyUpdate{
+		AutoReviewRiskFlags: &emptyPolicy,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, setting.AutoReviewRiskFlags)
+	require.Empty(t, setting.AutoReviewRiskFlags)
+	loadedPolicy, err = GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	require.NotNil(t, loadedPolicy.AutoReviewRiskFlags)
+	require.Empty(t, loadedPolicy.AutoReviewRiskFlags)
 	campaign := CashbackCampaign{StartAt: now - 10, EndAt: now + 3600, MaxRewardsPerUser: 1, CreatedBy: 1}
 	require.NoError(t, db.Create(&campaign).Error)
 	payer := User{Username: namespace + "_campaign_payer", AffCode: "payer_" + namespace[len(namespace)-8:], Status: common.UserStatusEnabled}
@@ -648,6 +669,53 @@ func testCashbackProductionDatabase(t *testing.T, databaseType common.DatabaseTy
 		[]string{ordered[0].Kind, ordered[1].Kind, ordered[2].Kind, ordered[3].Kind})
 	require.Equal(t, payerRewards[0].ID, ordered[2].SourceID)
 	require.EqualValues(t, payerRewards[0].RewardQuota, ordered[2].Quota)
+
+	selectedPolicy := []string{"device_missing"}
+	_, setting, err = UpdateCashbackSettingAtomic(setting, true, now, operation_setting.CashbackReviewPolicyUpdate{
+		AutoReviewRiskFlags: &selectedPolicy,
+	})
+	require.NoError(t, err)
+	invalidPolicy := []string{"device_missing", "device_missing"}
+	_, _, err = UpdateCashbackSettingAtomic(setting, true, now, operation_setting.CashbackReviewPolicyUpdate{
+		AutoReviewRiskFlags: &invalidPolicy,
+	})
+	require.Error(t, err)
+	loadedPolicy, err = GetCashbackSettingFromDB()
+	require.NoError(t, err)
+	require.Equal(t, setting.Version, loadedPolicy.Version)
+	require.Equal(t, selectedPolicy, loadedPolicy.AutoReviewRiskFlags)
+	policyPayer := User{Username: namespace + "_policy_payer", AffCode: "policy_" + namespace[len(namespace)-8:],
+		Status: common.UserStatusEnabled, CreatedAt: now - 30*24*60*60}
+	require.NoError(t, db.Create(&policyPayer).Error)
+	policyOrder := TopUp{UserId: policyPayer.Id, Amount: 1, Money: 1, TradeNo: namespace + "_policy_order",
+		PaymentProvider: PaymentProviderEpay, PaymentMethod: "alipay", CreateTime: now, Status: common.TopUpStatusPending}
+	require.NoError(t, insertCashbackTestTopUp(&policyOrder, 1_000, CashbackRequestMetadata{}))
+	_, err = RechargeEpay(policyOrder.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(policyOrder.TradeNo))
+	require.NoError(t, err)
+	var policyReward CashbackReward
+	require.NoError(t, db.Where("top_up_id = ? AND direction = ?", policyOrder.Id, CashbackDirectionInvitee).First(&policyReward).Error)
+	require.Equal(t, CashbackReviewPending, policyReward.ReviewStatus)
+	require.Equal(t, CashbackSettlementFrozen, policyReward.SettlementStatus)
+	var policySnapshot CashbackRiskSnapshot
+	require.NoError(t, common.Unmarshal([]byte(policyReward.RiskSnapshot), &policySnapshot))
+	require.Equal(t, "selected_flags", policySnapshot.AutoReviewDecision)
+	require.Equal(t, selectedPolicy, policySnapshot.AutoReviewMatchedFlags)
+	require.Contains(t, policyReward.ConfigSnapshot, `"auto_review_risk_flags":["device_missing"]`)
+	var policyWallet User
+	require.NoError(t, db.First(&policyWallet, policyPayer.Id).Error)
+	require.Equal(t, 1_000, policyWallet.Quota) // The signed purchase succeeds; only cashback waits for review.
+	_, err = RechargeEpay(policyOrder.TradeNo, "alipay", "1.00", "127.0.0.1", epayTestDetails(policyOrder.TradeNo))
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&CashbackReward{}).Where("top_up_id = ?", policyOrder.Id).Count(&policyRows).Error)
+	require.EqualValues(t, 1, policyRows)
+	setting.AutoReviewRiskFlags = []string{}
+	require.NoError(t, SaveCashbackSetting(setting))
+	var unchanged CashbackReward
+	require.NoError(t, db.First(&unchanged, policyReward.ID).Error)
+	require.Equal(t, policyReward.RiskSnapshot, unchanged.RiskSnapshot)
+	require.Equal(t, policyReward.ConfigSnapshot, unchanged.ConfigSnapshot)
+	require.Equal(t, CashbackReviewPending, unchanged.ReviewStatus)
+
 	// Real dialect read path: source joins, ordered grants, paid-cents
 	// proration and the optional log database stay independent.
 	t.Setenv("CASHBACK_REFUND_REFERENCE_ENABLED", "true")

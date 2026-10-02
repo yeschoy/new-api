@@ -87,7 +87,7 @@ snapshot and overrun the cap.
 | --- | --- | --- |
 | `GET /api/user/topup/cashback-preview?amount=<integer>` or `?product_id=<id>` | Authenticated user + scoped rate limit (60/minute when rate limiting is enabled) | Exactly one selection; response `data: {status, strategy?, rate_bps?, fixed_per_hundred?, tiers?, matched_tier?, config_version?, reward_quota, as_of}`; `status` adds `not_applicable` for tiered token/Creem face and `rounds_to_zero` when a tier is reached but the exact conversion floors to zero quota; only unreached tiers use `below_minimum`. Only this user's payer estimate; no risk or inviter evidence. |
 | `GET /api/cashback/public-offers` | Anonymous + global API rate limit | Whitelisted `{active,currency:"CNY",inviter?,invitee?}` with only active directions' `strategy` and selected `rate_bps` / `fixed_per_hundred` / `tiers` (cent pairs); payer requires a live campaign. Read errors return 503, never false inactivity. |
-| `GET /api/cashback/config` | Root | Returns the stored config plus `compliance_confirmed` |
+| `GET /api/cashback/config` | Root | Returns the stored config, `compliance_confirmed`, and the complete `available_auto_review_risk_flags` catalog |
 | `PUT /api/cashback/config` | Root | Replaces required fields atomically; omitted optional strategy/fixed-amount and review-policy fields preserve current values under the version-row lock |
 | `GET /api/cashback/campaigns` | Root | Lists bounded campaign history |
 | `POST /api/cashback/campaigns` | Root + critical rate limit | Creates a nonoverlapping scheduled campaign with `start_at`, `end_at`, `max_rewards_per_user` |
@@ -232,12 +232,28 @@ wallet quota; floating-point money arithmetic is forbidden.
   increments the version under a locked Option row.
 - Generated rewards retain their config version and full config snapshot.
   Later configuration changes never recalculate an existing reward.
-- Review automation applies only to payer (`invitee` wire value) rewards. Its
-  master switch defaults off; low/medium require no manual review by default,
-  high/severe do; `auto_review_immediate_issue` defaults on but acts only for
-  auto-approved rewards. Invitee/payer and inviter directions remain independently
-  enabled; the latter always needs manual review. Missing new Option keys load
-  these defaults; older PUT clients omit policy and strategy/fixed fields without resetting them. Missing strategy Option keys load `rate`; a historical reward with empty strategy is displayed as a percentage, not reclassified or recalculated.
+- Review automation applies only to positive payer (`invitee` wire value)
+  rewards. The master switch defaults off; `auto_review_risk_flags` is `null`
+  until explicitly configured. Unconfigured or master-off means manual review,
+  even when legacy level switches would have approved. Once configured, `[]`
+  explicitly means no risk flag routes to manual review; any intersection of
+  selected and observed flags routes to `pending/frozen`, otherwise the reward
+  is automatically approved. All 23 existing emitted flags are selectable,
+  including `open_debt`, which occurs only on canceled zero rewards and cannot
+  bypass the debt block. Risk levels remain evidence, not review gates. A
+  nonempty selection must be bounded, allowlisted, unique and stored in sorted
+  order; malformed, null, unknown, duplicate or oversized PUT values return
+  `400` with `field=auto_review_risk_flags`. The Option is absent until an
+  explicit policy save, and older PUT clients omitting it cannot create or
+  erase it. Old four-level Options remain stored for rollback but are neither
+  exposed in the Root DTO nor used in new decisions. Config and risk snapshots
+  preserve the payment-time policy, decision (`master_disabled`,
+  `policy_unconfigured`, `selected_flags`, `automatic`) and matched flags on
+  positive payer rewards; past rewards are never rewritten. Admin detail alone
+  exposes routing and sensitive evidence. `auto_review_immediate_issue` defaults
+  on but acts only for auto-approved rewards. Inviter always needs manual
+  review. Missing strategy Option keys load `rate`; a historical reward with
+  empty strategy is displayed as a percentage, not reclassified or recalculated.
 - Campaigns are explicitly created, never synthesized at migration. Creation
   and early stop serialize on the config version Option row. Order creation
   captures campaign ID only when both server order-placement time and stored
@@ -436,7 +452,7 @@ wallet quota; floating-point money arithmetic is forbidden.
   debt transition. Pending dialogs keep Confirm disabled but remain dismissible
   through Escape, Close, and Cancel; mutation-owned invalidation must still run
   after the dialog unmounts.
-- The settings form conditionally shows rate or fixed input for each direction, validates selected nominal exposure, and uses the same high-exposure confirmation. The list/detail display fixed rewards as per-100 amounts and historical empty-strategy rows as percentages. All visible strings use the seven project locales. Dialog reason fields need
+- Root must deliberately activate an unconfigured per-flag policy; unrelated saves leave it absent. The form warns that all new payer rewards remain manual until activation, lists all 23 backend-provided choices with independent labels, and confirms an explicit empty selection before saving. Activation with an empty list may expand auto-approval when the master switch is on. The settings form conditionally shows rate or fixed input for each direction, validates selected nominal exposure, and uses the same high-exposure confirmation. The list/detail display fixed rewards as per-100 amounts and historical empty-strategy rows as percentages. All visible strings use the seven project locales. Dialog reason fields need
   labels, validation/error association, keyboard handling, and focus recovery.
   Count copy must choose singular/plural from the raw numeric count before
   applying locale-specific number formatting.
@@ -462,6 +478,8 @@ wallet quota; floating-point money arithmetic is forbidden.
 | --- | --- |
 | Preview supplies neither/both selectors, duplicate selectors, malformed/out-of-range amount, unknown/disabled Creem product | `400`; no estimate or mutation. A valid selection with no eligible activity returns `200` with a non-estimated status; DB/config read failure returns `503`, never a false zero reward. |
 | Malformed config JSON, invalid strategy/fixed range, duplicate/non-increasing/empty active tiers, overflowing cents, or selected nominal sum above 100% | `400`; config validation includes the offending `field`; no partial Option update |
+| `auto_review_risk_flags` is explicitly `null`, malformed, duplicated, unknown, or over 1024 JSON bytes | `400`, `field=auto_review_risk_flags`; neither version nor policy Option changes |
+| `auto_review_risk_flags` omitted by an old or unrelated PUT | Preserve the stored list under the version lock; if absent, leave the Option absent and route new positive payer rewards to manual review |
 | Either direction enabled without compliance or positive caps | `400`; keep the previous complete configuration |
 | Anonymous public offers read when Option table is absent or DB read fails | `503`, never misreport `active:false` |
 | Reached tier whose reward floors below one wallet quota unit | `rounds_to_zero` preview with `matched_tier`; keep an auditable canceled zero reward, not a false below-threshold message |
@@ -499,6 +517,9 @@ wallet quota; floating-point money arithmetic is forbidden.
 - **Good:** A current payer previews a 250-face fixed-per-hundred order and sees two hundreds of reward under current caps; a discounted checkout does not reduce the estimate, and payment completion independently recalculates it.
 - **Base:** No active campaign or no amount selected returns a distinct status with zero reward; a switch to another amount hides the old query result while the new request is pending.
 - **Bad:** Use a provider's discounted price or a stale amount response as the preview face, or feed an estimate back into settlement as authoritative quota.
+- **Good:** Root explicitly saves `["device_missing"]`; a new positive payer reward with that flag stays `pending/frozen` while the verified purchase credits normally, and the Admin detail shows `selected_flags` plus the matched flag. A retry creates no duplicate reward.
+- **Base:** The new policy Option is absent after upgrade or an unrelated legacy PUT; even with the auto-review master on, payer rewards remain manual until Root explicitly activates the policy. An explicit `[]` is a different, confirmed state that allows otherwise eligible positive rewards to auto-approve.
+- **Bad:** Treat a missing Option as `[]`, apply the retired four risk-level switches to new decisions, or use an unchecked `open_debt` flag to bypass the debt hard block.
 - **Good:** A post-enable Stripe order with both directions enabled settles once.
   The same transaction snapshots the face-value base, creates inviter and
   invitee rewards, and credits the purchased quota. A repeated webhook changes
@@ -529,7 +550,7 @@ wallet quota; floating-point money arithmetic is forbidden.
 
 ### Backend assertions
 
-- Configuration: defaults; independent strategy/fixed/tier fields; exact cent parsing, order, count, bounds, mixed nominal return bounds; old-client omitted-field preservation under concurrent versioned writes; compliance; positive caps; immutable first-enable timestamp. Verify Option and in-memory slice replacement on SQLite/MySQL/PostgreSQL.
+- Configuration: defaults; independent strategy/fixed/tier fields; exact cent parsing, order, count, bounds, mixed nominal return bounds; old-client omitted-field preservation under concurrent versioned writes; missing/null/empty/selected risk policy and allowlist validation; compliance; positive caps; immutable first-enable timestamp. Verify Option and in-memory slice replacement on SQLite/MySQL/PostgreSQL.
 - Migration: cashback side tables without columns on `TopUp`; fresh, representative released-schema upgrade and twice-repeated migration on real SQLite/MySQL/PostgreSQL when their schema changes; old context/reward rows retain data, indexes and uniqueness. Historical empty strategy is rate.
 - Tiered compatibility: tiered adds only two Option keys and no tables or columns. Existing `CashbackOrderContext` checkout face/factor and provider remain unchanged; old missing face evidence cannot qualify for tiered. Verify Option, existing order/reward read/write and retry on real SQLite/MySQL/PostgreSQL before rollout; do not claim three-engine compatibility without the matrix.
 - Preview: authenticated selection/invalid/disabled-product cases; tiered standard cent boundaries, `rounds_to_zero` with matched evidence, explicit token/Creem/factor-1 `not_applicable`; compare unchanged fixed/rate currency, token and Creem face estimates with verified settlement, positive campaign slots (including later canceled/rejected), 24-hour caps and zero/ineligible/no-campaign states; assert no reward/wallet write. Public route tests cover anonymous access, Root-only config, limiter, inactive/missing Option state, and no sensitive fields; mounted-page tests cover polling/focus refresh and stale-rule suppression. Use real three-dialect integration for query and counting changes, not SQLite alone.
@@ -537,7 +558,7 @@ wallet quota; floating-point money arithmetic is forbidden.
 - Transactionality: a missing required context or cashback insert failure rolls
   back provider completion and wallet credit. Run concurrent cap/settlement
   tests and `go test -race` for cashback state.
-- Review/settlement: reason rules, immediate manual payer approval, legacy
+- Review/settlement: four states (master off, missing policy, explicit empty, matched/unmatched selection), 23-flag catalog parity, decision/matched snapshot and historical readability; debt/zero cancellation still blocks issue; reason rules, immediate manual payer approval, legacy
   reviewed-by evidence and bounded early pickup, inviter/automatic hold
   boundaries, hard blockers, task retries, reconciliation stop, wallet maximum,
   and at-most-once quota credit. All list filters/count/pages and the
@@ -630,6 +651,19 @@ UpdateOption("cashback_setting.inviter_rate_bps", "500")
 // Correct: merge omitted strategy fields under the lock, validate selected
 // nominal return, then persist one locked, versioned object.
 _, stored, err := UpdateCashbackSettingAtomic(candidate, compliance, now)
+```
+
+### Missing policy is not an empty policy
+
+```go
+// Wrong: absence silently enables automatic approval for every risk flag.
+selected := append([]string{}, setting.AutoReviewRiskFlags...)
+if len(selected) == 0 { approveAutomatically() }
+
+// Correct: nil is the unconfigured, manual-review state; a non-nil
+// empty slice is an intentional, confirmed policy. Existing hard blockers
+// still run independently of the flag intersection.
+if setting.AutoReviewRiskFlags == nil { requireManualReview() }
 ```
 
 ### Incident arithmetic

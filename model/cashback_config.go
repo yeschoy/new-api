@@ -72,6 +72,7 @@ func UpdateCashbackSettingAtomic(candidate operation_setting.CashbackSetting, co
 		stored.InviterTiers = current.InviterTiers
 		stored.InviteeTiers = current.InviteeTiers
 		stored.AutoReviewEnabled = current.AutoReviewEnabled
+		stored.AutoReviewRiskFlags = current.AutoReviewRiskFlags
 		stored.LowReviewRequired = current.LowReviewRequired
 		stored.MediumReviewRequired = current.MediumReviewRequired
 		stored.HighReviewRequired = current.HighReviewRequired

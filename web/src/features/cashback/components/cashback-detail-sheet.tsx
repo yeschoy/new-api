@@ -188,6 +188,31 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
     (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
   )
   const detail = query.data
+  const decision = detail?.risk_snapshot.auto_review_decision
+  const matchedFlags = detail?.risk_snapshot.auto_review_matched_flags
+  let routingMessage = '—'
+  switch (decision) {
+    case 'master_disabled':
+      routingMessage = t(
+        'Automatic payer review was disabled; sent to manual review.'
+      )
+      break
+    case 'policy_unconfigured':
+      routingMessage = t(
+        'Risk policy was not configured; sent to manual review.'
+      )
+      break
+    case 'selected_flags':
+      routingMessage = t(
+        'Selected risk flags sent this reward to manual review.'
+      )
+      break
+    case 'automatic':
+      routingMessage = t(
+        'No selected risk flags matched; automatically approved.'
+      )
+      break
+  }
   const manualPayer = detail && isManuallyApprovedPayer(detail.reward)
   let availableAt = formatTime(detail?.reward.available_at ?? 0)
   if (manualPayer && detail?.reward.settlement_status === 'frozen') {
@@ -504,6 +529,37 @@ export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
                   </dl>
                 </section>
 
+                {typeof decision === 'string' && (
+                  <>
+                    <Separator />
+                    <section aria-labelledby='cashback-detail-auto-review'>
+                      <h3
+                        id='cashback-detail-auto-review'
+                        className='font-semibold'
+                      >
+                        {t('Automatic review routing')}
+                      </h3>
+                      <p className='text-muted-foreground text-sm'>
+                        {routingMessage}
+                      </p>
+                      {decision === 'selected_flags' &&
+                        Array.isArray(matchedFlags) && (
+                          <div className='mt-2 flex flex-wrap gap-1.5'>
+                            {matchedFlags
+                              .filter(
+                                (flag): flag is string =>
+                                  typeof flag === 'string'
+                              )
+                              .map((flag) => (
+                                <Badge key={flag} variant='outline'>
+                                  {t(flag)}
+                                </Badge>
+                              ))}
+                          </div>
+                        )}
+                    </section>
+                  </>
+                )}
                 <Separator />
                 <section aria-labelledby='cashback-detail-compensation'>
                   <h3

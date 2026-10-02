@@ -3313,8 +3313,7 @@ func TestCashbackManualPayerLegacyScanRespectsReviewEvidenceAndMaturity(t *testi
 	setting := saveCashbackTestSetting(t, now-100)
 	setting.AutoReviewEnabled = true
 	setting.AutoReviewImmediateIssue = false
-	setting.HighReviewRequired = false
-	setting.SevereReviewRequired = false
+	setting.AutoReviewRiskFlags = []string{}
 	require.NoError(t, SaveCashbackSetting(setting))
 	_, payer := createCashbackUsers(t, now-30*24*60*60)
 	order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
@@ -3458,8 +3457,7 @@ func TestCashbackAutoReviewImmediateIssueUsesPaymentTransaction(t *testing.T) {
 			setting := saveCashbackTestSetting(t, now-100)
 			setting.AutoReviewEnabled = true
 			setting.AutoReviewImmediateIssue = immediate
-			setting.HighReviewRequired = false
-			setting.SevereReviewRequired = false
+			setting.AutoReviewRiskFlags = []string{}
 			require.NoError(t, SaveCashbackSetting(setting))
 			_, payer := createCashbackUsers(t, now-30*24*60*60)
 			order := createCompletedCashbackTopUp(t, payer, now, now, 10_000, 10_000)
@@ -3489,27 +3487,29 @@ func TestCashbackAutoReviewImmediateIssueUsesPaymentTransaction(t *testing.T) {
 	}
 }
 
-func TestCashbackReviewPolicyAppliesEachRiskBandOnlyToPayer(t *testing.T) {
+func TestCashbackReviewPolicyUsesSelectedFlagsOnlyForPositivePayerRewards(t *testing.T) {
 	cases := []struct {
 		name             string
 		level            CashbackRiskLevel
 		masterEnabled    bool
-		reviewRequired   bool
+		selectedFlags    []string
+		decision         string
+		matched          []string
 		matchingSession  bool
 		missingDevice    bool
 		newAccount       bool
 		frequencyLimit   int
 		wantReviewStatus CashbackReviewStatus
 	}{
-		{"low automatic", CashbackRiskLow, true, false, true, false, false, 5, CashbackReviewApproved},
-		{"low manual", CashbackRiskLow, true, true, true, false, false, 5, CashbackReviewPending},
-		{"medium automatic", CashbackRiskMedium, true, false, false, false, false, 5, CashbackReviewApproved},
-		{"medium manual", CashbackRiskMedium, true, true, false, false, false, 5, CashbackReviewPending},
-		{"high automatic", CashbackRiskHigh, true, false, false, true, false, 5, CashbackReviewApproved},
-		{"high manual", CashbackRiskHigh, true, true, false, true, false, 5, CashbackReviewPending},
-		{"severe automatic", CashbackRiskSevere, true, false, false, true, true, 1, CashbackReviewApproved},
-		{"severe manual", CashbackRiskSevere, true, true, false, true, true, 1, CashbackReviewPending},
-		{"master off", CashbackRiskLow, false, false, true, false, false, 5, CashbackReviewPending},
+		{"low empty automatic", CashbackRiskLow, true, []string{}, "automatic", nil, true, false, false, 5, CashbackReviewApproved},
+		{"unconfigured", CashbackRiskMedium, true, nil, "policy_unconfigured", nil, false, false, false, 5, CashbackReviewPending},
+		{"medium unmatched", CashbackRiskMedium, true, []string{"prior_payment_incident"}, "automatic", nil, false, false, false, 5, CashbackReviewApproved},
+		{"medium matched", CashbackRiskMedium, true, []string{"login_ip_mismatch"}, "selected_flags", []string{"login_ip_mismatch"}, false, false, false, 5, CashbackReviewPending},
+		{"high unmatched", CashbackRiskHigh, true, []string{}, "automatic", nil, false, true, false, 5, CashbackReviewApproved},
+		{"high matched", CashbackRiskHigh, true, []string{"device_missing", "login_ip_mismatch"}, "selected_flags", []string{"device_missing", "login_ip_mismatch"}, false, true, false, 5, CashbackReviewPending},
+		{"severe empty", CashbackRiskSevere, true, []string{}, "automatic", nil, false, true, true, 1, CashbackReviewApproved},
+		{"severe matched", CashbackRiskSevere, true, []string{"new_account"}, "selected_flags", []string{"new_account"}, false, true, true, 1, CashbackReviewPending},
+		{"master off", CashbackRiskLow, false, []string{}, "master_disabled", nil, true, false, false, 5, CashbackReviewPending},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -3519,22 +3519,10 @@ func TestCashbackReviewPolicyAppliesEachRiskBandOnlyToPayer(t *testing.T) {
 			setting.AutoReviewEnabled = tc.masterEnabled
 			setting.AutoReviewImmediateIssue = false
 			setting.DailyTopUpCountThreshold = tc.frequencyLimit
-			// Keep the other bands at their opposite setting: a policy must
-			// choose the actual reward risk rather than one shared toggle.
-			setting.LowReviewRequired = !tc.reviewRequired
-			setting.MediumReviewRequired = !tc.reviewRequired
-			setting.HighReviewRequired = !tc.reviewRequired
-			setting.SevereReviewRequired = !tc.reviewRequired
-			switch tc.level {
-			case CashbackRiskLow:
-				setting.LowReviewRequired = tc.reviewRequired
-			case CashbackRiskMedium:
-				setting.MediumReviewRequired = tc.reviewRequired
-			case CashbackRiskHigh:
-				setting.HighReviewRequired = tc.reviewRequired
-			case CashbackRiskSevere:
-				setting.SevereReviewRequired = tc.reviewRequired
-			}
+			setting.AutoReviewRiskFlags = tc.selectedFlags
+			// Legacy switches must not affect the new routing decision.
+			setting.HighReviewRequired = false
+			setting.SevereReviewRequired = false
 			require.NoError(t, SaveCashbackSetting(setting))
 			createdAt := now - 30*24*60*60
 			if tc.newAccount {
@@ -3581,6 +3569,10 @@ func TestCashbackReviewPolicyAppliesEachRiskBandOnlyToPayer(t *testing.T) {
 					continue
 				}
 				assert.Equal(t, payer.Id, reward.BeneficiaryID)
+				var snapshot CashbackRiskSnapshot
+				require.NoError(t, common.Unmarshal([]byte(reward.RiskSnapshot), &snapshot))
+				assert.Equal(t, tc.decision, snapshot.AutoReviewDecision)
+				assert.Equal(t, tc.matched, snapshot.AutoReviewMatchedFlags)
 				assert.Equal(t, tc.wantReviewStatus, reward.ReviewStatus)
 				if tc.wantReviewStatus == CashbackReviewApproved {
 					assert.Equal(t, CashbackReviewAutomatic, reward.ReviewSource)
@@ -3597,10 +3589,7 @@ func TestCashbackSevereRiskAutoApprovalRemainsInAdminRiskFilter(t *testing.T) {
 	now := time.Now().Unix()
 	setting := saveCashbackTestSetting(t, now-100)
 	setting.AutoReviewEnabled = true
-	setting.LowReviewRequired = false
-	setting.MediumReviewRequired = false
-	setting.HighReviewRequired = false
-	setting.SevereReviewRequired = false
+	setting.AutoReviewRiskFlags = []string{}
 	setting.MaxRewardQuota = 50
 	setting.DailyTopUpCountThreshold = 1
 	setting.AutoReviewImmediateIssue = false
@@ -3628,10 +3617,7 @@ func TestCashbackCanceledZeroRewardsRemainAuditableButNotPendingReview(t *testin
 	setting.InviterEnabled = false
 	setting.AutoReviewEnabled = true
 	setting.AutoReviewImmediateIssue = false
-	setting.LowReviewRequired = false
-	setting.MediumReviewRequired = false
-	setting.HighReviewRequired = false
-	setting.SevereReviewRequired = false
+	setting.AutoReviewRiskFlags = []string{"open_debt"}
 	setting.DailyRewardQuota = 50
 	require.NoError(t, SaveCashbackSetting(setting))
 	payer := User{Username: "canceled-zero-payer", Status: common.UserStatusEnabled, CreatedAt: now}
@@ -3676,6 +3662,10 @@ func TestCashbackCanceledZeroRewardsRemainAuditableButNotPendingReview(t *testin
 	assert.Empty(t, debt.ReviewSource)
 	assert.Zero(t, debt.ReviewedAt)
 	assert.Equal(t, "beneficiary_has_open_cashback_debt", debt.BlockingReason)
+	var debtRisk CashbackRiskSnapshot
+	require.NoError(t, common.Unmarshal([]byte(debt.RiskSnapshot), &debtRisk))
+	assert.Contains(t, debtRisk.Flags, "open_debt")
+	assert.Empty(t, debtRisk.AutoReviewDecision)
 
 	setting.AutoReviewEnabled = false
 	require.NoError(t, SaveCashbackSetting(setting))
@@ -3775,8 +3765,7 @@ func TestCashbackImmediateIssueKeepsPurchaseAndRewardBehindOneQuotaFence(t *test
 	now := time.Now().Unix()
 	setting := saveCashbackTestSetting(t, now-100)
 	setting.AutoReviewEnabled = true
-	setting.HighReviewRequired = false
-	setting.SevereReviewRequired = false
+	setting.AutoReviewRiskFlags = []string{}
 	require.NoError(t, SaveCashbackSetting(setting))
 	payer := User{Username: "immediate-fenced-payer", Status: common.UserStatusEnabled}
 	require.NoError(t, DB.Create(&payer).Error)
@@ -3806,8 +3795,7 @@ func TestCashbackImmediateIssueLosesFenceAfterRewardMutationAndRollsBack(t *test
 	now := time.Now().Unix()
 	setting := saveCashbackTestSetting(t, now-100)
 	setting.AutoReviewEnabled = true
-	setting.HighReviewRequired = false
-	setting.SevereReviewRequired = false
+	setting.AutoReviewRiskFlags = []string{}
 	require.NoError(t, SaveCashbackSetting(setting))
 	payer := User{Username: "immediate-lost-fence", Status: common.UserStatusEnabled}
 	require.NoError(t, DB.Create(&payer).Error)
@@ -3843,8 +3831,7 @@ func TestCashbackImmediateIssueFailureDefersRewardAndKeepsPayment(t *testing.T) 
 	now := time.Now().Unix()
 	setting := saveCashbackTestSetting(t, now-100)
 	setting.AutoReviewEnabled = true
-	setting.HighReviewRequired = false
-	setting.SevereReviewRequired = false
+	setting.AutoReviewRiskFlags = []string{}
 	require.NoError(t, SaveCashbackSetting(setting))
 	payer := User{Username: "immediate-rollback", Status: common.UserStatusEnabled}
 	require.NoError(t, DB.Create(&payer).Error)

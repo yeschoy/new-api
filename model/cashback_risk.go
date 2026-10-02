@@ -22,6 +22,8 @@ type CashbackTopUpStatusCounts struct {
 
 type CashbackRiskSnapshot struct {
 	Flags                        []string                  `json:"flags"`
+	AutoReviewDecision           string                    `json:"auto_review_decision,omitempty"`
+	AutoReviewMatchedFlags       []string                  `json:"auto_review_matched_flags,omitempty"`
 	SignalCount                  int                       `json:"signal_count"`
 	InviteeAccountAgeSeconds     int64                     `json:"invitee_account_age_seconds"`
 	InviterAccountAgeSeconds     int64                     `json:"inviter_account_age_seconds"`

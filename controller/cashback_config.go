@@ -35,13 +35,11 @@ type cashbackConfigUpdateRequest struct {
 	DeviceAccountThreshold   *int            `json:"device_account_threshold"`
 	DailyTopUpCountThreshold *int            `json:"daily_topup_count_threshold"`
 	AutoReviewEnabled        *bool           `json:"auto_review_enabled"`
-	LowReviewRequired        *bool           `json:"low_review_required"`
-	MediumReviewRequired     *bool           `json:"medium_review_required"`
-	HighReviewRequired       *bool           `json:"high_review_required"`
-	SevereReviewRequired     *bool           `json:"severe_review_required"`
+	AutoReviewRiskFlags      json.RawMessage `json:"auto_review_risk_flags"`
 	AutoReviewImmediateIssue *bool           `json:"auto_review_immediate_issue"`
 	inviterTiersParsed       *([]operation_setting.CashbackTier)
 	inviteeTiersParsed       *([]operation_setting.CashbackTier)
+	autoReviewFlagsParsed    *[]string
 }
 
 func decodeCashbackConfigUpdate(reader io.Reader) (cashbackConfigUpdateRequest, error) {
@@ -73,6 +71,20 @@ func decodeCashbackConfigUpdate(reader io.Reader) (cashbackConfigUpdateRequest, 
 			return request, &operation_setting.CashbackSettingValidationError{Field: input.field, Message: "invalid cashback tiers"}
 		}
 		*input.target = &tiers
+	}
+	if request.AutoReviewRiskFlags != nil {
+		raw := request.AutoReviewRiskFlags
+		if len(raw) > operation_setting.CashbackMaxRiskFlagsJSONBytes || strings.TrimSpace(string(raw)) == "null" {
+			return request, &operation_setting.CashbackSettingValidationError{Field: "auto_review_risk_flags", Message: "invalid auto-review risk flags"}
+		}
+		var flags []string
+		if err := common.Unmarshal(raw, &flags); err != nil || flags == nil {
+			return request, &operation_setting.CashbackSettingValidationError{Field: "auto_review_risk_flags", Message: "invalid auto-review risk flags"}
+		}
+		if err := operation_setting.ValidateCashbackAutoReviewRiskFlags(flags); err != nil {
+			return request, err
+		}
+		request.autoReviewFlagsParsed = &flags
 	}
 	return request, nil
 }
@@ -120,7 +132,8 @@ func (request cashbackConfigUpdateRequest) candidate() (operation_setting.Cashba
 
 type cashbackConfigResponse struct {
 	operation_setting.CashbackSetting
-	ComplianceConfirmed bool `json:"compliance_confirmed"`
+	ComplianceConfirmed          bool     `json:"compliance_confirmed"`
+	AvailableAutoReviewRiskFlags []string `json:"available_auto_review_risk_flags"`
 }
 
 var cashbackConfigUpdateMu sync.Mutex
@@ -142,8 +155,9 @@ func GetCashbackConfig(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, cashbackConfigResponse{
-		CashbackSetting:     setting,
-		ComplianceConfirmed: operation_setting.IsPaymentComplianceConfirmed(),
+		CashbackSetting:              setting,
+		ComplianceConfirmed:          operation_setting.IsPaymentComplianceConfirmed(),
+		AvailableAutoReviewRiskFlags: operation_setting.CashbackAutoReviewRiskFlags(),
 	})
 }
 
@@ -187,9 +201,8 @@ func UpdateCashbackConfig(c *gin.Context) {
 		operation_setting.IsPaymentComplianceConfirmed(),
 		time.Now().Unix(),
 		operation_setting.CashbackReviewPolicyUpdate{
-			AutoReviewEnabled: request.AutoReviewEnabled, LowReviewRequired: request.LowReviewRequired,
-			MediumReviewRequired: request.MediumReviewRequired, HighReviewRequired: request.HighReviewRequired,
-			SevereReviewRequired: request.SevereReviewRequired, AutoReviewImmediateIssue: request.AutoReviewImmediateIssue,
+			AutoReviewEnabled: request.AutoReviewEnabled, AutoReviewRiskFlags: request.autoReviewFlagsParsed,
+			AutoReviewImmediateIssue: request.AutoReviewImmediateIssue,
 			Strategy: operation_setting.CashbackStrategyUpdate{
 				InviterStrategy: request.InviterStrategy, InviteeStrategy: request.InviteeStrategy,
 				InviterFixedPerHundred: request.InviterFixedPerHundred, InviteeFixedPerHundred: request.InviteeFixedPerHundred,
@@ -216,8 +229,9 @@ func UpdateCashbackConfig(c *gin.Context) {
 		"fields": strings.Join(changedFields, ","),
 	})
 	common.ApiSuccess(c, cashbackConfigResponse{
-		CashbackSetting:     next,
-		ComplianceConfirmed: operation_setting.IsPaymentComplianceConfirmed(),
+		CashbackSetting:              next,
+		ComplianceConfirmed:          operation_setting.IsPaymentComplianceConfirmed(),
+		AvailableAutoReviewRiskFlags: operation_setting.CashbackAutoReviewRiskFlags(),
 	})
 }
 
@@ -274,17 +288,8 @@ func cashbackConfigChangedFields(current, next operation_setting.CashbackSetting
 	if current.AutoReviewEnabled != next.AutoReviewEnabled {
 		fields = append(fields, "auto_review_enabled")
 	}
-	if current.LowReviewRequired != next.LowReviewRequired {
-		fields = append(fields, "low_review_required")
-	}
-	if current.MediumReviewRequired != next.MediumReviewRequired {
-		fields = append(fields, "medium_review_required")
-	}
-	if current.HighReviewRequired != next.HighReviewRequired {
-		fields = append(fields, "high_review_required")
-	}
-	if current.SevereReviewRequired != next.SevereReviewRequired {
-		fields = append(fields, "severe_review_required")
+	if !slices.Equal(current.AutoReviewRiskFlags, next.AutoReviewRiskFlags) || (current.AutoReviewRiskFlags == nil) != (next.AutoReviewRiskFlags == nil) {
+		fields = append(fields, "auto_review_risk_flags")
 	}
 	if current.AutoReviewImmediateIssue != next.AutoReviewImmediateIssue {
 		fields = append(fields, "auto_review_immediate_issue")

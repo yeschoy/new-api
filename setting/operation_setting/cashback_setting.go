@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -12,21 +13,60 @@ import (
 )
 
 const (
-	CashbackSettingName        = "cashback_setting"
-	CashbackStrategyRate       = "rate"
-	CashbackStrategyPerHundred = "per_hundred"
-	CashbackStrategyTiered     = "tiered"
-	CashbackMaxTiers           = 32
-	CashbackMaxTiersJSONBytes  = 4096
-	CashbackRateBasisPoints    = 10_000
-	CashbackMinSettlementDays  = 1
-	CashbackMaxSettlementDays  = 90
-	CashbackMaxRiskThreshold   = 100_000
-	CashbackDefaultSettlement  = 7
-	CashbackDefaultIPThreshold = 3
-	CashbackDefaultDeviceLimit = 2
-	CashbackDefaultTopUpCount  = 5
+	CashbackSettingName           = "cashback_setting"
+	CashbackStrategyRate          = "rate"
+	CashbackStrategyPerHundred    = "per_hundred"
+	CashbackStrategyTiered        = "tiered"
+	CashbackMaxTiers              = 32
+	CashbackMaxTiersJSONBytes     = 4096
+	CashbackRateBasisPoints       = 10_000
+	CashbackMinSettlementDays     = 1
+	CashbackMaxSettlementDays     = 90
+	CashbackMaxRiskThreshold      = 100_000
+	CashbackDefaultSettlement     = 7
+	CashbackDefaultIPThreshold    = 3
+	CashbackDefaultDeviceLimit    = 2
+	CashbackDefaultTopUpCount     = 5
+	CashbackMaxRiskFlagsJSONBytes = 1024
 )
+
+// CashbackAutoReviewRiskFlags is the complete, bounded policy catalog. Keep it
+// synchronized with emitted risk flags; open_debt is emitted on canceled rewards.
+var cashbackAutoReviewRiskFlags = []string{
+	"device_invalid", "device_missing", "device_rotation", "first_observed_ip_mismatch",
+	"high_daily_reward_exposure", "high_topup_failure_rate", "high_topup_frequency",
+	"inviter_concentration", "login_ip_mismatch", "new_account", "open_debt",
+	"payment_channel_mismatch", "prior_payment_incident", "rapid_registration_to_topup",
+	"repeated_amount", "request_ip_missing", "reward_capped", "reward_near_single_limit",
+	"shared_device_accounts", "shared_ip_accounts", "small_test_then_large",
+	"user_agent_changed", "user_agent_missing",
+}
+
+func CashbackAutoReviewRiskFlags() []string {
+	return slices.Clone(cashbackAutoReviewRiskFlags)
+}
+
+// Nil is unconfigured (manual review); a non-nil empty list is an explicit policy.
+func ValidateCashbackAutoReviewRiskFlags(flags []string) error {
+	if flags == nil {
+		return nil
+	}
+	if len(flags) > len(cashbackAutoReviewRiskFlags) {
+		return cashbackValidationError("auto_review_risk_flags", "too many auto-review risk flags")
+	}
+	seen := make(map[string]bool, len(flags))
+	for _, flag := range flags {
+		if !slices.Contains(cashbackAutoReviewRiskFlags, flag) || seen[flag] {
+			return cashbackValidationError("auto_review_risk_flags", "unknown or duplicate auto-review risk flag")
+		}
+		seen[flag] = true
+	}
+	encoded, err := common.Marshal(flags)
+	if err != nil || len(encoded) > CashbackMaxRiskFlagsJSONBytes {
+		return cashbackValidationError("auto_review_risk_flags", "auto-review risk flags are too large")
+	}
+	return nil
+}
 
 // CashbackTier represents an exact CNY face threshold and fixed reward, in cents.
 type CashbackTier struct {
@@ -54,20 +94,19 @@ type CashbackSetting struct {
 	FirstEnabledAt           int64          `json:"first_enabled_at"`
 	Version                  int64          `json:"version"`
 	AutoReviewEnabled        bool           `json:"auto_review_enabled"`
-	LowReviewRequired        bool           `json:"low_review_required"`
-	MediumReviewRequired     bool           `json:"medium_review_required"`
-	HighReviewRequired       bool           `json:"high_review_required"`
-	SevereReviewRequired     bool           `json:"severe_review_required"`
-	AutoReviewImmediateIssue bool           `json:"auto_review_immediate_issue"`
+	AutoReviewRiskFlags      []string       `json:"auto_review_risk_flags"`
+	// Legacy Options are retained for rollback, but never exposed or used in new review decisions.
+	LowReviewRequired        bool `json:"-"`
+	MediumReviewRequired     bool `json:"-"`
+	HighReviewRequired       bool `json:"-"`
+	SevereReviewRequired     bool `json:"-"`
+	AutoReviewImmediateIssue bool `json:"auto_review_immediate_issue"`
 }
 
 // Nil fields preserve the stored policy when an older client replaces the configuration.
 type CashbackReviewPolicyUpdate struct {
 	AutoReviewEnabled        *bool
-	LowReviewRequired        *bool
-	MediumReviewRequired     *bool
-	HighReviewRequired       *bool
-	SevereReviewRequired     *bool
+	AutoReviewRiskFlags      *[]string
 	AutoReviewImmediateIssue *bool
 	Strategy                 CashbackStrategyUpdate
 }
@@ -77,17 +116,8 @@ func (u CashbackReviewPolicyUpdate) Apply(current *CashbackSetting) {
 	if u.AutoReviewEnabled != nil {
 		current.AutoReviewEnabled = *u.AutoReviewEnabled
 	}
-	if u.LowReviewRequired != nil {
-		current.LowReviewRequired = *u.LowReviewRequired
-	}
-	if u.MediumReviewRequired != nil {
-		current.MediumReviewRequired = *u.MediumReviewRequired
-	}
-	if u.HighReviewRequired != nil {
-		current.HighReviewRequired = *u.HighReviewRequired
-	}
-	if u.SevereReviewRequired != nil {
-		current.SevereReviewRequired = *u.SevereReviewRequired
+	if u.AutoReviewRiskFlags != nil {
+		current.AutoReviewRiskFlags = append([]string{}, (*u.AutoReviewRiskFlags)...)
 	}
 	if u.AutoReviewImmediateIssue != nil {
 		current.AutoReviewImmediateIssue = *u.AutoReviewImmediateIssue
@@ -169,6 +199,9 @@ func cashbackValidationError(field, message string) error {
 }
 
 func ValidateCashbackSetting(s CashbackSetting, complianceConfirmed bool) error {
+	if err := ValidateCashbackAutoReviewRiskFlags(s.AutoReviewRiskFlags); err != nil {
+		return err
+	}
 	if s.InviterRateBPS < 0 || s.InviterRateBPS > CashbackRateBasisPoints {
 		return cashbackValidationError("inviter_rate_bps", "inviter cashback rate must be between 0 and 10000 basis points")
 	}
@@ -303,7 +336,7 @@ func CashbackSettingOptionValues(s CashbackSetting) (map[string]string, error) {
 		return nil, cashbackValidationError("invitee_tiers", "cashback tier schedule is too large")
 	}
 	prefix := CashbackSettingName + "."
-	return map[string]string{
+	values := map[string]string{
 		prefix + "inviter_enabled":             strconv.FormatBool(s.InviterEnabled),
 		prefix + "invitee_enabled":             strconv.FormatBool(s.InviteeEnabled),
 		prefix + "inviter_rate_bps":            strconv.Itoa(s.InviterRateBPS),
@@ -328,7 +361,20 @@ func CashbackSettingOptionValues(s CashbackSetting) (map[string]string, error) {
 		prefix + "high_review_required":        strconv.FormatBool(s.HighReviewRequired),
 		prefix + "severe_review_required":      strconv.FormatBool(s.SevereReviewRequired),
 		prefix + "auto_review_immediate_issue": strconv.FormatBool(s.AutoReviewImmediateIssue),
-	}, nil
+	}
+	if err := ValidateCashbackAutoReviewRiskFlags(s.AutoReviewRiskFlags); err != nil {
+		return nil, err
+	}
+	if s.AutoReviewRiskFlags != nil {
+		flags := slices.Clone(s.AutoReviewRiskFlags)
+		slices.Sort(flags)
+		encoded, err := common.Marshal(flags)
+		if err != nil {
+			return nil, err
+		}
+		values[prefix+"auto_review_risk_flags"] = string(encoded)
+	}
+	return values, nil
 }
 
 func CashbackSettingOptionKeys() []string {
@@ -337,7 +383,7 @@ func CashbackSettingOptionKeys() []string {
 	for key := range values {
 		keys = append(keys, key)
 	}
-	return keys
+	return append(keys, CashbackSettingName+".auto_review_risk_flags")
 }
 
 func ParseCashbackSettingOptions(values map[string]string) (CashbackSetting, error) {
@@ -442,6 +488,24 @@ func ParseCashbackSettingOptions(values map[string]string) (CashbackSetting, err
 		func() error { return parseBool("high_review_required", &setting.HighReviewRequired) },
 		func() error { return parseBool("severe_review_required", &setting.SevereReviewRequired) },
 		func() error { return parseBool("auto_review_immediate_issue", &setting.AutoReviewImmediateIssue) },
+		func() error {
+			value, ok := lookup("auto_review_risk_flags")
+			if !ok {
+				return nil
+			}
+			if len(value) > CashbackMaxRiskFlagsJSONBytes || value == "null" {
+				return cashbackValidationError("auto_review_risk_flags", "invalid stored auto-review risk flags")
+			}
+			var flags []string
+			if err := common.Unmarshal([]byte(value), &flags); err != nil || flags == nil {
+				return cashbackValidationError("auto_review_risk_flags", "invalid stored auto-review risk flags")
+			}
+			if err := ValidateCashbackAutoReviewRiskFlags(flags); err != nil {
+				return err
+			}
+			setting.AutoReviewRiskFlags = flags
+			return nil
+		},
 	}
 	for _, parse := range parsers {
 		if err := parse(); err != nil {
