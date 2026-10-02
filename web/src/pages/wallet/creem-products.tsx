@@ -63,7 +63,7 @@ function CreemConfirm(props: { product: CreemProduct; onClose: () => void }) {
     <PayDialog
       rows={[
         { label: t('商品'), value: props.product.name },
-        { label: t('价格'), value: priceLabel(props.product.price, props.product.currency) },
+        { label: t('价格|金额'), value: priceLabel(props.product.price, props.product.currency) },
         { label: t('到账额度'), value: money.format(props.product.quota) },
       ]}
       error={checkout.isError ? errorMessage(checkout.error, t('支付请求失败')) : null}

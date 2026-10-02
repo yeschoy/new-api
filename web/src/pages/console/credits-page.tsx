@@ -22,6 +22,7 @@ import { Notice } from '@/components/ui'
 import { useI18n } from '@/i18n/i18n'
 import { errorMessage } from '@/lib/api'
 import { BalancePanel } from '@/pages/wallet/balance-panel'
+import { SubscriptionPanel } from '@/pages/wallet/subscription-panel'
 import { TopUpHistory } from '@/pages/wallet/topup-history'
 import { TopUpPanel } from '@/pages/wallet/topup-panel'
 import { useWalletInfo } from '@/pages/wallet/wallet-hooks'
@@ -29,7 +30,7 @@ import { useWalletInfo } from '@/pages/wallet/wallet-hooks'
 import { ConsolePage } from './console-page'
 import { RedeemPanel } from './credits-redeem'
 
-/** The wallet: balance, online top-up, redemption codes and top-up orders. */
+/** The wallet: balance, online top-up, redemption codes, subscriptions and top-up orders. */
 export function CreditsPage() {
   const { t } = useI18n()
   return (
@@ -50,6 +51,7 @@ function WalletContent() {
       {info.data ? <TopUpPanel info={info.data} /> : null}
       {info.isError ? <Notice tone='error'>{errorMessage(info.error, t('获取充值信息失败'))}</Notice> : null}
       <RedeemPanel info={info.data} />
+      {info.data ? <SubscriptionPanel info={info.data} /> : null}
       <TopUpHistory focus={params.has('show_history')} />
     </div>
   )

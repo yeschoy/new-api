@@ -75,6 +75,17 @@ describe('wallet page', () => {
     expect(screen.getByRole('button', { name: '支付宝' })).toBeInTheDocument()
   })
 
+  it('offers subscription plans when the site sells them', async () => {
+    const plan = {
+      id: 1, title: 'Pro', price_amount: 9.9, currency: 'USD', duration_unit: 'month', duration_value: 1,
+      quota_reset_period: 'never', max_purchase_per_user: 0, total_amount: 0,
+    }
+    answer({ '/api/subscription/plans': [{ plan }] })
+    renderPage(<CreditsPage />)
+    expect(await screen.findByRole('heading', { name: '订阅套餐' })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: 'Pro' })).toBeInTheDocument()
+  })
+
   it('scrolls to the orders when a payment sends the user back with ?show_history', async () => {
     answer({ '/api/user/topup/self': { items: [], total: 0 } })
     const scrollIntoView = vi.fn()
