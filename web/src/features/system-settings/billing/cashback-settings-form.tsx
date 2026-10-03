@@ -1,0 +1,1085 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
+import dayjs from 'dayjs'
+import { useState } from 'react'
+import { useForm, type Resolver } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { z } from 'zod'
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { getCurrencyLabel } from '@/lib/currency'
+import {
+  getEditableQuotaStep,
+  parseQuotaFromDollars,
+  quotaUnitsToEditableAmount,
+} from '@/lib/format'
+
+import { updateCashbackConfig } from '../api'
+import {
+  SettingsForm,
+  SettingsSwitchContent,
+  SettingsSwitchItem,
+} from '../components/settings-form-layout'
+import { SettingsPageFormActions } from '../components/settings-page-context'
+import { SettingsSection } from '../components/settings-section'
+import type { CashbackConfig, CashbackConfigUpdate } from '../types'
+import {
+  centsToInput,
+  nominalTierPercent,
+  parseCnyCents,
+  tierInputToCents,
+  type TierInput,
+} from './cashback-tier-amount'
+import { CashbackTierEditor } from './cashback-tier-editor'
+
+const MAX_WALLET_QUOTA = Number.MAX_SAFE_INTEGER
+
+const fieldMap = {
+  inviter_enabled: 'inviterEnabled',
+  invitee_enabled: 'inviteeEnabled',
+  inviter_rate_bps: 'inviterRatePercent',
+  invitee_rate_bps: 'inviteeRatePercent',
+  inviter_strategy: 'inviterStrategy',
+  invitee_strategy: 'inviteeStrategy',
+  inviter_fixed_per_hundred: 'inviterFixedPerHundred',
+  invitee_fixed_per_hundred: 'inviteeFixedPerHundred',
+  inviter_tiers: 'inviterTiers',
+  invitee_tiers: 'inviteeTiers',
+  settlement_days: 'settlementDays',
+  max_reward_quota: 'maxRewardQuota',
+  daily_reward_quota: 'dailyRewardQuota',
+  ip_account_threshold: 'ipAccountThreshold',
+  device_account_threshold: 'deviceAccountThreshold',
+  daily_topup_count_threshold: 'dailyTopUpCountThreshold',
+  auto_review_enabled: 'autoReviewEnabled',
+  auto_review_risk_flags: 'autoReviewRiskFlags',
+  auto_review_immediate_issue: 'autoReviewImmediateIssue',
+} as const
+
+export type Values = {
+  inviterEnabled: boolean
+  inviteeEnabled: boolean
+  inviterRatePercent: number
+  inviteeRatePercent: number
+  inviterStrategy: 'rate' | 'per_hundred' | 'tiered'
+  inviteeStrategy: 'rate' | 'per_hundred' | 'tiered'
+  inviterTiers: TierInput[]
+  inviteeTiers: TierInput[]
+  inviterFixedPerHundred: number
+  inviteeFixedPerHundred: number
+  settlementDays: number
+  /** Display-currency amount (tokens in token display); converted on save. */
+  maxRewardQuota: number
+  /** Display-currency amount (tokens in token display); converted on save. */
+  dailyRewardQuota: number
+  ipAccountThreshold: number
+  deviceAccountThreshold: number
+  dailyTopUpCountThreshold: number
+  autoReviewEnabled: boolean
+  autoReviewRiskFlags: string[] | null
+  autoReviewImmediateIssue: boolean
+}
+
+type CashbackSettingsFormProps = {
+  config: CashbackConfig
+}
+
+function configToValues(config: CashbackConfig): Values {
+  return {
+    inviterEnabled: config.inviter_enabled,
+    inviteeEnabled: config.invitee_enabled,
+    inviterRatePercent: config.inviter_rate_bps / 100,
+    inviteeRatePercent: config.invitee_rate_bps / 100,
+    inviterStrategy: config.inviter_strategy ?? 'rate',
+    inviteeStrategy: config.invitee_strategy ?? 'rate',
+    inviterTiers: (config.inviter_tiers ?? []).map((tier) => ({
+      threshold: centsToInput(tier.threshold_cents),
+      reward: centsToInput(tier.reward_cents),
+    })),
+    inviteeTiers: (config.invitee_tiers ?? []).map((tier) => ({
+      threshold: centsToInput(tier.threshold_cents),
+      reward: centsToInput(tier.reward_cents),
+    })),
+    inviterFixedPerHundred: config.inviter_fixed_per_hundred ?? 0,
+    inviteeFixedPerHundred: config.invitee_fixed_per_hundred ?? 0,
+    settlementDays: config.settlement_days,
+    maxRewardQuota: quotaUnitsToEditableAmount(config.max_reward_quota),
+    dailyRewardQuota: quotaUnitsToEditableAmount(config.daily_reward_quota),
+    ipAccountThreshold: config.ip_account_threshold,
+    deviceAccountThreshold: config.device_account_threshold,
+    dailyTopUpCountThreshold: config.daily_topup_count_threshold,
+    autoReviewEnabled: config.auto_review_enabled,
+    autoReviewRiskFlags: config.auto_review_risk_flags,
+    autoReviewImmediateIssue: config.auto_review_immediate_issue,
+  }
+}
+
+// Caps are edited in the display currency but stored as wallet quota. An
+// untouched value keeps its exact stored quota instead of a rounded round-trip.
+function rewardLimitToQuota(value: number, storedQuota: number): number {
+  return value === quotaUnitsToEditableAmount(storedQuota)
+    ? storedQuota
+    : parseQuotaFromDollars(value)
+}
+
+function valuesToRequest(
+  values: Values,
+  current: CashbackConfig
+): CashbackConfigUpdate {
+  return {
+    inviter_enabled: values.inviterEnabled,
+    invitee_enabled: values.inviteeEnabled,
+    inviter_rate_bps: Math.round(values.inviterRatePercent * 100),
+    invitee_rate_bps: Math.round(values.inviteeRatePercent * 100),
+    inviter_strategy: values.inviterStrategy,
+    invitee_strategy: values.inviteeStrategy,
+    inviter_tiers: values.inviterTiers.map(tierInputToCents),
+    invitee_tiers: values.inviteeTiers.map(tierInputToCents),
+    inviter_fixed_per_hundred: values.inviterFixedPerHundred,
+    invitee_fixed_per_hundred: values.inviteeFixedPerHundred,
+    settlement_days: values.settlementDays,
+    max_reward_quota: rewardLimitToQuota(
+      values.maxRewardQuota,
+      current.max_reward_quota
+    ),
+    daily_reward_quota: rewardLimitToQuota(
+      values.dailyRewardQuota,
+      current.daily_reward_quota
+    ),
+    ip_account_threshold: values.ipAccountThreshold,
+    device_account_threshold: values.deviceAccountThreshold,
+    daily_topup_count_threshold: values.dailyTopUpCountThreshold,
+    auto_review_enabled: values.autoReviewEnabled,
+    ...(values.autoReviewRiskFlags !== null
+      ? { auto_review_risk_flags: values.autoReviewRiskFlags }
+      : {}),
+    auto_review_immediate_issue: values.autoReviewImmediateIssue,
+  }
+}
+
+function nominalPercent(
+  values: Values,
+  direction: 'inviter' | 'invitee'
+): number {
+  if (direction === 'inviter') {
+    if (values.inviterStrategy === 'tiered') {
+      return nominalTierPercent(values.inviterTiers)
+    }
+    return values.inviterStrategy === 'rate'
+      ? values.inviterRatePercent
+      : values.inviterFixedPerHundred
+  }
+  if (values.inviteeStrategy === 'tiered') {
+    return nominalTierPercent(values.inviteeTiers)
+  }
+  return values.inviteeStrategy === 'rate'
+    ? values.inviteeRatePercent
+    : values.inviteeFixedPerHundred
+}
+
+export function CashbackSettingsForm(props: CashbackSettingsFormProps) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [confirmationOpen, setConfirmationOpen] = useState(false)
+  const [pendingValues, setPendingValues] = useState<Values | null>(null)
+
+  const percentage = z.coerce
+    .number({ error: t('Enter a valid percentage') })
+    .min(0, t('Percentage must be at least 0'))
+    .max(100, t('Percentage must not exceed 100'))
+    .refine(
+      (value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-8,
+      t('Use no more than two decimal places')
+    )
+  const rewardLimit = z.coerce
+    .number({ error: t('Enter a valid quota amount') })
+    .min(0, t('Quota cannot be negative'))
+    .refine(
+      (value) => parseQuotaFromDollars(value) <= MAX_WALLET_QUOTA,
+      t('Quota exceeds the wallet safety limit')
+    )
+  const schema = z
+    .object({
+      inviterEnabled: z.boolean(),
+      inviteeEnabled: z.boolean(),
+      inviterRatePercent: percentage,
+      inviteeRatePercent: percentage,
+      inviterStrategy: z.enum(['rate', 'per_hundred', 'tiered']),
+      inviteeStrategy: z.enum(['rate', 'per_hundred', 'tiered']),
+      inviterTiers: z.array(
+        z.object({ threshold: z.string(), reward: z.string() })
+      ),
+      inviteeTiers: z.array(
+        z.object({ threshold: z.string(), reward: z.string() })
+      ),
+      inviterFixedPerHundred: z.coerce
+        .number({ error: t('Enter a whole number from 1 to 100') })
+        .int(t('Enter a whole number from 1 to 100'))
+        .min(0)
+        .max(100, t('Enter a whole number from 1 to 100')),
+      inviteeFixedPerHundred: z.coerce
+        .number({ error: t('Enter a whole number from 1 to 100') })
+        .int(t('Enter a whole number from 1 to 100'))
+        .min(0)
+        .max(100, t('Enter a whole number from 1 to 100')),
+      settlementDays: z.coerce
+        .number({ error: t('Enter valid settlement days') })
+        .int()
+        .min(1, t('Settlement days must be between 1 and 90'))
+        .max(90, t('Settlement days must be between 1 and 90')),
+      maxRewardQuota: rewardLimit,
+      dailyRewardQuota: rewardLimit,
+      ipAccountThreshold: z.coerce.number().int().min(2).max(100000),
+      deviceAccountThreshold: z.coerce.number().int().min(2).max(100000),
+      dailyTopUpCountThreshold: z.coerce.number().int().min(1).max(100000),
+      autoReviewEnabled: z.boolean(),
+      autoReviewRiskFlags: z.array(z.string()).nullable(),
+      autoReviewImmediateIssue: z.boolean(),
+    })
+    .superRefine((values, context) => {
+      if (
+        values.inviterEnabled &&
+        values.inviterStrategy === 'rate' &&
+        values.inviterRatePercent <= 0
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['inviterRatePercent'],
+          message: t('Enabled inviter cashback requires a positive rate'),
+        })
+      }
+      if (
+        values.inviteeEnabled &&
+        values.inviteeStrategy === 'rate' &&
+        values.inviteeRatePercent <= 0
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['inviteeRatePercent'],
+          message: t('Enabled top-up payer cashback requires a positive rate'),
+        })
+      }
+      if (
+        values.inviterEnabled &&
+        values.inviterStrategy === 'per_hundred' &&
+        values.inviterFixedPerHundred < 1
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['inviterFixedPerHundred'],
+          message: t('Enter a whole number from 1 to 100'),
+        })
+      }
+      if (
+        values.inviteeEnabled &&
+        values.inviteeStrategy === 'per_hundred' &&
+        values.inviteeFixedPerHundred < 1
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['inviteeFixedPerHundred'],
+          message: t('Enter a whole number from 1 to 100'),
+        })
+      }
+      for (const direction of ['inviter', 'invitee'] as const) {
+        const tiers =
+          direction === 'inviter' ? values.inviterTiers : values.inviteeTiers
+        const path = direction === 'inviter' ? 'inviterTiers' : 'inviteeTiers'
+        const selected =
+          direction === 'inviter'
+            ? values.inviterEnabled && values.inviterStrategy === 'tiered'
+            : values.inviteeEnabled && values.inviteeStrategy === 'tiered'
+        if (tiers.length > 32 || (selected && !tiers.length)) {
+          context.addIssue({
+            code: 'custom',
+            path: [path],
+            message: t('Configure 1 to 32 tiers'),
+          })
+        }
+        let previous = 0
+        tiers.forEach((tier, index) => {
+          const threshold = parseCnyCents(tier.threshold)
+          const reward = parseCnyCents(tier.reward)
+          if (!threshold || threshold <= previous) {
+            context.addIssue({
+              code: 'custom',
+              path: [path, index, 'threshold'],
+              message: t(
+                'Enter increasing positive CNY amounts with at most two decimals'
+              ),
+            })
+          }
+          if (!reward || (threshold && reward > threshold)) {
+            context.addIssue({
+              code: 'custom',
+              path: [path, index, 'reward'],
+              message: t(
+                'Reward must be positive, at most the threshold, with at most two decimals'
+              ),
+            })
+          }
+          if (threshold) previous = threshold
+        })
+      }
+      if (
+        nominalPercent(values, 'inviter') + nominalPercent(values, 'invitee') >
+        100
+      ) {
+        let path = 'inviteeRatePercent'
+        if (values.inviteeStrategy === 'tiered') {
+          path = 'inviteeTiers'
+        }
+        if (values.inviteeStrategy === 'per_hundred') {
+          path = 'inviteeFixedPerHundred'
+        }
+        context.addIssue({
+          code: 'custom',
+          path: [path],
+          message: t('Combined cashback return cannot exceed 100%'),
+        })
+      }
+      if (values.inviterEnabled || values.inviteeEnabled) {
+        if (parseQuotaFromDollars(values.maxRewardQuota) <= 0) {
+          context.addIssue({
+            code: 'custom',
+            path: ['maxRewardQuota'],
+            message: t('Set a positive single reward limit before enabling'),
+          })
+        }
+        if (parseQuotaFromDollars(values.dailyRewardQuota) <= 0) {
+          context.addIssue({
+            code: 'custom',
+            path: ['dailyRewardQuota'],
+            message: t('Set a positive daily reward limit before enabling'),
+          })
+        }
+        if (!props.config.compliance_confirmed) {
+          context.addIssue({
+            code: 'custom',
+            path: ['inviterEnabled'],
+            message: t('Confirm payment compliance before enabling cashback'),
+          })
+        }
+      }
+    })
+
+  const form = useForm<Values>({
+    resolver: zodResolver(schema) as Resolver<Values>,
+    defaultValues: configToValues(props.config),
+  })
+  const mutation = useMutation({
+    mutationFn: updateCashbackConfig,
+  })
+  const enabled = form.watch('inviterEnabled') || form.watch('inviteeEnabled')
+  const selectedRiskFlags = form.watch('autoReviewRiskFlags')
+  const currencyLabel = getCurrencyLabel()
+  const rewardLimitStep = getEditableQuotaStep()
+
+  async function persist(values: Values) {
+    try {
+      const response = await mutation.mutateAsync(
+        valuesToRequest(values, props.config)
+      )
+      if (!response.success || !response.data) {
+        throw new Error(response.message || 'Failed to save cashback settings')
+      }
+      queryClient.setQueryData(['cashback', 'config'], response.data)
+      form.reset(configToValues(response.data))
+      toast.success(t('Cashback settings saved'))
+    } catch (error: unknown) {
+      const axiosError = axios.isAxiosError(error) ? error : undefined
+      const field = axiosError?.response?.data?.field as string | undefined
+      const serverMessage =
+        axiosError?.response?.data?.message || t('Invalid cashback setting')
+      if (field === 'config') {
+        form.setError('root.server', { message: serverMessage })
+      } else if (field && field in fieldMap) {
+        form.setError(fieldMap[field as keyof typeof fieldMap], {
+          message: serverMessage,
+        })
+      }
+      let message: string | undefined
+      if (axiosError) {
+        message = axiosError.response?.data?.message
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message || t('Failed to save cashback settings'))
+    }
+  }
+
+  function onSubmit(values: Values) {
+    const firstEnable =
+      props.config.first_enabled_at === 0 &&
+      (values.inviterEnabled || values.inviteeEnabled)
+    const highRate =
+      nominalPercent(values, 'inviter') + nominalPercent(values, 'invitee') >=
+      50
+    if (firstEnable || highRate || values.autoReviewRiskFlags?.length === 0) {
+      setPendingValues(values)
+      setConfirmationOpen(true)
+      return
+    }
+    void persist(values)
+  }
+
+  function handleConfirmationChange(open: boolean) {
+    setConfirmationOpen(open)
+    if (!open && !mutation.isPending) setPendingValues(null)
+  }
+
+  return (
+    <SettingsSection title={t('Top-up and inviter cashback')}>
+      <Form {...form}>
+        <SettingsForm onSubmit={form.handleSubmit(onSubmit)} autoComplete='off'>
+          <SettingsPageFormActions
+            onSave={form.handleSubmit(onSubmit)}
+            isSaving={mutation.isPending || form.formState.isSubmitting}
+            isSaveDisabled={!form.formState.isDirty}
+            saveLabel='Save cashback settings'
+          />
+
+          {form.formState.errors.root?.server?.message && (
+            <p role='alert' className='text-destructive text-sm'>
+              {form.formState.errors.root.server.message}
+            </p>
+          )}
+
+          {!props.config.compliance_confirmed && (
+            <Alert variant='destructive'>
+              <AlertTitle>
+                {t('Payment compliance is not confirmed')}
+              </AlertTitle>
+              <AlertDescription>
+                {t(
+                  'Cashback stays disabled until the payment compliance statement is confirmed.'
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className='grid gap-4 lg:grid-cols-2'>
+            <FormField
+              control={form.control}
+              name='inviterEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Reward the inviter')}</FormLabel>
+                    <FormDescription>
+                      {t('Create a separate reward for the referring user.')}
+                    </FormDescription>
+                    <FormMessage />
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={mutation.isPending}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='inviteeEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Reward the top-up payer')}</FormLabel>
+                    <FormDescription>
+                      {t('Create a separate reward for the user who tops up.')}
+                    </FormDescription>
+                    <FormMessage />
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={mutation.isPending}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+          </div>
+
+          <div className='grid gap-6 sm:grid-cols-2'>
+            <FormField
+              control={form.control}
+              name='inviterStrategy'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Inviter cashback strategy')}</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={mutation.isPending}
+                  >
+                    <FormControl>
+                      <SelectTrigger
+                        className='w-full'
+                        aria-label={t('Inviter cashback strategy')}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value='rate'>
+                        {t('Percentage of top-up')}
+                      </SelectItem>
+                      <SelectItem value='per_hundred'>
+                        {t('Fixed per 100 of top-up')}
+                      </SelectItem>
+                      <SelectItem value='tiered'>
+                        {t('Tiered fixed reward')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='inviteeStrategy'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Payer cashback strategy')}</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    disabled={mutation.isPending}
+                  >
+                    <FormControl>
+                      <SelectTrigger
+                        className='w-full'
+                        aria-label={t('Payer cashback strategy')}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value='rate'>
+                        {t('Percentage of top-up')}
+                      </SelectItem>
+                      <SelectItem value='per_hundred'>
+                        {t('Fixed per 100 of top-up')}
+                      </SelectItem>
+                      <SelectItem value='tiered'>
+                        {t('Tiered fixed reward')}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {form.watch('inviterStrategy') === 'rate' && (
+              <FormField
+                control={form.control}
+                name='inviterRatePercent'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Inviter cashback rate (%)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Applied to the selected top-up face value.')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {form.watch('inviterStrategy') === 'tiered' && (
+              <CashbackTierEditor
+                direction='inviter'
+                form={form}
+                disabled={mutation.isPending}
+              />
+            )}
+            {form.watch('inviterStrategy') === 'per_hundred' && (
+              <FormField
+                control={form.control}
+                name='inviterFixedPerHundred'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Inviter reward per 100')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={100}
+                        step={1}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Only complete hundreds count per order; remainders do not carry over.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {form.watch('inviteeStrategy') === 'rate' && (
+              <FormField
+                control={form.control}
+                name='inviteeRatePercent'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Top-up payer cashback rate (%)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'The combined rate for both directions cannot exceed 100%.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {form.watch('inviteeStrategy') === 'tiered' && (
+              <CashbackTierEditor
+                direction='invitee'
+                form={form}
+                disabled={mutation.isPending}
+              />
+            )}
+            {form.watch('inviteeStrategy') === 'per_hundred' && (
+              <FormField
+                control={form.control}
+                name='inviteeFixedPerHundred'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Payer reward per 100')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={1}
+                        max={100}
+                        step={1}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Only complete hundreds count per order; remainders do not carry over.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            <FormField
+              control={form.control}
+              name='settlementDays'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Settlement delay (days)')}</FormLabel>
+                  <FormControl>
+                    <Input type='number' min={1} max={90} step={1} {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Each day is a full 24-hour hold after payment succeeds.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormItem>
+              <Label htmlFor='cashback-first-enabled-at'>
+                {t('First enabled at')}
+              </Label>
+              <Input
+                id='cashback-first-enabled-at'
+                aria-describedby='cashback-first-enabled-at-description'
+                readOnly
+                value={
+                  props.config.first_enabled_at > 0
+                    ? dayjs
+                        .unix(props.config.first_enabled_at)
+                        .format('YYYY-MM-DD HH:mm:ss')
+                    : t('Not enabled yet')
+                }
+              />
+              <p
+                id='cashback-first-enabled-at-description'
+                className='text-muted-foreground text-sm'
+              >
+                {t(
+                  'Orders created before this time can never receive cashback.'
+                )}
+              </p>
+            </FormItem>
+          </div>
+
+          <div className='grid gap-6 sm:grid-cols-2'>
+            <FormField
+              control={form.control}
+              name='maxRewardQuota'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Single reward limit ({{currency}})', {
+                      currency: currencyLabel,
+                    })}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      step={rewardLimitStep}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Enter the amount in the display currency; it is converted to quota when saved.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='dailyRewardQuota'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Beneficiary 24-hour reward limit ({{currency}})', {
+                      currency: currencyLabel,
+                    })}
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      step={rewardLimitStep}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className='grid gap-6 sm:grid-cols-3'>
+            <FormField
+              control={form.control}
+              name='ipAccountThreshold'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Shared IP account threshold')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={2}
+                      max={100000}
+                      step={1}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='deviceAccountThreshold'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Shared device account threshold')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={2}
+                      max={100000}
+                      step={1}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='dailyTopUpCountThreshold'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('User 24-hour top-up threshold')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={1}
+                      max={100000}
+                      step={1}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className='space-y-2'>
+            <h3 className='font-semibold'>{t('Top-up payer review policy')}</h3>
+            <p className='text-muted-foreground text-sm'>
+              {t(
+                'Inviter rewards always require manual review. Payer rewards require an active campaign as well as the direction switch.'
+              )}
+            </p>
+            <FormField
+              control={form.control}
+              name='autoReviewEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Enable automatic payer review')}</FormLabel>
+                    <FormDescription>
+                      {t('When off, all payer rewards require manual review.')}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={mutation.isPending}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+            {selectedRiskFlags === null ? (
+              <Alert>
+                <AlertTitle>
+                  {t('Per-flag review policy is not configured')}
+                </AlertTitle>
+                <AlertDescription>
+                  {t(
+                    'Until you activate a risk policy, all payer rewards require manual review, even when automatic review is enabled.'
+                  )}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <p className='text-muted-foreground text-sm'>
+                {t(
+                  'Selected risk flags route positive payer rewards to manual review. An empty selection allows automatic approval when the master switch is on; payment safety checks still apply.'
+                )}
+              </p>
+            )}
+            {selectedRiskFlags === null && (
+              <Button
+                type='button'
+                variant='outline'
+                disabled={mutation.isPending}
+                onClick={() =>
+                  form.setValue('autoReviewRiskFlags', [], {
+                    shouldDirty: true,
+                  })
+                }
+              >
+                {t('Activate per-flag review policy')}
+              </Button>
+            )}
+            {selectedRiskFlags !== null && (
+              <fieldset
+                className='grid gap-3 sm:grid-cols-2'
+                disabled={mutation.isPending}
+                aria-invalid={!!form.formState.errors.autoReviewRiskFlags}
+                aria-describedby={
+                  form.formState.errors.autoReviewRiskFlags
+                    ? 'cashback-risk-flags-error'
+                    : undefined
+                }
+              >
+                <legend className='mb-2 font-medium'>
+                  {t('Risk flags requiring manual review')}
+                </legend>
+                {props.config.available_auto_review_risk_flags.map((flag) => (
+                  <label key={flag} className='flex items-center gap-2 text-sm'>
+                    <Checkbox
+                      checked={selectedRiskFlags.includes(flag)}
+                      onCheckedChange={(checked) => {
+                        const next = checked
+                          ? [...selectedRiskFlags, flag]
+                          : selectedRiskFlags.filter((item) => item !== flag)
+                        form.setValue('autoReviewRiskFlags', next, {
+                          shouldDirty: true,
+                        })
+                      }}
+                    />
+                    {t(flag)}
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {form.formState.errors.autoReviewRiskFlags?.message && (
+              <p
+                id='cashback-risk-flags-error'
+                role='alert'
+                className='text-destructive text-sm'
+              >
+                {form.formState.errors.autoReviewRiskFlags.message}
+              </p>
+            )}
+            <FormField
+              control={form.control}
+              name='autoReviewImmediateIssue'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>
+                      {t(
+                        'Issue automatically approved payer rewards immediately'
+                      )}
+                    </FormLabel>
+                    <FormDescription>
+                      {t(
+                        'When off, automatically approved payer rewards wait for the configured delay. Manually approved payer rewards may issue immediately; inviter rewards still wait. Safety checks always apply.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={
+                        mutation.isPending || !form.watch('autoReviewEnabled')
+                      }
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
+          </div>
+
+          {enabled && (
+            <Alert>
+              <AlertTitle>{t('Cashback review and settlement')}</AlertTitle>
+              <AlertDescription>
+                {t(
+                  'Manually reviewed rewards wait for the configured hold. Only automatically approved payer rewards may be issued immediately after verified payment and wallet checks.'
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+        </SettingsForm>
+      </Form>
+
+      <AlertDialog
+        open={confirmationOpen}
+        onOpenChange={handleConfirmationChange}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('Confirm cashback risk settings')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingValues?.autoReviewRiskFlags?.length === 0
+                ? t(
+                    'No risk flags are selected. With automatic payer review enabled, eligible positive rewards may be approved without risk-based manual review. Payment and wallet safety checks still apply. Confirm this policy before saving.'
+                  )
+                : t(
+                    'Enabling cashback or setting a high combined nominal return creates wallet exposure. Confirm the limits and review workflow before saving.'
+                  )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mutation.isPending}>
+              {t('Cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={mutation.isPending || !pendingValues}
+              onClick={() => {
+                if (pendingValues) void persist(pendingValues)
+                setConfirmationOpen(false)
+              }}
+            >
+              {t('Confirm and save')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </SettingsSection>
+  )
+}

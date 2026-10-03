@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "后端分层规范入口"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "三库迁移及容器隔离测试"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端分层规范入口"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端购买展示与回归约定"}
+{"file": ".agents/rules/billing.md", "reason": "计费安全和资金来源强制约定"}
+{"file": ".trellis/tasks/10-01-subscription-group-billing/research/current-flows.md", "reason": "现有套餐、计费与界面入口调查"}

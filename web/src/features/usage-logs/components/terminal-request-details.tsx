@@ -84,7 +84,7 @@ export function TerminalRequestDetails(props: { log: UsageLog }) {
     cacheRead > 0 || cacheWrite > 0 || cacheWrite5m > 0 || cacheWrite1h > 0
   const hasDynamicCachePrice =
     dynamicSummary?.priceEntries.some((entry) =>
-      ['cr', 'cc', 'cc1h'].includes(entry.key)
+      ['cr', 'cc', 'cc1h'].includes(entry.key ?? '')
     ) ?? false
   const cacheIncludedInInput =
     prices.mode === 'dynamic' && hasCacheUsage && !hasDynamicCachePrice

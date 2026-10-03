@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -13,7 +14,7 @@ import (
 )
 
 // RegisterScheduledSystemTasks wires the periodic channel test, upstream model
-// update, and async task polling (Midjourney / Suno / video) jobs into the
+// update, cashback settlement, and async task polling (Midjourney / Suno / video) jobs into the
 // system task framework so a DB lease dedups execution across multiple master
 // instances and each run is recorded as one task row. Call this before
 // service.StartSystemTaskRunner.
@@ -22,6 +23,7 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(&cashbackSettlementHandler{})
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and
@@ -150,6 +152,54 @@ func (asyncTaskPollHandler) NewPayload() any { return nil }
 func (asyncTaskPollHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
 	summary := service.RunTaskPollingOnce(ctx, service.NewSystemTaskProgressReporter(task, runnerID))
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+const cashbackIdleCheckInterval = time.Hour
+
+type cashbackSettlementHandler struct {
+	mu              sync.Mutex
+	nextIdleCheckAt time.Time
+}
+
+func (*cashbackSettlementHandler) Type() string { return model.SystemTaskTypeCashbackSettlement }
+func (h *cashbackSettlementHandler) Enabled() bool {
+	return h.enabledAt(time.Now(), model.HasMaturedCashbackRewards)
+}
+
+func (h *cashbackSettlementHandler) enabledAt(now time.Time, hasMatured func(int64) (bool, error)) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if now.Before(h.nextIdleCheckAt) {
+		return false
+	}
+	due, err := hasMatured(now.Unix())
+	if err != nil {
+		common.SysError("failed to check matured cashback rewards: " + err.Error())
+		return true
+	}
+	// Back off only after an empty check. Pending batches must still run
+	// every minute, and query errors must remain retryable.
+	if !due {
+		h.nextIdleCheckAt = now.Add(cashbackIdleCheckInterval)
+	}
+	return due
+}
+func (*cashbackSettlementHandler) Interval() time.Duration { return time.Minute }
+func (*cashbackSettlementHandler) NewPayload() any         { return nil }
+
+func (*cashbackSettlementHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	select {
+	case <-ctx.Done():
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, ctx.Err())
+		return
+	default:
+	}
+	result, err := model.SettleMaturedCashbackRewards(common.GetTimestamp(), 100)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, result, err)
+		return
+	}
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, result, nil)
 }
 
 func finishSystemTaskHandler(task *model.SystemTask, runnerID string, status model.SystemTaskStatus, result any, runErr error) {

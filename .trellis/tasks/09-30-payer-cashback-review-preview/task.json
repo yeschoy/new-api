@@ -1,0 +1,30 @@
+{
+  "id": "payer-cashback-review-preview",
+  "name": "payer-cashback-review-preview",
+  "title": "充值人返现即时结算、自动审核状态与充值页预览",
+  "description": "修正充值人手审后发放、零额奖励审核状态，并在充值页展示预计返现。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "kevin tang",
+  "assignee": "kevin tang",
+  "createdAt": "2026-09-30",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-30-payer-manual-issue",
+    "09-30-payer-review-zero-state",
+    "09-30-payer-topup-preview"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

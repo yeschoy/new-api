@@ -68,7 +68,7 @@ export function getRequestErrorText(log: UsageLog): string {
   const other = parseLogOther(log.other)
   const stream = other?.stream_status
   const parts = [
-    other?.reject_reason,
+    other?.admin_info?.reject_reason,
     stream?.end_error,
     ...(Array.isArray(stream?.errors) ? stream.errors : []),
     log.content,
@@ -195,7 +195,7 @@ export function getDynamicBillingDetails(
     if (!Number.isFinite(costBeforeGroup) || costBeforeGroup < 0) return null
     calculatedCost += costBeforeGroup
     lineItems.push({
-      key: entry.key,
+      key: entry.key ?? entry.field,
       labelKey: entry.shortLabel,
       quantity,
       unitPrice: entry.price,

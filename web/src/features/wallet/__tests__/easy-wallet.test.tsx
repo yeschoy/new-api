@@ -17,7 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient } from '@tanstack/react-query'
-import { cleanup, screen } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react'
+import { Toaster } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { api } from '@/lib/api'
@@ -26,6 +33,8 @@ import { useConsoleModeStore } from '@/stores/console-mode-store'
 import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 import { renderApp } from '@/test-utils/render-app'
 
+import { SubscriptionPlansCard } from '../components/subscription-plans-card'
+import { useRedemption } from '../hooks/use-redemption'
 import { Wallet } from '../index'
 
 const originalAdapter = api.defaults.adapter
@@ -131,6 +140,116 @@ describe('easy wallet redemption', () => {
 
     await screen.findByText('Have a Code?')
     expect(screen.getAllByRole('button', { name: 'Redeem' })).toHaveLength(1)
+  })
+
+  it.each([
+    {
+      data: 500,
+      expected: 'Redemption successful! Added:',
+      refreshFails: false,
+    },
+    {
+      data: { type: 'subscription', plan_id: 7, plan_title: 'Pro' },
+      expected: 'Subscription redeemed: Pro',
+      refreshFails: false,
+    },
+    {
+      data: { type: 'subscription', plan_id: 7, plan_title: 'Pro' },
+      expected: 'Subscription redeemed: Pro',
+      refreshFails: true,
+    },
+  ])(
+    'reports the correct entitlement after redeeming $data',
+    async ({ data, expected, refreshFails }) => {
+      const adapter = api.defaults.adapter
+      api.defaults.adapter = async (config) => {
+        if (config.url === '/api/user/topup') {
+          return {
+            data: { success: true, data },
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config,
+          }
+        }
+        if (refreshFails && config.url === '/api/user/self') {
+          throw new Error('refresh unavailable')
+        }
+        if (typeof adapter === 'function') return adapter(config)
+        throw new Error('Missing adapter')
+      }
+      render(<Toaster />)
+      const { result } = renderHook(() => useRedemption())
+      await act(async () => {
+        expect(await result.current.redeemCode('gift')).toBe(true)
+      })
+      expect(
+        await screen.findByText((content) => content.includes(expected))
+      ).toBeVisible()
+    }
+  )
+
+  it('shows the current scope of an active subscription even if its plan is no longer for sale', async () => {
+    const adapter = api.defaults.adapter
+    api.defaults.adapter = async (config) => {
+      const path = new URL(config.url ?? '', 'http://localhost').pathname
+      if (path === '/api/subscription/plans') {
+        return {
+          data: { success: true, data: [] },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }
+      }
+      if (path === '/api/subscription/self') {
+        return {
+          data: {
+            success: true,
+            data: {
+              billing_preference: 'subscription_first',
+              subscriptions: [
+                {
+                  applicable_group: 'deepflash',
+                  subscription: {
+                    id: 17,
+                    plan_id: 8,
+                    status: 'active',
+                    end_time: Date.now() / 1000 + 3600,
+                    amount_total: 500000,
+                    amount_used: 0,
+                  },
+                },
+              ],
+              all_subscriptions: [
+                {
+                  applicable_group: 'deepflash',
+                  subscription: {
+                    id: 17,
+                    plan_id: 8,
+                    status: 'active',
+                    end_time: Date.now() / 1000 + 3600,
+                    amount_total: 500000,
+                    amount_used: 0,
+                  },
+                },
+              ],
+            },
+          },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }
+      }
+      if (typeof adapter === 'function') return adapter(config)
+      throw new Error('Missing adapter')
+    }
+
+    await renderApp(<SubscriptionPlansCard topupInfo={null} />, client)
+
+    expect(await screen.findByText(/Applicable Group/)).toBeVisible()
+    expect(screen.getByText('deepflash')).toBeVisible()
   })
 
   it('hides the redemption action when compliance disables redemption', async () => {

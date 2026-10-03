@@ -16,11 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
 import { useStatus } from '@/hooks/use-status'
-import { getFreshModuleAccess } from '@/lib/nav-modules'
+import { getModuleAccessForGuard } from '@/lib/nav-modules'
+import { requireServerSuccess } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getPricing } from '../api'
@@ -30,31 +31,25 @@ export function usePricingData(
   options: { publicPreview?: boolean } = {}
 ) {
   const { status } = useStatus()
+  const queryClient = useQueryClient()
   const viewerId = useAuthStore((state) =>
     state.auth.accessToken ? (state.auth.user?.id ?? null) : null
   )
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: options.publicPreview
-      ? ['pricing', 'home', viewerId]
-      : ['pricing'],
+    queryKey: options.publicPreview ? ['pricing', 'home', viewerId] : ['pricing'],
     queryFn: async () => {
-      if (!options.publicPreview) return getPricing()
+      if (!options.publicPreview) return requireServerSuccess(await getPricing())
 
-      // Home is public even when the catalog is private. Do not rely on
-      // placeholder status or a previously cached authenticated catalog.
-      const access = await getFreshModuleAccess('pricing')
-      if (!access.enabled || (access.requireAuth && viewerId === null)) {
-        return null
-      }
-      return getPricing({
+      // A public preview must never share the catalog's auth policy or in-flight request.
+      const access = await getModuleAccessForGuard(queryClient, 'pricing')
+      if (!access.enabled || (access.requireAuth && viewerId === null)) return null
+      return requireServerSuccess(await getPricing({
         skipAuthRefresh: true,
         skipErrorHandler: true,
         skipBusinessError: true,
-        // Preview and catalog requests must not share an in-flight request
-        // whose auth-error policy could redirect the public page.
         disableDuplicate: true,
-      })
+      }))
     },
     staleTime: 5 * 60 * 1000,
     enabled,

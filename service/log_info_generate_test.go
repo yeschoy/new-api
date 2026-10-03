@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/stretchr/testify/assert"
@@ -11,7 +12,7 @@ import (
 )
 
 func TestInjectTieredBillingInfoAddsSettlementTrace(t *testing.T) {
-	other := map[string]interface{}{}
+	other := model.NewLogOther()
 	relayInfo := &relaycommon.RelayInfo{
 		TieredBillingSnapshot: &billingexpr.BillingSnapshot{
 			ExprString: `tier("base", p * 2 + c * 10)`,
@@ -24,11 +25,12 @@ func TestInjectTieredBillingInfoAddsSettlementTrace(t *testing.T) {
 	}
 
 	InjectTieredBillingInfo(other, relayInfo, result)
+	fields := other.Snapshot()
 
-	assert.Equal(t, result.ActualUsage, other["billing_usage"])
-	assert.Equal(t, 0.00017, other["billing_cost_before_group"])
-	assert.Equal(t, "base", other["matched_tier"])
-	assert.NotEmpty(t, other["expr_b64"])
+	assert.Equal(t, result.ActualUsage, fields["billing_usage"])
+	assert.Equal(t, 0.00017, fields["billing_cost_before_group"])
+	assert.Equal(t, "base", fields["matched_tier"])
+	assert.NotEmpty(t, fields["expr_b64"])
 
 	encoded, err := common.Marshal(other)
 	require.NoError(t, err)

@@ -34,11 +34,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  formatLocalCurrencyAmount,
+  formatQuotaWithCurrency,
+  getCurrencyDisplay,
+} from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import {
-  formatCurrency,
+  usePayerCashbackPreview,
+  usePayerCashbackRule,
+} from '../hooks/use-payer-cashback-preview'
+import {
+  estimateTopupCashbackQuota,
   getDiscountLabel,
   getPaymentIcon,
   getMinTopupAmount,
@@ -52,6 +61,7 @@ import type {
   WaffoPayMethod,
 } from '../types'
 import { CreemProductsSection } from './creem-products-section'
+import { PayerCashbackPreviewView } from './payer-cashback-preview'
 
 interface RechargeFormCardProps {
   topupInfo: TopupInfo | null
@@ -122,12 +132,16 @@ export function RechargeFormCard({
     )
   }, [topupAmount])
 
+  const cashbackPreview = usePayerCashbackPreview({ amount: topupAmount })
+  const cashbackRule = usePayerCashbackRule(cashbackPreview)
+  const { config: currencyConfig, meta: currencyMeta } = getCurrencyDisplay()
+
   const handleAmountChange = (value: string) => {
     setLocalAmount(value)
-    const numValue = Number.parseInt(value) || 0
-    if (numValue >= 0) {
-      onTopupAmountChange(numValue)
-    }
+    const numValue = value === '' ? 0 : Number(value)
+    onTopupAmountChange(
+      Number.isSafeInteger(numValue) && numValue >= 0 ? numValue : 0
+    )
   }
 
   const hasConfigurableTopup =
@@ -140,7 +154,17 @@ export function RechargeFormCard({
     Array.isArray(topupInfo?.pay_methods) && topupInfo.pay_methods.length > 0
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
-  const minTopup = getMinTopupAmount(topupInfo)
+  const minTopup = Math.min(
+    topupInfo?.enable_online_topup ? topupInfo.min_topup : Infinity,
+    topupInfo?.enable_stripe_topup ? topupInfo.stripe_min_topup : Infinity,
+    enableWaffoTopup ? (waffoMinTopup ?? Infinity) : Infinity,
+    enableWaffoPancakeTopup
+      ? (topupInfo?.waffo_pancake_min_topup ?? Infinity)
+      : Infinity
+  )
+  const inputMinTopup = Number.isFinite(minTopup)
+    ? minTopup
+    : getMinTopupAmount(topupInfo)
   const redemptionEnabled = topupInfo?.enable_redemption !== false
 
   if (loading) {
@@ -243,6 +267,16 @@ export function RechargeFormCard({
                         discount,
                         usdExchangeRate
                       )
+                      // Nominal campaign reward before per-order caps; the
+                      // preview below remains the authoritative estimate.
+                      const cashbackQuota = cashbackRule
+                        ? estimateTopupCashbackQuota(
+                            preset.value,
+                            cashbackRule,
+                            currencyConfig.quotaPerUnit,
+                            currencyMeta.kind === 'tokens'
+                          )
+                        : 0
                       return (
                         <Button
                           key={preset.value}
@@ -265,12 +299,29 @@ export function RechargeFormCard({
                               </div>
                             )}
                           </div>
-                          <div className='text-muted-foreground mt-1.5 w-full text-xs sm:mt-2'>
-                            Pay {formatCurrency(actualPrice)}
-                            {hasDiscount && savedAmount > 0 && (
-                              <span className='text-green-600'>
-                                {' '}
-                                • Save {formatCurrency(savedAmount)}
+                          <div className='text-muted-foreground mt-1.5 flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:mt-2'>
+                            <span>
+                              {t('Pay {{amount}}', {
+                                amount: formatLocalCurrencyAmount(actualPrice),
+                              })}
+                              {hasDiscount && savedAmount > 0 && (
+                                <span className='text-green-600'>
+                                  {' • '}
+                                  {t('Save {{amount}}', {
+                                    amount:
+                                      formatLocalCurrencyAmount(savedAmount),
+                                  })}
+                                </span>
+                              )}
+                            </span>
+                            {cashbackQuota > 0 && (
+                              <span className='rounded-sm bg-green-600/10 px-1.5 py-0.5 text-[11px] leading-4 font-medium text-green-700 dark:text-green-400'>
+                                {t('Cashback {{amount}}', {
+                                  amount: formatQuotaWithCurrency(
+                                    cashbackQuota,
+                                    { abbreviate: false }
+                                  ),
+                                })}
                               </span>
                             )}
                           </div>
@@ -294,8 +345,8 @@ export function RechargeFormCard({
                     type='number'
                     value={localAmount}
                     onChange={(e) => handleAmountChange(e.target.value)}
-                    min={minTopup}
-                    placeholder={`Minimum ${minTopup}`}
+                    min={inputMinTopup}
+                    placeholder={`Minimum ${inputMinTopup}`}
                     className='h-9 text-base sm:h-10 sm:text-lg'
                   />
                   <div className='bg-muted/30 flex min-h-9 items-center justify-between gap-2 rounded-md border px-3 lg:min-w-52'>
@@ -306,12 +357,17 @@ export function RechargeFormCard({
                       <Skeleton className='h-5 w-16' />
                     ) : (
                       <span className='text-sm font-semibold'>
-                        {formatCurrency(paymentAmount)}
+                        {formatLocalCurrencyAmount(paymentAmount)}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
+
+              <PayerCashbackPreviewView
+                amount={topupAmount}
+                state={cashbackPreview}
+              />
 
               <div className='space-y-2.5 sm:space-y-3'>
                 <Label className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
@@ -322,7 +378,9 @@ export function RechargeFormCard({
                     {topupInfo?.pay_methods?.map((method) => {
                       const minTopup = Math.max(
                         method.min_topup || 0,
-                        getMinTopupAmount(topupInfo)
+                        method.type === 'stripe'
+                          ? (topupInfo?.stripe_min_topup ?? inputMinTopup)
+                          : (topupInfo?.min_topup ?? inputMinTopup)
                       )
                       const disabled = minTopup > topupAmount
                       const disabledReason = disabled

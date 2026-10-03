@@ -21,6 +21,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { GroupBadge } from '@/components/group-badge'
 import {
   StatusBadge,
   dotColorMap,
@@ -57,11 +58,14 @@ import type {
   UserSubscriptionRecord,
 } from '@/features/subscriptions/types'
 import { formatQuota } from '@/lib/format'
+import { handleServerError } from '@/lib/handle-server-error'
+import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
 import type { PaymentMethod, TopupInfo } from '../types'
 
 interface SubscriptionPlansCardProps {
+  refreshTrigger?: number
   topupInfo: TopupInfo | null
   onAvailabilityChange?: (available: boolean) => void
   userQuota?: number
@@ -94,6 +98,7 @@ function getBillingPreferenceLabel(
 
 export function SubscriptionPlansCard({
   topupInfo,
+  refreshTrigger,
   onAvailabilityChange,
   userQuota,
   onPurchaseSuccess,
@@ -126,18 +131,19 @@ export function SubscriptionPlansCard({
 
   const fetchPlans = useCallback(async () => {
     try {
-      const res = await getPublicPlans()
+      const res = requireServerSuccess(await getPublicPlans())
       if (res.success) {
         setPlans(res.data || [])
       }
-    } catch {
+    } catch (error) {
+      handleServerError(error)
       setPlans([])
     }
   }, [])
 
   const fetchSelfSubscription = useCallback(async () => {
     try {
-      const res = await getSelfSubscriptionFull()
+      const res = requireServerSuccess(await getSelfSubscriptionFull())
       if (res.success && res.data) {
         setBillingPreference(
           res.data.billing_preference || 'subscription_first'
@@ -145,8 +151,8 @@ export function SubscriptionPlansCard({
         setActiveSubscriptions(res.data.subscriptions || [])
         setAllSubscriptions(res.data.all_subscriptions || [])
       }
-    } catch {
-      // ignore
+    } catch (error) {
+      handleServerError(error)
     }
   }, [])
 
@@ -158,6 +164,10 @@ export function SubscriptionPlansCard({
     }
     init()
   }, [fetchPlans, fetchSelfSubscription])
+
+  useEffect(() => {
+    if (refreshTrigger) void fetchSelfSubscription()
+  }, [refreshTrigger, fetchSelfSubscription])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -178,11 +188,11 @@ export function SubscriptionPlansCard({
         const normalized = res.data?.billing_preference || pref
         setBillingPreference(normalized)
       } else {
-        toast.error(res.message || t('Update failed'))
+        handleServerError(res, t('Update failed'))
         setBillingPreference(previous)
       }
-    } catch {
-      toast.error(t('Request failed'))
+    } catch (error) {
+      handleServerError(error, t('Request failed'))
       setBillingPreference(previous)
     }
   }
@@ -194,8 +204,6 @@ export function SubscriptionPlansCard({
   const isSubPref =
     billingPreference === 'subscription_first' ||
     billingPreference === 'subscription_only'
-  const displayPref =
-    disablePref && isSubPref ? 'wallet_first' : billingPreference
 
   const planPurchaseCountMap = useMemo(() => {
     const map = new Map<number, number>()
@@ -332,12 +340,12 @@ export function SubscriptionPlansCard({
                     label: getBillingPreferenceLabel('wallet_only', t),
                   },
                 ]}
-                value={displayPref}
+                value={billingPreference}
                 onValueChange={(v) => v !== null && handlePreferenceChange(v)}
               >
                 <SelectTrigger className='h-8 flex-1 text-xs sm:w-[140px] sm:flex-none'>
                   <SelectValue>
-                    {getBillingPreferenceLabel(displayPref, t)}
+                    {getBillingPreferenceLabel(billingPreference, t)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false}>
@@ -381,15 +389,15 @@ export function SubscriptionPlansCard({
 
           {disablePref && isSubPref && (
             <p className='text-muted-foreground mt-2 text-xs'>
-              {t(
-                'Preference saved as {{pref}}, but no active subscription. Wallet will be used automatically.',
-                {
-                  pref:
-                    billingPreference === 'subscription_only'
-                      ? t('Subscription Only')
-                      : t('Subscription First'),
-                }
-              )}
+              {billingPreference === 'subscription_only'
+                ? t(
+                    'Preference saved as {{pref}}, but no active subscription. Requests will be rejected.',
+                    { pref: t('Subscription Only') }
+                  )
+                : t(
+                    'Preference saved as {{pref}}, but no active subscription. Wallet will be used automatically.',
+                    { pref: t('Subscription First') }
+                  )}
             </p>
           )}
 
@@ -504,6 +512,16 @@ export function SubscriptionPlansCard({
                           </span>
                         )}
                       </div>
+                      {isActive && (
+                        <div className='text-muted-foreground mt-1 flex items-center gap-2'>
+                          {t('Applicable Group')}:
+                          {sub.applicable_group ? (
+                            <GroupBadge group={sub.applicable_group} />
+                          ) : (
+                            t('All groups')
+                          )}
+                        </div>
+                      )}
                       {totalAmount > 0 && isActive && (
                         <Progress value={usagePercent} className='mt-2 h-1.5' />
                       )}
@@ -542,6 +560,7 @@ export function SubscriptionPlansCard({
                 totalAmount > 0
                   ? `${t('Total Quota')}: ${formatQuota(totalAmount)}`
                   : `${t('Total Quota')}: ${t('Unlimited')}`,
+                `${t('Applicable Group')}: ${plan.applicable_group || t('All groups')}`,
                 limit > 0 ? `${t('Purchase Limit')}: ${limit}` : null,
                 plan.upgrade_group
                   ? `${t('Upgrade Group')}: ${plan.upgrade_group}`

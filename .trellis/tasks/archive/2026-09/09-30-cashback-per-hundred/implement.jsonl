@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/referral-recharge-cashback.md", "reason": "返现资金与跨层合同"}
+{"file": ".agents/rules/billing.md", "reason": "返现奖励的资金边界规则，完整读取"}
+{"file": ".trellis/tasks/09-30-cashback-per-hundred/research/face-value-paths.md", "reason": "五支付渠道面额及兼容调查"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "配置到下单快照到奖励展示链路"}

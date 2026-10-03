@@ -16,12 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PublicLayout } from '@/components/layout'
 import { RichContent } from '@/components/rich-content'
 import { useTheme } from '@/context/theme-provider'
+import { CashbackActivityPage } from '@/features/cashback-activity'
 import { usePricingData } from '@/features/pricing/hooks'
 import { isLikelyHtml } from '@/lib/content-format'
 import { useAuthStore } from '@/stores/auth-store'
@@ -30,6 +31,9 @@ import { CiLandingPage } from './components/ci-landing-page'
 import { useHomePageContent } from './hooks'
 import { buildModelCatalog } from './lib/catalog'
 import { getMaximumSavingsPercent } from './lib/pricing-savings'
+
+// 2026-10-08 00:00 Beijing time. This only controls the default home display.
+const CAMPAIGN_HOME_END = Date.parse('2026-10-07T16:00:00Z')
 
 function DefaultHome(props: { isAuthenticated: boolean }) {
   const { models, priceRate } = usePricingData(true, { publicPreview: true })
@@ -58,6 +62,38 @@ export function Home() {
   const { auth } = useAuthStore()
   const isAuthenticated = !!auth.user
   const { content, isLoaded, isUrl } = useHomePageContent()
+  const [showCampaign, setShowCampaign] = useState(
+    () => Date.now() < CAMPAIGN_HOME_END
+  )
+
+  useEffect(() => {
+    if (!isLoaded || content || !showCampaign) return
+
+    let timer: number
+    const checkDeadline = () => {
+      const remaining = CAMPAIGN_HOME_END - Date.now()
+      if (remaining <= 0) {
+        setShowCampaign(false)
+        return
+      }
+      window.clearTimeout(timer)
+      timer = window.setTimeout(
+        checkDeadline,
+        Math.min(remaining, 2_147_483_647)
+      )
+    }
+    const checkWhenVisible = () => {
+      if (!document.hidden) checkDeadline()
+    }
+    checkDeadline()
+    window.addEventListener('focus', checkDeadline)
+    document.addEventListener('visibilitychange', checkWhenVisible)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('focus', checkDeadline)
+      document.removeEventListener('visibilitychange', checkWhenVisible)
+    }
+  }, [content, isLoaded, showCampaign])
 
   const syncIframePreferences = useCallback(() => {
     try {
@@ -140,6 +176,10 @@ export function Home() {
         </div>
       </PublicLayout>
     )
+  }
+
+  if (showCampaign && Date.now() < CAMPAIGN_HOME_END) {
+    return <CashbackActivityPage />
   }
 
   return <DefaultHome isAuthenticated={isAuthenticated} />

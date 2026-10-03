@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef } from '@tanstack/react-table'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -173,6 +173,18 @@ export function useSubscriptionsColumns(): ColumnDef<PlanRecord>[] {
           )
         },
         size: 150,
+      },
+      {
+        id: 'applicable_group',
+        header: t('Applicable Group'),
+        meta: { mobileHidden: true },
+        cell: ({ row }) =>
+          row.original.plan.applicable_group ? (
+            <GroupBadge group={row.original.plan.applicable_group} />
+          ) : (
+            <span className='text-muted-foreground'>{t('All groups')}</span>
+          ),
+        size: 125,
       },
       {
         id: 'upgrade_group',

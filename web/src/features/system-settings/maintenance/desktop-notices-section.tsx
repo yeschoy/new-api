@@ -31,6 +31,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Textarea } from '@/components/ui/textarea'
+import { getServerErrorMessage } from '@/lib/server-error-message'
 
 import { SettingsForm } from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
@@ -97,13 +98,14 @@ export function DesktopNoticesSection(props: DesktopNoticesSectionProps) {
     if (values.DesktopNotices === props.defaultValue) {
       return
     }
-    const result = await updateOption.mutateAsync({
-      key: 'DesktopNotices',
-      value: values.DesktopNotices,
-    })
-    if (!result.success) {
+    try {
+      await updateOption.mutateAsync({
+        key: 'DesktopNotices',
+        value: values.DesktopNotices,
+      })
+    } catch (error) {
       form.setError('DesktopNotices', {
-        message: result.message || t('Failed to update setting'),
+        message: getServerErrorMessage(error, t('Failed to update setting')),
       })
     }
   }

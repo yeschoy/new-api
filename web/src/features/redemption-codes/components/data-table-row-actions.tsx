@@ -33,6 +33,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { handleServerError } from '@/lib/handle-server-error'
 
 import { updateRedemptionStatus } from '../api'
 import { REDEMPTION_STATUS, SUCCESS_MESSAGES } from '../constants'
@@ -62,17 +63,25 @@ export function DataTableRowActions<TData>({
       ? REDEMPTION_STATUS.DISABLED
       : REDEMPTION_STATUS.ENABLED
 
-    const result = await updateRedemptionStatus(redemption.id, newStatus)
-    if (result.success) {
-      const message = isEnabled
-        ? t(SUCCESS_MESSAGES.REDEMPTION_DISABLED)
-        : t(SUCCESS_MESSAGES.REDEMPTION_ENABLED)
-      toast.success(message)
-      triggerRefresh()
+    try {
+      const result = await updateRedemptionStatus(redemption.id, newStatus)
+      if (result.success) {
+        const message = isEnabled
+          ? t(SUCCESS_MESSAGES.REDEMPTION_DISABLED)
+          : t(SUCCESS_MESSAGES.REDEMPTION_ENABLED)
+        toast.success(message)
+        triggerRefresh()
+      } else {
+        handleServerError(result)
+      }
+    } catch (error) {
+      handleServerError(error)
     }
   }
 
-  const canEdit = isEnabled && !isExpired
+  // Administrators may correct metadata/expiry on any unused code, including
+  // disabled or expired codes. Used codes remain immutable in the UI.
+  const canEdit = !isUsed
   const canToggle = !isUsed && !isExpired
 
   return (

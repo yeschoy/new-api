@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "审查三库升级和隔离验证"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "审查前端可见行为及测试"}
+{"file": ".agents/rules/billing.md", "reason": "审查计费资金来源与回退边界"}
+{"file": ".trellis/tasks/10-01-subscription-group-billing/research/current-flows.md", "reason": "复核原路径与潜在绕过"}
