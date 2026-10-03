@@ -21,6 +21,7 @@ import { api, type ApiEnvelope } from '@/lib/api'
 import { unwrap } from '@/lib/console-api'
 
 import type { ChannelAffinity, DrawingLog, LogEntry, LogPage, LogScope, LogStats, LogUserInfo, TaskLog } from './log-types'
+import { parseArtifacts, type ArtifactSet } from './task-artifacts-lib'
 
 type Params = Record<string, string | number | undefined>
 
@@ -105,6 +106,12 @@ export function listDrawingLogs(scope: LogScope, query: TaskQuery, page: number,
     end_timestamp: query.end_timestamp,
   }
   return getPage<DrawingLog>(url, params, t('获取绘图记录失败'))
+}
+
+/** What a finished task produced (GET /api/task/:id/artifacts); links are checked before use. */
+export async function getTaskArtifacts(taskId: string): Promise<ArtifactSet> {
+  const res = await api.get<ApiEnvelope<unknown>>(`/api/task/${encodeURIComponent(taskId)}/artifacts`)
+  return parseArtifacts(unwrap(res.data, t('制品加载失败')))
 }
 
 /** GET /api/user/:id (admins). */
