@@ -374,9 +374,15 @@ wallet quota; floating-point money arithmetic is forbidden.
   purchase and reward. Post-commit cache publication invalidates the balance
   instead of publishing only the purchase delta when an immediate gift issued.
 - Row locks, the unique mutation event, and state predicates—not the scheduler
-  lease—guarantee at-most-once issuance. `cashback_settlement` runs every minute
-  in batches of 100, including approved/frozen manual payer rewards with a
-  future original hold date and respecting retry times. Before issuing, it
+  lease—guarantee at-most-once issuance. An empty due-reward check is cached in
+  the master process for one hour; a newly matured reward can therefore wait up
+  to about an hour before its first settlement attempt (including manual payer
+  rewards whose immediate issue was deferred). Due batches continue at most
+  once per minute in groups of 100, including approved/frozen manual payer
+  rewards with a future original hold date and respecting retry times as
+  earliest eligibility, not an exact wakeup guarantee. An isolated retry may
+  also wait for the next hourly idle probe. Failed due checks do not start the
+  hourly idle delay. Before issuing, it
   advances a bounded, primary-key ordered
   reconciliation page across rewards, order contexts, and mutation evidence; a
   mismatched page remains pinned and stops settlement until repaired. Process

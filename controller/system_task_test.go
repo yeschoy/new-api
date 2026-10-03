@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -13,6 +15,50 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func TestCashbackSettlementIdleCheckBackoff(t *testing.T) {
+	handler := &cashbackSettlementHandler{}
+	start := time.Unix(1_700_000_000, 0)
+	calls := 0
+	var dueChecks []int64
+	probe := func(timestamp int64) (bool, error) {
+		calls++
+		dueChecks = append(dueChecks, timestamp)
+		return true, nil
+	}
+
+	assert.False(t, handler.enabledAt(start, func(timestamp int64) (bool, error) {
+		calls++
+		assert.Equal(t, start.Unix(), timestamp)
+		return false, nil
+	}))
+	assert.False(t, handler.enabledAt(start.Add(time.Hour-time.Second), probe))
+	assert.Equal(t, 1, calls)
+
+	assert.True(t, handler.enabledAt(start.Add(time.Hour), probe))
+	assert.True(t, handler.enabledAt(start.Add(time.Hour+15*time.Second), probe))
+	assert.Equal(t, 3, calls, "due batches must not wait an hour between checks")
+	assert.Equal(t, []int64{start.Add(time.Hour).Unix(), start.Add(time.Hour + 15*time.Second).Unix()}, dueChecks)
+}
+
+func TestCashbackSettlementProbeErrorDoesNotBackOff(t *testing.T) {
+	handler := &cashbackSettlementHandler{}
+	start := time.Unix(1_700_000_000, 0)
+	assert.True(t, handler.enabledAt(start, func(int64) (bool, error) {
+		return false, errors.New("database unavailable")
+	}))
+
+	calls := 0
+	assert.False(t, handler.enabledAt(start.Add(15*time.Second), func(int64) (bool, error) {
+		calls++
+		return false, nil
+	}))
+	assert.False(t, handler.enabledAt(start.Add(30*time.Second), func(int64) (bool, error) {
+		calls++
+		return true, nil
+	}))
+	assert.Equal(t, 1, calls, "only an empty successful probe starts the hourly backoff")
+}
 
 func TestSystemTaskListFiltersAndPaginationResponse(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
