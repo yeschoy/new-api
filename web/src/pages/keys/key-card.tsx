@@ -73,7 +73,7 @@ export function KeyCard(props: KeyRowProps) {
         </Detail>
       </dl>
       <div className='mt-2'>
-        <KeyActions apiKey={key} full={full} />
+        <KeyActions apiKey={key} full={full} onEdit={props.onEdit} />
       </div>
     </li>
   )

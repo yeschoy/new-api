@@ -29,8 +29,8 @@ import { KeyMenu } from './key-menu'
 import type { KeyDetail } from './keys-api'
 import type { FullKey } from './use-full-key'
 
-/** Enable / disable, delete (asked inline first) and the "more" menu for one key. */
-export function KeyActions(props: { apiKey: KeyDetail; full: FullKey }) {
+/** Edit, enable / disable, delete (asked inline first) and the "more" menu for one key. */
+export function KeyActions(props: { apiKey: KeyDetail; full: FullKey; onEdit: () => void }) {
   const { t } = useI18n()
   const key = props.apiKey
   const queryClient = useQueryClient()
@@ -71,6 +71,9 @@ export function KeyActions(props: { apiKey: KeyDetail; full: FullKey }) {
           </>
         ) : (
           <>
+            <Button size='sm' variant='ghost' onClick={props.onEdit}>
+              {t('编辑')}
+            </Button>
             <Button size='sm' variant='ghost' busy={toggle.isPending} onClick={() => toggle.mutate()}>
               {enabled ? t('禁用') : t('启用')}
             </Button>

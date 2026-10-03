@@ -33,17 +33,20 @@ import { useNow } from '@/pages/keys/time-labels'
 
 import { useConsoleKey } from './console-hooks'
 import { ConsolePage } from './console-page'
-import { CreateKeyDialog } from './key-create-dialog'
+import { KeyDialog } from './key-create-dialog'
 
-/** API keys: search, filter and page through keys; reveal / copy, enable / disable, delete, create. */
+/** The open create (no id) or edit dialog. */
+type DialogState = { keyId?: number } | null
+
+/** API keys: search, filter and page through keys; reveal / copy, edit, enable / disable, delete, create. */
 export function KeysPage() {
   const { t } = useI18n()
   const { data: status } = useStatus()
-  const [creating, setCreating] = useState(false)
+  const [dialog, setDialog] = useState<DialogState>(null)
 
   const baseUrl = `${(status?.server_address || window.location.origin).replace(/\/+$/, '')}/v1`
   const create = (
-    <Button variant='primary' onClick={() => setCreating(true)}>
+    <Button variant='primary' onClick={() => setDialog({})}>
       <Plus className='size-4' aria-hidden='true' />
       {t('创建密钥')}
     </Button>
@@ -61,8 +64,8 @@ export function KeysPage() {
       }
       actions={create}
     >
-      <KeysContent create={create} />
-      {creating ? <CreateKeyDialog onClose={() => setCreating(false)} /> : null}
+      <KeysContent create={create} onEdit={(keyId) => setDialog({ keyId })} />
+      {dialog ? <KeyDialog keyId={dialog.keyId} onClose={() => setDialog(null)} /> : null}
     </ConsolePage>
   )
 }
@@ -70,7 +73,7 @@ export function KeysPage() {
 const NONE: ReadonlySet<number> = new Set()
 
 /** Signed-in part of the page: the queries only run once the visitor is known. */
-function KeysContent(props: { create: React.ReactNode }) {
+function KeysContent(props: { create: React.ReactNode; onEdit: (keyId: number) => void }) {
   const { t } = useI18n()
   const [view, setView] = useState<KeyQuery>({ page: 1, size: 20, keyword: '', token: '' })
   const [statusFilter, setStatusFilter] = useState('')
@@ -142,6 +145,7 @@ function KeysContent(props: { create: React.ReactNode }) {
         empty={empty}
         selected={selectedIds}
         onSelect={(id, checked) => select([id], checked)}
+        onEdit={props.onEdit}
       />
       <KeysFooter
         page={view.page}

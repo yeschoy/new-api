@@ -32,6 +32,7 @@ export type KeyRowProps = {
   now: number
   selected: boolean
   onSelect: (checked: boolean) => void
+  onEdit: () => void
 }
 
 /** One key in the table: name and limits, masked key with reveal / copy, group, credit, times and actions. */
@@ -77,7 +78,7 @@ export function KeyRow(props: KeyRowProps) {
         <UsageTimes apiKey={key} now={props.now} />
       </Td>
       <Td right>
-        <KeyActions apiKey={key} full={full} />
+        <KeyActions apiKey={key} full={full} onEdit={props.onEdit} />
       </Td>
     </Tr>
   )

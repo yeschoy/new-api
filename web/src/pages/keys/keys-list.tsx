@@ -75,6 +75,7 @@ export function KeysList(props: {
   empty: React.ReactNode
   selected: ReadonlySet<number>
   onSelect: (id: number, checked: boolean) => void
+  onEdit: (id: number) => void
 }) {
   const phone = useMediaQuery(PHONE_QUERY)
   const message = hasMessage(props.state, props.items.length) ? (
@@ -95,6 +96,7 @@ export function KeysList(props: {
                 now={props.now}
                 selected={props.selected.has(apiKey.id)}
                 onSelect={(checked) => props.onSelect(apiKey.id, checked)}
+                onEdit={() => props.onEdit(apiKey.id)}
               />
             ))}
           </ul>
@@ -115,6 +117,7 @@ export function KeysList(props: {
             now={props.now}
             selected={props.selected.has(apiKey.id)}
             onSelect={(checked) => props.onSelect(apiKey.id, checked)}
+            onEdit={() => props.onEdit(apiKey.id)}
           />
         ))}
       </Table>
