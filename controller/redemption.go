@@ -86,12 +86,8 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountMax)
 		return
 	}
-	if redemption.Quota <= 0 {
-		common.ApiError(c, errors.New("redemption quota must be positive"))
-		return
-	}
-	if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-		common.ApiError(c, err)
+	if redemption.PlanId < 0 || (redemption.PlanId == 0 && redemption.Quota <= 0) || (redemption.PlanId > 0 && redemption.Quota != 0) {
+		common.ApiError(c, errors.New("invalid redemption entitlement"))
 		return
 	}
 	if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
@@ -107,6 +103,8 @@ func AddRedemption(c *gin.Context) {
 			Key:         key,
 			CreatedTime: common.GetTimestamp(),
 			Quota:       redemption.Quota,
+			PlanId:      redemption.PlanId,
+			Type:        redemption.Type,
 			ExpiredTime: redemption.ExpiredTime,
 		}
 		err = cleanRedemption.Insert()
@@ -121,10 +119,11 @@ func AddRedemption(c *gin.Context) {
 		}
 		keys = append(keys, key)
 	}
-	recordManageAudit(c, "redemption.create", map[string]interface{}{
-		"name":  redemption.Name,
-		"count": redemption.Count,
-		"quota": logger.LogQuota(redemption.Quota),
+	recordManageAudit(c, "redemption.create", map[string]any{
+		"name":    redemption.Name,
+		"count":   redemption.Count,
+		"quota":   logger.LogQuota(redemption.Quota),
+		"plan_id": redemption.PlanId,
 	})
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -162,12 +161,8 @@ func UpdateRedemption(c *gin.Context) {
 		return
 	}
 	if statusOnly == "" {
-		if redemption.Quota <= 0 {
-			common.ApiError(c, errors.New("redemption quota must be positive"))
-			return
-		}
-		if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-			common.ApiError(c, err)
+		if redemption.PlanId < 0 || (redemption.PlanId == 0 && redemption.Quota <= 0) || (redemption.PlanId > 0 && redemption.Quota != 0) {
+			common.ApiError(c, errors.New("invalid redemption entitlement"))
 			return
 		}
 		if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
@@ -177,12 +172,14 @@ func UpdateRedemption(c *gin.Context) {
 		// If you add more fields, please also update redemption.Update()
 		cleanRedemption.Name = redemption.Name
 		cleanRedemption.Quota = redemption.Quota
+		cleanRedemption.PlanId = redemption.PlanId
+		cleanRedemption.Type = redemption.Type
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
 	}
 	if statusOnly != "" {
 		cleanRedemption.Status = redemption.Status
 	}
-	err = cleanRedemption.Update()
+	err = cleanRedemption.Update(statusOnly != "")
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -214,4 +211,25 @@ func validateExpiredTime(c *gin.Context, expired int64) (bool, string) {
 		return false, i18n.T(c, i18n.MsgRedemptionExpireTimeInvalid)
 	}
 	return true, ""
+}
+
+func DeleteRedemptionBatch(c *gin.Context) {
+	var request struct {
+		Ids []int `json:"ids" binding:"required,min=1,max=1000,dive,gt=0"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	count, err := model.BatchDeleteRedemptions(request.Ids)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	recordManageAudit(c, "redemption.delete_batch", map[string]any{
+		"count":                    count,
+		"total":                    len(request.Ids),
+		"requested_redemption_ids": request.Ids,
+	})
+	common.ApiSuccess(c, count)
 }

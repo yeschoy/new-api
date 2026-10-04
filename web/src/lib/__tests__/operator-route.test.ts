@@ -34,6 +34,8 @@ describe('isOperatorRoute', () => {
 
   it('recognizes operator workspaces', () => {
     expect(isOperatorRoute('/channels')).toBe(true)
+    expect(isOperatorRoute('/cashback')).toBe(true)
+    expect(isOperatorRoute('/cashback/rewards/1')).toBe(true)
     expect(isOperatorRoute('/system-settings/site')).toBe(true)
     expect(isOperatorRoute('/models/metadata')).toBe(true)
     expect(isOperatorRoute('/guide')).toBe(true)

@@ -19,14 +19,22 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import type {
+  CashbackCampaignCreate,
+  CashbackCampaignListResponse,
+  CashbackCampaignResponse,
+  CashbackConfigResponse,
+  CashbackConfigUpdate,
   ConfirmPaymentComplianceResponse,
   FetchUpstreamRatiosRequest,
   LogCleanupTask,
   SystemOptionsResponse,
   SystemTaskListResponse,
+  SystemTaskFilters,
   SystemTaskResponse,
   UpdateOptionRequest,
   UpdateOptionResponse,
+  UpdatePasskeyDomainsRequest,
+  UpdatePasskeyDomainsResponse,
   UpstreamChannelsResponse,
   UpstreamRatiosResponse,
 } from './types'
@@ -41,10 +49,69 @@ export async function updateSystemOption(request: UpdateOptionRequest) {
   return res.data
 }
 
+export async function updatePasskeyDomains(
+  request: UpdatePasskeyDomainsRequest
+) {
+  const res = await api.put<UpdatePasskeyDomainsResponse>(
+    '/api/option/passkey/domains',
+    request,
+    {
+      validateStatus: (status) =>
+        (status >= 200 && status < 300) || status === 409,
+    }
+  )
+  return res.data
+}
+
 export async function confirmPaymentCompliance() {
   const res = await api.post<ConfirmPaymentComplianceResponse>(
     '/api/option/payment_compliance',
     { confirmed: true }
+  )
+  return res.data
+}
+
+export async function getCashbackConfig(): Promise<CashbackConfigResponse> {
+  const res = await api.get<CashbackConfigResponse>('/api/cashback/config')
+  return res.data
+}
+
+export async function updateCashbackConfig(
+  request: CashbackConfigUpdate
+): Promise<CashbackConfigResponse> {
+  const res = await api.put<CashbackConfigResponse>(
+    '/api/cashback/config',
+    request,
+    { skipErrorHandler: true }
+  )
+  return res.data
+}
+
+export async function listCashbackCampaigns(): Promise<CashbackCampaignListResponse> {
+  const res = await api.get<CashbackCampaignListResponse>(
+    '/api/cashback/campaigns'
+  )
+  return res.data
+}
+
+export async function createCashbackCampaign(
+  request: CashbackCampaignCreate
+): Promise<CashbackCampaignResponse> {
+  const res = await api.post<CashbackCampaignResponse>(
+    '/api/cashback/campaigns',
+    request,
+    { skipErrorHandler: true }
+  )
+  return res.data
+}
+
+export async function stopCashbackCampaign(
+  id: number
+): Promise<CashbackCampaignResponse> {
+  const res = await api.post<CashbackCampaignResponse>(
+    `/api/cashback/campaigns/${id}/stop`,
+    null,
+    { skipErrorHandler: true }
   )
   return res.data
 }
@@ -77,9 +144,12 @@ export async function getSystemTask(taskId: string) {
   return res.data
 }
 
-export async function listSystemTasks(limit = 20) {
+export async function listSystemTasks(
+  limit = 20,
+  filters: SystemTaskFilters = {}
+) {
   const res = await api.get<SystemTaskListResponse>('/api/system-task/list', {
-    params: { limit },
+    params: { limit, ...filters },
   })
   return res.data
 }

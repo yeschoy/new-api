@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "后端规范及质量检查入口"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "冲突规范须保留全部两侧契约"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "三库 Docker 隔离验证"}
+{"file": ".trellis/spec/backend/oauth-client-pkce.md", "reason": "认证令牌隔离和过期安全边界参考"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范及质量检查入口"}
+{"file": ".trellis/tasks/10-02-merge-origin-main-cashback/research/merge-surface.md", "reason": "冲突、受影响层及认证回归风险"}

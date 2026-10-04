@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/referral-recharge-cashback.md", "reason": "Existing payout, configuration, campaign, audit and preview contracts; update for tiered strategy."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Isolated three-database verification and Option compatibility."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend contracts and wallet preview consistency."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Config, API, settlement, UI and public endpoint data-flow boundaries."}

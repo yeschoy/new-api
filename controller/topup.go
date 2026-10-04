@@ -21,6 +21,103 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// PreviewTopUpCashback returns a point-in-time, read-only payer estimate.
+// Checkout and verified completion never consume this response.
+func PreviewTopUpCashback(c *gin.Context) {
+	query := c.Request.URL.Query()
+	amounts, hasAmount := query["amount"]
+	products, hasProduct := query["product_id"]
+	if hasAmount == hasProduct || len(amounts) > 1 || len(products) > 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+		return
+	}
+	var baseQuota int
+	var faceAmount int64
+	var factor string
+	if hasProduct {
+		if !isCreemTopUpEnabled() || len(products[0]) == 0 || len(products[0]) > 255 {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+			return
+		}
+		var configured []CreemProduct
+		if err := common.Unmarshal([]byte(setting.CreemProducts), &configured); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Preview unavailable"})
+			return
+		}
+		for _, product := range configured {
+			if product.ProductId == products[0] {
+				faceAmount = product.Quota
+				break
+			}
+		}
+		var err error
+		baseQuota, err = cashbackBaseQuotaFromWalletQuota(faceAmount)
+		if err != nil || faceAmount <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+			return
+		}
+		factor = "1"
+	} else {
+		amount, err := strconv.ParseInt(amounts[0], 10, 64)
+		var minAmount int64
+		standardEnabled := false
+		if isEpayTopUpEnabled() {
+			minAmount = getMinTopup()
+			standardEnabled = true
+		}
+		if isStripeTopUpEnabled() {
+			stripeMin := getStripeMinTopup()
+			if !standardEnabled {
+				minAmount = stripeMin
+			} else {
+				minAmount = min(minAmount, stripeMin)
+			}
+			standardEnabled = true
+		}
+		if isWaffoTopUpEnabled() {
+			waffoMin := int64(setting.WaffoMinTopUp)
+			if !standardEnabled {
+				minAmount = waffoMin
+			} else {
+				minAmount = min(minAmount, waffoMin)
+			}
+			standardEnabled = true
+		}
+		if isWaffoPancakeTopUpEnabled() {
+			pancakeMin := int64(setting.WaffoPancakeMinTopUp)
+			if !standardEnabled {
+				minAmount = pancakeMin
+			} else {
+				minAmount = min(minAmount, pancakeMin)
+			}
+			standardEnabled = true
+		}
+		if err != nil || amount < 0 || amount > getMaxTopUpAmount() || (amount > 0 && (!standardEnabled || amount < minAmount)) {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+			return
+		}
+		if amount > 0 {
+			baseQuota, err = cashbackBaseQuotaFromTopUpAmount(amount)
+			if err != nil || baseQuota <= 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid preview selection"})
+				return
+			}
+			faceAmount = amount
+			factor = decimal.NewFromFloat(common.QuotaPerUnit).String()
+			if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+				faceAmount = int64(baseQuota)
+				factor = "1"
+			}
+		}
+	}
+	preview, err := model.PreviewPayerCashback(c.GetInt("id"), baseQuota, faceAmount, factor)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Preview unavailable"})
+		return
+	}
+	common.ApiSuccess(c, preview)
+}
+
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
 
@@ -104,7 +201,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_redemption":                complianceConfirmed,
 		"payment_compliance_confirmed":     complianceConfirmed,
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,
-		"waffo_pay_methods": func() interface{} {
+		"waffo_pay_methods": func() any {
 			if enableWaffo {
 				return setting.GetWaffoPayMethods()
 			}
@@ -327,6 +424,11 @@ func RequestEpay(c *gin.Context) {
 		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
 		amount = dAmount.Div(dQuotaPerUnit).IntPart()
 	}
+	baseQuota, err := cashbackBaseQuotaFromTopUpAmount(req.Amount)
+	if err != nil || baseQuota <= 0 {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "充值数量无效"})
+		return
+	}
 	topUp := &model.TopUp{
 		UserId:          id,
 		Amount:          amount,
@@ -338,7 +440,7 @@ func RequestEpay(c *gin.Context) {
 		CreateTime:      time.Now().Unix(),
 		Status:          common.TopUpStatusPending,
 	}
-	err = topUp.Insert()
+	err = insertOnlineTopUpWithCashbackContext(c, topUp, baseQuota, req.Amount, false)
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("易支付 创建充值订单失败 user_id=%d trade_no=%s payment_method=%s amount=%d error=%q", id, tradeNo, req.PaymentMethod, req.Amount, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "创建订单失败"})
@@ -452,11 +554,17 @@ func EpayNotify(c *gin.Context) {
 	logger.LogInfo(c.Request.Context(), fmt.Sprintf("易支付 webhook 验签成功 trade_no=%s callback_type=%s trade_status=%s client_ip=%s verify_info=%q", verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.TradeStatus, c.ClientIP(), common.GetJsonString(verifyInfo)))
 
 	if verifyInfo.TradeStatus == epay.StatusTradeSuccess {
+		if params["pid"] == "" || params["pid"] != client.Config.PartnerID || verifyInfo.TradeNo == "" {
+			c.String(http.StatusOK, "fail")
+			return
+		}
 		// 进程内锁只是优化；重复/并发回调的正确性由 RechargeEpay 的
 		// 数据库行锁 + 事务内状态校验保证（多实例部署下同样安全）。
 		LockOrder(verifyInfo.ServiceTradeNo)
 		defer UnlockOrder(verifyInfo.ServiceTradeNo)
-		alreadyDone, err := model.RechargeEpay(verifyInfo.ServiceTradeNo, verifyInfo.Type, c.ClientIP())
+		alreadyDone, err := model.RechargeEpay(verifyInfo.ServiceTradeNo, verifyInfo.Type, verifyInfo.Money, c.ClientIP(), model.EpayVerifiedDetails{
+			GatewayTradeNo: verifyInfo.TradeNo, MerchantID: params["pid"],
+		})
 		if err != nil {
 			switch {
 			case errors.Is(err, model.ErrTopUpNotFound):

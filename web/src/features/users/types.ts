@@ -143,6 +143,8 @@ export interface ManageUserQuotaPayload {
   action: 'add_quota'
   mode: QuotaAdjustMode
   value: number
+  /** Administrator-declared CNY input for add only; quota-only requests omit it. */
+  cny_cents?: number
 }
 
 // ============================================================================

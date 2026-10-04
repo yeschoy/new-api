@@ -1,0 +1,788 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import dayjs from 'dayjs'
+import type { TFunction } from 'i18next'
+import { useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { Skeleton } from '@/components/ui/skeleton'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatNumber } from '@/lib/format'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
+
+import { useCashbackReward } from '../hooks/use-cashback'
+import {
+  cashbackFaceQuota,
+  formatCashbackCents,
+  formatCashbackQuota,
+} from '../lib/format'
+import { isManuallyApprovedPayer } from '../lib/settlement'
+import {
+  CashbackActionDialog,
+  type CashbackDialogAction,
+} from './cashback-action-dialog'
+import { CashbackStatusBadge } from './cashback-status-badge'
+import { CashbackStrategyLabel } from './cashback-strategy-label'
+
+type CashbackDetailSheetProps = {
+  rewardId: number | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+function formatTime(timestamp: number): string {
+  return timestamp > 0
+    ? dayjs.unix(timestamp).format('YYYY-MM-DD HH:mm:ss')
+    : '—'
+}
+
+function formatCapReason(reason: string, t: TFunction): string {
+  if (!reason) return '—'
+  return reason
+    .split(',')
+    .filter(Boolean)
+    .map((item) => t(item))
+    .join(', ')
+}
+
+function formatBlockingReason(reason: string, t: TFunction): string {
+  if (!reason) return '—'
+  if (reason.startsWith('payment_incident:')) {
+    const kind = reason.slice('payment_incident:'.length)
+    return t('Payment incident: {{kind}}', { kind: t(kind) })
+  }
+  return t(reason)
+}
+
+function formatDisposition(
+  timestamp: number,
+  operatorId: number,
+  reason: string
+): string {
+  const parts = [formatTime(timestamp)]
+  if (operatorId > 0) {
+    parts.push(`#${operatorId}`)
+  }
+  if (reason) {
+    parts.push(reason)
+  }
+  return parts.join(' · ')
+}
+
+function riskCount(
+  snapshot: Record<string, unknown>,
+  key: string
+): string | number {
+  const value = snapshot[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : '—'
+}
+
+function matchedSnapshotTier(
+  detail: NonNullable<ReturnType<typeof useCashbackReward>['data']>
+) {
+  if (
+    detail.reward.strategy !== 'tiered' ||
+    detail.reward.cap_reason
+      .split(',')
+      .some((reason) =>
+        ['strategy_not_applicable', 'face_basis_unavailable'].includes(reason)
+      )
+  ) {
+    return null
+  }
+  const key =
+    detail.reward.direction === 'inviter' ? 'inviter_tiers' : 'invitee_tiers'
+  const tiers = detail.config_snapshot[key]
+  const face = detail.order.face_amount
+  if (
+    typeof face !== 'number' ||
+    !Number.isSafeInteger(face) ||
+    !Number.isSafeInteger(face * 100) ||
+    !Array.isArray(tiers)
+  ) {
+    return null
+  }
+  let matched: { threshold_cents: number; reward_cents: number } | null = null
+  for (const tier of tiers) {
+    if (
+      !tier ||
+      typeof tier !== 'object' ||
+      !Number.isSafeInteger(tier.threshold_cents) ||
+      tier.threshold_cents <= 0 ||
+      !Number.isSafeInteger(tier.reward_cents) ||
+      tier.reward_cents <= 0
+    ) {
+      continue
+    }
+    if (
+      tier.threshold_cents <= face * 100 &&
+      (!matched || tier.threshold_cents > matched.threshold_cents)
+    ) {
+      matched = tier
+    }
+  }
+  return matched
+}
+
+function DetailRow(props: { label: string; value: ReactNode }) {
+  return (
+    <div className='grid grid-cols-[minmax(8rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-1.5'>
+      <dt className='text-muted-foreground'>{props.label}</dt>
+      <dd className='text-right font-medium break-all'>{props.value}</dd>
+    </div>
+  )
+}
+
+function CashbackQuotaDetailValue(props: {
+  quota: number
+  locale: string | undefined
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <span className='block'>
+        {formatCashbackQuota(props.quota, props.locale)}
+      </span>
+      <span className='text-muted-foreground block text-xs'>
+        {t('Raw Quota')}: {formatNumber(props.quota, props.locale)}
+      </span>
+    </>
+  )
+}
+
+export function CashbackDetailSheet(props: CashbackDetailSheetProps) {
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const query = useCashbackReward(props.open ? props.rewardId : null)
+  const [action, setAction] = useState<CashbackDialogAction | null>(null)
+  const isRoot = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
+  const detail = query.data
+  const decision = detail?.risk_snapshot.auto_review_decision
+  const matchedFlags = detail?.risk_snapshot.auto_review_matched_flags
+  let routingMessage = '—'
+  switch (decision) {
+    case 'master_disabled':
+      routingMessage = t(
+        'Automatic payer review was disabled; sent to manual review.'
+      )
+      break
+    case 'policy_unconfigured':
+      routingMessage = t(
+        'Risk policy was not configured; sent to manual review.'
+      )
+      break
+    case 'selected_flags':
+      routingMessage = t(
+        'Selected risk flags sent this reward to manual review.'
+      )
+      break
+    case 'automatic':
+      routingMessage = t(
+        'No selected risk flags matched; automatically approved.'
+      )
+      break
+  }
+  const manualPayer = detail && isManuallyApprovedPayer(detail.reward)
+  let availableAt = formatTime(detail?.reward.available_at ?? 0)
+  if (manualPayer && detail?.reward.settlement_status === 'frozen') {
+    availableAt = t('Eligible after manual approval')
+  }
+  let reviewSource = '—'
+  if (detail?.reward.review_source === 'automatic') {
+    reviewSource = t('Automatic review')
+  } else if (
+    detail?.reward.review_source === 'manual' ||
+    (detail?.reward.reviewed_by ?? 0) > 0
+  ) {
+    reviewSource = t('Manual review')
+  }
+
+  return (
+    <>
+      <Sheet
+        open={props.open}
+        onOpenChange={(open) => {
+          if (!open) setAction(null)
+          props.onOpenChange(open)
+        }}
+      >
+        <SheetContent className='w-full sm:max-w-2xl'>
+          <SheetHeader>
+            <SheetTitle>{t('Cashback reward details')}</SheetTitle>
+            <SheetDescription>
+              {t(
+                'Sensitive IP and device access is recorded in the audit log.'
+              )}
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className='min-h-0 flex-1 px-4 pb-6'>
+            {query.isPending && (
+              <div
+                aria-label={t('Loading cashback details')}
+                className='space-y-3'
+              >
+                <Skeleton className='h-28 w-full' />
+                <Skeleton className='h-48 w-full' />
+              </div>
+            )}
+            {query.isError && (
+              <Alert variant='destructive'>
+                <AlertTitle>{t('Unable to load cashback details')}</AlertTitle>
+                <AlertDescription>
+                  {t('Close the panel and try again.')}
+                </AlertDescription>
+              </Alert>
+            )}
+            {detail && (
+              <div className='space-y-5'>
+                <div className='flex flex-wrap gap-2'>
+                  {!(
+                    detail.reward.review_status === 'pending' &&
+                    detail.reward.settlement_status === 'canceled'
+                  ) && (
+                    <CashbackStatusBadge
+                      kind='review'
+                      value={detail.reward.review_status}
+                    />
+                  )}
+                  <CashbackStatusBadge
+                    kind='settlement'
+                    value={detail.reward.settlement_status}
+                  />
+                  <CashbackStatusBadge
+                    kind='risk'
+                    value={detail.reward.risk_level}
+                  />
+                </div>
+
+                <section aria-labelledby='cashback-detail-financial'>
+                  <h3 id='cashback-detail-financial' className='font-semibold'>
+                    {t('Reward and order')}
+                  </h3>
+                  <dl className='divide-y'>
+                    <DetailRow
+                      label={t('Reward ID')}
+                      value={detail.reward.id}
+                    />
+                    <DetailRow
+                      label={t('Top-up ID')}
+                      value={detail.reward.top_up_id}
+                    />
+                    <DetailRow
+                      label={t('Order number')}
+                      value={detail.reward.trade_no}
+                    />
+                    <DetailRow
+                      label={t('Provider')}
+                      value={detail.order.payment_provider || '—'}
+                    />
+                    <DetailRow
+                      label={t('Direction')}
+                      value={t(
+                        detail.reward.direction === 'inviter'
+                          ? 'Inviter'
+                          : 'Top-up payer'
+                      )}
+                    />
+                    <DetailRow
+                      label={t('Campaign ID')}
+                      value={
+                        detail.order.campaign_id > 0
+                          ? `#${detail.order.campaign_id}`
+                          : '—'
+                      }
+                    />
+                    <DetailRow
+                      label={t('Face value quota')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.base_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    <DetailRow
+                      label={t('Cashback strategy')}
+                      value={<CashbackStrategyLabel reward={detail.reward} />}
+                    />
+                    {detail.reward.strategy === 'tiered' && (
+                      <DetailRow
+                        label={t('Highest tier reached')}
+                        value={(() => {
+                          const tier = matchedSnapshotTier(detail)
+                          return tier
+                            ? t(
+                                'Top up {{threshold}} or more: {{reward}} back',
+                                {
+                                  threshold: formatCashbackCents(
+                                    tier.threshold_cents,
+                                    locale
+                                  ),
+                                  reward: formatCashbackCents(
+                                    tier.reward_cents,
+                                    locale
+                                  ),
+                                }
+                              )
+                            : '—'
+                        })()}
+                      />
+                    )}
+                    <DetailRow
+                      label={t('Selected top-up amount')}
+                      value={(() => {
+                        const faceQuota = cashbackFaceQuota(
+                          detail.order.face_amount,
+                          detail.order.quota_per_face_unit
+                        )
+                        return faceQuota == null
+                          ? '—'
+                          : formatCashbackQuota(faceQuota, locale)
+                      })()}
+                    />
+                    <DetailRow
+                      label={t('Calculated reward')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.calculated_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    <DetailRow
+                      label={t('Payable reward')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.reward_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    <DetailRow
+                      label={t('Cap reason')}
+                      value={formatCapReason(detail.reward.cap_reason, t)}
+                    />
+                    <DetailRow
+                      label={t('Actually credited top-up quota')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.credited_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    {!(
+                      manualPayer &&
+                      (detail.reward.settlement_status === 'issued' ||
+                        detail.reward.settlement_status === 'canceled')
+                    ) && (
+                      <DetailRow
+                        label={t(
+                          detail.reward.settlement_status === 'canceled'
+                            ? 'Original hold date'
+                            : 'Available at'
+                        )}
+                        value={availableAt}
+                      />
+                    )}
+                    {manualPayer && (
+                      <DetailRow
+                        label={t('Original hold date')}
+                        value={formatTime(detail.reward.available_at)}
+                      />
+                    )}
+                  </dl>
+                </section>
+
+                <Separator />
+                <section aria-labelledby='cashback-detail-relationship'>
+                  <h3
+                    id='cashback-detail-relationship'
+                    className='font-semibold'
+                  >
+                    {t('Referral relationship')}
+                  </h3>
+                  <dl className='divide-y'>
+                    <DetailRow
+                      label={t('Top-up payer')}
+                      value={`${detail.invitee_username || '—'} (#${detail.reward.invitee_id})`}
+                    />
+                    <DetailRow
+                      label={t('Inviter')}
+                      value={`${detail.inviter_username || '—'} (#${detail.reward.inviter_id})`}
+                    />
+                    <DetailRow
+                      label={t('Beneficiary')}
+                      value={`${detail.beneficiary_username || '—'} (#${detail.reward.beneficiary_id})`}
+                    />
+                  </dl>
+                </section>
+
+                <Separator />
+                <section aria-labelledby='cashback-detail-risk'>
+                  <h3 id='cashback-detail-risk' className='font-semibold'>
+                    {t('Risk evidence')}
+                  </h3>
+                  <div className='my-2 flex flex-wrap gap-1.5'>
+                    {detail.reward.risk_flags.length > 0 ? (
+                      detail.reward.risk_flags.map((flag) => (
+                        <Badge key={flag} variant='outline'>
+                          {t(flag)}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className='text-muted-foreground text-sm'>
+                        {t('No risk flags')}
+                      </span>
+                    )}
+                  </div>
+                  <dl className='divide-y'>
+                    <DetailRow
+                      label={t('Full request IP')}
+                      value={detail.order.request_ip || '—'}
+                    />
+                    <DetailRow
+                      label={t('Device signal status')}
+                      value={t(detail.order.device_signal_status || 'missing')}
+                    />
+                    <DetailRow
+                      label={t('Device fingerprint hash')}
+                      value={detail.order.device_fingerprint_hash || '—'}
+                    />
+                    <DetailRow
+                      label={t('IP-associated accounts')}
+                      value={riskCount(
+                        detail.risk_snapshot,
+                        'ip_associated_account_count'
+                      )}
+                    />
+                    <DetailRow
+                      label={t('Device-associated accounts')}
+                      value={riskCount(
+                        detail.risk_snapshot,
+                        'device_associated_account_count'
+                      )}
+                    />
+                    <DetailRow
+                      label={t('Recent devices')}
+                      value={riskCount(
+                        detail.risk_snapshot,
+                        'recent_device_count'
+                      )}
+                    />
+                    <DetailRow
+                      label={t('User-Agent hash')}
+                      value={detail.order.request_user_agent_hash || '—'}
+                    />
+                    <DetailRow
+                      label={t('Completion source')}
+                      value={
+                        detail.order.completion_source
+                          ? t(detail.order.completion_source)
+                          : '—'
+                      }
+                    />
+                    <DetailRow
+                      label={t('Blocking reason')}
+                      value={formatBlockingReason(
+                        detail.reward.blocking_reason,
+                        t
+                      )}
+                    />
+                    {detail.reward.last_settlement_error && (
+                      <DetailRow
+                        label={t('Error')}
+                        value={detail.reward.last_settlement_error}
+                      />
+                    )}
+                  </dl>
+                </section>
+
+                {typeof decision === 'string' && (
+                  <>
+                    <Separator />
+                    <section aria-labelledby='cashback-detail-auto-review'>
+                      <h3
+                        id='cashback-detail-auto-review'
+                        className='font-semibold'
+                      >
+                        {t('Automatic review routing')}
+                      </h3>
+                      <p className='text-muted-foreground text-sm'>
+                        {routingMessage}
+                      </p>
+                      {decision === 'selected_flags' &&
+                        Array.isArray(matchedFlags) && (
+                          <div className='mt-2 flex flex-wrap gap-1.5'>
+                            {matchedFlags
+                              .filter(
+                                (flag): flag is string =>
+                                  typeof flag === 'string'
+                              )
+                              .map((flag) => (
+                                <Badge key={flag} variant='outline'>
+                                  {t(flag)}
+                                </Badge>
+                              ))}
+                          </div>
+                        )}
+                    </section>
+                  </>
+                )}
+                <Separator />
+                <section aria-labelledby='cashback-detail-compensation'>
+                  <h3
+                    id='cashback-detail-compensation'
+                    className='font-semibold'
+                  >
+                    {t('Incident and recovery')}
+                  </h3>
+                  <dl className='divide-y'>
+                    <DetailRow
+                      label={t('Incident type')}
+                      value={
+                        detail.order.incident_kind
+                          ? t(detail.order.incident_kind)
+                          : '—'
+                      }
+                    />
+                    {detail.order.incident_reason && (
+                      <DetailRow
+                        label={t('Reason')}
+                        value={detail.order.incident_reason}
+                      />
+                    )}
+                    {detail.order.incident_evidence_ref && (
+                      <DetailRow
+                        label={t('Evidence reference (optional)')}
+                        value={detail.order.incident_evidence_ref}
+                      />
+                    )}
+                    <DetailRow
+                      label={t('Cumulative refund percentage')}
+                      value={`${(detail.order.cumulative_refund_rate_bps / 100).toFixed(2)}%`}
+                    />
+                    <DetailRow
+                      label={t('Reward recovered')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.recovered_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    <DetailRow
+                      label={t('Reward debt')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.reward.outstanding_debt_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    <DetailRow
+                      label={t('Principal reversal target')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.principal_reversal_target_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    <DetailRow
+                      label={t('Principal recovered')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.principal_recovered_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                    <DetailRow
+                      label={t('Principal debt')}
+                      value={
+                        <CashbackQuotaDetailValue
+                          quota={detail.order.principal_outstanding_debt_quota}
+                          locale={locale}
+                        />
+                      }
+                    />
+                  </dl>
+                </section>
+
+                <Separator />
+                <section aria-labelledby='cashback-detail-timeline'>
+                  <h3 id='cashback-detail-timeline' className='font-semibold'>
+                    {t('Timeline')}
+                  </h3>
+                  <dl className='divide-y'>
+                    <DetailRow
+                      label={t('Paid at')}
+                      value={formatTime(detail.reward.paid_at)}
+                    />
+                    <DetailRow
+                      label={t('Review source')}
+                      value={reviewSource}
+                    />
+                    {detail.reward.reviewed_at > 0 && (
+                      <DetailRow
+                        label={t('Review')}
+                        value={formatDisposition(
+                          detail.reward.reviewed_at,
+                          detail.reward.reviewed_by,
+                          detail.reward.review_reason
+                        )}
+                      />
+                    )}
+                    <DetailRow
+                      label={t('Issued at')}
+                      value={formatTime(detail.reward.issued_at)}
+                    />
+                    <DetailRow
+                      label={t('Incident reported at')}
+                      value={formatTime(detail.order.incident_reported_at)}
+                    />
+                    {detail.reward.debt_resolved_at > 0 && (
+                      <DetailRow
+                        label={t('Resolve reward debt')}
+                        value={formatDisposition(
+                          detail.reward.debt_resolved_at,
+                          detail.reward.debt_resolved_by,
+                          detail.reward.debt_resolution_reason
+                        )}
+                      />
+                    )}
+                    {detail.order.principal_debt_resolved_at > 0 && (
+                      <DetailRow
+                        label={t('Resolve principal debt')}
+                        value={formatDisposition(
+                          detail.order.principal_debt_resolved_at,
+                          detail.order.principal_debt_resolved_by,
+                          detail.order.principal_debt_resolution_reason
+                        )}
+                      />
+                    )}
+                    {detail.reward.next_settlement_attempt_at > 0 && (
+                      <DetailRow
+                        label={t('Next settlement attempt')}
+                        value={formatTime(
+                          detail.reward.next_settlement_attempt_at
+                        )}
+                      />
+                    )}
+                  </dl>
+                </section>
+
+                <details className='rounded-lg border p-3'>
+                  <summary className='cursor-pointer font-medium'>
+                    {t('Configuration and risk snapshots')}
+                  </summary>
+                  <div className='mt-3 grid gap-3'>
+                    <pre className='bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs'>
+                      {JSON.stringify(detail.config_snapshot, null, 2)}
+                    </pre>
+                    <pre className='bg-muted max-h-64 overflow-auto rounded-md p-3 text-xs'>
+                      {JSON.stringify(detail.risk_snapshot, null, 2)}
+                    </pre>
+                  </div>
+                </details>
+
+                <div className='flex flex-wrap gap-2'>
+                  {detail.reward.review_status === 'pending' &&
+                    detail.reward.settlement_status === 'frozen' &&
+                    detail.reward.reward_quota > 0 && (
+                      <Button
+                        type='button'
+                        onClick={() => setAction('approve')}
+                      >
+                        {t('Approve')}
+                      </Button>
+                    )}
+                  {(detail.reward.review_status === 'pending' ||
+                    detail.reward.review_status === 'approved') &&
+                    detail.reward.settlement_status === 'frozen' &&
+                    detail.reward.reward_quota > 0 && (
+                      <Button
+                        type='button'
+                        variant='destructive'
+                        onClick={() => setAction('reject')}
+                      >
+                        {t('Reject')}
+                      </Button>
+                    )}
+                  <Button
+                    type='button'
+                    variant='outline'
+                    onClick={() => setAction('incident')}
+                  >
+                    {t('Record incident')}
+                  </Button>
+                  {isRoot && detail.reward.outstanding_debt_quota > 0 && (
+                    <Button
+                      type='button'
+                      variant='outline'
+                      onClick={() => setAction('reward-debt')}
+                    >
+                      {t('Resolve reward debt')}
+                    </Button>
+                  )}
+                  {isRoot &&
+                    detail.order.principal_outstanding_debt_quota > 0 && (
+                      <Button
+                        type='button'
+                        variant='outline'
+                        onClick={() => setAction('principal-debt')}
+                      >
+                        {t('Resolve principal debt')}
+                      </Button>
+                    )}
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+
+      {detail && action && (
+        <CashbackActionDialog
+          key={`${detail.reward.id}-${action}`}
+          action={action}
+          detail={detail}
+          open
+          onOpenChange={(open) => !open && setAction(null)}
+        />
+      )}
+    </>
+  )
+}

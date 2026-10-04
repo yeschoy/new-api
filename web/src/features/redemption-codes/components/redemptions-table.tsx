@@ -20,7 +20,6 @@ import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
 
 import {
   DISABLED_ROW_DESKTOP,
@@ -28,8 +27,10 @@ import {
   DataTablePage,
   useDataTable,
 } from '@/components/data-table'
+import { getAdminPlans } from '@/features/subscriptions/api'
 import { useMediaQuery } from '@/hooks'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
+import { createServerError } from '@/lib/server-error-message'
 
 import { getRedemptions, searchRedemptions } from '../api'
 import {
@@ -55,7 +56,21 @@ function isDisabledRedemptionRow(redemption: Redemption) {
 
 export function RedemptionsTable() {
   const { t } = useTranslation()
-  const columns = useRedemptionsColumns()
+  const { data: plansResponse } = useQuery({
+    queryKey: ['admin-subscription-plans'],
+    queryFn: getAdminPlans,
+  })
+  const planTitles = useMemo(
+    () =>
+      Object.fromEntries(
+        (plansResponse?.data ?? []).map((record) => [
+          record.plan.id,
+          record.plan.title,
+        ])
+      ),
+    [plansResponse]
+  )
+  const columns = useRedemptionsColumns(planTitles)
   const { refreshTrigger } = useRedemptions()
   const isMobile = useMediaQuery('(max-width: 640px)')
 
@@ -108,15 +123,14 @@ export function RedemptionsTable() {
           : await getRedemptions(params)
 
       if (!result.success) {
-        toast.error(
-          result.message ||
-            t(
-              hasFilter || hasStatusFilter
-                ? ERROR_MESSAGES.SEARCH_FAILED
-                : ERROR_MESSAGES.LOAD_FAILED
-            )
+        throw createServerError(
+          result,
+          t(
+            hasFilter || hasStatusFilter
+              ? ERROR_MESSAGES.SEARCH_FAILED
+              : ERROR_MESSAGES.LOAD_FAILED
+          )
         )
-        return { items: [], total: 0 }
       }
 
       return {
@@ -133,6 +147,7 @@ export function RedemptionsTable() {
     data: redemptions,
     columns,
     enableRowSelection: true,
+    getRowId: (row) => String(row.id),
     columnFilters,
     globalFilter,
     pagination,
@@ -181,7 +196,13 @@ export function RedemptionsTable() {
           },
         ],
       }}
-      mobile={<RedemptionsMobileList table={table} isLoading={isLoading} />}
+      mobile={
+        <RedemptionsMobileList
+          table={table}
+          isLoading={isLoading}
+          planTitles={planTitles}
+        />
+      }
       getRowClassName={(row, { isMobile }) => {
         if (!isDisabledRedemptionRow(row.original)) return undefined
         return isMobile ? DISABLED_ROW_MOBILE : DISABLED_ROW_DESKTOP

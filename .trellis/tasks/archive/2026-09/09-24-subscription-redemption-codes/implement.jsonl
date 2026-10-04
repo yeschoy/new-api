@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "后端规范入口与质量检查"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范入口与质量检查"}
+{"file": ".agents/rules/billing.md", "reason": "额度充值与订阅额度语义"}
+{"file": "web/AGENTS.md", "reason": "前端组件复用与验证规则"}
+{"file": ".trellis/tasks/09-24-subscription-redemption-codes/research/existing-flows.md", "reason": "已核实的兑换、订阅和验证限制"}

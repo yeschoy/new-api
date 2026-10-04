@@ -25,6 +25,8 @@ import type {
   AffiliateTransferRequest,
   ApiResponse,
   TopupInfoResponse,
+  PayerCashbackPreview,
+  PayerCashbackPreviewResponse,
   RedemptionResponse,
   AmountResponse,
   PaymentResponse,
@@ -58,6 +60,21 @@ export function isApiSuccess(response: ApiResponse): boolean {
 export async function getTopupInfo(): Promise<TopupInfoResponse> {
   const res = await api.get('/api/user/topup/info')
   return res.data
+}
+
+export async function getPayerCashbackPreview(
+  selection: { amount: number } | { productId: string }
+): Promise<PayerCashbackPreview> {
+  const params =
+    'amount' in selection
+      ? { amount: selection.amount }
+      : { product_id: selection.productId }
+  const res = await api.get('/api/user/topup/cashback-preview', { params })
+  const response = res.data as PayerCashbackPreviewResponse
+  if (response?.success !== true || !response.data) {
+    throw new Error('Preview unavailable')
+  }
+  return response.data
 }
 
 /**

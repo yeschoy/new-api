@@ -16,11 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Check, Copy, Globe2, RadioTower } from 'lucide-react'
+import { Globe2, RadioTower } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import { Button } from '@/components/ui/button'
-import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { CopyButton } from '@/components/copy-button'
 import { cn } from '@/lib/utils'
 
 const API_ACCELERATION_URLS = {
@@ -34,7 +33,6 @@ type ApiAccelerationUrlsProps = {
 
 export function ApiAccelerationUrls({ className }: ApiAccelerationUrlsProps) {
   const { t } = useTranslation()
-  const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
   const endpoints = [
     {
       label: t('Mainland China acceleration URL'),
@@ -57,8 +55,6 @@ export function ApiAccelerationUrls({ className }: ApiAccelerationUrlsProps) {
     >
       {endpoints.map((endpoint) => {
         const Icon = endpoint.icon
-        const copied = copiedText === endpoint.url
-
         return (
           <div
             key={endpoint.url}
@@ -76,20 +72,13 @@ export function ApiAccelerationUrls({ className }: ApiAccelerationUrlsProps) {
                 {endpoint.url}
               </code>
             </div>
-            <Button
-              type='button'
-              variant='ghost'
-              size='icon-xs'
-              className='shrink-0'
+            <CopyButton
+              value={endpoint.url}
+              size='icon'
+              className='size-6 rounded-md'
+              iconClassName='size-3'
               aria-label={t('Copy {{label}}', { label: endpoint.label })}
-              onClick={() => void copyToClipboard(endpoint.url)}
-            >
-              {copied ? (
-                <Check className='text-success' />
-              ) : (
-                <Copy aria-hidden='true' />
-              )}
-            </Button>
+            />
           </div>
         )
       })}

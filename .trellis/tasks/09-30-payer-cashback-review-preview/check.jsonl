@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/referral-recharge-cashback.md", "reason": "返现资格、资金状态、审核结算与兼容的项目合同"}
+{"file": ".trellis/spec/backend/index.md", "reason": "后端层入口与质量要求"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端层规范入口与 UI 组件复用"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "前端测试和用户可见状态回归"}

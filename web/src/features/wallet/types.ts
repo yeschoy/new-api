@@ -33,7 +33,36 @@ export interface ApiResponse<T = unknown> {
  * Standard API response types
  */
 export type TopupInfoResponse = ApiResponse<TopupInfo>
-export type RedemptionResponse = ApiResponse<number>
+
+export interface PayerCashbackPreview {
+  status:
+    | 'inactive'
+    | 'no_campaign'
+    | 'ineligible'
+    | 'limit_reached'
+    | 'select_amount'
+    | 'below_minimum'
+    | 'rounds_to_zero'
+    | 'cap_exhausted'
+    | 'estimated'
+    | 'not_applicable'
+  strategy?: 'rate' | 'per_hundred' | 'tiered'
+  tiers?: { threshold_cents: number; reward_cents: number }[]
+  matched_tier?: { threshold_cents: number; reward_cents: number }
+  config_version?: number
+  rate_bps?: number
+  fixed_per_hundred?: number
+  /** Rule result before single/24-hour limits. */
+  calculated_quota?: number
+  reward_quota: number
+  /** Comma-separated limits that reduced the estimate: single_cap, daily_cap. */
+  cap_reason?: string
+  as_of: number
+}
+export type PayerCashbackPreviewResponse = ApiResponse<PayerCashbackPreview>
+export type RedemptionResponse = ApiResponse<
+  number | { type: 'subscription'; plan_id: number; plan_title: string }
+>
 export type AmountResponse = ApiResponse<string>
 export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string
