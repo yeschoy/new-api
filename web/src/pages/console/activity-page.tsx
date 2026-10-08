@@ -16,96 +16,84 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { tk, useI18n } from '@/i18n/i18n'
-import { RequireAuth } from '@/components/require-auth'
-import { errorMessage } from '@/lib/api'
-import { listRequestLogs } from '@/lib/console-api'
-import { dateTime } from '@/lib/format'
-import type { UsageLog } from '@/lib/services'
+import { useI18n } from '@/i18n/i18n'
+import { LogPager, ScopeSwitch } from '@/pages/logs/log-controls'
+import { LOG_TYPE } from '@/pages/logs/log-format'
+import type { LogScope } from '@/pages/logs/log-types'
+import { LogsViewProvider } from '@/pages/logs/logs-context'
+import { listLogs } from '@/pages/logs/logs-api'
+import { useEmptyPageReset, useLogScope } from '@/pages/logs/use-log-scope'
+import { useLogSearch } from '@/pages/logs/use-log-search'
 
+import { ACTIVITY_KEYS, ActivityFilters, activityQuery } from './activity-filters'
+import { ActivityStats } from './activity-stats'
 import { UsageTiles } from './activity-summary'
-import { durationLabel } from './console-helpers'
-import { useConsoleKey, useMoney } from './console-hooks'
-import { ConsoleLayout } from './console-layout'
-import { Pager, Table, TableMessage, Td, Tr, type Column } from './console-table'
-import { Panel, Tag } from './console-ui'
+import { ActivityTable } from './activity-table'
+import { useConsoleKey } from './console-hooks'
+import { ConsolePage } from './console-page'
 
-const PAGE_SIZE = 20
-const LOG_TYPE_ERROR = 5
-
-const COLUMNS: Column[] = [
-  { label: tk('时间') },
-  { label: tk('模型|表头') },
-  { label: tk('密钥') },
-  { label: tk('输入 tokens'), right: true },
-  { label: tk('输出 tokens'), right: true },
-  { label: tk('费用'), right: true },
-  { label: tk('耗时'), right: true },
-]
-
-/** Usage: 7-day summary tiles and the paginated request log. */
+/**
+ * Usage logs: every request, top-up, refund, sign-in and admin action, with
+ * filters, spend / RPM / TPM for the filters and a detail view per row.
+ * Admins start on everyone's logs and can switch to their own.
+ */
 export function ActivityPage() {
+  const { t } = useI18n()
+  const view = useLogScope()
   return (
-    <RequireAuth framed>
-      <ActivityContent />
-    </RequireAuth>
+    <ConsolePage
+      active='activity'
+      title={t('使用记录')}
+      description={t('查看每一次 API 调用的模型、Token 用量与费用。')}
+      actions={view.canSeeAll ? <ScopeSwitch value={view.scope} onChange={view.choose} /> : undefined}
+    >
+      <ActivityContent key={view.scope} scope={view.scope} admin={view.admin} root={view.root} />
+    </ConsolePage>
   )
 }
 
-function ActivityContent() {
-  const { t } = useI18n()
-  const [page, setPage] = useState(1)
+function ActivityContent(props: { scope: LogScope; admin: boolean; root: boolean }) {
+  const search = useLogSearch(ACTIVITY_KEYS)
+  const query = activityQuery(search, props.admin)
+  const client = useQueryClient()
+  const baseKey = useConsoleKey('logs', props.scope)
+  const [masked, setMasked] = useState(false)
   const logs = useQuery({
-    queryKey: useConsoleKey('logs', page),
-    queryFn: () => listRequestLogs(page, PAGE_SIZE),
+    queryKey: [...baseKey, query, search.page, search.pageSize],
+    queryFn: () => listLogs(props.scope, query, search.page, search.pageSize),
     placeholderData: keepPreviousData,
   })
   const items = logs.data?.items ?? []
+  useEmptyPageReset(search.page, search.setPage, logs.isSuccess && !logs.isPlaceholderData, items.length === 0)
 
   return (
-    <ConsoleLayout active='activity' title={t('使用记录')} description={t('查看每一次 API 调用的模型、Token 用量与费用。')}>
-      <UsageTiles logs={items} />
-      <Panel title={t('请求明细')} flush className='mt-6'>
-        <Table columns={COLUMNS} minWidth={920}>
-          {logs.isLoading ? <TableMessage colSpan={COLUMNS.length}>{t('加载中…')}</TableMessage> : null}
-          {logs.isError ? (
-            <TableMessage colSpan={COLUMNS.length}>{errorMessage(logs.error, t('使用记录加载失败'))}</TableMessage>
-          ) : null}
-          {logs.isSuccess && items.length === 0 ? (
-            <TableMessage colSpan={COLUMNS.length}>{t('暂无调用记录，使用 API 密钥发起请求后会显示在这里。')}</TableMessage>
-          ) : null}
-          {items.map((log) => (
-            <LogRow key={log.id} log={log} />
-          ))}
-        </Table>
-      </Panel>
-      <Pager page={page} size={PAGE_SIZE} total={logs.data?.total ?? 0} onChange={setPage} />
-    </ConsoleLayout>
-  )
-}
-
-function LogRow(props: { log: UsageLog }) {
-  const { t } = useI18n()
-  const log = props.log
-  const money = useMoney()
-  return (
-    <Tr>
-      <Td muted className='whitespace-nowrap'>{dateTime(log.created_at)}</Td>
-      <Td className='whitespace-nowrap'>
-        <div className='flex items-center gap-2'>
-          <span className='font-medium'>{log.model_name || '—'}</span>
-          {log.type === LOG_TYPE_ERROR ? <Tag tone='danger'>{t('失败')}</Tag> : null}
-          {log.is_stream ? <Tag>{t('流式')}</Tag> : null}
+    <LogsViewProvider masked={masked} admin={props.admin} root={props.root}>
+      <div className='flex flex-col gap-6'>
+        {props.admin ? null : <UsageTiles logs={items.filter((log) => log.type === LOG_TYPE.CONSUME)} />}
+        <ActivityFilters
+          key={search.signature}
+          search={search}
+          admin={props.admin}
+          busy={logs.isFetching}
+          masked={masked}
+          onMask={setMasked}
+          onSearch={() => client.invalidateQueries({ queryKey: baseKey })}
+          stats={<ActivityStats scope={props.scope} query={query} queryKey={baseKey} masked={masked} />}
+        />
+        <div>
+          <ActivityTable
+            items={items}
+            admin={props.admin}
+            loading={logs.isLoading}
+            error={logs.isError ? logs.error : null}
+            success={logs.isSuccess}
+          />
+          <LogPager page={search.page} size={search.pageSize} total={logs.data?.total ?? 0} onPage={search.setPage} onSize={search.setPageSize} />
         </div>
-      </Td>
-      <Td muted className='whitespace-nowrap'>{log.token_name || '—'}</Td>
-      <Td right>{(log.prompt_tokens || 0).toLocaleString('zh-CN')}</Td>
-      <Td right>{(log.completion_tokens || 0).toLocaleString('zh-CN')}</Td>
-      <Td right>{money.format(log.quota)}</Td>
-      <Td right muted>{durationLabel(log.use_time)}</Td>
-    </Tr>
+      </div>
+    </LogsViewProvider>
   )
 }
