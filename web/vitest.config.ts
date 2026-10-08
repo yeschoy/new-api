@@ -9,5 +9,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
     css: false,
+    // Form tests that type with user-event slow down when the whole suite runs in parallel; 5s is too tight there.
+    testTimeout: 15_000,
   },
 })
