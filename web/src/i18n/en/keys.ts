@@ -121,6 +121,8 @@ const EN_KEYS: Record<string, string> = {
   当前分组: 'Current',
   '选用 {group}': 'Use {group}',
   选用: 'Use',
+  '一键复制——这就是你的 AI 工具需要的密码': 'One tap to copy: this is the password your AI tool needs',
+  '怎么使用？': 'How do I use it?',
 }
 
 export default EN_KEYS

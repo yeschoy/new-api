@@ -18,18 +18,20 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { KeyRound, Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui'
 import { useI18n } from '@/i18n/i18n'
 import { useStatus } from '@/lib/queries'
 import { AccelerationUrls } from '@/pages/keys/acceleration-urls'
 import { BulkBar, DeleteAllKeys, SelectAll } from '@/pages/keys/bulk-actions'
-import { fetchKeys, getUserGroups, type KeyQuery } from '@/pages/keys/keys-api'
+import { KeyTip } from '@/pages/keys/key-tip'
+import { fetchKeys, getUserGroups } from '@/pages/keys/keys-api'
 import { KeysFooter } from '@/pages/keys/keys-footer'
 import { KeysList } from '@/pages/keys/keys-list'
-import { KeysToolbar, type SearchTerms } from '@/pages/keys/keys-toolbar'
+import { KeysToolbar } from '@/pages/keys/keys-toolbar'
 import { useNow } from '@/pages/keys/time-labels'
+import { useKeysView } from '@/pages/keys/use-keys-view'
 
 import { useConsoleKey } from './console-hooks'
 import { ConsolePage } from './console-page'
@@ -75,21 +77,21 @@ const NONE: ReadonlySet<number> = new Set()
 /** Signed-in part of the page: the queries only run once the visitor is known. */
 function KeysContent(props: { create: React.ReactNode; onEdit: (keyId: number) => void }) {
   const { t } = useI18n()
-  const [view, setView] = useState<KeyQuery>({ page: 1, size: 20, keyword: '', token: '' })
-  const [statusFilter, setStatusFilter] = useState('')
+  const [view, update] = useKeysView()
+  const query = { page: view.page, size: view.size, keyword: view.keyword, token: view.token }
   // Ticks belong to what is on screen: another page, search or filter starts with none.
-  const viewKey = `${view.page}|${view.size}|${view.keyword}|${view.token}|${statusFilter}`
+  const viewKey = `${view.page}|${view.size}|${view.keyword}|${view.token}|${view.status}`
   const [selection, setSelection] = useState<{ view: string; ids: ReadonlySet<number> }>({ view: '', ids: NONE })
   const now = useNow()
   const keys = useQuery({
-    queryKey: useConsoleKey('keys', view),
-    queryFn: () => fetchKeys(view),
+    queryKey: useConsoleKey('keys', query),
+    queryFn: () => fetchKeys(query),
     placeholderData: keepPreviousData,
   })
   const groups = useQuery({ queryKey: useConsoleKey('key-groups'), queryFn: getUserGroups, staleTime: 60_000 })
   const groupMap = useMemo(() => new Map((groups.data ?? []).map((group) => [group.name, group])), [groups.data])
   const items = keys.data?.items ?? []
-  const shown = statusFilter ? items.filter((item) => String(item.status) === statusFilter) : items
+  const shown = view.status ? items.filter((item) => String(item.status) === view.status) : items
   const selectedIds = selection.view === viewKey ? selection.ids : NONE
   const selected = shown.filter((item) => selectedIds.has(item.id))
   const searching = Boolean(view.keyword || view.token)
@@ -105,16 +107,8 @@ function KeysContent(props: { create: React.ReactNode; onEdit: (keyId: number) =
 
   // Deleting the last key on a later page would leave an empty page behind.
   useEffect(() => {
-    if (view.page > 1 && keys.isSuccess && !keys.isPlaceholderData && items.length === 0) {
-      setView((current) => ({ ...current, page: current.page - 1 }))
-    }
-  }, [view.page, keys.isSuccess, keys.isPlaceholderData, items.length])
-
-  const onSearch = useCallback((terms: SearchTerms) => {
-    setView((current) =>
-      current.keyword === terms.keyword && current.token === terms.token ? current : { ...current, ...terms, page: 1 }
-    )
-  }, [])
+    if (view.page > 1 && keys.isSuccess && !keys.isPlaceholderData && items.length === 0) update({ page: view.page - 1 })
+  }, [view.page, keys.isSuccess, keys.isPlaceholderData, items.length, update])
 
   const empty = (
     <div className='flex flex-col items-center gap-3'>
@@ -126,8 +120,14 @@ function KeysContent(props: { create: React.ReactNode; onEdit: (keyId: number) =
 
   return (
     <>
+      <KeyTip />
       <AccelerationUrls />
-      <KeysToolbar status={statusFilter} onStatus={setStatusFilter} onSearch={onSearch}>
+      <KeysToolbar
+        search={{ keyword: view.keyword, token: view.token }}
+        status={view.status}
+        onStatus={(status) => update({ status })}
+        onSearch={(terms) => update({ ...terms, page: 1 })}
+      >
         <SelectAll shown={shown.length} selected={selected.length} onChange={(all) => select(shown.map((item) => item.id), all)} />
       </KeysToolbar>
       {selected.length ? <BulkBar selected={selected} onDone={() => setSelection({ view: viewKey, ids: NONE })} /> : null}
@@ -151,8 +151,8 @@ function KeysContent(props: { create: React.ReactNode; onEdit: (keyId: number) =
         page={view.page}
         size={view.size}
         total={keys.data?.total ?? 0}
-        onPage={(page) => setView((current) => ({ ...current, page }))}
-        onSize={(size) => setView((current) => ({ ...current, size, page: 1 }))}
+        onPage={(page) => update({ page })}
+        onSize={(size) => update({ size, page: 1 })}
       >
         <DeleteAllKeys total={searching ? 0 : (keys.data?.total ?? 0)} />
       </KeysFooter>

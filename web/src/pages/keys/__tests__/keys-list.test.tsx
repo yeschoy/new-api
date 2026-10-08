@@ -53,7 +53,8 @@ describe('key list', () => {
     renderKeysPage()
     const row = await screen.findByRole('row', { name: /abcd/ })
     expect(within(row).getByText('vip')).toBeInTheDocument()
-    expect(within(row).getByText('×0.5')).toBeInTheDocument()
+    // The ratio comes with the account's groups, which may arrive after the keys.
+    expect(await within(row).findByText('×0.5')).toBeInTheDocument()
     expect(within(row).getByText('2 个模型')).toBeInTheDocument()
     expect(within(row).getByText('1 个 IP')).toBeInTheDocument()
     expect(within(row).getByText('永不过期')).toBeInTheDocument()

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { api } from '@/lib/api'
@@ -74,7 +74,7 @@ describe('key menu', () => {
     const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
     const menu = await openMenu(user)
     await user.click(within(menu).getByRole('menuitem', { name: '复制密钥' }))
-    expect(write).toHaveBeenCalledWith('sk-FULL')
+    await waitFor(() => expect(write).toHaveBeenCalledWith('sk-FULL'))
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
@@ -83,6 +83,7 @@ describe('key menu', () => {
     const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
     const menu = await openMenu(user)
     await user.click(within(menu).getByRole('menuitem', { name: '复制连接信息' }))
+    await waitFor(() => expect(write).toHaveBeenCalled())
     expect(JSON.parse(write.mock.calls[0][0])).toEqual({ _type: 'newapi_channel_conn', key: 'sk-FULL', url: ADDRESS })
   })
 
@@ -91,6 +92,7 @@ describe('key menu', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const menu = await openMenu(user)
     await user.click(within(menu).getByRole('menuitem', { name: 'AI as Workspace' }))
+    await waitFor(() => expect(open).toHaveBeenCalled())
     expect(open).toHaveBeenCalledWith(`https://aiaw.app/set-provider?key=sk-FULL&url=${encodeURIComponent(ADDRESS)}`, '_blank', 'noopener')
   })
 
@@ -99,6 +101,7 @@ describe('key menu', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const menu = await openMenu(user)
     await user.click(within(menu).getByRole('menuitem', { name: 'Cherry Studio' }))
+    await waitFor(() => expect(open).toHaveBeenCalled())
     expect(open).toHaveBeenCalledWith(expect.stringMatching(/^cherrystudio:\/\/providers\/api-keys\?v=1&data=/), '_self')
   })
 
@@ -111,6 +114,7 @@ describe('key menu', () => {
     const user = userEvent.setup()
     const menu = await openMenu(user)
     await user.click(within(menu).getByRole('menuitem', { name: '流畅阅读' }))
+    await waitFor(() => expect(received).toHaveLength(1))
     expect(received).toEqual([{ id: 'new-api', baseUrl: ADDRESS, apiKey: 'sk-FULL' }])
   })
 

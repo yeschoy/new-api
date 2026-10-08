@@ -74,8 +74,8 @@ describe('selected keys', () => {
     await user.click(await screen.findByRole('checkbox', { name: '选择 prod' }))
     await user.click(screen.getByRole('checkbox', { name: '选择 ci' }))
     await user.click(screen.getByRole('button', { name: '复制所选' }))
+    await waitFor(() => expect(write).toHaveBeenCalledWith('prod\tsk-AAA\nci\tsk-BBB'))
     expect(post).toHaveBeenCalledWith('/api/token/batch/keys', { ids: [1, 2] })
-    expect(write).toHaveBeenCalledWith('prod\tsk-AAA\nci\tsk-BBB')
   })
 
   it('deletes the selected keys after asking', async () => {
@@ -87,7 +87,7 @@ describe('selected keys', () => {
     expect(screen.getByText('确认删除所选的 1 个密钥？')).toBeInTheDocument()
     expect(post).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '确认' }))
-    expect(post).toHaveBeenCalledWith('/api/token/batch', { ids: [1] })
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/token/batch', { ids: [1] }))
     await waitFor(() => expect(screen.queryByRole('checkbox', { name: '选择 prod' })).toBeNull())
     expect(screen.queryByText(/已选/)).toBeNull()
   })

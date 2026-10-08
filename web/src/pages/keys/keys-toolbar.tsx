@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Search } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Select, TextInput } from '@/components/ui'
 import { tk, useI18n } from '@/i18n/i18n'
@@ -45,22 +45,30 @@ function SearchBox(props: { label: string; value: string; onChange: (value: stri
 }
 
 /**
- * Name and key search (sent once typing pauses) and the status filter, which
- * like on the old page narrows the keys of the current page; `children` sits at the end.
+ * Name and key search (sent once typing pauses, starting from `search`) and the
+ * status filter, which like on the old page narrows the keys of the current
+ * page; `children` sits at the end.
  */
 export function KeysToolbar(props: {
+  search: SearchTerms
   status: string
   onStatus: (status: string) => void
   onSearch: (terms: SearchTerms) => void
   children?: React.ReactNode
 }) {
   const { t } = useI18n()
-  const [keyword, setKeyword] = useState('')
-  const [token, setToken] = useState('')
+  const [keyword, setKeyword] = useState(props.search.keyword)
+  const [token, setToken] = useState(props.search.token)
+  const sent = useRef(props.search)
   const onSearch = props.onSearch
 
   useEffect(() => {
-    const timer = window.setTimeout(() => onSearch({ keyword: keyword.trim(), token: token.trim() }), SEARCH_DELAY_MS)
+    const terms = { keyword: keyword.trim(), token: token.trim() }
+    if (terms.keyword === sent.current.keyword && terms.token === sent.current.token) return
+    const timer = window.setTimeout(() => {
+      sent.current = terms
+      onSearch(terms)
+    }, SEARCH_DELAY_MS)
     return () => window.clearTimeout(timer)
   }, [keyword, token, onSearch])
 

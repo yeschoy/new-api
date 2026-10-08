@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render } from '@testing-library/react'
+import { configure, render } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 
 import { Toaster } from '@/components/ui'
@@ -26,6 +26,9 @@ import { authStore } from '@/lib/auth-store'
 import { KeysPage } from '@/pages/console/keys-page'
 
 import type { KeyDetail } from '../keys-api'
+
+// The whole page renders behind each findBy; when the suite runs in parallel the default 1s wait is too tight.
+configure({ asyncUtilTimeout: 5000 })
 
 export const USER = {
   id: 7,
@@ -109,13 +112,14 @@ export function resetWidth() {
   Reflect.deleteProperty(window, 'matchMedia')
 }
 
-export function renderKeysPage() {
-  const router = createMemoryRouter([{ path: '*', element: <KeysPage /> }], { initialEntries: ['/settings/keys'] })
+export function renderKeysPage(path = '/settings/keys') {
+  const router = createMemoryRouter([{ path: '*', element: <KeysPage /> }], { initialEntries: [path] })
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
       <Toaster />
     </QueryClientProvider>
   )
+  return { ...view, router }
 }
