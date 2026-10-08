@@ -21,6 +21,7 @@ import { render, screen } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 
 import { api } from '@/lib/api'
+import { ThemeProvider } from '@/site/theme'
 
 import { routes } from '../router'
 
@@ -56,5 +57,20 @@ describe('app routes', () => {
     expect(screen.queryAllByText(/初始化/)).toHaveLength(0)
     const hrefs = screen.queryAllByRole('link').map((link) => link.getAttribute('href'))
     expect(hrefs).not.toContain('/setup')
+  })
+
+  it('opens a page whose code loads on demand', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { success: true, message: '', data: {} } })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const router = createMemoryRouter(routes, { initialEntries: ['/client'] })
+    render(
+      <QueryClientProvider client={client}>
+        <ThemeProvider>
+          <RouterProvider router={router} />
+        </ThemeProvider>
+      </QueryClientProvider>
+    )
+    // The page's code is fetched on first visit, which takes longer than the default 1s wait under test.
+    expect(await screen.findByRole('heading', { name: 'AI 工作台，现在就在桌面' }, { timeout: 10_000 })).toBeInTheDocument()
   })
 })
