@@ -16,37 +16,106 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LogOut, Pencil } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { LogOut } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { Button, Panel } from '@/components/ui'
 import { useI18n } from '@/i18n/i18n'
-import { RequireAuth } from '@/components/require-auth'
-import { errorMessage } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
-import { updateDisplayName } from '@/lib/console-api'
 import { logout } from '@/lib/services'
+import type { AccountUser } from '@/pages/account/account-api'
+import { CheckinPanel } from '@/pages/account/checkin-panel'
+import { DisplayNameEditor } from '@/pages/account/display-name-editor'
+import { EmailBindModal } from '@/pages/account/email-bind-modal'
+import { LanguagePanel } from '@/pages/account/language-panel'
+import { NotificationPanel } from '@/pages/account/notification-panel'
+import { ProfileOverview } from '@/pages/account/profile-overview'
+import { SidebarPanel } from '@/pages/account/sidebar-panel'
+import { useAuthStatus } from '@/pages/auth/auth-status'
 
 import { roleLabel } from './console-helpers'
 import { useSelf } from './console-hooks'
-import { ConsoleLayout } from './console-layout'
-import { Button, Notice, Panel, TextInput } from './console-ui'
+import { ConsolePage } from './console-page'
 
-/** Account details, display-name editing and sign-out. */
+/** /settings/profile: who you are, your email, check-in, language, notifications, menu and sign-out. */
 export function ProfilePage() {
+  const { t } = useI18n()
   return (
-    <RequireAuth framed>
+    <ConsolePage active='profile' title={t('账户设置')} description={t('管理账户资料、通知与偏好设置。')}>
       <ProfileContent />
-    </RequireAuth>
+    </ConsolePage>
   )
 }
 
 function ProfileContent() {
-  const { t } = useI18n()
   const auth = useAuth()
   const self = useSelf()
-  const user = self.data ?? auth.user
+  const status = useAuthStatus()
+  const user = (self.data ?? auth.user) as AccountUser | null
+  // The settings panels start from the saved settings, so they wait for the fresh profile.
+  const loaded = self.data as AccountUser | undefined
+
+  return (
+    <div className='flex flex-col gap-4'>
+      <ProfileOverview user={user} />
+      <BasicInfo user={user} />
+      {status?.checkin_enabled ? <CheckinPanel /> : null}
+      <LanguagePanel user={user} />
+      {loaded ? <NotificationPanel key={loaded.setting ?? ''} user={loaded} /> : null}
+      {loaded && loaded.permissions?.sidebar_settings !== false ? <SidebarPanel key={loaded.sidebar_modules ?? ''} user={loaded} /> : null}
+      <SignOutPanel />
+    </div>
+  )
+}
+
+function BasicInfo(props: { user: AccountUser | null }) {
+  const { t } = useI18n()
+  const queryClient = useQueryClient()
+  const [binding, setBinding] = useState(false)
+  const user = props.user
+  const email = user?.email ?? ''
+
+  const rows: Array<[string, React.ReactNode]> = [
+    [t('用户 ID'), user ? String(user.id) : '—'],
+    [t('用户名'), user?.username || '—'],
+    [t('显示名称'), <DisplayNameEditor value={user?.display_name ?? ''} />],
+    [
+      t('邮箱'),
+      <div className='flex flex-wrap items-center gap-2'>
+        {email ? <span>{email}</span> : <span className='text-or-muted'>{t('未绑定')}</span>}
+        <Button size='sm' variant='ghost' onClick={() => setBinding(true)}>
+          {email ? t('更换邮箱') : t('绑定邮箱')}
+        </Button>
+      </div>,
+    ],
+    [t('分组'), user?.group || 'default'],
+    [t('角色'), roleLabel(user?.role)],
+  ]
+
+  return (
+    <Panel title={t('基本信息')} flush>
+      <dl>
+        {rows.map(([label, value]) => (
+          <div
+            key={label}
+            className='border-or-line flex flex-col gap-1 border-t px-5 py-3.5 first:border-t-0 sm:flex-row sm:items-center sm:gap-6'
+          >
+            <dt className='text-or-muted w-[120px] shrink-0 text-[14px]'>{label}</dt>
+            <dd className='min-w-0 flex-1 text-[14px] break-all'>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {binding ? (
+        <EmailBindModal current={email} onBound={() => void queryClient.invalidateQueries({ queryKey: ['console'] })} onClose={() => setBinding(false)} />
+      ) : null}
+    </Panel>
+  )
+}
+
+function SignOutPanel() {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [signingOut, setSigningOut] = useState(false)
@@ -58,109 +127,15 @@ function ProfileContent() {
     navigate('/')
   }
 
-  const rows: Array<[string, React.ReactNode]> = [
-    [t('用户 ID'), user ? String(user.id) : '—'],
-    [t('用户名'), user?.username || '—'],
-    [t('显示名称'), <DisplayNameEditor value={user?.display_name ?? ''} />],
-    [t('邮箱'), user?.email || <span className='text-or-muted'>{t('未绑定')}</span>],
-    [t('分组'), user?.group || 'default'],
-    [t('角色'), roleLabel(user?.role)],
-  ]
-
   return (
-    <ConsoleLayout active='profile' title={t('账户设置')} description={t('管理账户资料与登录状态。')}>
-      <div className='flex flex-col gap-4'>
-        <Panel title={t('基本信息')} flush>
-          <dl>
-            {rows.map(([label, value]) => (
-              <div
-                key={label}
-                className='border-or-line flex flex-col gap-1 border-t px-5 py-3.5 first:border-t-0 sm:flex-row sm:items-center sm:gap-6'
-              >
-                <dt className='text-or-muted w-[120px] shrink-0 text-[14px]'>{label}</dt>
-                <dd className='min-w-0 flex-1 text-[14px] break-all'>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </Panel>
-
-        <Panel title={t('退出登录')}>
-          <div className='flex flex-wrap items-center justify-between gap-4'>
-            <p className='text-or-muted text-[14px]'>{t('退出当前浏览器中的登录状态，API 密钥不受影响。')}</p>
-            <Button busy={signingOut} onClick={signOut}>
-              <LogOut className='size-4' aria-hidden='true' />
-              {t('退出登录')}
-            </Button>
-          </div>
-        </Panel>
-      </div>
-    </ConsoleLayout>
-  )
-}
-
-/** Inline editor; PUT /api/user/self only applies a non-empty display_name (max 20). */
-function DisplayNameEditor(props: { value: string }) {
-  const { t } = useI18n()
-  const queryClient = useQueryClient()
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const save = useMutation({
-    mutationFn: (name: string) => updateDisplayName(name),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['console'] })
-      setEditing(false)
-    },
-    onError: (err) => setError(errorMessage(err, t('保存失败'))),
-  })
-
-  if (!editing) {
-    return (
-      <div className='flex items-center gap-2'>
-        <span>{props.value || t('未设置')}</span>
-        <Button
-          size='sm'
-          variant='ghost'
-          onClick={() => {
-            setDraft(props.value)
-            setError(null)
-            setEditing(true)
-          }}
-        >
-          <Pencil className='size-3.5' aria-hidden='true' />
-          {t('编辑')}
+    <Panel title={t('退出登录')}>
+      <div className='flex flex-wrap items-center justify-between gap-4'>
+        <p className='text-or-muted text-[14px]'>{t('退出当前浏览器中的登录状态，API 密钥不受影响。')}</p>
+        <Button busy={signingOut} onClick={signOut}>
+          <LogOut className='size-4' aria-hidden='true' />
+          {t('退出登录')}
         </Button>
       </div>
-    )
-  }
-
-  function onSubmit(event: React.FormEvent) {
-    event.preventDefault()
-    const name = draft.trim()
-    if (!name) {
-      setError(t('显示名称不能为空'))
-      return
-    }
-    if (name === props.value) {
-      setEditing(false)
-      return
-    }
-    setError(null)
-    save.mutate(name)
-  }
-
-  return (
-    <form onSubmit={onSubmit} className='flex max-w-[460px] flex-col gap-2'>
-      <div className='flex gap-2'>
-        <TextInput value={draft} onChange={setDraft} maxLength={20} autoFocus ariaLabel={t('显示名称')} />
-        <Button type='submit' variant='primary' busy={save.isPending}>
-          {t('保存')}
-        </Button>
-        <Button variant='ghost' onClick={() => setEditing(false)}>
-          {t('取消')}
-        </Button>
-      </div>
-      {error ? <Notice tone='error'>{error}</Notice> : null}
-    </form>
+    </Panel>
   )
 }
