@@ -34,9 +34,9 @@ export type GuideValues = {
 
 const NAMES = /\{(host|baseUrl|fullUrl|model|group|apiKey|brand)\}/g
 
-/** Fills the known {placeholders} of a code template; anything else (JSON braces, unknown names) stays as written. */
-export function fillTemplate(template: string, values: GuideValues): string {
-  return template.replace(NAMES, (_match, name: keyof GuideValues) => values[name])
+/** Fills the {placeholders} of a code template it has values for; anything else (JSON braces, other names) stays as written. */
+export function fillTemplate(template: string, values: Partial<GuideValues>): string {
+  return template.replace(NAMES, (match, name: keyof GuideValues) => values[name] ?? match)
 }
 
 /** The account's models that speak the article's protocol, by name; every model when the article works with any. */
