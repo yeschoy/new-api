@@ -39,7 +39,7 @@ const TOP_LIMITS = [5, 10, 20, 50]
 
 /** Admin view: which accounts spend the most, and how their spend moves over time. */
 export function UsersTab(props: { initialGranularity: Granularity }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const money = useMoney()
   const amount = useAmount()
   const [granularity, setGranularity] = useState(props.initialGranularity)
@@ -53,10 +53,12 @@ export function UsersTab(props: { initialGranularity: Granularity }) {
     placeholderData: keepPreviousData,
   })
   const current = rows.isError ? undefined : rows.data
-  const data = useMemo(() => breakdown(current ?? [], span, granularity, (row) => row.username || t('未知')), [current, span, granularity, t])
+  // lang: unnamed accounts are labelled in the page language.
+  const data = useMemo(() => breakdown(current ?? [], span, granularity, (row) => row.username || t('未知')), [current, span, granularity, t, lang])
   const total = useMemo(() => totalsOf(current ?? []).quota, [current])
   const series = namedSeries(data, 'quota', limit)
   const isolation = useIsolation(series)
+  const empty = rows.isLoading ? t('加载中…') : t('暂无数据')
 
   const pickDays = (next: number) => {
     setDays(next)
@@ -91,7 +93,7 @@ export function UsersTab(props: { initialGranularity: Granularity }) {
 
       <Section title={t('用户消费排行')} description={t('合计 {amount}', { amount: money.format(total) })} flush>
         {series.length === 0 ? (
-          <EmptyNote>{rows.isLoading ? t('加载中…') : t('暂无数据')}</EmptyNote>
+          <EmptyNote>{empty}</EmptyNote>
         ) : (
           <RankBars items={namedShares(data, 'quota', limit)} format={money.format} ariaLabel={t('用户消费排行')} />
         )}
@@ -99,7 +101,7 @@ export function UsersTab(props: { initialGranularity: Granularity }) {
 
       <Section title={t('用户消费趋势')} flush>
         {series.length === 0 ? (
-          <EmptyNote>{rows.isLoading ? t('加载中…') : t('暂无数据')}</EmptyNote>
+          <EmptyNote>{empty}</EmptyNote>
         ) : (
           <>
             <div className='px-2 pt-4 sm:px-3'>

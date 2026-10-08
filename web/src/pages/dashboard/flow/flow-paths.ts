@@ -25,6 +25,15 @@ export type Metrics = Record<FlowMetric, number>
 /** One step of a request's path: the node it passes in one column. */
 export type PathNode = { kind: FlowKind; id: string; label: string }
 
+export type NodeRef = { kind: FlowKind; id: string }
+
+/** A user or node to filter by, with its total in the width metric. */
+export type FlowOption = NodeRef & { label: string; value: number }
+
+/** Names that can identify people, keys or infrastructure; model names are public. */
+export const SENSITIVE: ReadonlySet<FlowKind> = new Set(['user', 'node', 'token', 'group', 'channel'])
+export const MASK = '••••'
+
 /** Names the page supplies in its language. */
 export type FlowLabels = {
   deletedToken: (id: number) => string

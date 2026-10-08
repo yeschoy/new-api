@@ -44,28 +44,32 @@ export function DonutChart(props: { slices: Slice[]; format: (value: number) => 
   const [active, setActive] = useState<string | null>(null)
   const total = props.slices.reduce((sum, slice) => sum + slice.value, 0)
   const focus = props.slices.find((slice) => slice.key === active)
+  const opacityOf = (key: string) => (active === null || active === key ? 1 : 0.35)
+  const arcs: Array<{ slice: Slice; from: number; to: number }> = []
   let angle = -Math.PI / 2
+  for (const slice of props.slices) {
+    const sweep = total > 0 ? (slice.value / total) * Math.PI * 2 : 0
+    arcs.push({ slice, from: angle, to: angle + sweep })
+    angle += sweep
+  }
 
   return (
     <div className='flex flex-col items-center gap-6 p-5 sm:flex-row sm:items-start'>
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role='img' aria-label={props.ariaLabel} className='size-[200px] shrink-0'>
+        {/* A single slice is the whole ring; an arc from a point back to itself would draw nothing. */}
         {props.slices.length === 1 ? (
           <circle cx={SIZE / 2} cy={SIZE / 2} r={(OUTER + INNER) / 2} fill='none' style={{ stroke: props.slices[0].color, strokeWidth: OUTER - INNER }} />
         ) : (
-          props.slices.map((slice) => {
-            const from = angle
-            angle += total > 0 ? (slice.value / total) * Math.PI * 2 : 0
-            return (
-              <path
-                key={slice.key}
-                d={arc(from, angle)}
-                style={{ fill: slice.color }}
-                opacity={active === null || active === slice.key ? 1 : 0.35}
-                onPointerEnter={() => setActive(slice.key)}
-                onPointerLeave={() => setActive(null)}
-              />
-            )
-          })
+          arcs.map((item) => (
+            <path
+              key={item.slice.key}
+              d={arc(item.from, item.to)}
+              style={{ fill: item.slice.color }}
+              opacity={opacityOf(item.slice.key)}
+              onPointerEnter={() => setActive(item.slice.key)}
+              onPointerLeave={() => setActive(null)}
+            />
+          ))
         )}
         <text x={SIZE / 2} y={SIZE / 2 - 4} textAnchor='middle' fontSize='12' style={{ fill: 'var(--or-muted)' }}>
           {focus ? focus.label.slice(0, 18) : t('合计')}

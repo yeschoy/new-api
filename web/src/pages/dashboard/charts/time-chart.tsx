@@ -65,6 +65,17 @@ export function TimeChart(props: {
     const index = Math.floor(((event.clientX - box.left) / box.width) * count)
     setHover(Math.min(count - 1, Math.max(0, index)))
   }
+  /** What the tooltip shows for a bucket: its name, the stack total for bars, and each series' value. */
+  const tipAt = (index: number) => ({
+    title: bucketName(props.buckets[index], props.granularity),
+    total: props.kind === 'bar' ? props.format(totals[index]) : null,
+    rows: props.series
+      .map((series) => ({ key: series.key, label: series.label, color: series.color, value: series.values[index] ?? 0 }))
+      .filter((row) => row.value > 0)
+      .sort((a, b) => b.value - a.value),
+    at: (xAt(index) / width) * 100,
+  })
+  const tip = hover === null || props.buckets[hover] === undefined ? null : tipAt(hover)
 
   return (
     <div ref={ref} className='relative' onPointerLeave={() => setHover(null)}>
@@ -92,18 +103,7 @@ export function TimeChart(props: {
         )}
         <rect x={left} y={TOP} width={plotW} height={plotH} fill='transparent' onPointerMove={pick} onPointerDown={pick} />
       </svg>
-      {hover !== null && props.buckets[hover] !== undefined ? (
-        <Tooltip
-          title={bucketName(props.buckets[hover], props.granularity)}
-          total={props.kind === 'bar' ? props.format(totals[hover]) : null}
-          rows={props.series
-            .map((series) => ({ key: series.key, label: series.label, color: series.color, value: series.values[hover] ?? 0 }))
-            .filter((row) => row.value > 0)
-            .sort((a, b) => b.value - a.value)}
-          format={props.format}
-          at={(xAt(hover) / width) * 100}
-        />
-      ) : null}
+      {tip ? <Tooltip title={tip.title} total={tip.total} rows={tip.rows} format={props.format} at={tip.at} /> : null}
     </div>
   )
 }

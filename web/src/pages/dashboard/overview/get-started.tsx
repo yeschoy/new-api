@@ -100,7 +100,7 @@ export function QuickConnect() {
   const { data: status } = useStatus()
   const keys = useKeysPeek()
   const baseUrl = `${(status?.server_address || window.location.origin).replace(/\/+$/, '')}/v1`
-  const hasKey = (keys.data?.items ?? []).length > 0
+  const keyAction = (keys.data?.items ?? []).length > 0 ? t('管理密钥') : t('创建第一个密钥')
 
   const copy = async () => {
     try {
@@ -126,7 +126,7 @@ export function QuickConnect() {
           </div>
         </div>
         <div className='flex flex-wrap gap-2'>
-          {keys.isSuccess ? <LinkButton to='/settings/keys'>{hasKey ? t('管理密钥') : t('创建第一个密钥')}</LinkButton> : null}
+          {keys.isSuccess ? <LinkButton to='/settings/keys'>{keyAction}</LinkButton> : null}
           <LinkButton to='/beginner-guide'>{t('新手指南')}</LinkButton>
         </div>
       </div>

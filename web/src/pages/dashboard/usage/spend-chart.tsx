@@ -44,6 +44,7 @@ export function SpendChart(props: {
   const series = namedSeries(props.data, 'quota', SERIES_LIMIT, t('其他'))
   const isolation = useIsolation(series)
   const kinds = SPEND_CHARTS.map((item) => ({ id: item.id, label: t(item.label) }))
+  const chartKind = props.kind === 'bar' ? 'bar' : 'line'
 
   return (
     <Section
@@ -58,7 +59,7 @@ export function SpendChart(props: {
         <>
           <div className='px-2 pt-4 sm:px-3'>
             <TimeChart
-              kind={props.kind === 'bar' ? 'bar' : 'line'}
+              kind={chartKind}
               buckets={props.data.buckets}
               granularity={props.granularity}
               series={isolation.shown.map((item) => ({ ...item, values: item.values.map(amount.of) }))}

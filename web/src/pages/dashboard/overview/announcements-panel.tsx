@@ -54,18 +54,24 @@ export function AnnouncementsPanel(props: { items: AnnouncementItem[] }) {
           </li>
         ))}
       </ul>
-      {open ? (
-        <Modal title={t('公告详情')} onClose={() => setOpen(null)} size='lg'>
-          {publishedAt(open) ? <p className='text-or-dim mb-3 text-[12px]'>{t('发布于 {date}', { date: publishedAt(open) })}</p> : null}
-          <RichText text={open.content} className='text-[14px] leading-6' />
-          {open.extra ? (
-            <div className='border-or-line mt-4 border-t pt-4'>
-              <h3 className='mb-1.5 text-[13px] font-medium'>{t('补充说明')}</h3>
-              <RichText text={open.extra} className='text-or-muted text-[13px] leading-6' />
-            </div>
-          ) : null}
-        </Modal>
-      ) : null}
+      {open ? <AnnouncementDialog item={open} onClose={() => setOpen(null)} /> : null}
     </Section>
+  )
+}
+
+function AnnouncementDialog(props: { item: AnnouncementItem; onClose: () => void }) {
+  const { t } = useI18n()
+  const date = publishedAt(props.item)
+  return (
+    <Modal title={t('公告详情')} onClose={props.onClose} size='lg'>
+      {date ? <p className='text-or-dim mb-3 text-[12px]'>{t('发布于 {date}', { date })}</p> : null}
+      <RichText text={props.item.content} className='text-[14px] leading-6' />
+      {props.item.extra ? (
+        <div className='border-or-line mt-4 border-t pt-4'>
+          <h3 className='mb-1.5 text-[13px] font-medium'>{t('补充说明')}</h3>
+          <RichText text={props.item.extra} className='text-or-muted text-[13px] leading-6' />
+        </div>
+      ) : null}
+    </Modal>
   )
 }

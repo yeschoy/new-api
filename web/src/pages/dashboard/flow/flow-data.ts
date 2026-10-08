@@ -17,11 +17,26 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { FlowRow } from '../dashboard-api'
-import { flowPath, nodeOf, rowMetrics, type FlowKind, type FlowLabels, type FlowMetric, type Metrics, type PathNode } from './flow-paths'
+import { filterByNodes, maskOptions, nodeOptions, userOptions } from './flow-options'
+import {
+  MASK,
+  SENSITIVE,
+  flowPath,
+  nodeOf,
+  rowMetrics,
+  type FlowKind,
+  type FlowLabels,
+  type FlowMetric,
+  type FlowOption,
+  type Metrics,
+  type NodeRef,
+  type PathNode,
+} from './flow-paths'
+
+export type { FlowOption, NodeRef } from './flow-paths'
 
 export type FlowRole = 'user' | 'admin' | 'root'
 export type Overflow = 'aggregate' | 'hide'
-export type NodeRef = { kind: FlowKind; id: string }
 export type LinkRef = { source: string; target: string }
 
 /** The columns each role's rows can fill (model/usedata_flow.go returns more fields the higher the role). */
@@ -30,10 +45,6 @@ export const ROLE_STAGES: Record<FlowRole, FlowKind[]> = {
   admin: ['user', 'group', 'model', 'channel'],
   user: ['token', 'group', 'model'],
 }
-
-/** Names that can identify people, keys or infrastructure; model names are public. */
-const SENSITIVE: ReadonlySet<FlowKind> = new Set(['user', 'node', 'token', 'group', 'channel'])
-export const MASK = '••••'
 
 export type FlowNode = PathNode & Metrics & { value: number; other: boolean; highlighted?: boolean; dimmed?: boolean }
 export type FlowLink = Metrics & {
@@ -46,7 +57,6 @@ export type FlowLink = Metrics & {
   highlighted?: boolean
   dimmed?: boolean
 }
-export type FlowOption = NodeRef & { label: string; value: number }
 
 export type FlowSettings = {
   role: FlowRole
@@ -74,38 +84,22 @@ export type FlowData = {
   nodeOptions: FlowOption[]
 }
 
+type Path = { path: PathNode[]; metrics: Metrics }
+
+const OTHER = '\u0000other'
+const linkKey = (source: string, target: string) => `${source}\u0000${target}`
+
 export function visibleStages(role: FlowRole, shown: FlowKind[]): FlowKind[] {
   const stages = ROLE_STAGES[role]
   const visible = stages.filter((stage) => shown.includes(stage))
   return visible.length >= 2 ? visible : stages
 }
 
-const linkKey = (source: string, target: string) => `${source}\u0000${target}`
-
-function metricOf(metrics: Metrics, metric: FlowMetric): number {
-  return metrics[metric]
-}
-
-function matchesFilters(path: PathNode[], selected: NodeRef[]): boolean {
-  const kinds = new Set(selected.map((item) => item.kind))
-  for (const kind of kinds) {
-    const ids = new Set(selected.filter((item) => item.kind === kind).map((item) => item.id))
-    if (!path.some((node) => node.kind === kind && ids.has(node.id))) return false
-  }
-  return true
-}
-
-function filterByNodes(rows: FlowRow[], selected: NodeRef[], stages: FlowKind[], labels: FlowLabels): FlowRow[] {
-  const relevant = selected.filter((item) => stages.includes(item.kind))
-  if (relevant.length === 0) return rows
-  return rows.filter((row) => matchesFilters(flowPath(row, stages, labels), relevant))
-}
-
 /** Per column, the ids of the `limit` largest nodes by the metric. */
 function topNodes(rows: FlowRow[], stages: FlowKind[], settings: FlowSettings): Map<FlowKind, Set<string>> {
   const totals = new Map<FlowKind, Map<string, { label: string; value: number }>>()
   for (const row of rows) {
-    const value = metricOf(rowMetrics(row), settings.metric)
+    const value = rowMetrics(row)[settings.metric]
     for (const node of flowPath(row, stages, settings.labels)) {
       const column = totals.get(node.kind) ?? new Map()
       const current = column.get(node.id) ?? { label: node.label, value: 0 }
@@ -125,82 +119,95 @@ function topNodes(rows: FlowRow[], stages: FlowKind[], settings: FlowSettings): 
   return tops
 }
 
+/** Each row's path, with nodes past the limit merged into their column's "other" node, or the row left out. */
+function limitedPaths(rows: FlowRow[], stages: FlowKind[], settings: FlowSettings): Path[] {
+  const tops = topNodes(rows, stages, settings)
+  const kept = (node: PathNode) => tops.get(node.kind)?.has(node.id) === true
+  const paths: Path[] = []
+  for (const row of rows) {
+    const path = flowPath(row, stages, settings.labels)
+    if (settings.overflow === 'hide' && !path.every(kept)) continue
+    paths.push({
+      metrics: rowMetrics(row),
+      path: path.map((node) => {
+        if (kept(node)) return node
+        return { kind: node.kind, id: `${node.kind}:${OTHER}`, label: settings.labels.other(node.kind) }
+      }),
+    })
+  }
+  return paths
+}
+
+function add(target: Metrics & { value: number }, metrics: Metrics, value: number) {
+  target.value += value
+  target.quota += metrics.quota
+  target.tokens += metrics.tokens
+  target.requests += metrics.requests
+}
+
+/** Sums the paths into nodes and links; each link's share is of all that flows. */
+function accumulate(paths: Path[], metric: FlowMetric) {
+  const nodes = new Map<string, FlowNode>()
+  const links = new Map<string, FlowLink>()
+  let total = 0
+  for (const { path, metrics } of paths) {
+    const value = metrics[metric]
+    total += value
+    path.forEach((step, index) => {
+      const node = nodes.get(step.id) ?? { ...step, value: 0, quota: 0, tokens: 0, requests: 0, other: step.id.endsWith(OTHER) }
+      add(node, metrics, value)
+      nodes.set(step.id, node)
+      const next = path[index + 1]
+      if (!next) return
+      const key = linkKey(step.id, next.id)
+      const link = links.get(key) ?? { source: step.id, target: next.id, value: 0, quota: 0, tokens: 0, requests: 0, share: 0, sourceLabel: step.label, targetLabel: next.label }
+      add(link, metrics, value)
+      links.set(key, link)
+    })
+  }
+  for (const link of links.values()) link.share = total > 0 ? link.value / total : 0
+  return { nodes, links }
+}
+
 /** Builds the flow graph, its totals and the filter options from the rows of /api/data/flow. */
 export function buildFlow(rows: FlowRow[], settings: FlowSettings): FlowData {
   const stages = visibleStages(settings.role, settings.stages)
   const users = new Set(settings.selectedUsers)
   const userRows = users.size ? rows.filter((row) => users.has(nodeOf(row, 'user', settings.labels).id)) : rows
   const filtered = filterByNodes(userRows, settings.selectedNodes, stages, settings.labels)
-  const tops = topNodes(filtered, stages, settings)
+  const summary = { quota: 0, tokens: 0, requests: 0, value: 0 }
+  for (const row of filtered) add(summary, rowMetrics(row), 0)
 
-  const summary: Metrics = { quota: 0, tokens: 0, requests: 0 }
-  const paths: Array<{ path: PathNode[]; metrics: Metrics }> = []
-  for (const row of filtered) {
-    const metrics = rowMetrics(row)
-    summary.quota += metrics.quota
-    summary.tokens += metrics.tokens
-    summary.requests += metrics.requests
-    const path = flowPath(row, stages, settings.labels)
-    const overflowing = path.some((node) => !tops.get(node.kind)?.has(node.id))
-    if (overflowing && settings.overflow === 'hide') continue
-    paths.push({
-      metrics,
-      path: path.map((node) => (tops.get(node.kind)?.has(node.id) ? node : { kind: node.kind, id: `${node.kind}:\u0000other`, label: settings.labels.other(node.kind) })),
-    })
-  }
-
-  const nodes = new Map<string, FlowNode>()
-  const links = new Map<string, FlowLink>()
-  let total = 0
-  for (const { path, metrics } of paths) {
-    const value = metricOf(metrics, settings.metric)
-    total += value
-    path.forEach((step, index) => {
-      const node = nodes.get(step.id) ?? { ...step, value: 0, quota: 0, tokens: 0, requests: 0, other: step.id.endsWith('\u0000other') }
-      node.value += value
-      node.quota += metrics.quota
-      node.tokens += metrics.tokens
-      node.requests += metrics.requests
-      nodes.set(step.id, node)
-      const next = path[index + 1]
-      if (!next) return
-      const key = linkKey(step.id, next.id)
-      const link = links.get(key) ?? { source: step.id, target: next.id, value: 0, quota: 0, tokens: 0, requests: 0, share: 0, sourceLabel: step.label, targetLabel: next.label }
-      link.value += value
-      link.quota += metrics.quota
-      link.tokens += metrics.tokens
-      link.requests += metrics.requests
-      links.set(key, link)
-    })
-  }
-  for (const link of links.values()) link.share = total > 0 ? link.value / total : 0
-
-  highlight(paths, nodes, links, settings, stages)
-  if (settings.mask) mask(nodes, links)
-  const hide = (options: FlowOption[]) => (settings.mask ? options.map((option) => (SENSITIVE.has(option.kind) ? { ...option, label: MASK } : option)) : options)
+  const paths = limitedPaths(filtered, stages, settings)
+  const graph = accumulate(paths, settings.metric)
+  highlight(paths, graph.nodes, graph.links, settings, stages)
+  if (settings.mask) mask(graph.nodes, graph.links)
+  const userChoices = userOptions(rows, settings.metric, settings.labels)
+  const nodeChoices = nodeOptions(userRows, stages, settings.selectedNodes, settings.metric, settings.labels)
 
   return {
     stages,
-    summary,
-    nodes: [...nodes.values()].filter((node) => node.value > 0),
-    links: [...links.values()].filter((link) => link.value > 0),
-    userOptions: hide(userOptions(rows, settings)),
-    nodeOptions: hide(nodeOptions(userRows, stages, settings)),
+    summary: { quota: summary.quota, tokens: summary.tokens, requests: summary.requests },
+    nodes: [...graph.nodes.values()].filter((node) => node.value > 0),
+    links: [...graph.links.values()].filter((link) => link.value > 0),
+    userOptions: settings.mask ? maskOptions(userChoices) : userChoices,
+    nodeOptions: settings.mask ? maskOptions(nodeChoices) : nodeChoices,
   }
 }
 
-/** A clicked node or link keeps the paths through it bright and dims the rest. */
-function highlight(paths: Array<{ path: PathNode[] }>, nodes: Map<string, FlowNode>, links: Map<string, FlowLink>, settings: FlowSettings, stages: FlowKind[]) {
+/** A picked node or link keeps the paths through it bright and dims the rest. */
+function highlight(paths: Path[], nodes: Map<string, FlowNode>, links: Map<string, FlowLink>, settings: FlowSettings, stages: FlowKind[]) {
   const link = settings.activeLink
   const active = settings.active && stages.includes(settings.active.kind) ? settings.active : null
   if (!link && !active) return
+  const through = (path: PathNode[]) => {
+    if (link) return path.some((node, index) => node.id === link.source && path[index + 1]?.id === link.target)
+    return path.some((node) => node.kind === active?.kind && node.id === active.id)
+  }
   const litNodes = new Set<string>()
   const litLinks = new Set<string>()
   for (const { path } of paths) {
-    const through = link
-      ? path.some((node, index) => node.id === link.source && path[index + 1]?.id === link.target)
-      : path.some((node) => node.kind === active?.kind && node.id === active.id)
-    if (!through) continue
+    if (!through(path)) continue
     path.forEach((node, index) => {
       litNodes.add(node.id)
       if (path[index + 1]) litLinks.add(linkKey(node.id, path[index + 1].id))
@@ -229,33 +236,4 @@ function mask(nodes: Map<string, FlowNode>, links: Map<string, FlowLink>) {
     if (masked.has(link.source)) link.sourceLabel = MASK
     if (masked.has(link.target)) link.targetLabel = MASK
   }
-}
-
-function userOptions(rows: FlowRow[], settings: FlowSettings): FlowOption[] {
-  const totals = new Map<string, FlowOption>()
-  for (const row of rows) {
-    if (!row.user_id && !row.username) continue
-    const node = nodeOf(row, 'user', settings.labels)
-    const option = totals.get(node.id) ?? { kind: 'user', id: node.id, label: node.label, value: 0 }
-    option.value += metricOf(rowMetrics(row), settings.metric)
-    totals.set(node.id, option)
-  }
-  return [...totals.values()].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-}
-
-function nodeOptions(rows: FlowRow[], stages: FlowKind[], settings: FlowSettings): FlowOption[] {
-  const options: FlowOption[] = []
-  for (const stage of stages) {
-    // A column's choices follow the other columns' filters, not its own.
-    const candidates = filterByNodes(rows, settings.selectedNodes.filter((item) => item.kind !== stage), stages, settings.labels)
-    const totals = new Map<string, FlowOption>()
-    for (const row of candidates) {
-      const node = nodeOf(row, stage, settings.labels)
-      const option = totals.get(node.id) ?? { kind: stage, id: node.id, label: node.label, value: 0 }
-      option.value += metricOf(rowMetrics(row), settings.metric)
-      totals.set(node.id, option)
-    }
-    options.push(...[...totals.values()].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)))
-  }
-  return options
 }

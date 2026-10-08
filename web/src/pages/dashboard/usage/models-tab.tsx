@@ -41,7 +41,7 @@ import { UsageStats } from './usage-stats'
  * (or one username), everyone else their own.
  */
 export function ModelsTab(props: { admin: boolean; operatorGranularity?: string }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [prefs, setPrefs] = useState(() => loadPrefs(props.operatorGranularity))
   const [range, setRange] = useState<RangeState>(() => presetRange(prefs.defaultTimeRangeDays))
   const [granularity, setGranularity] = useState(prefs.defaultTimeGranularity)
@@ -58,9 +58,10 @@ export function ModelsTab(props: { admin: boolean; operatorGranularity?: string 
   })
   // A refused range shows its message, not the figures of the range before it.
   const current = rows.isError ? undefined : rows.data
+  // lang: unnamed models are labelled in the page language.
   const data = useMemo(
     () => breakdown(current ?? [], range.window, granularity, (row) => row.model_name || t('未知')),
-    [current, range.window, granularity, t]
+    [current, range.window, granularity, t, lang]
   )
   const totals = useMemo(() => (current ? totalsOf(current) : null), [current])
   const minutes = Math.max(1, (range.window.end - range.window.start) / 60)
