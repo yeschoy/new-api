@@ -16,148 +16,69 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, Eye, EyeOff } from 'lucide-react'
-import { useState } from 'react'
-
 import { useI18n } from '@/i18n/i18n'
-import { errorMessage } from '@/lib/api'
-import { KEY_STATUS_DISABLED, KEY_STATUS_ENABLED, setKeyStatus, unwrap } from '@/lib/console-api'
-import { cn, dateTime } from '@/lib/format'
-import { deleteKey, revealKey, type ApiKey } from '@/lib/services'
+import { CHECKBOX } from '@/pages/keys/bulk-actions'
+import { KeyActions } from '@/pages/keys/key-actions'
+import { ExpiryInfo, GroupInfo, LimitTags, QuotaInfo, StatusTag, UsageTimes } from '@/pages/keys/key-cells'
+import { KeyValue } from '@/pages/keys/key-value'
+import type { KeyDetail, UserGroup } from '@/pages/keys/keys-api'
+import { useFullKey } from '@/pages/keys/use-full-key'
 
-import { keyStatusLabel, withKeyPrefix } from './console-helpers'
-import { useMoney } from './console-hooks'
 import { Td, Tr } from './console-table'
-import { Button, Tag } from './console-ui'
 
-const ICON_BUTTON = 'text-or-muted hover:bg-or-fill hover:text-or-fg flex size-7 shrink-0 items-center justify-center rounded-[6px] transition-colors'
+export type KeyRowProps = {
+  apiKey: KeyDetail
+  groups: Map<string, UserGroup>
+  now: number
+  selected: boolean
+  onSelect: (checked: boolean) => void
+  onEdit: () => void
+}
 
-/** One key: masked value with reveal / copy, limits, and row actions. */
-export function KeyRow(props: { apiKey: ApiKey }) {
+/** One key in the table: name and limits, masked key with reveal / copy, group, credit, times and actions. */
+export function KeyRow(props: KeyRowProps) {
   const { t } = useI18n()
   const key = props.apiKey
-  const money = useMoney()
-  const queryClient = useQueryClient()
-  const [fullKey, setFullKey] = useState<string | null>(null)
-  const [shown, setShown] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [confirming, setConfirming] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ['console'] })
-  const remove = useMutation({
-    mutationFn: async () => unwrap(await deleteKey(key.id), t('删除失败')),
-    onSuccess: refresh,
-    onError: (err) => setError(errorMessage(err, t('删除失败'))),
-  })
-  const enabled = key.status === KEY_STATUS_ENABLED
-  const toggle = useMutation({
-    mutationFn: () => setKeyStatus(key.id, enabled ? KEY_STATUS_DISABLED : KEY_STATUS_ENABLED),
-    onSuccess: refresh,
-    onError: (err) => setError(errorMessage(err, t('操作失败'))),
-  })
-
-  async function loadFullKey(): Promise<string> {
-    if (fullKey) return fullKey
-    const value = withKeyPrefix(await revealKey(key.id))
-    if (!value) throw new Error(t('获取密钥失败'))
-    setFullKey(value)
-    return value
-  }
-
-  async function onReveal() {
-    setError(null)
-    if (shown) {
-      setShown(false)
-      return
-    }
-    try {
-      await loadFullKey()
-      setShown(true)
-    } catch (err) {
-      setError(errorMessage(err, t('获取密钥失败')))
-    }
-  }
-
-  async function onCopy() {
-    setError(null)
-    try {
-      await navigator.clipboard.writeText(await loadFullKey())
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch (err) {
-      setError(errorMessage(err, t('复制失败')))
-    }
-  }
-
-  const status = keyStatusLabel(key.status)
+  const full = useFullKey(key.id)
+  const name = key.name || t('未命名')
 
   return (
     <Tr>
+      <Td className='w-10 pr-0'>
+        <input
+          type='checkbox'
+          className={CHECKBOX}
+          checked={props.selected}
+          onChange={(event) => props.onSelect(event.target.checked)}
+          aria-label={t('选择 {name}', { name })}
+        />
+      </Td>
       <Td>
         <div className='flex items-center gap-2'>
-          <span className='max-w-[200px] truncate font-medium'>{key.name || t('未命名')}</span>
-          {status ? <Tag tone={key.status === KEY_STATUS_DISABLED ? 'neutral' : 'danger'}>{status}</Tag> : null}
+          <span className='max-w-[180px] truncate font-medium' title={key.name}>
+            {name}
+          </span>
+          <StatusTag status={key.status} />
         </div>
+        <LimitTags apiKey={key} />
       </Td>
       <Td>
-        <div className='flex items-center gap-1'>
-          <code className={cn('font-geist mr-1 text-[13px] break-all', !shown && 'text-or-muted')}>
-            {shown && fullKey ? fullKey : withKeyPrefix(key.key)}
-          </code>
-          <button type='button' onClick={onReveal} className={ICON_BUTTON} aria-label={shown ? t('隐藏密钥') : t('显示密钥')} title={shown ? t('隐藏') : t('显示')}>
-            {shown ? <EyeOff className='size-3.5' /> : <Eye className='size-3.5' />}
-          </button>
-          <button type='button' onClick={onCopy} className={ICON_BUTTON} aria-label={t('复制密钥')} title={copied ? t('已复制') : t('复制')}>
-            {copied ? <Check className='text-or-primary size-3.5' /> : <Copy className='size-3.5' />}
-          </button>
-        </div>
+        <KeyValue masked={key.key} full={full} />
+      </Td>
+      <Td>
+        <GroupInfo apiKey={key} groups={props.groups} />
       </Td>
       <Td right>
-        {key.unlimited_quota ? (
-          <span className='text-or-muted'>{t('无限制')}</span>
-        ) : (
-          <div className='flex flex-col items-end'>
-            <span>{money.format(key.remain_quota + key.used_quota)}</span>
-            <span className='text-or-muted text-[12px]'>{t('剩余 {amount}', { amount: money.format(key.remain_quota) })}</span>
-          </div>
-        )}
+        <QuotaInfo apiKey={key} />
       </Td>
-      <Td right>{money.format(key.used_quota)}</Td>
-      <Td muted className='whitespace-nowrap'>{dateTime(key.created_time)}</Td>
+      <Td>
+        <ExpiryInfo expiredTime={key.expired_time} now={props.now} />
+      </Td>
+      <Td>
+        <UsageTimes apiKey={key} now={props.now} />
+      </Td>
       <Td right>
-        <div className='flex items-center justify-end gap-1'>
-          {confirming ? (
-            <>
-              <span className='text-or-muted mr-1 text-[13px] whitespace-nowrap'>{t('确认删除？')}</span>
-              <Button size='sm' variant='danger' busy={remove.isPending} onClick={() => remove.mutate()}>
-                {t('删除')}
-              </Button>
-              <Button size='sm' variant='ghost' onClick={() => setConfirming(false)}>
-                {t('取消')}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button size='sm' variant='ghost' busy={toggle.isPending} onClick={() => toggle.mutate()}>
-                {enabled ? t('禁用') : t('启用')}
-              </Button>
-              <Button
-                size='sm'
-                variant='ghost'
-                className='hover:text-or-red'
-                onClick={() => {
-                  setError(null)
-                  setConfirming(true)
-                }}
-              >
-                {t('删除')}
-              </Button>
-            </>
-          )}
-        </div>
-        {error ? <div className='text-or-red mt-1 text-[12px]'>{error}</div> : null}
+        <KeyActions apiKey={key} full={full} onEdit={props.onEdit} />
       </Td>
     </Tr>
   )

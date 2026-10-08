@@ -1,0 +1,128 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+
+/** English for the API keys page (src/pages/console/key*.tsx, src/pages/keys/). */
+const EN_KEYS: Record<string, string> = {
+  搜索密钥失败: 'Could not search keys',
+  '仍有密钥未删除，请重试': 'Some keys were not deleted. Please try again.',
+  分组加载失败: 'Could not load groups',
+  模型列表加载失败: 'Could not load models',
+  请输入有效的剩余额度: 'Enter a valid remaining credit',
+  '请至少选择一个自动分组，或恢复全局顺序': 'Choose at least one auto group, or go back to the global order',
+  '最多选择 {max} 个自动分组': 'Choose at most {max} auto groups',
+  '数量需为 1 到 100 之间的整数': 'Quantity must be a whole number from 1 to 100',
+  刚刚: 'Just now',
+  '已用 {amount}': '{amount} used',
+  按顺序自动选择可用的分组: 'Picks a usable group automatically, in order',
+  自动分组: 'Auto group',
+  跨分组重试: 'Cross-group retry',
+  '{count} 个模型': 'Models: {count}',
+  '{count} 个 IP': 'IPs: {count}',
+  永不过期: 'Never expires',
+  '最近使用 {time}': 'Last used {time}',
+  久未使用: 'Unused for a while',
+  '三网加速 URL': 'Mainland China acceleration URL',
+  '全球加速 URL': 'Global acceleration URL',
+  '复制{label}': 'Copy {label}',
+  全部状态: 'All statuses',
+  已启用: 'Enabled',
+  搜索名称: 'Search names',
+  搜索密钥: 'Search keys',
+  每页条数: 'Rows per page',
+  '{size} 条/页': '{size} / page',
+  到期: 'Expires',
+  '当前页没有该状态的密钥。': 'No keys with this status on this page.',
+  没有匹配的密钥: 'No matching keys',
+  '按完整名称或完整密钥匹配，可用 % 模糊匹配，例如 %prod%。': 'Matches the full name or the full key. Use % as a wildcard, e.g. %prod%.',
+  密钥已删除: 'Key deleted',
+  密钥已禁用: 'Key disabled',
+  密钥已启用: 'Key enabled',
+  更多操作: 'More actions',
+  复制连接信息: 'Copy connection info',
+  连接信息已复制: 'Connection info copied',
+  '填入 CC Switch': 'Import to CC Switch',
+  在应用中使用: 'Use in an app',
+  '已将密钥发送到流畅阅读。': 'Sent the key to FluentRead.',
+  '未检测到流畅阅读扩展，请确认已安装并启用。': 'FluentRead extension not found. Make sure it is installed and enabled.',
+  主模型: 'Primary model',
+  'Haiku 模型': 'Haiku model',
+  'Sonnet 模型': 'Sonnet model',
+  'Opus 模型': 'Opus model',
+  请选择主模型: 'Choose a primary model',
+  '打开 CC Switch': 'Open CC Switch',
+  应用: 'App',
+  选择或输入模型名称: 'Choose or type a model name',
+  全选本页: 'Select all on this page',
+  '已复制 {count} 个密钥': 'Copied {count} keys',
+  '已删除 {count} 个密钥': 'Deleted {count} keys',
+  '已选 {count} 个': '{count} selected',
+  复制所选: 'Copy selected',
+  '确认删除所选的 {count} 个密钥？': 'Delete the {count} selected keys?',
+  删除所选: 'Delete selected',
+  取消选择: 'Clear selection',
+  已删除全部密钥: 'All keys deleted',
+  '确认删除全部 {count} 个密钥？': 'Delete all {count} keys?',
+  删除全部密钥: 'Delete all keys',
+  '选择 {name}': 'Select {name}',
+  编辑密钥: 'Edit key',
+  剩余额度: 'Credit left',
+  高级设置: 'Advanced settings',
+  模型限制: 'Model limits',
+  '不勾选则可使用全部模型。': 'Leave all unticked to allow every model.',
+  'IP 白名单': 'IP allow list',
+  '请勿过度依赖此功能，IP 可能被伪造，请配合 nginx、CDN 等网关使用。':
+    'Don’t rely on this alone: IPs can be spoofed. Use it together with a gateway such as nginx or a CDN.',
+  '每行一个 IP，支持 CIDR，留空不限制': 'One IP per line, CIDR allowed; leave empty for no limit',
+  数量: 'Quantity',
+  '一次创建多个密钥，后面的名称会自动加上随机后缀。': 'Create several keys at once; the extra keys get a random suffix on their name.',
+  密钥已更新: 'Key updated',
+  '已创建 {count} 个密钥。': 'Created {count} keys.',
+  '可在列表中勾选它们，一次复制全部密钥。': 'Tick them in the list to copy all their keys at once.',
+  账户默认分组: 'Your account’s group',
+  '使用账户所在的分组。': 'Uses the group your account is in.',
+  比较各分组价格: 'Compare group prices',
+  自动分组顺序: 'Auto group order',
+  '选择并排列这个密钥依次尝试的分组。': 'Choose and order the groups this key tries.',
+  '当前分组的渠道都失败时，按顺序尝试下一个分组。': 'When every channel in a group fails, try the next group in order.',
+  '最多 {max} 个分组': 'At most {max} groups',
+  添加分组: 'Add a group',
+  '正在使用全局自动分组顺序（{count} 个分组）': 'Following the global auto order ({count} groups)',
+  '已选 {count} / {max} 个分组': '{count} of {max} groups chosen',
+  恢复全局顺序: 'Use the global order',
+  '全局自动分组顺序中没有可用的分组。': 'The global auto order has no groups you can use.',
+  '没有有效的自定义分组，请添加分组或恢复全局顺序。': 'No usable groups in this order. Add one, or go back to the global order.',
+  '上移 {group}': 'Move {group} up',
+  '下移 {group}': 'Move {group} down',
+  '移除 {group}': 'Remove {group}',
+  过期时间: 'Expiry',
+  留空表示永不过期: 'Leave empty to never expire',
+  '1 个月': '1 month',
+  '1 天': '1 day',
+  '1 小时': '1 hour',
+  清空: 'Clear',
+  参考模型: 'Model to price',
+  '这个模型没有你可用的分组。': 'None of your groups serve this model.',
+  当前分组: 'Current',
+  '选用 {group}': 'Use {group}',
+  选用: 'Use',
+  '一键复制——这就是你的 AI 工具需要的密码': 'One tap to copy: this is the password your AI tool needs',
+  '怎么使用？': 'How do I use it?',
+}
+
+export default EN_KEYS

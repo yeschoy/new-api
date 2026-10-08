@@ -177,7 +177,19 @@ describe('key actions', () => {
     await user.type(screen.getByPlaceholderText('10'), '2')
     await user.click(screen.getByRole('button', { name: '创建' }))
     expect(await screen.findByText('sk-FULLKEY')).toBeInTheDocument()
-    expect(post).toHaveBeenCalledWith('/api/token/', { name: 'ci', remain_quota: 1_000_000, unlimited_quota: false, expired_time: -1 })
+    // The form sends every field of the key, as the old keys page did.
+    expect(post).toHaveBeenCalledWith('/api/token/', {
+      name: 'ci',
+      remain_quota: 1_000_000,
+      unlimited_quota: false,
+      expired_time: -1,
+      model_limits_enabled: false,
+      model_limits: '',
+      allow_ips: '',
+      group: '',
+      auto_groups: [],
+      cross_group_retry: false,
+    })
     expect(post).toHaveBeenCalledWith('/api/token/9/key')
   })
 
@@ -194,6 +206,18 @@ describe('key actions', () => {
     await user.type(screen.getByPlaceholderText('例如：生产环境'), 'ci')
     await user.click(screen.getByRole('button', { name: '创建' }))
     expect(await screen.findByText('sk-FULLKEY')).toBeInTheDocument()
-    expect(post).toHaveBeenCalledWith('/api/token/', { name: 'ci', remain_quota: 0, unlimited_quota: true, expired_time: -1, group: 'auto' })
+    // Auto keys follow the global order and retry across groups unless told otherwise.
+    expect(post).toHaveBeenCalledWith('/api/token/', {
+      name: 'ci',
+      remain_quota: 0,
+      unlimited_quota: true,
+      expired_time: -1,
+      model_limits_enabled: false,
+      model_limits: '',
+      allow_ips: '',
+      group: 'auto',
+      auto_groups: [],
+      cross_group_retry: true,
+    })
   })
 })
