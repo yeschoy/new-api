@@ -16,9 +16,43 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { tk } from '@/i18n/i18n'
-import { ComingSoon } from '@/pages/console/coming-soon'
+import { useI18n } from '@/i18n/i18n'
+import { useAuth } from '@/lib/auth-store'
+import { useSelf } from '@/pages/console/console-hooks'
+import { ConsolePage } from '@/pages/console/console-page'
 
+import { AccessTokenPanel } from './access-token-panel'
+import type { AccountUser } from './account-api'
+import { BindingsPanel } from './bindings-panel'
+import { DeleteAccountPanel } from './delete-account-panel'
+import { PasskeyPanel } from './passkey-panel'
+import { PasswordPanel } from './password-panel'
+import { SessionsPanel } from './sessions-panel'
+import { TwoFactorPanel } from './two-factor-panel'
+
+/** /settings/security: how the account signs in and where it is signed in. */
 export function SecurityPage() {
-  return <ComingSoon active='security' title={tk('账户安全')} />
+  const { t } = useI18n()
+  return (
+    <ConsolePage active='security' title={t('账户安全')} description={t('管理登录密码、两步验证、第三方账号与登录设备。')}>
+      <SecurityPanels />
+    </ConsolePage>
+  )
+}
+
+function SecurityPanels() {
+  const auth = useAuth()
+  const self = useSelf()
+  const user = (self.data ?? auth.user) as AccountUser | null
+  return (
+    <div className='flex flex-col gap-4'>
+      <PasswordPanel />
+      <TwoFactorPanel />
+      <PasskeyPanel />
+      <BindingsPanel user={user} />
+      <AccessTokenPanel />
+      <SessionsPanel />
+      <DeleteAccountPanel user={user} />
+    </div>
+  )
 }
