@@ -23,7 +23,9 @@ import { ConsolePage } from '@/pages/console/console-page'
 
 import { AccessTokenPanel } from './access-token-panel'
 import type { AccountUser } from './account-api'
+import { BindingsPanel } from './bindings-panel'
 import { DeleteAccountPanel } from './delete-account-panel'
+import { PasskeyPanel } from './passkey-panel'
 import { PasswordPanel } from './password-panel'
 import { SessionsPanel } from './sessions-panel'
 import { TwoFactorPanel } from './two-factor-panel'
@@ -46,6 +48,8 @@ function SecurityPanels() {
     <div className='flex flex-col gap-4'>
       <PasswordPanel />
       <TwoFactorPanel />
+      <PasskeyPanel />
+      <BindingsPanel user={user} />
       <AccessTokenPanel />
       <SessionsPanel />
       <DeleteAccountPanel user={user} />

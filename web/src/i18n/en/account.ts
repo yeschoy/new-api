@@ -160,6 +160,39 @@ const EN_ACCOUNT: Record<string, string> = {
   '此操作无法撤销。': 'This can’t be undone.',
   '输入用户名 {username} 以确认': 'Type your username {username} to confirm',
 
+  // Passkeys and linked accounts
+  验证失败: 'Verification failed',
+  安全验证: 'Security check',
+  '这项操作需要先验证身份，请输入验证器 App 中的验证码或一个备用码。':
+    'Please confirm it’s you first: enter a code from your authenticator app or a backup code.',
+  'Passkey 操作已取消': 'The passkey request was cancelled',
+  'Passkey 已添加': 'Passkey added',
+  'Passkey 已移除': 'Passkey removed',
+  尚未使用: 'Not used yet',
+  '上次使用：{time}': 'Last used {time}',
+  '用指纹、面容或设备密码登录，无需输入密码。': 'Sign in with your fingerprint, face or device PIN instead of a password.',
+  'Passkey 登录': 'Passkey sign-in',
+  '移除后需改用其他方式登录，确认？': 'You’ll need another way to sign in afterwards. Remove it?',
+  '移除 Passkey': 'Remove passkey',
+  '添加 Passkey': 'Add a passkey',
+  '此设备不支持 Passkey，请使用支持生物识别或安全密钥的浏览器与设备。':
+    'This device doesn’t support passkeys. Use a browser and device with biometrics or a security key.',
+  获取绑定信息失败: 'Could not load linked accounts',
+  解绑失败: 'Could not unlink',
+  '浏览器拦截了弹出窗口，请允许弹窗后重试': 'The browser blocked the popup. Allow popups and try again.',
+  '绑定 {provider} 账号': 'Link your {provider} account',
+  '点击下方按钮，在 Telegram 中授权机器人 @{bot}，完成后会自动绑定。':
+    'Click the button below and authorize the bot @{bot} in Telegram; the account links automatically.',
+  重试: 'Try again',
+  已解绑: 'Unlinked',
+  '绑定 {provider}': 'Link {provider}',
+  绑定: 'Link',
+  已绑定: 'Linked',
+  '解绑后将无法再用 {provider} 登录，确认？': 'You won’t be able to sign in with {provider} anymore. Unlink?',
+  解绑: 'Unlink',
+  第三方账号: 'Linked accounts',
+  绑定微信: 'Link WeChat',
+
   // Password recovery
   '输入注册邮箱，我们会发送一封重置密码的邮件。': 'Enter the email you signed up with and we’ll send you a link to reset your password.',
   '想起密码了？': 'Remembered your password?',
