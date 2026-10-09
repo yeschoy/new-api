@@ -649,6 +649,7 @@ func GetUserTopUps(c *gin.Context) {
 }
 
 // GetAllTopUps 管理员获取全平台充值记录
+// Query: keyword, status, start_timestamp, end_timestamp, user_id
 func GetAllTopUps(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	keyword := c.Query("keyword")
@@ -661,7 +662,25 @@ func GetAllTopUps(c *gin.Context) {
 	if keyword != "" {
 		topups, total, err = model.SearchAllTopUps(keyword, pageInfo)
 	} else {
-		topups, total, err = model.GetAllTopUps(pageInfo)
+		startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+		endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+		userId, _ := strconv.Atoi(c.Query("user_id"))
+		status := c.Query("status")
+		if status != "" && status != common.TopUpStatusPending && status != common.TopUpStatusSuccess &&
+			status != common.TopUpStatusFailed && status != common.TopUpStatusExpired {
+			common.ApiErrorMsg(c, "无效的充值状态")
+			return
+		}
+		if startTimestamp != 0 && endTimestamp != 0 && endTimestamp < startTimestamp {
+			common.ApiErrorMsg(c, "无效的时间范围")
+			return
+		}
+		topups, total, err = model.GetAllTopUpsFiltered(pageInfo, model.TopUpListFilter{
+			Status:         status,
+			StartTimestamp: startTimestamp,
+			EndTimestamp:   endTimestamp,
+			UserId:         userId,
+		})
 	}
 	if err != nil {
 		common.ApiError(c, err)

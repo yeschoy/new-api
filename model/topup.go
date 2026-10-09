@@ -585,8 +585,23 @@ func GetUserTopUps(userId int, pageInfo *common.PageInfo) (topups []*TopUp, tota
 	return topups, total, nil
 }
 
+// TopUpListFilter optional filters for admin top-up listing / ledger sync.
+type TopUpListFilter struct {
+	Status         string // pending|success|failed|expired; empty = all
+	StartTimestamp int64  // filter create_time >= ; 0 = no lower bound
+	EndTimestamp   int64  // filter create_time <= ; 0 = no upper bound
+	UserId         int    // 0 = all users
+}
+
 // GetAllTopUps 获取全平台的充值记录（管理员使用，不限制时间窗口）
 func GetAllTopUps(pageInfo *common.PageInfo) (topups []*TopUp, total int64, err error) {
+	return GetAllTopUpsFiltered(pageInfo, TopUpListFilter{})
+}
+
+// GetAllTopUpsFiltered lists top-ups with optional status / time / user filters.
+// Used by partnership ledger sync to pull successful topups for a period
+// without paging through the entire history.
+func GetAllTopUpsFiltered(pageInfo *common.PageInfo, filter TopUpListFilter) (topups []*TopUp, total int64, err error) {
 	tx := DB.Begin()
 	if tx.Error != nil {
 		return nil, 0, tx.Error
@@ -597,12 +612,26 @@ func GetAllTopUps(pageInfo *common.PageInfo) (topups []*TopUp, total int64, err 
 		}
 	}()
 
-	if err = tx.Model(&TopUp{}).Count(&total).Error; err != nil {
+	query := tx.Model(&TopUp{})
+	if filter.Status != "" {
+		query = query.Where("status = ?", filter.Status)
+	}
+	if filter.UserId != 0 {
+		query = query.Where("user_id = ?", filter.UserId)
+	}
+	if filter.StartTimestamp != 0 {
+		query = query.Where("create_time >= ?", filter.StartTimestamp)
+	}
+	if filter.EndTimestamp != 0 {
+		query = query.Where("create_time <= ?", filter.EndTimestamp)
+	}
+
+	if err = query.Count(&total).Error; err != nil {
 		tx.Rollback()
 		return nil, 0, err
 	}
 
-	if err = tx.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error; err != nil {
+	if err = query.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Find(&topups).Error; err != nil {
 		tx.Rollback()
 		return nil, 0, err
 	}
