@@ -327,9 +327,14 @@ func updatePricing() {
 	pricingMap = make([]Pricing, 0)
 	pluginGeneration := jsplugin.DefaultRegistry.Generation()
 	for model, groups := range modelGroupsMap {
+		enableGroups := groups.Items()
+		// Skip uncurated upstream dumps that only live on the default group.
+		if HideDefaultOnlyModels && IsDefaultOnlyEnableGroup(enableGroups) {
+			continue
+		}
 		pricing := Pricing{
 			ModelName:              model,
-			EnableGroup:            groups.Items(),
+			EnableGroup:            enableGroups,
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
 		}
 

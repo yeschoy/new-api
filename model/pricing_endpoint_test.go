@@ -14,7 +14,10 @@ import (
 func resetPricingEndpointTestTables(t *testing.T) {
 	t.Helper()
 	originalMemoryCacheEnabled := common.MemoryCacheEnabled
+	originalHideDefaultOnly := HideDefaultOnlyModels
 	common.MemoryCacheEnabled = true
+	// Endpoint/schema fixtures intentionally park models on default only.
+	HideDefaultOnlyModels = false
 	require.NoError(t, DB.AutoMigrate(&Channel{}, &Ability{}, &Model{}, &Vendor{}))
 	for _, table := range []string{"abilities", "channels", "models", "vendors"} {
 		require.NoError(t, DB.Exec("DELETE FROM "+table).Error)
@@ -28,6 +31,7 @@ func resetPricingEndpointTestTables(t *testing.T) {
 		InitChannelCache()
 		InvalidatePricingCache()
 		common.MemoryCacheEnabled = originalMemoryCacheEnabled
+		HideDefaultOnlyModels = originalHideDefaultOnly
 	})
 }
 
