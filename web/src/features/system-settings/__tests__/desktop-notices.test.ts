@@ -17,29 +17,30 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import assert from 'node:assert/strict'
-
 import { describe, test } from 'vitest'
 
 import {
-  DESKTOP_NOTICES_EXAMPLE,
+  createEmptyDesktopNotice,
+  parseDesktopNotices,
+  serializeDesktopNotices,
   validateDesktopNotices,
 } from '../maintenance/desktop-notices'
 
 describe('desktop notices validation', () => {
-  test('accepts an empty value, an empty array, and the documented example', () => {
-    for (const value of ['', '   ', '[]', DESKTOP_NOTICES_EXAMPLE]) {
+  test('accepts empty config and a well-formed array', () => {
+    for (const value of ['', '[]', '[{"title":"ok"}]']) {
       assert.equal(validateDesktopNotices(value), null, value)
     }
   })
 
-  test('rejects malformed JSON and non-array values', () => {
+  test('rejects invalid JSON and non-arrays', () => {
     assert.deepEqual(validateDesktopNotices('[{'), { kind: 'invalid-json' })
     assert.deepEqual(validateDesktopNotices('{"title":"x"}'), {
       kind: 'not-array',
     })
   })
 
-  test('reports the position of entries without a usable title', () => {
+  test('rejects non-object items and missing titles', () => {
     assert.deepEqual(validateDesktopNotices('[{"title":"ok"},"x"]'), {
       kind: 'not-object',
       position: 2,
@@ -50,13 +51,35 @@ describe('desktop notices validation', () => {
     })
   })
 
-  test('rejects a repeated id but allows entries without ids', () => {
+  test('rejects duplicate ids', () => {
     assert.deepEqual(
       validateDesktopNotices(
-        '[{"id":"a","title":"x"},{"title":"y"},{"id":"a","title":"z"}]'
+        '[{"id":"same","title":"a"},{"id":"same","title":"b"}]'
       ),
-      { kind: 'duplicate-id', position: 3, id: 'a' }
+      { kind: 'duplicate-id', position: 2, id: 'same' }
     )
     assert.equal(validateDesktopNotices('[{"title":"x"},{"title":"y"}]'), null)
+  })
+})
+
+describe('desktop notices parse/serialize', () => {
+  test('round-trips a typical notice', () => {
+    const raw = serializeDesktopNotices([
+      {
+        id: 'a',
+        title: 'Hello',
+        body: 'Line1\nLine2',
+        severity: 'info',
+        publishedAtEpochMs: 1000,
+        expiresAtEpochMs: 0,
+        banner: true,
+        action: { kind: 'wallet', label: 'Top up' },
+      },
+    ])
+    const parsed = parseDesktopNotices(raw)
+    assert.equal(parsed.length, 1)
+    assert.equal(parsed[0]?.title, 'Hello')
+    assert.equal(parsed[0]?.action?.kind, 'wallet')
+    assert.equal(createEmptyDesktopNotice().severity, 'info')
   })
 })

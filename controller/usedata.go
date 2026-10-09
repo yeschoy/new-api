@@ -48,7 +48,21 @@ func GetAllQuotaDates(c *gin.Context) {
 func GetQuotaDatesByUser(c *gin.Context) {
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
-	dates, err := model.GetQuotaDataGroupByUser(startTimestamp, endTimestamp)
+	if startTimestamp <= 0 || endTimestamp <= 0 || endTimestamp < startTimestamp {
+		common.ApiErrorMsg(c, "invalid time range")
+		return
+	}
+	// Default: user × hour. group_by=channel adds channel_id for cost allocation.
+	var (
+		dates []*model.QuotaData
+		err   error
+	)
+	switch c.Query("group_by") {
+	case "channel":
+		dates, err = model.GetQuotaDataGroupByUserChannel(startTimestamp, endTimestamp)
+	default:
+		dates, err = model.GetQuotaDataGroupByUser(startTimestamp, endTimestamp)
+	}
 	if err != nil {
 		common.ApiError(c, err)
 		return
