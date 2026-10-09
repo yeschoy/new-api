@@ -34,6 +34,14 @@ type userModelsResponse struct {
 	Data    []string `json:"data"`
 }
 
+
+func withHideDefaultOnlyModels(t *testing.T, enabled bool) {
+	t.Helper()
+	prev := model.HideDefaultOnlyModels
+	model.HideDefaultOnlyModels = enabled
+	t.Cleanup(func() { model.HideDefaultOnlyModels = prev })
+}
+
 func setupModelListControllerTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -182,6 +190,7 @@ func decodeUserModelsResponse(t *testing.T, recorder *httptest.ResponseRecorder)
 }
 
 func TestGetUserModelsFiltersByRequestedGroup(t *testing.T) {
+	withHideDefaultOnlyModels(t, true)
 	db := setupModelListControllerTestDB(t)
 	require.NoError(t, db.Create(&model.User{
 		Id:       1002,
@@ -191,7 +200,9 @@ func TestGetUserModelsFiltersByRequestedGroup(t *testing.T) {
 		Status:   common.UserStatusEnabled,
 	}).Error)
 	require.NoError(t, db.Create(&[]model.Ability{
-		{Group: "default", Model: "zz-default-only-model", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "zz-open-model", ChannelId: 1, Enabled: true},
+		{Group: "vip", Model: "zz-open-model", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "zz-default-only-dump", ChannelId: 1, Enabled: true},
 		{Group: "default", Model: "zz-disabled-model", ChannelId: 1, Enabled: false},
 	}).Error)
 
@@ -203,7 +214,7 @@ func TestGetUserModelsFiltersByRequestedGroup(t *testing.T) {
 	GetUserModels(defaultContext)
 
 	defaultModels := decodeUserModelsResponse(t, defaultRecorder)
-	require.ElementsMatch(t, []string{"zz-default-only-model"}, defaultModels)
+	require.ElementsMatch(t, []string{"zz-open-model"}, defaultModels)
 
 	vipRecorder := httptest.NewRecorder()
 	vipContext, _ := gin.CreateTestContext(vipRecorder)
@@ -212,10 +223,11 @@ func TestGetUserModelsFiltersByRequestedGroup(t *testing.T) {
 
 	GetUserModels(vipContext)
 
-	require.Empty(t, decodeUserModelsResponse(t, vipRecorder))
+	require.ElementsMatch(t, []string{"zz-open-model"}, decodeUserModelsResponse(t, vipRecorder))
 }
 
 func TestGetUserModelsExpandsAutoGroupsInConfiguredOrder(t *testing.T) {
+	withHideDefaultOnlyModels(t, true)
 	originalAutoGroups := setting.AutoGroups2JsonString()
 	originalUsableGroups := setting.UserUsableGroups2JSONString()
 	originalSpecialGroups := ratio_setting.GetGroupRatioSetting().GroupSpecialUsableGroup.ReadAll()
@@ -247,7 +259,9 @@ func TestGetUserModelsExpandsAutoGroupsInConfiguredOrder(t *testing.T) {
 	require.NoError(t, db.Create(&[]model.Ability{
 		{Group: "vip", Model: "zz-vip-model", ChannelId: 1, Enabled: true},
 		{Group: "vip", Model: "zz-shared-model", ChannelId: 1, Enabled: true},
-		{Group: "default", Model: "zz-default-model", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "zz-default-dump", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "zz-curated-default", ChannelId: 1, Enabled: true},
+		{Group: "vip", Model: "zz-curated-default", ChannelId: 3, Enabled: true},
 		{Group: "default", Model: "zz-shared-model", ChannelId: 2, Enabled: true},
 		{Group: "unavailable", Model: "zz-unavailable-model", ChannelId: 1, Enabled: true},
 	}).Error)
@@ -260,13 +274,15 @@ func TestGetUserModelsExpandsAutoGroupsInConfiguredOrder(t *testing.T) {
 	GetUserModels(context)
 
 	models := decodeUserModelsResponse(t, recorder)
+	// vip first (incl. curated also on vip), then default contributes nothing new that is curated-only-via-default after vip.
 	require.Len(t, models, 3)
-	assert.ElementsMatch(t, []string{"zz-vip-model", "zz-shared-model"}, models[:2])
-	assert.Equal(t, "zz-default-model", models[2])
+	assert.ElementsMatch(t, []string{"zz-vip-model", "zz-shared-model", "zz-curated-default"}, models)
+	require.NotContains(t, models, "zz-default-dump")
 }
 
 func TestListModelsIncludesTieredBillingModel(t *testing.T) {
 	withSelfUseModeDisabled(t)
+	withHideDefaultOnlyModels(t, false)
 	withTieredBillingConfig(t, map[string]string{
 		"zz-tiered-visible-model":      "tiered_expr",
 		"zz-tiered-empty-expr-model":   "tiered_expr",
@@ -323,6 +339,7 @@ func TestListModelsIncludesTieredBillingModel(t *testing.T) {
 
 func TestListModelsUsesAdvancedCustomEndpointTypesFromPricingCache(t *testing.T) {
 	withSelfUseModeEnabled(t)
+	withHideDefaultOnlyModels(t, false)
 	db := setupModelListControllerTestDB(t)
 
 	originalMemoryCacheEnabled := common.MemoryCacheEnabled
@@ -394,6 +411,7 @@ func TestListModelsUsesAdvancedCustomEndpointTypesFromPricingCache(t *testing.T)
 
 func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 	withSelfUseModeDisabled(t)
+	withHideDefaultOnlyModels(t, false)
 	withTieredBillingConfig(t, map[string]string{
 		"zz-token-tiered-visible-model":      "tiered_expr",
 		"zz-token-tiered-empty-expr-model":   "tiered_expr",
@@ -433,6 +451,7 @@ func TestListModelsTokenLimitIncludesTieredBillingModel(t *testing.T) {
 
 func TestListModelsTokenLimitUsesResolvedCustomAutoGroups(t *testing.T) {
 	withSelfUseModeEnabled(t)
+	withHideDefaultOnlyModels(t, false)
 	originalMax := setting.GetMaxTokenAutoGroups()
 	originalUsableGroups := setting.UserUsableGroups2JSONString()
 	originalRatios := ratio_setting.GroupRatio2JSONString()

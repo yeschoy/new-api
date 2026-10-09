@@ -30,28 +30,97 @@ type AbilityWithChannel struct {
 	ChannelType int `json:"channel_type"`
 }
 
+// HideDefaultOnlyModels hides models that are only enabled on the "default"
+// group from user-facing catalogs (/api/pricing, /v1/models, /api/user/models).
+// Those rows are typically uncurated upstream /v1/models dumps parked on
+// default-group channels. Intentionally sold models always appear on at least
+// one named selling group as well.
+var HideDefaultOnlyModels = true
+
 func GetAllEnableAbilityWithChannels() ([]AbilityWithChannel, error) {
 	var abilities []AbilityWithChannel
 	err := DB.Table("abilities").
 		Select("abilities.*, channels.type as channel_type").
 		Joins("left join channels on abilities.channel_id = channels.id").
 		Where("abilities.enabled = ?", true).
+		// Drop abilities whose channel is disabled; keep orphan rows (no channel)
+		// so unit tests and mid-migration data still resolve.
+		Where("(channels.id IS NULL OR channels.status = ?)", common.ChannelStatusEnabled).
 		Scan(&abilities).Error
 	return abilities, err
 }
 
 func GetGroupEnabledModels(group string) []string {
 	var models []string
-	// Find distinct models
-	DB.Table("abilities").Where(commonGroupCol+" = ? and enabled = ?", group, true).Distinct("model").Pluck("model", &models)
+	// Find distinct models on enabled abilities (and enabled channels when present).
+	DB.Table("abilities").
+		Joins("left join channels on abilities.channel_id = channels.id").
+		Where("abilities."+commonGroupCol+" = ? and abilities.enabled = ?", group, true).
+		Where("(channels.id IS NULL OR channels.status = ?)", common.ChannelStatusEnabled).
+		Distinct("abilities.model").
+		Pluck("abilities.model", &models)
+	if group == "default" {
+		return filterDefaultGroupToOpenModels(models)
+	}
 	return models
 }
 
 func GetEnabledModels() []string {
 	var models []string
-	// Find distinct models
-	DB.Table("abilities").Where("enabled = ?", true).Distinct("model").Pluck("model", &models)
+	DB.Table("abilities").
+		Joins("left join channels on abilities.channel_id = channels.id").
+		Where("abilities.enabled = ?", true).
+		Where("(channels.id IS NULL OR channels.status = ?)", common.ChannelStatusEnabled).
+		Distinct("abilities.model").
+		Pluck("abilities.model", &models)
 	return models
+}
+
+// filterDefaultGroupToOpenModels keeps default-group models that are also
+// enabled on at least one named (non-default) selling group.
+func filterDefaultGroupToOpenModels(candidates []string) []string {
+	if !HideDefaultOnlyModels || len(candidates) == 0 {
+		return candidates
+	}
+	open := modelsEnabledOutsideDefault()
+	if len(open) == 0 {
+		return []string{}
+	}
+	out := make([]string, 0, len(candidates))
+	for _, name := range candidates {
+		if _, ok := open[name]; ok {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func modelsEnabledOutsideDefault() map[string]struct{} {
+	var curated []string
+	DB.Table("abilities").
+		Joins("left join channels on abilities.channel_id = channels.id").
+		Where("abilities.enabled = ? AND abilities."+commonGroupCol+" <> ?", true, "default").
+		Where("(channels.id IS NULL OR channels.status = ?)", common.ChannelStatusEnabled).
+		Distinct("abilities.model").
+		Pluck("abilities.model", &curated)
+	set := make(map[string]struct{}, len(curated))
+	for _, name := range curated {
+		set[name] = struct{}{}
+	}
+	return set
+}
+
+// IsDefaultOnlyEnableGroup reports whether a model is only wired to the default group.
+func IsDefaultOnlyEnableGroup(groups []string) bool {
+	if len(groups) == 0 {
+		return false
+	}
+	for _, group := range groups {
+		if group != "default" {
+			return false
+		}
+	}
+	return true
 }
 
 func GetAllEnableAbilities() []Ability {
