@@ -18,7 +18,35 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
 
+/** Admin UI timestamps always render in China Standard Time. */
+export const DISPLAY_TIMEZONE = 'Asia/Shanghai'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 dayjs.extend(relativeTime)
+dayjs.tz.setDefault(DISPLAY_TIMEZONE)
 
-export default dayjs
+function inDisplayTz(value: dayjs.Dayjs): dayjs.Dayjs {
+  return value.tz(DISPLAY_TIMEZONE)
+}
+
+const createDisplayDayjs = ((
+  date?: dayjs.ConfigType,
+  format?: dayjs.OptionType,
+  locale?: string,
+  strict?: boolean
+) => {
+  if (date === undefined && format === undefined) {
+    return inDisplayTz(dayjs())
+  }
+  return inDisplayTz(dayjs(date, format, locale, strict))
+}) as typeof dayjs
+
+const displayDayjs = Object.assign(createDisplayDayjs, dayjs, {
+  unix: (timestamp: number) => inDisplayTz(dayjs.unix(timestamp)),
+}) as typeof dayjs
+
+export default displayDayjs

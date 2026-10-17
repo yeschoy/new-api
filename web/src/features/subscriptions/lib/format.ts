@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { TFunction } from 'i18next'
 
-import dayjs from '@/lib/dayjs'
+import dayjs, { DISPLAY_TIMEZONE } from '@/lib/dayjs'
 
 import type { SubscriptionPlan } from '../types'
 
@@ -64,5 +64,5 @@ export function formatResetPeriod(
 
 export function formatTimestamp(ts: number): string {
   if (!ts) return '-'
-  return dayjs(ts * 1000).format('YYYY-MM-DD HH:mm:ss')
+  return dayjs(ts * 1000).tz(DISPLAY_TIMEZONE).format('YYYY-MM-DD HH:mm:ss')
 }

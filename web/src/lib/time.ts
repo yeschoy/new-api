@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 /**
  * Time utility functions for consistent time handling across the application
  */
-import dayjs from '@/lib/dayjs'
+import dayjs, { DISPLAY_TIMEZONE } from '@/lib/dayjs'
 
 /**
  * Time granularity type
@@ -143,14 +143,14 @@ export function computeTimeRange(
  * Format Unix timestamp (seconds) to YYYY-MM-DD
  */
 export function formatDate(tsSec: number): string {
-  return dayjs(tsSec * 1000).format('YYYY-MM-DD')
+  return dayjs(tsSec * 1000).tz(DISPLAY_TIMEZONE).format('YYYY-MM-DD')
 }
 
 /**
  * Format Date object to YYYY-MM-DD HH:mm:ss
  */
 export function formatDateTimeObject(date: Date): string {
-  return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+  return dayjs(date).tz(DISPLAY_TIMEZONE).format('YYYY-MM-DD HH:mm:ss')
 }
 
 /**
@@ -163,7 +163,7 @@ export function formatChartTime(
   timestamp: number,
   granularity: TimeGranularity = 'day'
 ): string {
-  const d = dayjs(timestamp * 1000)
+  const d = dayjs(timestamp * 1000).tz(DISPLAY_TIMEZONE)
   let result = d.format('MM-DD')
 
   if (granularity === 'hour') {
