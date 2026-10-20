@@ -20,11 +20,7 @@ import { describe, expect, test } from 'vitest'
 
 import type { AuthUser } from '@/stores/auth-store'
 
-import {
-  getSavedLanguage,
-  requiresFullPageAuthRedirect,
-  sanitizeAuthRedirect,
-} from './auth-redirect'
+import { getSavedLanguage, sanitizeAuthRedirect } from './auth-redirect'
 
 const origin = 'https://dashboard.example.com'
 
@@ -94,12 +90,3 @@ describe('saved authentication language', () => {
   })
 })
 
-describe('full-page authentication redirects', () => {
-  test('marks Go-served desktop connect as a full document load', () => {
-    expect(requiresFullPageAuthRedirect('/desktop/connect')).toBe(true)
-    expect(requiresFullPageAuthRedirect('/desktop/connect?auto=1')).toBe(true)
-    expect(requiresFullPageAuthRedirect('/desktop/connect/')).toBe(true)
-    expect(requiresFullPageAuthRedirect('/dashboard')).toBe(false)
-    expect(requiresFullPageAuthRedirect('/sign-in')).toBe(false)
-  })
-})

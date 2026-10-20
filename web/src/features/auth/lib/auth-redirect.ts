@@ -79,27 +79,11 @@ export function sanitizeAuthRedirect(
   return `${redirectURL.pathname}${redirectURL.search}${redirectURL.hash}`
 }
 
-/** Go-served pages (not SPA routes). Client navigate() would show the SPA 404. */
-const FULL_PAGE_AUTH_REDIRECT_PATHS = new Set(['/desktop/connect'])
-
-export function requiresFullPageAuthRedirect(href: string): boolean {
-  try {
-    const path = new URL(href, 'https://internal.invalid').pathname.replace(/\/$/, '') || '/'
-    return FULL_PAGE_AUTH_REDIRECT_PATHS.has(path)
-  } catch {
-    return false
-  }
-}
-
-/** Prefer full document load for backend HTML pages; otherwise leave SPA navigation to the caller. */
+/** Navigate inside the SPA after login (all auth return paths are SPA routes). */
 export function followAuthRedirect(
   href: string,
   navigate: (opts: { href: string; replace: boolean }) => void | Promise<unknown>
 ): void | Promise<unknown> {
-  if (requiresFullPageAuthRedirect(href)) {
-    window.location.replace(href)
-    return
-  }
   return navigate({ href, replace: true })
 }
 

@@ -19,10 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import {
-  requiresFullPageAuthRedirect,
-  sanitizeAuthRedirect,
-} from '@/features/auth/lib/auth-redirect'
+import { sanitizeAuthRedirect } from '@/features/auth/lib/auth-redirect'
 import { SignIn } from '@/features/auth/sign-in'
 import { resolveAuthentication } from '@/lib/auth-session'
 import { createInternalRedirect } from '@/lib/internal-redirect'
@@ -47,11 +44,6 @@ export const Route = createFileRoute('/(auth)/sign-in')({
       const target =
         sanitizeAuthRedirect(search?.redirect, window.location.origin) ??
         '/dashboard'
-      // /desktop/connect is Go HTML, not an SPA route — hard navigate or we 404.
-      if (requiresFullPageAuthRedirect(target)) {
-        window.location.replace(target)
-        return
-      }
       throw createInternalRedirect(target)
     }
   },
