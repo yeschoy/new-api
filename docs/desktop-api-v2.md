@@ -121,7 +121,7 @@ v2 为官方桌面助手补齐网页登录授权和桌面会话，同时复用 N
 
 - 方法：`POST`
 - 路径：`/api/desktop/v2/connect-codes`
-- 鉴权：网站浏览器会话 Cookie（`credentials: include`）；未登录返回 `session_required`（401）
+- 鉴权：浏览器会话 Access Token（`Authorization: Bearer`）。连接页 `/desktop/connect` 与 `/connect.js` 会先 `POST /api/user/auth/refresh`（携带 HttpOnly refresh cookie）换取 access token，再签发连接码；未登录返回 `session_required`（401）
 - 请求体（可选）：`{"origin":"https://your-station.example"}`；省略时可用 `Origin` 请求头或由 `Host` 推导 canonical HTTPS origin
 - TTL：300 秒，单次使用；响应 `data` 含 `code`、`origin`、`expiresAt`、`ttlSeconds`
 
