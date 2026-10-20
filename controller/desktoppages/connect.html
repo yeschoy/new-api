@@ -197,7 +197,10 @@
       var connectApi = null;
 
       function buildConnectReturnPath() {
-        return window.location.pathname + window.location.search;
+        var url = new URL(window.location.href);
+        // After sign-in, auto-issue the connect code and open the desktop app.
+        url.searchParams.set("auto", "1");
+        return url.pathname + url.search;
       }
 
       function buildSignInUrl() {

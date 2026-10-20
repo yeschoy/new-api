@@ -33,7 +33,10 @@ import {
   OAUTH_POPUP_RESULT_MESSAGE,
 } from '@/features/auth/constants'
 import { useAuthRedirect } from '@/features/auth/hooks/use-auth-redirect'
-import { sanitizeAuthRedirect } from '@/features/auth/lib/auth-redirect'
+import {
+  followAuthRedirect,
+  sanitizeAuthRedirect,
+} from '@/features/auth/lib/auth-redirect'
 import {
   buildDomainBindHandoffURL,
   buildDomainBindReturnURL,
@@ -204,7 +207,7 @@ function OAuthCallback() {
     const safeNavigate = (target: unknown, fallback = '/dashboard') => {
       const href =
         sanitizeAuthRedirect(target, window.location.origin) ?? fallback
-      void navigate({ href, replace: true })
+      void followAuthRedirect(href, navigate)
     }
 
     if (!code && !search.error) {
