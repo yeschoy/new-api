@@ -274,21 +274,28 @@
         return new URLSearchParams(window.location.search).get("auto") === "1";
       }
 
+      // Dashboard APIs need a Bearer access token. The refresh cookie is only
+      // sent to /api/user/auth/*, so probing /api/user/self with credentials
+      // alone always looks logged-out after a hard navigation back here.
       function probeBrowserSession() {
-        return fetch("/api/user/self", {
-          method: "GET",
-          credentials: "include",
-        }).then(function (response) {
-          if (response.status === 401) {
-            enterLoginRequiredMode();
+        var ensure =
+          connectApi && typeof connectApi.ensureAccessToken === "function"
+            ? connectApi.ensureAccessToken()
+            : Promise.reject({ reasonCode: "issue_failed", httpStatus: 0 });
+        return ensure
+          .then(function () {
+            enterConnectMode();
+            return true;
+          })
+          .catch(function (err) {
+            var code = normalizeReasonCode(err);
+            if (code === "session_required") {
+              enterLoginRequiredMode();
+              return false;
+            }
+            // Transient/server errors: keep the connect button so the user can retry.
             return false;
-          }
-          if (!response.ok) {
-            return false;
-          }
-          enterConnectMode();
-          return true;
-        });
+          });
       }
 
       function initConnectPage() {
