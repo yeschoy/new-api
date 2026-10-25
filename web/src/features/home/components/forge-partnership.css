@@ -1,0 +1,917 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+/* Qupper's Forge co-branding borrows the event's own night palette — ink
+   canvas, dot grid, cold teal, editorial serif — and keeps it in both home
+   themes, so the partnership reads as a deliberate spotlight. */
+.ci-forgeBadge,
+.ci-forgePanel {
+  --forge-bg: #07090c;
+  --forge-ink: #f3f8f9;
+  --forge-muted: #9aa8ad;
+  --forge-line: rgb(255 255 255 / 9%);
+  --forge-line-strong: rgb(255 255 255 / 16%);
+  --forge-teal: #8fe3ea;
+  --forge-accent: linear-gradient(
+    100deg,
+    #c4f3f6 0%,
+    #6fe3ee 48%,
+    #6cf59a 100%
+  );
+  --forge-mono: var(--font-brand-mono);
+  --forge-serif: 'Instrument Serif', var(--font-instrument);
+}
+
+/* Hero badge */
+.ci-forgeBadge {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 26px;
+  padding: 7px 8px 7px 8px;
+  border: 1px solid rgb(143 227 234 / 28%);
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      120% 160% at 0% 50%,
+      rgb(143 227 234 / 14%),
+      transparent 60%
+    ),
+    rgb(7 9 12 / 92%);
+  color: var(--forge-ink);
+  text-decoration: none;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 8%),
+    0 16px 40px -18px rgb(34 211 238 / 55%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+  /* Lands first, ahead of the hero copy's fade-up, so it is read first. */
+  animation: ci-forge-badge-in 760ms cubic-bezier(0.22, 1, 0.36, 1) 80ms
+    backwards;
+}
+/* A teal comet orbits the border to keep pulling the eye back. */
+.ci-forgeBadge::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--forge-orbit),
+    transparent 0deg 210deg,
+    rgb(111 227 238 / 90%) 290deg,
+    #6cf59a 340deg,
+    transparent 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: ci-forge-orbit 4.8s linear infinite;
+  pointer-events: none;
+}
+/* A light sheen crosses the pill once in a while. */
+.ci-forgeBadge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+      105deg,
+      transparent 38%,
+      rgb(255 255 255 / 18%) 48%,
+      rgb(143 227 234 / 22%) 52%,
+      transparent 62%
+    )
+    no-repeat;
+  background-size: 260% 100%;
+  animation: ci-forge-sheen 6s ease-in-out 900ms infinite;
+  pointer-events: none;
+}
+.ci-forgeBadge:active {
+  transform: scale(0.97);
+  transition-duration: 90ms;
+}
+/* Outranks the landing's link reset, which inherits the hero ink colour. */
+.ci-handoffRoot .ci-heroCopy a.ci-forgeBadge {
+  color: var(--forge-ink);
+}
+.ci-forgeBadge:hover {
+  border-color: rgb(143 227 234 / 55%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 8%),
+    0 20px 48px -16px rgb(34 211 238 / 70%);
+  transform: translateY(-2px);
+}
+.ci-forgeBadge:focus-visible {
+  outline: 2px solid var(--forge-teal);
+  outline-offset: 3px;
+}
+.ci-forgeBadgeTag {
+  flex: none;
+  padding: 6px 11px;
+  border: 1px solid rgb(143 227 234 / 40%);
+  border-radius: 999px;
+  color: var(--forge-teal);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.ci-forgeBadge img {
+  flex: none;
+  width: 40px;
+  height: auto;
+  filter: drop-shadow(0 0 10px rgb(34 211 238 / 45%));
+}
+.ci-forgeBadgeText {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  text-align: left;
+}
+.ci-forgeBadgeText strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Our own name gets the accent so the pairing reads at a glance. */
+.ci-forgeBadgeWith {
+  background: var(--forge-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 750;
+}
+.ci-forgeBadgeWith > span {
+  color: var(--forge-teal);
+}
+.ci-forgeBadgeText > span {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+  color: var(--forge-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ci-forgeBadgeEvent {
+  color: var(--forge-ink);
+  font-weight: 600;
+}
+.ci-forgeBadgeRole {
+  padding-left: 8px;
+  border-left: 1px solid var(--forge-line-strong);
+  color: var(--forge-teal);
+}
+.ci-forgeBadgeArrow {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--forge-accent);
+  color: #041015;
+  transition: transform 200ms ease;
+}
+.ci-forgeBadge:hover .ci-forgeBadgeArrow {
+  transform: translateX(2px);
+}
+.ci-forgeBadgeArrow {
+  position: relative;
+}
+.ci-forgeBadgeArrow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: ci-forge-ping 2.6s cubic-bezier(0.2, 0.7, 0.3, 1) 1.2s infinite;
+  pointer-events: none;
+}
+
+@property --forge-orbit {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes ci-forge-badge-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(-16px) scale(0.92);
+  }
+}
+@keyframes ci-forge-orbit {
+  to {
+    --forge-orbit: 360deg;
+  }
+}
+@keyframes ci-forge-sheen {
+  0% {
+    background-position: 130% 0;
+  }
+  22%,
+  100% {
+    background-position: -30% 0;
+  }
+}
+@keyframes ci-forge-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgb(111 227 238 / 55%);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 12px rgb(111 227 238 / 0%);
+  }
+}
+
+/* Clicking the badge morphs it into the spotlight panel (View Transitions);
+   browsers without them jump to the panel and get the landing glow only. */
+::view-transition-group(forge-spotlight) {
+  overflow: clip;
+  border-radius: 28px;
+  box-shadow:
+    0 0 0 1px rgb(143 227 234 / 45%),
+    0 40px 120px -40px rgb(34 211 238 / 65%);
+  animation-duration: 760ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(forge-spotlight) {
+  height: 100%;
+  object-fit: contain;
+  animation: ci-forge-vt-out 280ms ease-out both;
+}
+::view-transition-new(forge-spotlight) {
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  animation: ci-forge-vt-in 420ms ease-out 90ms both;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 520ms;
+}
+@keyframes ci-forge-vt-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ci-forge-vt-in {
+  from {
+    opacity: 0;
+  }
+}
+.ci-forgePanel.is-landed {
+  animation: ci-forge-landed 1.2s ease-out;
+}
+@keyframes ci-forge-landed {
+  0% {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 6%),
+      0 0 0 2px rgb(143 227 234 / 75%),
+      0 0 90px 4px rgb(34 211 238 / 45%);
+  }
+}
+
+/* Spotlight */
+.ci-section.ci-forgeSection {
+  padding-block: clamp(56px, 8vw, 104px);
+  scroll-margin-top: 96px;
+}
+.ci-forgePanel {
+  position: relative;
+  display: grid;
+  gap: clamp(28px, 4vw, 44px);
+  overflow: hidden;
+  isolation: isolate;
+  padding: clamp(22px, 4vw, 48px);
+  border: 1px solid var(--forge-line);
+  border-radius: 28px;
+  background: var(--forge-bg);
+  color: var(--forge-ink);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 6%),
+    0 50px 120px -70px rgb(34 211 238 / 55%);
+}
+/* Dot grid echoing the event's ASCII anvil. */
+.ci-forgePanel::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: radial-gradient(
+    rgb(255 255 255 / 9%) 1px,
+    transparent 1.4px
+  );
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 75% 70% at 70% 30%,
+    #000 10%,
+    transparent 75%
+  );
+  mask-image: radial-gradient(
+    ellipse 75% 70% at 70% 30%,
+    #000 10%,
+    transparent 75%
+  );
+  pointer-events: none;
+}
+.ci-forgePanel::after {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background:
+    radial-gradient(42% 46% at 82% 18%, rgb(34 211 238 / 20%), transparent 70%),
+    radial-gradient(36% 40% at 8% 96%, rgb(108 245 154 / 10%), transparent 70%),
+    radial-gradient(30% 30% at 50% 50%, rgb(230 170 90 / 5%), transparent 70%);
+  pointer-events: none;
+}
+
+.ci-forgeHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
+}
+.ci-forgeLockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.ci-forgeLockup .ci-mark span {
+  color: var(--forge-ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+.ci-forgeLockup > img {
+  width: auto;
+  height: 34px;
+}
+.ci-forgeCross {
+  color: var(--forge-muted);
+  font-size: 18px;
+}
+.ci-forgeMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  color: var(--forge-muted);
+  font-family: var(--forge-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+.ci-forgeMeta > span + span {
+  padding-left: 14px;
+  border-left: 1px solid var(--forge-line-strong);
+  letter-spacing: 0.04em;
+}
+
+.ci-forgeBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  align-items: center;
+  gap: clamp(28px, 4vw, 56px);
+}
+.ci-forgeKicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  color: var(--forge-teal);
+  font-family: var(--forge-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+.ci-forgeKicker > span {
+  width: 26px;
+  height: 1px;
+  background: currentColor;
+}
+.ci-forgeCopy h2 {
+  margin: 0;
+  color: var(--forge-ink);
+  font-family: var(--forge-serif);
+  font-size: clamp(2.8rem, 5.8vw, 5.4rem);
+  font-weight: 400;
+  line-height: 0.94;
+  letter-spacing: -0.01em;
+}
+.ci-forgeCopy h2 > span {
+  display: block;
+}
+.ci-forgeAccent {
+  background: var(--forge-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.ci-forgeLead {
+  max-width: 36rem;
+  margin: 24px 0 0;
+  color: var(--forge-muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+.ci-forgeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+.ci-forgeActions .ci-button {
+  min-height: 46px;
+  padding-inline: 22px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.ci-handoffRoot a.ci-forgePrimary,
+.ci-handoffRoot a.ci-forgePrimary:hover {
+  border-color: transparent;
+  background: var(--forge-accent);
+  color: #041015;
+}
+.ci-handoffRoot a.ci-forgePrimary {
+  box-shadow: 0 14px 36px -16px rgb(34 211 238 / 75%);
+}
+.ci-handoffRoot a.ci-forgePrimary:hover {
+  box-shadow: 0 18px 44px -14px rgb(34 211 238 / 90%);
+}
+.ci-handoffRoot a.ci-forgeSecondary,
+.ci-handoffRoot a.ci-forgeSecondary:hover {
+  border-color: var(--forge-line-strong);
+  background: rgb(255 255 255 / 4%);
+  color: var(--forge-ink);
+}
+.ci-handoffRoot a.ci-forgeSecondary:hover {
+  border-color: rgb(143 227 234 / 55%);
+}
+.ci-forgeActions .ci-button:focus-visible {
+  outline: 2px solid var(--forge-teal);
+  outline-offset: 3px;
+}
+.ci-forgeNote {
+  margin: 16px 0 0;
+  color: var(--forge-muted);
+  font-size: 13px;
+}
+
+.ci-forgeVisual {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+}
+.ci-forgeAnvil {
+  position: relative;
+  display: grid;
+  width: min(100%, 280px);
+  aspect-ratio: 1;
+  place-items: center;
+}
+/* Slow turning ring behind the anvil. */
+.ci-forgeAnvil::before {
+  content: '';
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgb(143 227 234 / 0%),
+    rgb(143 227 234 / 55%),
+    rgb(108 245 154 / 0%) 40%,
+    rgb(230 170 90 / 35%) 70%,
+    rgb(143 227 234 / 0%)
+  );
+  -webkit-mask: radial-gradient(
+    circle,
+    transparent 66%,
+    #000 67%,
+    #000 68.5%,
+    transparent 69.5%
+  );
+  mask: radial-gradient(
+    circle,
+    transparent 66%,
+    #000 67%,
+    #000 68.5%,
+    transparent 69.5%
+  );
+  animation: ci-forge-spin 18s linear infinite;
+}
+.ci-forgeAnvil::after {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(34 211 238 / 28%), transparent 70%);
+  filter: blur(18px);
+}
+.ci-forgeAnvil img {
+  position: relative;
+  width: 72%;
+  height: auto;
+  filter: drop-shadow(0 0 22px rgb(34 211 238 / 45%));
+}
+.ci-forgeSpark {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f6c47a;
+  box-shadow: 0 0 10px 2px rgb(246 196 122 / 70%);
+  opacity: 0;
+  animation: ci-forge-spark 3.2s ease-out infinite;
+}
+.ci-forgeSpark:nth-of-type(1) {
+  top: 30%;
+  left: 52%;
+}
+.ci-forgeSpark:nth-of-type(2) {
+  top: 34%;
+  left: 60%;
+  animation-delay: 0.5s;
+}
+.ci-forgeSpark:nth-of-type(3) {
+  top: 28%;
+  left: 44%;
+  animation-delay: 1.1s;
+}
+.ci-forgeSpark:nth-of-type(4) {
+  top: 36%;
+  left: 66%;
+  animation-delay: 1.7s;
+}
+.ci-forgeSpark:nth-of-type(5) {
+  top: 32%;
+  left: 38%;
+  animation-delay: 2.2s;
+}
+.ci-forgeSpark:nth-of-type(6) {
+  top: 26%;
+  left: 56%;
+  animation-delay: 2.7s;
+}
+.ci-forgeConsole {
+  width: min(100%, 300px);
+  padding: 12px 16px 14px;
+  border: 1px solid var(--forge-line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 3%);
+  font-family: var(--forge-mono);
+  font-size: 12px;
+  line-height: 1.75;
+}
+.ci-forgeConsole p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--forge-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ci-forgeConsole em {
+  color: var(--forge-teal);
+  font-style: normal;
+}
+.ci-forgeConsoleMuted {
+  color: var(--forge-muted) !important;
+}
+.ci-forgeConsoleBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--forge-muted);
+}
+.ci-forgeConsoleBar b {
+  font-weight: 500;
+}
+.ci-forgeConsoleBar span {
+  display: flex;
+  gap: 6px;
+}
+.ci-forgeConsoleBar i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff6b6b;
+}
+.ci-forgeConsoleBar i:nth-child(2) {
+  background: #f6c47a;
+}
+.ci-forgeConsoleBar i:nth-child(3) {
+  background: #6cf59a;
+}
+
+.ci-forgeStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--forge-line);
+}
+.ci-forgeStats > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  padding: 22px 20px;
+}
+.ci-forgeStats > div + div {
+  border-left: 1px solid var(--forge-line);
+}
+.ci-forgeStats > div:first-child {
+  padding-left: 0;
+}
+.ci-forgeStats dt {
+  color: var(--forge-muted);
+  font-size: 13px;
+}
+.ci-forgeStats dd {
+  margin: 0;
+  color: var(--forge-ink);
+  font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ci-forgeTracks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ci-forgeTracks li {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px 20px;
+  overflow: hidden;
+  border: 1px solid var(--forge-line);
+  border-radius: 16px;
+  background: linear-gradient(
+    160deg,
+    rgb(255 255 255 / 4%),
+    rgb(255 255 255 / 0%) 60%
+  );
+  transition:
+    border-color 200ms ease,
+    transform 200ms ease;
+}
+.ci-forgeTracks li:hover {
+  border-color: rgb(143 227 234 / 40%);
+  transform: translateY(-2px);
+}
+.ci-forgeTrackIndex {
+  color: var(--forge-teal);
+  font-family: var(--forge-mono);
+  font-size: 12px;
+}
+.ci-forgeTrackKicker {
+  color: var(--forge-muted);
+  font-family: var(--forge-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+.ci-forgeTracks strong {
+  color: var(--forge-ink);
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.ci-forgeEcosystem {
+  padding-top: 4px;
+}
+.ci-forgeEcosystem ul {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ci-forgeEcosystem li {
+  display: grid;
+  min-height: 96px;
+  grid-template-rows: 40px auto;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 16px 12px;
+  border: 1px solid var(--forge-line);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 2.5%);
+  text-align: center;
+  transition:
+    border-color 200ms ease,
+    background-color 200ms ease;
+}
+.ci-forgeEcosystem li:hover {
+  border-color: var(--forge-line-strong);
+  background: rgb(255 255 255 / 4.5%);
+}
+/* Partner logos render as one monochrome set on the night panel. */
+.ci-forgeEcosystem li:not(.ci-forgeEcosystemSelf) img {
+  width: auto;
+  max-width: 100%;
+  height: 26px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.86;
+}
+/* Badge-style logos carry small type, so they get more height. */
+.ci-forgeEcosystem li img.ci-forgePartnerLogo--badge {
+  height: 40px;
+}
+.ci-forgeEcosystem li strong {
+  color: var(--forge-ink);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 26px;
+}
+.ci-forgeEcosystem li > span:not(.ci-mark) {
+  color: var(--forge-muted);
+  font-size: 12px;
+}
+.ci-forgeEcosystem .ci-forgeEcosystemSelf {
+  border-color: rgb(143 227 234 / 40%);
+  background:
+    radial-gradient(
+      90% 120% at 50% 0%,
+      rgb(108 245 154 / 12%),
+      transparent 70%
+    ),
+    rgb(255 255 255 / 3%);
+}
+.ci-forgeEcosystem .ci-forgeEcosystemSelf {
+  grid-template-rows: auto;
+  gap: 8px;
+}
+/* Mark on one side, 野菜 over YesChoy on the other. */
+.ci-forgeEcosystemSelf .ci-mark img {
+  margin-right: 3px;
+  filter: drop-shadow(0 0 10px rgb(74 222 128 / 35%));
+}
+.ci-forgeEcosystem .ci-forgeEcosystemSelf .ci-mark .ci-markStack {
+  align-items: flex-start;
+  gap: 5px;
+}
+.ci-forgeEcosystem
+  .ci-forgeEcosystemSelf
+  .ci-mark
+  .ci-markStack
+  > span:first-child {
+  color: var(--forge-ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+/* The panel stays dark in both themes, so always use the bright sweep. */
+.ci-forgeEcosystem
+  .ci-forgeEcosystemSelf
+  .ci-mark
+  .ci-markStack
+  > .ci-markLatin {
+  background-image: linear-gradient(
+    90deg,
+    var(--brand-lime),
+    var(--brand-mint),
+    var(--brand-cyan)
+  );
+  font-size: 11px;
+}
+.ci-forgeEcosystem .ci-forgeEcosystemSelf > span:not(.ci-mark) {
+  color: var(--forge-teal);
+}
+
+@keyframes ci-forge-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ci-forge-spark {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--spark-x, 18px), -46px) scale(0.4);
+  }
+}
+.ci-forgeSpark:nth-of-type(odd) {
+  --spark-x: -22px;
+}
+
+@media (max-width: 1080px) {
+  .ci-forgeEcosystem ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .ci-forgeBody {
+    grid-template-columns: 1fr;
+  }
+  .ci-forgeVisual {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-items: stretch;
+  }
+  .ci-forgeAnvil {
+    width: 150px;
+  }
+  .ci-forgeStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ci-forgeStats > div:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .ci-forgeStats > div:nth-child(n + 3) {
+    border-top: 1px solid var(--forge-line);
+  }
+  .ci-forgeTracks {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .ci-forgeBadge {
+    gap: 8px;
+    padding-right: 6px;
+  }
+  .ci-forgeBadgeTag,
+  .ci-forgeBadgeRole {
+    display: none;
+  }
+  .ci-forgePanel {
+    border-radius: 22px;
+  }
+  .ci-forgeLockup > img {
+    height: 26px;
+  }
+  .ci-forgeVisual {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .ci-forgeEcosystem ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* Full-width on top keeps the four partners in two even rows. */
+  .ci-forgeEcosystem .ci-forgeEcosystemSelf {
+    order: -1;
+    grid-column: 1 / -1;
+  }
+  .ci-forgeStats > div {
+    padding: 18px 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ci-forgeAnvil::before,
+  .ci-forgeSpark,
+  .ci-forgeBadge,
+  .ci-forgeBadge::before,
+  .ci-forgeBadge::after,
+  .ci-forgeBadgeArrow::after,
+  .ci-forgePanel.is-landed {
+    animation: none;
+  }
+  .ci-forgeBadge,
+  .ci-forgeBadgeArrow,
+  .ci-forgeTracks li {
+    transition: none;
+  }
+}

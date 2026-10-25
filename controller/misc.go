@@ -92,6 +92,7 @@ func GetStatus(c *gin.Context) {
 		"demo_site_enabled":             operation_setting.DemoSiteEnabled,
 		"self_use_mode_enabled":         operation_setting.SelfUseModeEnabled,
 		"register_enabled":              common.RegisterEnabled,
+		"quota_for_new_user":            common.QuotaForNewUser,
 		"password_login_enabled":        common.PasswordLoginEnabled,
 		"password_register_enabled":     common.PasswordRegisterEnabled,
 		"default_use_auto_group":        setting.DefaultUseAutoGroup,
@@ -129,6 +130,8 @@ func GetStatus(c *gin.Context) {
 		"checkin_enabled":             operation_setting.GetCheckinSetting().Enabled,
 		"log_export_enabled":          operation_setting.GetLogSetting().UserExportEnabled,
 		"log_max_range_days":          operation_setting.GetLogSetting().MaxRangeDays,
+		"quota_remind_enabled":        common.QuotaRemindEnabled,
+		"quota_remind_threshold":      common.QuotaRemindThreshold,
 	}
 
 	// 根据启用状态注入可选内容

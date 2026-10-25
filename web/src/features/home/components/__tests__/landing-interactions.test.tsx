@@ -21,9 +21,9 @@ import { readFileSync } from 'node:fs'
 import { QueryClient } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { PRODUCT_NAME } from '@/lib/product-brand'
+import { PRODUCT_NAME, PRODUCT_NAME_LATIN } from '@/lib/product-brand'
 import { useAuthStore } from '@/stores/auth-store'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 import { createTestAuthBundle } from '@/test-utils/auth-bundle'
@@ -92,11 +92,17 @@ describe('landing interactions and price layout', () => {
 
     const badge = brand.children[2]
     expect(getComputedStyle(badge).borderRadius).toBe('999px')
-    expect(getComputedStyle(badge).color).toBe('rgb(63, 80, 61)')
+    expect(getComputedStyle(badge).color).toBe('var(--hero-body)')
     const landing = container.querySelector('.ci-liquidHome')
-    if (!landing) throw new Error('Missing landing page')
+    const root = container.querySelector('.ci-handoffRoot')
+    if (!landing || !root) throw new Error('Missing landing page')
+    expect(getComputedStyle(root).getPropertyValue('--hero-canvas')).toBe(
+      '#fcfdfe'
+    )
     landing.setAttribute('data-theme', 'dark')
-    expect(getComputedStyle(badge).color).toBe('rgb(225, 234, 216)')
+    expect(getComputedStyle(root).getPropertyValue('--hero-canvas')).toBe(
+      '#080a0f'
+    )
 
     const community = within(screen.getByRole('banner')).getByRole('button', {
       name: 'Community',
@@ -210,6 +216,146 @@ describe('landing interactions and price layout', () => {
       ).toBeVisible()
     }
   )
+
+  it.each([
+    [false, '/sign-up'],
+    [true, '/dashboard'],
+  ])(
+    'jumps from the hero hackathon badge to the Qupper’s Forge spotlight with an external event link (authenticated=%s)',
+    async (isAuthenticated, primaryHref) => {
+      if (isAuthenticated) {
+        useAuthStore.getState().auth.setBundle(createTestAuthBundle())
+      }
+      const { container } = await renderApp(
+        <CiLandingPage
+          isAuthenticated={isAuthenticated}
+          models={models}
+          maxSavingsPercent={0}
+        />,
+        client
+      )
+      const hero = container.querySelector<HTMLElement>('.ci-hero')
+      if (!hero) throw new Error('Missing hero')
+
+      const badge = within(hero).getByRole('link', { name: /Qupper's Forge/ })
+      const spotlight = screen.getByRole('region', {
+        name: 'BUILD FOR REAL. SHIP FOR MARKET.',
+      })
+      expect(badge).toHaveAttribute('href', `#${spotlight.id}`)
+      expect(spotlight.previousElementSibling).toBe(hero)
+
+      const eventLink = within(spotlight).getByRole('link', {
+        name: /Explore the hackathon/,
+      })
+      expect(eventLink).toHaveAttribute(
+        'href',
+        'https://qupper.fastrun.com.cn/'
+      )
+      expect(eventLink).toHaveAttribute('target', '_blank')
+      expect(eventLink).toHaveAttribute('rel', 'noopener noreferrer')
+      expect(
+        within(spotlight).getByRole('link', { name: 'Start building' })
+      ).toHaveAttribute('href', primaryHref)
+    }
+  )
+
+  it('lists only confirmed hackathon partners and puts us second with the gradient mark', async () => {
+    await renderApp(
+      <CiLandingPage
+        isAuthenticated={false}
+        models={models}
+        maxSavingsPercent={0}
+      />,
+      client
+    )
+    const partners = screen.getByRole('list', { name: 'Event partners' })
+    const items = within(partners).getAllByRole('listitem')
+
+    expect(items).toHaveLength(5)
+    expect(
+      within(partners).getByRole('img', { name: 'Fastrun Cloud' })
+    ).toBeVisible()
+    expect(
+      within(partners).getByRole('img', { name: 'Moonstone' })
+    ).toBeVisible()
+    expect(within(partners).getByText('Wengu Bilingual School')).toBeVisible()
+    expect(within(partners).getByText('OpenForge')).toBeVisible()
+    // Our own card sits right after the host: the all-green mark beside
+    // the stacked 野菜 / YesChoy wordmark.
+    expect(within(items[1]).getByText(PRODUCT_NAME)).toBeVisible()
+    expect(within(items[1]).getByText(PRODUCT_NAME_LATIN)).toBeVisible()
+    expect(items[1]).toHaveTextContent('Model supply partner')
+    expect(items[1].querySelector('img')).toHaveAttribute(
+      'src',
+      '/yeschoy-mark-green.svg'
+    )
+    expect(within(partners).queryByText(/DeepSeek|Y Combinator/)).toBeNull()
+  })
+
+  describe('hero hackathon badge click', () => {
+    beforeEach(() => {
+      window.history.replaceState(null, '', window.location.pathname)
+    })
+    afterEach(() => {
+      vi.restoreAllMocks()
+      Reflect.deleteProperty(document, 'startViewTransition')
+    })
+
+    async function renderBadge() {
+      const { container } = await renderApp(
+        <CiLandingPage
+          isAuthenticated={false}
+          models={models}
+          maxSavingsPercent={0}
+        />,
+        client
+      )
+      const hero = container.querySelector<HTMLElement>('.ci-hero')
+      const panel = container.querySelector<HTMLElement>('.ci-forgePanel')
+      if (!hero || !panel) throw new Error('Missing hero or spotlight panel')
+      const badge = within(hero).getByRole('link', { name: /Qupper's Forge/ })
+      return { badge, panel }
+    }
+
+    it('keeps the anchor jump and lights up the spotlight when motion is reduced', async () => {
+      const startViewTransition = vi.fn()
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: startViewTransition,
+      })
+      const { badge, panel } = await renderBadge()
+
+      await userEvent.click(badge)
+
+      expect(startViewTransition).not.toHaveBeenCalled()
+      expect(window.location.hash).toBe('#hackathon')
+      expect(panel).toHaveClass('is-landed')
+    })
+
+    it('morphs the badge into the spotlight panel when view transitions are available', async () => {
+      let morphTarget = ''
+      Object.defineProperty(document, 'startViewTransition', {
+        configurable: true,
+        value: (update: () => void) => {
+          update()
+          morphTarget = panel.style.getPropertyValue('view-transition-name')
+          return { finished: Promise.resolve() }
+        },
+      })
+      const { badge, panel } = await renderBadge()
+      vi.spyOn(window, 'matchMedia').mockImplementation(
+        (query: string) => ({ matches: false, media: query }) as MediaQueryList
+      )
+
+      await userEvent.click(badge)
+
+      expect(morphTarget).toBe('forge-spotlight')
+      expect(window.location.hash).toBe('#hackathon')
+      expect(badge.style.getPropertyValue('view-transition-name')).toBe('')
+      await waitFor(() => expect(panel).toHaveClass('is-landed'))
+      expect(panel.style.getPropertyValue('view-transition-name')).toBe('')
+    })
+  })
 
   it('uses the savings translation instead of the on/off control translation', async () => {
     const discounted = buildModelCatalog(

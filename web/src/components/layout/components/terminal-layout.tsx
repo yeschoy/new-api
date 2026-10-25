@@ -27,6 +27,7 @@ import {
   List,
   LogOut,
   MessageSquare,
+  MonitorDown,
   Moon,
   PanelLeft,
   Plus,
@@ -74,6 +75,7 @@ const NAV_ICONS = {
   keys: KeyRound,
   billing: Wallet,
   docs: BookOpen,
+  client: MonitorDown,
 } as const
 
 const SIDEBAR_STORAGE_KEY = 'ci_sidebar_collapsed'
@@ -199,7 +201,7 @@ export function TerminalLayout(props: TerminalLayoutProps) {
         aria-hidden={(compactViewport && collapsed) || undefined}
       >
         <Link to='/' className='ci-appBrand' aria-label={PRODUCT_NAME}>
-          <CiMark size={22} withWordmark />
+          <CiMark size={26} withWordmark />
         </Link>
         <label className='ci-appSearch'>
           <Search size={14} />
@@ -318,6 +320,20 @@ export function TerminalLayout(props: TerminalLayoutProps) {
                         key={item.id}
                         to='/wallet'
                         hash={item.href.includes('#') ? 'redeem' : undefined}
+                        className={className}
+                        title={t(item.title)}
+                        aria-label={t(item.title)}
+                      >
+                        <Icon size={16} />
+                        <span className='ci-appNavText'>{t(item.title)}</span>
+                      </Link>
+                    )
+                  }
+                  if (path === '/client') {
+                    return (
+                      <Link
+                        key={item.id}
+                        to='/client'
                         className={className}
                         title={t(item.title)}
                         aria-label={t(item.title)}
