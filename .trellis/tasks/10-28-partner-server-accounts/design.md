@@ -124,6 +124,9 @@ grant_type=client_credentials&scope=partner:accounts
 - 只接受 Header 里的 Bearer；Query 里带 `access_token` 时返回 400。
 - 查令牌：未过期；签发它的密钥仍是 `active`；client 已启用；服务端模式已启用且未停用；请求 IP 在白名单内。白名单在每个请求上都检查，所以令牌被盗后从别的 IP 也用不了。
 - 按 client 限流：每分钟 3000 次（常量，后续需要再做成可配置）。
+- **IP 白名单是可选的**（2026-10-28 用户决定，见 `security-review.md` H1）：
+  - 为空时不限制来源；后台在白名单为空时显示风险提示，接入文档强烈建议配置。
+  - 白名单只对经过主站入口（Cloudflare → nginx）的请求可靠。WireGuard `8009` 的 TCP 直通入口能伪造 `X-Forwarded-For`（M2）；修复属于运维侧事项，不在本任务范围内。
 - 把 `PartnerServerPrincipal{Client, Config}` 放进请求上下文。
 
 ### 3.3 管理员操作密钥
@@ -139,6 +142,7 @@ grant_type=client_credentials&scope=partner:accounts
 - 错误体与 `/api/integrations/v1` 相同：`{"error":{"code","message"},"request_id"}`。
 - 只在主站 Host 提供服务（`ensurePartnerOAuthHost`）。
 - 路径里的 `{eid}` 即 `external_user_id`，必须满足 `^[A-Za-z0-9._-]{32,64}$`，否则返回 `400 invalid_external_user_id`。
+- **不允许浏览器跨域调用**（L1）：引擎级 `CORS()` 会给所有路由加 `Access-Control-Allow-Origin: *`。本路由组和 `client_credentials` 响应要删除 CORS 响应头，`OPTIONS` 预检返回 403。这样合作方如果误把密钥放进前端，会在联调时直接失败。
 
 | 方法 | 路径 | 自动开户 | 幂等 | 说明 |
 |---|---|---|---|---|
@@ -155,6 +159,10 @@ grant_type=client_credentials&scope=partner:accounts
 **两条说明**
 - 为什么"领 Key"不要求 `Idempotency-Key`：同一账号总是返回同一把 Key，重试本身没有副作用；开户由唯一约束保证只开一次。
 - 为什么"轮换"必须带：重试一次就会多轮换一次，导致合作方刚拿到的 Key 被作废。
+- **领 Key 可以反复返回明文**（2026-10-28 用户决定，H1），以便合作方随时取回。补偿措施：
+  - 领 Key 和轮换共用一个按合作方计算的限流：每分钟 120 次，超出返回 `429 rate_limited` 并写审计 `partner_account.credential_rate_limited`（每分钟最多一条）；
+  - 管理员可以一键吊销全部 Key（§5.7）。
+- 消耗明细单独限流：每个合作方每分钟 60 次（M3）。
 
 ## 5. 关键流程
 
@@ -213,7 +221,10 @@ grant_type=client_credentials&scope=partner:accounts
 - 模型请求在认证时检查用户状态（[middleware/auth.go:594](../../../middleware/auth.go)），用户被禁用后所有 Key 立即失效。
 
 **合作方级别（现有接口 `POST /api/partner-oauth/clients/{id}/status`）**
-- **停用：** 先写 `suspended_at`，此后服务端接口立即全部拒绝。然后按 500 条一批，对 `status=active` 且 `users.status=enabled` 的子账号：禁用用户、设置 `suspended_by_partner=true`、失效缓存。批处理可以重复执行。
+- **停用：** 状态接口只写 `suspended_at` 并删除合作方快照，此后服务端接口立即全部拒绝，接口随即返回。批量禁用在后台 goroutine 中执行（L3）：按 500 条一批，对 `status=active` 且 `users.status=enabled` 的子账号禁用用户、设置 `suspended_by_partner=true`、失效缓存。
+  - 批处理可以重入：进程重启后，由启动时的检查（或下一次触发）对比 `suspended_at` 与 `suspended_by_partner` 继续执行；
+  - 进度（已处理 / 总数）保存在内存中，并通过后台接口查看；
+  - 同一合作方同时只运行一个批处理，用进程内锁实现（单实例部署成立；以后扩成多实例时要改为数据库锁）。
 
   10 万个账号大约需要几十秒到几分钟，这段时间里模型 Key 还能用。这是已知的时间窗口，写进契约。
 - **恢复：** 清空 `suspended_at`，然后按批对 `suspended_by_partner=true` 且 `status=active` 的子账号：启用用户、清除标记、失效缓存。
@@ -244,6 +255,24 @@ grant_type=client_credentials&scope=partner:accounts
    如果 ZPay 报订单号重复（第一次其实成功了但响应丢失），仍然返回 503，并在错误说明里要求换一个新 Key 重新下单；这笔订单一直不付款，不影响任何钱。这种情况由 Q16 联调确认 ZPay 的实际行为。
 6. 入账：完全沿用 `EpayNotify` → `rechargeEpayWithSource`，不改。
 
+出站调用约束（L5）：
+- 只有 `PayAddress` 是 `https` 时才调用 `mapi.php`，否则返回 503，并写一条不含敏感信息的服务端错误日志；
+- 同一个请求内不自动重试；
+- `qrcode`、`payurl` 和 ZPay 的响应原文都不写入任何日志；
+- 不使用 ZPay 的订单查询接口 `api.php?act=order`，因为它要求把商户密钥放在 URL 里。
+
+### 5.7 应急：吊销合作方全部 Key
+
+用于怀疑合作方密钥已经泄露、Key 可能被批量导出的情况（H1）。
+
+- 管理员接口：`POST /api/partner-oauth/clients/{id}/server-keys/revoke-all`，要求 Casbin `sensitive_write` 加二次验证。
+- 执行方式与 §5.4 相同（后台、分批、可重入）：
+  - 把该合作方所有子账号当前的 Key 和宽限中的旧 Key 立即作废，并失效 Key 缓存；
+  - 子账号本身保持 `active`，余额不变。
+- 之后合作方调用领 Key 接口会得到 `403 credential_disabled`；调用轮换（`immediately`）会签发新 Key。因此轮换接口在当前 Key 已被禁用时也必须可用。
+- 通常与吊销服务端密钥、改配 IP 白名单一起使用，处置步骤写进运维手册。
+- 审计 `partner_server.keys_revoke_all`。
+
 **订单号生成：** 沿用 `USR{userId}NO{随机}{时间戳}`。
 
 **为什么不在事务里调用 ZPay：** 不能一边持有行锁一边等外部网络请求。
@@ -258,7 +287,7 @@ grant_type=client_credentials&scope=partner:accounts
 GET /api/partner/v1/accounts/{eid}/usage?start_time=&end_time=&page=1&page_size=50
 ```
 
-- `start_time` 和 `end_time` 是 Unix 秒，时间跨度不超过 31 天，默认最近 24 小时；`page_size` 取 1–100。
+- `start_time` 和 `end_time` 是 Unix 秒，时间跨度不超过 31 天，默认最近 24 小时；`start_time` 不能早于当前时间往前 90 天（M3）；`page_size` 取 1–100；单独限流，每个合作方每分钟 60 次。
 - 查询条件 `logs.user_id = 子账号 AND type = LogTypeConsume`，走 `idx_user_id_id` 索引，按 `id DESC` 分页。
 - 返回字段白名单：`created_at`、`model_name`、`prompt_tokens`、`completion_tokens`、`quota`、`use_time`、`is_stream`、`request_id`。**不返回** `content`、`ip`、`channel`、`group`、`other`、`token_name`。
 - 生产日志库与主库同在 PostgreSQL（D19）。代码通过 `LOG_DB` 访问，不写方言 SQL，因此独立日志库和 ClickHouse 也能用，但本任务只验证 PostgreSQL，交付说明会写明。
@@ -268,11 +297,13 @@ GET /api/partner/v1/accounts/{eid}/usage?start_time=&end_time=&page=1&page_size=
 
 在 `partner_oauth_authorization_logs` 的 action 白名单里新增：
 
-`partner_server.token_issue_failed`、`partner_server.secret_issue`、`partner_server.secret_revoke`、`partner_server.ip_denied`、`partner_account.create`、`partner_account.credential_issue`、`partner_account.credential_rotate`、`partner_account.disable`、`partner_account.enable`、`partner_account.payment_order_create`、`partner_server.suspend`、`partner_server.resume`
+`partner_server.token_issue`、`partner_server.token_issue_failed`、`partner_server.auth_denied`、`partner_server.keys_revoke_all`、`partner_account.credential_rate_limited`、`partner_server.secret_issue`、`partner_server.secret_revoke`、`partner_server.ip_denied`、`partner_account.create`、`partner_account.credential_issue`、`partner_account.credential_rotate`、`partner_account.disable`、`partner_account.enable`、`partner_account.payment_order_create`、`partner_server.suspend`、`partner_server.resume`
 
 - `TargetUserId` 填子账号的用户 ID；`BindingId` 留空。
 - 不记录 `external_user_id` 原文，避免把合作方的标识带进日志；排查时可以通过用户 ID 关联。
-- 成功换取令牌、普通查询不写审计日志，与现有约定一致。
+- **成功和失败的令牌签发都记录**（ASVS 16.3.1，M1）。频率大约每个合作方每小时一次。
+- **`PartnerServerBearer` 拒绝的请求**（令牌无效、IP 不在白名单、合作方停用）按“合作方 + 原因”每分钟最多写一条 `partner_server.auth_denied`（ASVS 16.3.2），防止日志被刷爆；`client_id` 不存在时不写入，只依靠每个 IP 的限流。
+- 普通查询成功不写审计日志。
 
 ## 8. 管理后台（前端）
 
@@ -293,7 +324,7 @@ GET /api/partner/v1/accounts/{eid}/usage?start_time=&end_time=&page=1&page_size=
 | 审计 | ASVS 5.0 V16（Security Logging and Error Handling）、Logging Cheat Sheet | §7；不记录密钥、令牌、Key、二维码 |
 | 传输 | ASVS 5.0 V12 | 只在主站 HTTPS 上提供；`no-store` |
 
-交付时按 ASVS 5.0 的具体条目号逐条列出已验证项与缺口。目前已知的待验证项：
+逐项审查结论、用户决定和已接受的风险见 `security-review.md`。交付时按 ASVS 5.0 的具体条目号逐条列出已验证项与缺口。目前已知的待验证项：
 - `c.ClientIP()` 在生产反向代理后能否取到真实来源 IP（关系到 IP 白名单是否有效）；
 - 合作方停用后，批量禁用完成前的时间窗口。
 
@@ -379,7 +410,7 @@ GET /api/partner/v1/accounts/{eid}/usage?start_time=&end_time=&page=1&page_size=
 
 ### 10.4 限流计数
 
-沿用现有实现：Redis 固定窗口计数，Redis 不可用时退回进程内计数（`partnerOAuthRateTake`、`PartnerOAuthClientAuthLimited`）。只新增两个计数键：按合作方的接口限流、按合作方的令牌换取失败计数。开户速率和下单限流按 §5.1、§5.5 的设计，在数据库事务内计数，不放进 Redis。
+沿用现有实现：Redis 固定窗口计数，Redis 不可用时退回进程内计数（`partnerOAuthRateTake`、`PartnerOAuthClientAuthLimited`）。新增的计数键：按合作方的接口限流（3000/分钟）、领 Key 和轮换（120/分钟）、消耗明细（60/分钟）、令牌换取失败计数，以及审计写入的节流（每个合作方、每种原因每分钟一条）。开户速率和下单限流按 §5.1、§5.5 的设计，在数据库事务内计数，不放进 Redis。
 
 ### 10.5 预期收益
 

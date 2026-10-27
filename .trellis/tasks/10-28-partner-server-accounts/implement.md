@@ -51,6 +51,9 @@
 - [ ] 新增 `middleware.PartnerServerBearer` 中间件，实现按 client 限流。
 - [ ] 新增管理员签发与吊销服务端密钥的接口，要求 Casbin `sensitive_write` 加二次验证；吊销时同一事务删除由该密钥签发的令牌。
 - [ ] 加入过期服务端令牌的清理。
+- [ ] 审计（security-review M1）：记录成功和失败的令牌签发；鉴权失败按“合作方 + 原因”节流后记录。
+- [ ] 去掉 `/api/partner/v1` 和 `client_credentials` 响应的 CORS 头，预检返回 403（L1）。
+- [ ] 隔离测试：`pcs_` 密钥不能用于 `client_credentials`，`pss_` 密钥不能用于授权码和刷新流程；`pst_` 和 `oa_` 两种令牌都不能访问对方的接口；白名单为空时不限制来源，配置后拒绝名单外的 IP。
 - [ ] 缓存（design §10.0）：用 `HybridCache` 缓存合作方快照，按 §10.0 列出的写操作在提交后主动删除；服务端访问令牌也用 `HybridCache` 缓存，有效期取令牌剩余时间与 5 分钟中较小的值，只缓存查到的令牌。测试另外覆盖：令牌过期后，缓存命中也被拒绝；密钥吊销后，已缓存的令牌立即被拒绝。测试覆盖：吊销密钥、停用 client、关闭服务端模式、修改 IP 白名单后，下一个请求立即被拒绝（快照已被删除），而不是等 60 秒有效期过去；Redis 关闭时退回进程内缓存，行为相同。
 - [ ] 测试写在 `controller/partner_server_test.go`，覆盖：
   - 密钥错误、已吊销、client 停用、服务端模式关闭、合作方停用、IP 不在白名单，都返回 `401 invalid_client`；
@@ -66,7 +69,9 @@
 - [ ] 校验 `external_user_id` 的格式。
 - [ ] 子账号映射首期不缓存（design §10.0）；所有状态和 Key 变更都调用现有的用户缓存和 Key 缓存失效函数（§10.3）。测试覆盖：宽限期满后旧 Key 被拒绝（启用 Redis 时也一样）；停用子账号后，同一把 Key 的下一个模型请求立即被拒绝。
 - [ ] 管理员在 `ManageUser` 中停用子账号时，同步把状态改为 `admin_disabled`；管理员更新用户时，拒绝给子账号设置密码或邮箱。
-- [ ] 合作方状态接口联动批量停用与恢复；删除有子账号的合作方返回 409。
+- [ ] 合作方状态接口联动批量停用与恢复，批处理放在后台执行、可以重入、可以查看进度（L3）；删除有子账号的合作方返回 409。
+- [ ] 领 Key 和轮换按合作方限流（每分钟 120 次），超出时写审计（H1）。
+- [ ] 管理员“吊销合作方全部 Key”（design §5.7），要求二次验证；轮换接口在当前 Key 已被禁用时也能签发新 Key。测试：吊销后所有旧 Key（包括宽限中的）被拒绝，余额不变，轮换后新 Key 可用。
 - [ ] 测试（同一个测试文件），覆盖：
   - 自动开户只发生在领 Key 和下单时，GET 请求遇到未知 ID 返回 404 且没有写入；
   - 跨合作方访问返回 404；
@@ -77,7 +82,7 @@
 
 ## 阶段 4：充值（ZPay mapi.php）
 
-- [ ] 实现 `mapi.php` 客户端：表单 POST、MD5 签名、10 秒超时；只接受 `code==1`；优先使用 `qrcode`，没有时使用 `payurl`。日志里不记录返回内容。
+- [ ] 实现 `mapi.php` 客户端：表单 POST、MD5 签名、10 秒超时；只接受 `code==1`；优先使用 `qrcode`，没有时使用 `payurl`。日志里不记录返回内容。`PayAddress` 不是 `https` 时拒绝调用并返回 503（L5）。
 - [ ] 实现下单与查询接口（design §5.5–5.6），复用金额校验、合规判断和返现排除逻辑。
 - [ ] 订单查询首期不缓存（design §10.0）。
 - [ ] 测试用 `httptest` 模拟 ZPay，覆盖：
@@ -93,7 +98,7 @@
 
 ## 阶段 5：消耗明细与审计
 
-- [ ] 实现 `GET /accounts/{eid}/usage`（design §6）：参数边界、白名单字段、通过 `LOG_DB` 查询。
+- [ ] 实现 `GET /accounts/{eid}/usage`（design §6）：参数边界（单次不超过 31 天、最早到 90 天前）、单独限流（每分钟 60 次）、白名单字段、通过 `LOG_DB` 查询（M3）。
 - [ ] 在审计 action 白名单中加入新动作，授权日志页的筛选项同步更新。
 - [ ] 测试覆盖：时间范围超过 31 天、`page_size` 超出范围返回 400；返回字段与白名单完全一致（断言不包含 `ip`、`content`、`other`）；不能查到其他用户的记录；审计日志里没有敏感值。
 - 提交：`feat(partner): expose sub-account usage and audit partner server events`
@@ -120,6 +125,12 @@
 ## 阶段 8：契约与文档
 
 - [ ] 新建 `.trellis/spec/backend/partner-server-accounts.md`；在 `partner-oauth.md` 中补充 scope 隔离与交叉引用。
+- [ ] 接入文档里要强调（security-review L2、L4、M2）：
+  - 怀疑泄露时轮换必须选 `immediately`；
+  - `external_user_id` 只能使用不透明 ID；
+  - 强烈建议配置 IP 白名单；
+  - 密钥和 Key 只能放在后端；
+  - 建议每 90 天轮换一次服务端密钥。
 - [ ] 新建对外接入文档 `docs/partner-server-api.md`（D24），风格与 `docs/partner-oauth-api.md` 一致：换令牌、自动开户、领取与轮换 Key、充值二维码、轮询到账、消耗明细、错误码、限流。并在 `docs/partner-oauth-api.md` 开头加一句指向它的说明。
 - 提交：`docs(spec): record the partner server accounts contract`
 
