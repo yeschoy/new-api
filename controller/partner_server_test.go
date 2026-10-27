@@ -2,6 +2,8 @@ package controller
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -9,11 +11,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Calcium-Ion/go-epay/epay"
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/authz"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -499,4 +503,205 @@ func TestPartnerSuspensionThroughClientStatus(t *testing.T) {
 	assert.Len(t, partnerServerLogs(t, "partner_server.suspend"), 1)
 	assert.Len(t, partnerServerLogs(t, "partner_server.resume"), 1)
 	assert.Equal(t, service.PartnerServerJobProgress{Processed: 1}, service.GetPartnerServerJobProgress(service.PartnerServerJobSuspension, fixture.client.ClientId))
+}
+
+// fakeZPay stands in for the gateway's mapi.php over TLS and records what it
+// was asked.
+type fakeZPay struct {
+	server   *httptest.Server
+	reply    func(w http.ResponseWriter)
+	requests []url.Values
+}
+
+func startFakeZPay(t *testing.T) *fakeZPay {
+	t.Helper()
+	fake := &fakeZPay{reply: func(w http.ResponseWriter) {
+		_, _ = io.WriteString(w, `{"code":1,"msg":"ok","trade_no":"zpay-1","qrcode":"weixin://wxpay/bizpayurl?pr=abc"}`)
+	}}
+	fake.server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mapi.php" || r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_ = r.ParseForm()
+		fake.requests = append(fake.requests, r.PostForm)
+		fake.reply(w)
+	}))
+	t.Cleanup(fake.server.Close)
+	previousClient, previousAddress := partnerServerMapiHTTPClient, operation_setting.PayAddress
+	partnerServerMapiHTTPClient = fake.server.Client()
+	operation_setting.PayAddress = fake.server.URL
+	t.Cleanup(func() {
+		partnerServerMapiHTTPClient = previousClient
+		operation_setting.PayAddress = previousAddress
+	})
+	return fake
+}
+
+func setupPartnerServerPaymentController(t *testing.T) *gin.Engine {
+	t.Helper()
+	engine := setupPartnerOAuthPaymentController(t)
+	require.NoError(t, model.DB.AutoMigrate(partnerServerTestModels...))
+	accounts := engine.Group("/api/partner/v1/accounts/:external_user_id", middleware.PartnerServerBearer())
+	accounts.GET("", PartnerServerGetAccount)
+	accounts.POST("/payment/orders", PartnerServerCreatePaymentOrder)
+	engine.GET("/api/partner/v1/payment/options", middleware.PartnerServerBearer(), PartnerServerPaymentOptions)
+	engine.GET("/api/partner/v1/payment/orders/:order_id", middleware.PartnerServerBearer(), PartnerServerGetPaymentOrder)
+	return engine
+}
+
+func decodePartnerServerOrder(t *testing.T, rec *httptest.ResponseRecorder, status int) partnerServerOrderResponse {
+	t.Helper()
+	require.Equal(t, status, rec.Code, rec.Body.String())
+	var order partnerServerOrderResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &order))
+	return order
+}
+
+func TestPartnerServerPaymentOrderQRCodeAndSettlement(t *testing.T) {
+	engine := setupPartnerServerPaymentController(t)
+	zpay := startFakeZPay(t)
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	ordersPath := "/api/partner/v1/accounts/" + partnerServerTestUser + "/payment/orders"
+	key := map[string]string{"Idempotency-Key": "order-000000000000001"}
+
+	options := partnerServerGet(engine, "/api/partner/v1/payment/options", token, "203.0.113.10")
+	require.Equal(t, http.StatusOK, options.Code)
+	assert.Contains(t, options.Body.String(), `"available":true`)
+
+	created := decodePartnerServerOrder(t, partnerServerPost(engine, ordersPath, token, `{"amount":10,"payment_method":"alipay","client_ip":"198.51.100.23"}`, key), http.StatusCreated)
+	assert.Equal(t, common.TopUpStatusPending, created.Status)
+	assert.Equal(t, "weixin://wxpay/bizpayurl?pr=abc", created.QRCode)
+	assert.Empty(t, created.PayURL)
+	assert.Equal(t, "70.00", created.PayMoney)
+	assert.Equal(t, partnerServerTestUser, created.ExternalUserID)
+	require.Len(t, zpay.requests, 1)
+	sent := zpay.requests[0]
+	assert.Equal(t, "198.51.100.23", sent.Get("clientip"), "the payer's address, not the partner server's")
+	assert.Equal(t, "pc", sent.Get("device"))
+	assert.Equal(t, created.OrderID, sent.Get("out_trade_no"))
+	assert.Equal(t, "70.00", sent.Get("money"))
+	signed := map[string]string{}
+	for name := range sent {
+		signed[name] = sent.Get(name)
+	}
+	verified, err := (&epay.Client{Config: &epay.Config{PartnerID: "merchant-id", Key: "merchant-secret"}}).Verify(signed)
+	require.NoError(t, err)
+	assert.True(t, verified.VerifyStatus, "the gateway request is signed with the merchant key")
+
+	replay := decodePartnerServerOrder(t, partnerServerPost(engine, ordersPath, token, `{"amount":10,"payment_method":"alipay"}`, key), http.StatusOK)
+	assert.Equal(t, created.OrderID, replay.OrderID)
+	assert.Equal(t, created.QRCode, replay.QRCode)
+	assert.Len(t, zpay.requests, 1, "a replay never orders again at the gateway")
+	assertPartnerError(t, partnerServerPost(engine, ordersPath, token, `{"amount":20,"payment_method":"alipay"}`, key), http.StatusConflict, "idempotency_conflict")
+
+	polled := decodePartnerServerOrder(t, partnerServerGet(engine, "/api/partner/v1/payment/orders/"+created.OrderID, token, "203.0.113.10"), http.StatusOK)
+	assert.Equal(t, common.TopUpStatusPending, polled.Status)
+	assert.Empty(t, polled.QRCode, "polling never returns the payment link")
+
+	params := epay.GenerateParams(map[string]string{
+		"pid": "merchant-id", "type": "alipay", "out_trade_no": created.OrderID,
+		"trade_no": "zpay-1", "trade_status": epay.StatusTradeSuccess, "money": "70.00",
+	}, "merchant-secret")
+	query := url.Values{}
+	for name, value := range params {
+		query.Set(name, value)
+	}
+	settle := httptest.NewRequest(http.MethodGet, "/api/user/epay/return?"+query.Encode(), nil)
+	settle.Host = "localhost:3000"
+	settled := httptest.NewRecorder()
+	engine.ServeHTTP(settled, settle)
+	require.Equal(t, http.StatusFound, settled.Code, settled.Body.String())
+
+	paid := decodePartnerServerOrder(t, partnerServerGet(engine, "/api/partner/v1/payment/orders/"+created.OrderID, token, "203.0.113.10"), http.StatusOK)
+	assert.Equal(t, common.TopUpStatusSuccess, paid.Status)
+	assert.NotEmpty(t, paid.PaidAt)
+	accountRec := partnerServerGet(engine, "/api/partner/v1/accounts/"+partnerServerTestUser, token, "203.0.113.10")
+	var account service.PartnerAccountView
+	require.NoError(t, json.Unmarshal(accountRec.Body.Bytes(), &account))
+	assert.Equal(t, 5_000_000, account.Quota, "the payment lands in the sub-account wallet")
+	var rewards int64
+	require.NoError(t, model.DB.Model(&model.CashbackReward{}).Count(&rewards).Error)
+	assert.Zero(t, rewards, "partner orders never earn cashback")
+
+	other := seedPartnerServerFixture(t, "")
+	otherToken := issuePartnerServerTestToken(t, engine, other)
+	assertPartnerError(t, partnerServerGet(engine, "/api/partner/v1/payment/orders/"+created.OrderID, otherToken, "203.0.113.10"), http.StatusNotFound, "order_not_found")
+	assert.Len(t, partnerServerLogs(t, "partner_account.payment_order_create"), 1)
+}
+
+func TestPartnerServerPaymentGatewayFailuresRecoverOnRetry(t *testing.T) {
+	tests := []struct {
+		name  string
+		reply func(w http.ResponseWriter)
+	}{
+		{name: "refused", reply: func(w http.ResponseWriter) { _, _ = io.WriteString(w, `{"code":-1,"msg":"channel closed"}`) }},
+		{name: "http error", reply: func(w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) }},
+		{name: "not json", reply: func(w http.ResponseWriter) { _, _ = io.WriteString(w, `<html>`) }},
+		{name: "no checkout", reply: func(w http.ResponseWriter) { _, _ = io.WriteString(w, `{"code":"1"}`) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine := setupPartnerServerPaymentController(t)
+			zpay := startFakeZPay(t)
+			fixture := seedPartnerServerFixture(t, "")
+			token := issuePartnerServerTestToken(t, engine, fixture)
+			ordersPath := "/api/partner/v1/accounts/" + partnerServerTestUser + "/payment/orders"
+			key := map[string]string{"Idempotency-Key": "order-000000000000002"}
+
+			zpay.reply = tt.reply
+			assertPartnerError(t, partnerServerPost(engine, ordersPath, token, `{"amount":10,"payment_method":"alipay"}`, key), http.StatusServiceUnavailable, "payment_unavailable")
+			zpay.reply = func(w http.ResponseWriter) {
+				_, _ = io.WriteString(w, `{"code":1,"payurl":"https://zpayz.cn/pay/abc"}`)
+			}
+			retried := decodePartnerServerOrder(t, partnerServerPost(engine, ordersPath, token, `{"amount":10,"payment_method":"alipay"}`, key), http.StatusOK)
+			assert.Equal(t, "https://zpayz.cn/pay/abc", retried.PayURL, "a payment URL is returned when there is no QR code")
+			var orders int64
+			require.NoError(t, model.DB.Model(&model.PartnerAccountPaymentOrder{}).Count(&orders).Error)
+			assert.Equal(t, int64(1), orders, "the retry completes the same order")
+			assert.Len(t, zpay.requests, 2)
+		})
+	}
+
+	t.Run("plain http gateway", func(t *testing.T) {
+		engine := setupPartnerServerPaymentController(t)
+		zpay := startFakeZPay(t)
+		operation_setting.PayAddress = "http://pay.example.com"
+		fixture := seedPartnerServerFixture(t, "")
+		token := issuePartnerServerTestToken(t, engine, fixture)
+		rec := partnerServerPost(engine, "/api/partner/v1/accounts/"+partnerServerTestUser+"/payment/orders", token, `{"amount":10,"payment_method":"alipay"}`, map[string]string{"Idempotency-Key": "order-000000000000003"})
+		assertPartnerError(t, rec, http.StatusServiceUnavailable, "payment_unavailable")
+		assert.Empty(t, zpay.requests, "never sent over plain HTTP")
+	})
+}
+
+func TestPartnerServerPaymentOrderValidation(t *testing.T) {
+	engine := setupPartnerServerPaymentController(t)
+	startFakeZPay(t)
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	ordersPath := "/api/partner/v1/accounts/" + partnerServerTestUser + "/payment/orders"
+	tests := []struct {
+		body   string
+		key    string
+		status int
+		code   string
+	}{
+		{body: `{"amount":10,"payment_method":"alipay"}`, key: "", status: http.StatusBadRequest, code: "invalid_request"},
+		{body: `{"amount":10,"payment_method":"alipay","client_ip":"nope"}`, key: "order-000000000000010", status: http.StatusBadRequest, code: "invalid_request"},
+		{body: `{"amount":10,"payment_method":"alipay","extra":1}`, key: "order-000000000000011", status: http.StatusBadRequest, code: "invalid_request"},
+		{body: `{"amount":10,"payment_method":"stripe"}`, key: "order-000000000000012", status: http.StatusBadRequest, code: "invalid_payment_method"},
+		{body: `{"amount":0,"payment_method":"alipay"}`, key: "order-000000000000013", status: http.StatusBadRequest, code: "invalid_amount"},
+	}
+	for _, tt := range tests {
+		headers := map[string]string{}
+		if tt.key != "" {
+			headers["Idempotency-Key"] = tt.key
+		}
+		assertPartnerError(t, partnerServerPost(engine, ordersPath, token, tt.body, headers), tt.status, tt.code)
+	}
+	count, err := model.CountPartnerAccounts(fixture.client.ClientId)
+	require.NoError(t, err)
+	assert.Zero(t, count, "a rejected order creates no account")
 }

@@ -23,5 +23,8 @@ func SetPartnerServerRouter(router *gin.Engine) {
 		accounts.POST("/credential/rotate", credentialLimit, controller.PartnerServerRotateCredential)
 		accounts.POST("/disable", controller.PartnerServerDisableAccount)
 		accounts.POST("/enable", controller.PartnerServerEnableAccount)
+		accounts.POST("/payment/orders", controller.PartnerServerCreatePaymentOrder)
 	}
+	partner.GET("/payment/options", middleware.PartnerServerBearer(), controller.PartnerServerPaymentOptions)
+	partner.GET("/payment/orders/:order_id", middleware.PartnerServerBearer(), controller.PartnerServerGetPaymentOrder)
 }

@@ -135,6 +135,12 @@ func PartnerOAuthPaymentOptions(c *gin.Context) {
 		return
 	}
 	principal := middleware.PartnerOAuthPrincipal(c)
+	c.JSON(http.StatusOK, buildPartnerPaymentOptions(principal.User.Group))
+}
+
+// buildPartnerPaymentOptions lists the Epay methods and preset amounts a
+// partner may offer, priced for the payer's user group.
+func buildPartnerPaymentOptions(group string) partnerPaymentOptionsResponse {
 	response := partnerPaymentOptionsResponse{
 		Currency:        partnerPaymentCurrency(),
 		AmountUnitQuota: partnerPaymentAmountUnitQuota(),
@@ -155,11 +161,11 @@ func PartnerOAuthPaymentOptions(c *gin.Context) {
 			}
 			response.AmountOptions = append(response.AmountOptions, partnerPaymentAmountOption{
 				Amount:   int64(amount),
-				PayMoney: strconv.FormatFloat(getPayMoney(int64(amount), principal.User.Group), 'f', 2, 64),
+				PayMoney: strconv.FormatFloat(getPayMoney(int64(amount), group), 'f', 2, 64),
 			})
 		}
 	}
-	c.JSON(http.StatusOK, response)
+	return response
 }
 
 func parsePartnerPaymentOrderRequest(c *gin.Context) (*partnerPaymentOrderRequest, error) {
