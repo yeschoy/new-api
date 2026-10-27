@@ -75,7 +75,7 @@ func BuildPartnerAccountView(account *model.PartnerAccount) (*PartnerAccountView
 	return &PartnerAccountView{
 		AccountID:      model.PartnerOAuthAccountID(account.UserId),
 		ExternalUserID: account.ExternalUserId,
-		Status:         account.Status,
+		Status:         account.ReportedStatus(),
 		Quota:          user.Quota,
 		UsedQuota:      user.UsedQuota,
 		Amount:         wallet.Amount,
@@ -101,11 +101,7 @@ func partnerAccountKeySpec(partner *PartnerServerSnapshot) (model.PartnerAccount
 	if err != nil {
 		return model.PartnerAccountKey{}, err
 	}
-	groups := []string{"default"}
-	if partner.AccountGroup != "" && partner.AccountGroup != "default" {
-		groups = []string{partner.AccountGroup, "default"}
-	}
-	return model.PartnerAccountKey{Key: key, Name: truncateRunes("partner:"+partner.Name, 50), AutoGroups: groups}, nil
+	return model.PartnerAccountKey{Key: key, Name: truncateRunes("partner:"+partner.Name, 50)}, nil
 }
 
 func partnerAccountCredentialView(account *model.PartnerAccount, token *model.Token) (*PartnerAccountCredentialView, error) {
@@ -128,27 +124,21 @@ func partnerAccountOwner(partner *PartnerServerSnapshot, externalUserID string) 
 }
 
 // IssuePartnerAccountCredential returns the account's current key, creating
-// the account and key on first use. It reports whether each was created.
-func IssuePartnerAccountCredential(partner *PartnerServerSnapshot, externalUserID string) (*PartnerAccountCredentialView, *model.PartnerAccount, bool, bool, error) {
+// the account and key on first use; the result says what was created.
+func IssuePartnerAccountCredential(partner *PartnerServerSnapshot, externalUserID string) (*PartnerAccountCredentialView, *model.PartnerAccountCredentialResult, error) {
 	spec, err := partnerAccountKeySpec(partner)
 	if err != nil {
-		return nil, nil, false, false, err
+		return nil, nil, err
 	}
-	existed := true
-	if _, err := model.GetPartnerAccount(partner.ClientId, externalUserID); errors.Is(err, model.ErrPartnerAccountNotFound) {
-		existed = false
-	} else if err != nil {
-		return nil, nil, false, false, err
-	}
-	account, token, keyCreated, err := model.IssuePartnerAccountCredential(partnerAccountOwner(partner, externalUserID), spec)
+	result, err := model.IssuePartnerAccountCredential(partnerAccountOwner(partner, externalUserID), spec)
 	if err != nil {
-		return nil, nil, false, false, err
+		return nil, nil, err
 	}
-	view, err := partnerAccountCredentialView(account, token)
+	view, err := partnerAccountCredentialView(result.Account, result.Token)
 	if err != nil {
-		return nil, nil, false, false, err
+		return nil, nil, err
 	}
-	return view, account, !existed, keyCreated, nil
+	return view, result, nil
 }
 
 // RotatePartnerAccountCredential issues a new key and retires the old one

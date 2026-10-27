@@ -100,17 +100,29 @@ unique `user_id`), `partner_account_payment_orders` (unique
   `registration` wallet opening event. It bypasses `User.Insert`, so there is no
   sign-up bonus or log. No sign-in path reaches it; admins cannot set its
   password (`UpdateUser` refuses).
-- Status: `active` / `disabled` (partner) / `admin_disabled`. Status changes
-  bump the user's auth version, set `users.status`, revoke sessions and drop
-  key caches. A partner cannot enable an `admin_disabled` account.
-  `ManageUser` disable/enable of a sub-account syncs `admin_disabled`/`active`.
-- Disabling the partner client sets `suspended_at` and runs a background,
-  resumable reconciliation (batches of 500) that disables enabled active
-  accounts and marks `suspended_by_partner`; enabling clears it and re-enables
-  only marked active accounts. Keys keep working until each account's batch
-  commits. Startup re-runs reconciliation for partners that need it. Jobs and
-  progress live in-process (single instance; multi-instance needs a DB lock).
-- A client that owns sub-accounts cannot be deleted (`409`).
+- Three independent switches decide the user's status: the partner's
+  `status` (`active`/`disabled`), the administrator's `admin_disabled`, and
+  the partner's suspension. `users.status` is enabled only when the partner
+  and administrators both allow it and the partner is not suspended; every
+  change recomputes it in the same transaction (auth version bump, sessions
+  revoked and key caches dropped after commit). No switch can undo another:
+  an admin enable does not lift a partner disable or a suspension, and a
+  partner cannot enable an admin-disabled account (`403
+  account_disabled_by_admin`). Partners and the admin list see
+  `admin_disabled` when the admin switch is on.
+- `ManageUser` disable/enable of a sub-account sets only the admin switch and
+  answers with the resulting status. Sub-account users cannot be deleted
+  (`ManageUser` delete and `DeleteUser` refuse), because the mapping is
+  permanent.
+- Disabling the partner client sets the client status and `suspended_at` in
+  one transaction, then runs a background, resumable reconciliation (batches
+  of 500, each account re-reading the suspension under its row lock) that
+  applies the status and records `suspended_by_partner`. Keys keep working
+  until each account's batch commits. A job triggered while running re-runs
+  afterwards, also after a failure. Startup resumes suspension jobs and any
+  pending key revocation. Jobs and progress live in-process (single instance;
+  multi-instance needs a DB lock).
+- A client that owns sub-accounts cannot be deleted.
 - The 2FA adoption denominator excludes sub-accounts. Consumption, usage and
   revenue reports include them.
 
@@ -126,8 +138,13 @@ unique `user_id`), `partner_account_payment_orders` (unique
   `409`): `immediately` disables the old key; `after_grace` sets its expiry to
   now + 24 h. A key still in grace is disabled first, so at most two work. Every
   token write raises the token cache fence before writing.
-- Admin revoke-all disables every current and graced key in the background;
-  rotation then issues working keys.
+- Admin revoke-all persists `key_revocation_requested_at`, then disables every
+  current and graced key in the background, locking each account before
+  reading its key IDs so a concurrent rotation cannot leave a fresh key. Only
+  a complete pass clears the marker it started for; a restart resumes it.
+  Rotation then issues working keys.
+- Keys use the sub-account user's own group (then `default`), read in the
+  transaction, so changing the partner's group affects only new sub-accounts.
 
 ### Payments
 
@@ -138,8 +155,12 @@ unique `user_id`), `partner_account_payment_orders` (unique
   so idempotent replays return it; a replay of an order without one retries the
   gateway. Gateway responses are never logged; ZPay's order query API is not
   used (it puts the merchant key in the URL).
-- Amount rules, pricing (by `account_group`), wallet capacity and settlement
-  are the web Epay ones. Orders settle through the unchanged Epay callbacks;
+- Amount rules, wallet capacity and settlement are the web Epay ones (shared
+  quote helper with the OAuth flow); the price uses the sub-account user's
+  group, read inside the order transaction. Only one request contacts the
+  gateway per order: creation claims it, a replay claims it only when the
+  previous claim is older than 15 s (the gateway timeout is 10 s) and otherwise
+  answers `503` with `Retry-After: 3`; a failed gateway call releases its claim. Orders settle through the unchanged Epay callbacks;
   the cashback context is `partner_oauth` (no reward, no IP/UA/device
   evidence). Limits: per account 20/hour and 5 pending/30 min; per partner
   2000/hour (not serialized across accounts, so it may overshoot slightly).
@@ -177,6 +198,8 @@ codes, pay URLs, request bodies or external user IDs.
 | Key disabled or expired | `403 credential_disabled` (rotate to recover) |
 | Idempotency-Key reused with another body | `409 idempotency_conflict` |
 | Gateway failure, non-HTTPS gateway, compliance off | `503 payment_unavailable`; retry with the same key |
+| Replay while another request is calling the gateway | `503 payment_unavailable`, `Retry-After: 3`, no gateway call |
+| Admin console refusals (config, secrets, delete, sub-account delete) | `ApiErrorT` (HTTP 200, `success:false`, translated `message_key`) |
 | Unknown body field, query on non-usage routes, `access_token` in query | `400 invalid_request` |
 | Usage range > 31 days, older than 90 days, reversed, bad paging | `400 invalid_request` |
 

@@ -57,8 +57,9 @@ func GetPartnerServerJobProgress(kind, clientID string) PartnerServerJobProgress
 }
 
 // StartPartnerServerJob runs the job in the background. If the same job is
-// already running it is restarted from the beginning once it finishes, so a
-// suspend quickly followed by a resume always ends in the latest state.
+// already running it is run again from the beginning once it finishes, even
+// when that run failed, so a suspend quickly followed by a resume always ends
+// in the latest state.
 func StartPartnerServerJob(kind, clientID string) {
 	key := partnerServerJobKey(kind, clientID)
 	partnerServerJobsMu.Lock()
@@ -73,22 +74,24 @@ func StartPartnerServerJob(kind, clientID string) {
 	partnerServerJobsMu.Unlock()
 
 	PartnerServerJobRunner(func() {
+		var err error
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				finishPartnerServerJob(key, job, fmt.Errorf("panic: %v", recovered))
+				err = fmt.Errorf("panic: %v", recovered)
 			}
+			finishPartnerServerJob(key, job, err)
 		}()
 		for {
-			err := runPartnerServerJob(kind, clientID, job)
+			err = runPartnerServerJob(kind, clientID, job)
 			partnerServerJobsMu.Lock()
-			again := job.rerun && err == nil
+			again := job.rerun
 			job.rerun = false
 			if again {
 				job.progress.Processed = 0
+				job.progress.Error = ""
 			}
 			partnerServerJobsMu.Unlock()
 			if !again {
-				finishPartnerServerJob(key, job, err)
 				return
 			}
 		}
@@ -108,6 +111,15 @@ func finishPartnerServerJob(key string, job *partnerServerJob, err error) {
 }
 
 func runPartnerServerJob(kind, clientID string, job *partnerServerJob) error {
+	// A key revocation is persisted, so a restart resumes it; only a complete
+	// pass clears the marker it was started for.
+	var revocationRequestedAt int64
+	if kind == PartnerServerJobKeyRevocation {
+		var err error
+		if revocationRequestedAt, err = model.PartnerKeyRevocationRequestedAt(clientID); err != nil {
+			return err
+		}
+	}
 	var after int64
 	for {
 		var batch *model.PartnerAccountBatch
@@ -132,27 +144,43 @@ func runPartnerServerJob(kind, clientID string, job *partnerServerJob) error {
 			return err
 		}
 		if batch.Done {
+			if kind == PartnerServerJobKeyRevocation && revocationRequestedAt != 0 {
+				return model.FinishPartnerKeyRevocation(clientID, revocationRequestedAt)
+			}
 			return nil
 		}
 	}
 }
 
+// StartPartnerKeyRevocation persists a revoke-all request for the partner's
+// sub-account keys and starts it.
+func StartPartnerKeyRevocation(clientID string) error {
+	if _, err := model.RequestPartnerKeyRevocation(clientID); err != nil {
+		return err
+	}
+	StartPartnerServerJob(PartnerServerJobKeyRevocation, clientID)
+	return nil
+}
+
 var partnerServerRecoveryOnce sync.Once
 
-// StartPartnerServerJobRecovery finishes suspension and resume jobs a restart
-// interrupted. It runs once, on the master node.
+// StartPartnerServerJobRecovery finishes suspension, resume and key
+// revocation jobs a restart interrupted. It runs once, on the master node.
 func StartPartnerServerJobRecovery() {
 	partnerServerRecoveryOnce.Do(func() {
 		if !common.IsMasterNode {
 			return
 		}
-		clientIDs, err := model.ListPartnerServerClientsToReconcile()
+		suspension, keyRevocation, err := model.PartnerServerJobsToResume()
 		if err != nil {
-			common.SysError(common.LogText("failed to list partners to reconcile: %s", err.Error()))
+			common.SysError(common.LogText("failed to list partner server jobs to resume: %s", err.Error()))
 			return
 		}
-		for _, clientID := range clientIDs {
+		for _, clientID := range suspension {
 			StartPartnerServerJob(PartnerServerJobSuspension, clientID)
+		}
+		for _, clientID := range keyRevocation {
+			StartPartnerServerJob(PartnerServerJobKeyRevocation, clientID)
 		}
 	})
 }

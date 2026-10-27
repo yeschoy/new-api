@@ -128,16 +128,16 @@ func PartnerServerIssueCredential(c *gin.Context) {
 		writePartnerServerError(c, err)
 		return
 	}
-	view, account, accountCreated, keyCreated, err := service.IssuePartnerAccountCredential(partner, externalUserID)
+	view, result, err := service.IssuePartnerAccountCredential(partner, externalUserID)
 	if err != nil {
 		writePartnerServerError(c, err)
 		return
 	}
-	if accountCreated {
-		recordPartnerAccountLog(c, "partner_account.create", partner, account.UserId, "", http.StatusOK)
+	if result.AccountCreated {
+		recordPartnerAccountLog(c, "partner_account.create", partner, result.Account.UserId, "", http.StatusOK)
 	}
-	if keyCreated {
-		recordPartnerAccountLog(c, "partner_account.credential_issue", partner, account.UserId, "", http.StatusOK)
+	if result.KeyCreated {
+		recordPartnerAccountLog(c, "partner_account.credential_issue", partner, result.Account.UserId, "", http.StatusOK)
 	}
 	c.JSON(http.StatusOK, view)
 }

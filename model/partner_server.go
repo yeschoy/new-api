@@ -43,8 +43,11 @@ type PartnerServerConfig struct {
 	MaxAccounts       int    `json:"max_accounts" gorm:"not null"`
 	AccountsPerMinute int    `json:"accounts_per_minute" gorm:"not null"`
 	SuspendedAt       int64  `json:"suspended_at" gorm:"type:bigint;default:0"`
-	CreatedAt         int64  `json:"created_at" gorm:"type:bigint"`
-	UpdatedAt         int64  `json:"updated_at" gorm:"type:bigint"`
+	// KeyRevocationRequestedAt marks a revoke-all of the partner's keys that
+	// has not finished yet, so a restart resumes it.
+	KeyRevocationRequestedAt int64 `json:"key_revocation_requested_at" gorm:"type:bigint;default:0"`
+	CreatedAt                int64 `json:"created_at" gorm:"type:bigint"`
+	UpdatedAt                int64 `json:"updated_at" gorm:"type:bigint"`
 }
 
 func (PartnerServerConfig) TableName() string {
@@ -123,35 +126,88 @@ func SavePartnerServerConfig(config *PartnerServerConfig) error {
 		}
 		config.Id = current.Id
 		config.SuspendedAt = current.SuspendedAt
+		config.KeyRevocationRequestedAt = current.KeyRevocationRequestedAt
 		config.CreatedAt = current.CreatedAt
 		config.UpdatedAt = now
 		return tx.Model(&current).Select("enabled", "account_group", "ip_allowlist", "max_accounts", "accounts_per_minute", "updated_at").Updates(config).Error
 	})
 }
 
-// SetPartnerServerSuspended records whether the partner is suspended and
-// reports whether the state changed. Callers reconcile sub-accounts afterwards.
-func SetPartnerServerSuspended(clientID string, suspended bool) (bool, error) {
+// SetPartnerOAuthClientStatus enables or disables a client and, in the same
+// transaction, suspends or resumes its server access, so an administrator
+// never sees a disabled client whose sub-accounts were left running. It
+// reports whether the suspension state changed; callers then reconcile the
+// sub-accounts.
+func SetPartnerOAuthClientStatus(clientID string, status int) (bool, error) {
+	if status != PartnerOAuthClientStatusEnabled && status != PartnerOAuthClientStatusDisabled {
+		return false, errors.New("invalid partner oauth client status")
+	}
 	changed := false
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		var config PartnerServerConfig
-		if err := lockForUpdate(tx).Where("client_id = ?", clientID).First(&config).Error; err != nil {
+		now := common.GetTimestamp()
+		var client PartnerOAuthClient
+		if err := lockForUpdate(tx).Where("client_id = ?", clientID).First(&client).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrPartnerServerConfigNotFound
+				return ErrPartnerOAuthClientNotFound
 			}
 			return err
 		}
+		if err := tx.Model(&client).Updates(map[string]any{"status": status, "updated_at": now}).Error; err != nil {
+			return err
+		}
+		var config PartnerServerConfig
+		err := lockForUpdate(tx).Where("client_id = ?", clientID).First(&config).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		suspended := status == PartnerOAuthClientStatusDisabled
 		if (config.SuspendedAt != 0) == suspended {
 			return nil
 		}
 		suspendedAt := int64(0)
 		if suspended {
-			suspendedAt = common.GetTimestamp()
+			suspendedAt = now
 		}
 		changed = true
-		return tx.Model(&config).Updates(map[string]any{"suspended_at": suspendedAt, "updated_at": common.GetTimestamp()}).Error
+		return tx.Model(&config).Updates(map[string]any{"suspended_at": suspendedAt, "updated_at": now}).Error
 	})
 	return changed, err
+}
+
+// RequestPartnerKeyRevocation records a pending revoke-all of the partner's
+// sub-account keys and returns its marker.
+func RequestPartnerKeyRevocation(clientID string) (int64, error) {
+	requestedAt := common.GetTimestamp()
+	result := DB.Model(&PartnerServerConfig{}).Where("client_id = ?", clientID).
+		Updates(map[string]any{"key_revocation_requested_at": requestedAt, "updated_at": requestedAt})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return 0, ErrPartnerServerConfigNotFound
+	}
+	return requestedAt, nil
+}
+
+// FinishPartnerKeyRevocation clears the marker once a complete pass has run,
+// unless a newer request replaced it meanwhile.
+func FinishPartnerKeyRevocation(clientID string, requestedAt int64) error {
+	return DB.Model(&PartnerServerConfig{}).
+		Where("client_id = ? AND key_revocation_requested_at <= ?", clientID, requestedAt).
+		Update("key_revocation_requested_at", 0).Error
+}
+
+// PartnerKeyRevocationRequestedAt returns the pending revoke-all marker, or 0.
+func PartnerKeyRevocationRequestedAt(clientID string) (int64, error) {
+	var config PartnerServerConfig
+	err := DB.Select("key_revocation_requested_at").Where("client_id = ?", clientID).First(&config).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	return config.KeyRevocationRequestedAt, err
 }
 
 // CreatePartnerServerSecret stores a new active secret unless the partner

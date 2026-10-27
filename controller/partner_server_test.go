@@ -167,7 +167,7 @@ func TestPartnerServerClientCredentialsRefusals(t *testing.T) {
 			require.NoError(t, model.SavePartnerServerConfig(&model.PartnerServerConfig{ClientId: f.client.ClientId, AccountGroup: "default", MaxAccounts: 1, AccountsPerMinute: 1}))
 		}, reason: service.PartnerServerReasonUnavailable},
 		{name: "partner suspended", prepare: func(t *testing.T, f partnerServerFixture) {
-			_, err := model.SetPartnerServerSuspended(f.client.ClientId, true)
+			_, err := model.SetPartnerOAuthClientStatus(f.client.ClientId, model.PartnerOAuthClientStatusDisabled)
 			require.NoError(t, err)
 		}, reason: service.PartnerServerReasonUnavailable},
 		{name: "address not allowed", allow: `["192.0.2.0/24"]`, reason: service.PartnerServerReasonIPNotAllowed},
@@ -277,15 +277,14 @@ func TestPartnerServerAdminConfigAndSecrets(t *testing.T) {
 	}
 
 	early := partnerOAuthAdminRequest(engine, http.MethodPost, base+"/server-secrets", root.token, issueProof(), "")
-	assert.Equal(t, http.StatusBadRequest, early.Code, "secrets need a server config first")
+	assertConsoleFailure(t, early, "Save the server access settings before issuing a secret.")
 
-	for _, body := range []string{
-		`{"enabled":true,"account_group":"missing","ip_allowlist":[],"max_accounts":10,"accounts_per_minute":1}`,
-		`{"enabled":true,"account_group":"partner_kede","ip_allowlist":["not-an-ip"],"max_accounts":10,"accounts_per_minute":1}`,
-		`{"enabled":true,"account_group":"partner_kede","ip_allowlist":[],"max_accounts":0,"accounts_per_minute":1}`,
+	for body, message := range map[string]string{
+		`{"enabled":true,"account_group":"missing","ip_allowlist":[],"max_accounts":10,"accounts_per_minute":1}`:                 "Select an existing user group",
+		`{"enabled":true,"account_group":"partner_kede","ip_allowlist":["not-an-ip"],"max_accounts":10,"accounts_per_minute":1}`: "Enter IP addresses or CIDR ranges, one per line",
+		`{"enabled":true,"account_group":"partner_kede","ip_allowlist":[],"max_accounts":0,"accounts_per_minute":1}`:             "The sub-account limit must be between 1 and 1000000",
 	} {
-		rec := partnerOAuthAdminRequest(engine, http.MethodPut, base+"/server", root.token, updateProof(), body)
-		assert.Equal(t, http.StatusBadRequest, rec.Code, body)
+		assertConsoleFailure(t, partnerOAuthAdminRequest(engine, http.MethodPut, base+"/server", root.token, updateProof(), body), message)
 	}
 	assert.Equal(t, http.StatusForbidden, partnerOAuthAdminRequest(engine, http.MethodPut, base+"/server", root.token, "",
 		`{"enabled":true,"account_group":"partner_kede","ip_allowlist":[],"max_accounts":10,"accounts_per_minute":1}`).Code, "config writes need a security proof")
@@ -309,7 +308,7 @@ func TestPartnerServerAdminConfigAndSecrets(t *testing.T) {
 		secretIDs = append(secretIDs, resp.Data.Secret.Id)
 	}
 	third := partnerOAuthAdminRequest(engine, http.MethodPost, base+"/server-secrets", root.token, issueProof(), "")
-	assert.Equal(t, http.StatusConflict, third.Code)
+	assertConsoleFailure(t, third, "Revoke an existing secret first; at most two can be active")
 
 	view := partnerOAuthAdminRequest(engine, http.MethodGet, base+"/server", root.token, "", "")
 	require.Equal(t, http.StatusOK, view.Code)
@@ -434,7 +433,8 @@ func TestPartnerServerAccountDisableAndAdminPrecedence(t *testing.T) {
 	require.Equal(t, http.StatusOK, partnerServerPost(engine, base+"/enable", token, "", nil).Code)
 	decodePartnerCredential(t, partnerServerPost(engine, base+"/credential", token, "{}", nil))
 
-	require.NoError(t, model.SyncPartnerAccountAdminStatus(account.UserId, false))
+	_, _, err = model.SetPartnerAccountAdminDisabled(account.UserId, true)
+	require.NoError(t, err)
 	assertPartnerError(t, partnerServerPost(engine, base+"/enable", token, "", nil), http.StatusForbidden, "account_disabled_by_admin")
 	assert.Len(t, partnerServerLogs(t, "partner_account.disable"), 1)
 	assert.Len(t, partnerServerLogs(t, "partner_account.enable"), 1)
@@ -481,9 +481,10 @@ func TestPartnerSuspensionThroughClientStatus(t *testing.T) {
 	t.Cleanup(func() { service.PartnerServerJobRunner = previousRunner })
 	root := createPartnerOAuthAdminActor(t, "partner-suspend-root", common.RoleRootUser)
 	fixture := seedPartnerServerFixture(t, "")
-	account, _, _, err := model.IssuePartnerAccountCredential(model.PartnerAccountOwner{ClientId: fixture.client.ClientId, ExternalUserId: partnerServerTestUser, DisplayName: "Kede"},
-		model.PartnerAccountKey{Key: strings.Repeat("k", 48), Name: "partner:Kede", AutoGroups: []string{"default"}})
+	issued, err := model.IssuePartnerAccountCredential(model.PartnerAccountOwner{ClientId: fixture.client.ClientId, ExternalUserId: partnerServerTestUser, DisplayName: "Kede"},
+		model.PartnerAccountKey{Key: strings.Repeat("k", 48), Name: "partner:Kede"})
 	require.NoError(t, err)
+	account := issued.Account
 
 	status := func(value int) {
 		rec := partnerOAuthAdminRequest(engine, http.MethodPost, "/api/partner-oauth/clients/"+strconv.FormatInt(fixture.client.Id, 10)+"/status", root.token, "", `{"status":`+strconv.Itoa(value)+`}`)
@@ -630,6 +631,7 @@ func TestPartnerServerPaymentOrderQRCodeAndSettlement(t *testing.T) {
 	otherToken := issuePartnerServerTestToken(t, engine, other)
 	assertPartnerError(t, partnerServerGet(engine, "/api/partner/v1/payment/orders/"+created.OrderID, otherToken, "203.0.113.10"), http.StatusNotFound, "order_not_found")
 	assert.Len(t, partnerServerLogs(t, "partner_account.payment_order_create"), 1)
+	assert.Len(t, partnerServerLogs(t, "partner_account.create"), 1, "an account created by its first order is audited")
 }
 
 func TestPartnerServerPaymentGatewayFailuresRecoverOnRetry(t *testing.T) {
@@ -750,4 +752,51 @@ func TestPartnerServerAccountUsage(t *testing.T) {
 			assertPartnerError(t, partnerServerGet(engine, base+query, token, "203.0.113.10"), http.StatusBadRequest, "invalid_request")
 		})
 	}
+}
+
+// assertConsoleFailure checks an admin console refusal: HTTP 200 with
+// success=false and the English source message the console translates.
+func assertConsoleFailure(t *testing.T, rec *httptest.ResponseRecorder, message string) {
+	t.Helper()
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.False(t, body.Success)
+	assert.Equal(t, message, body.Message)
+}
+
+func TestPartnerSubAccountsCannotBeDeleted(t *testing.T) {
+	_, identity, target := setupAdminUserTest(t)
+	require.NoError(t, model.DB.Create(&model.PartnerAccount{ClientId: "pc_" + strings.Repeat("a", 32), ExternalUserId: partnerServerTestUser,
+		ExternalUserIdHash: model.HashPartnerExternalUserID(partnerServerTestUser), UserId: target.Id, Status: model.PartnerAccountStatusActive, CreatedAt: 1}).Error)
+
+	manage := adminUserRequest(http.MethodPost, "/api/user/manage", `{"id":`+strconv.Itoa(target.Id)+`,"action":"delete"}`, "", identity, common.RoleRootUser, nil, ManageUser)
+	assertConsoleFailure(t, manage, "Partner sub-accounts cannot be deleted; disable them instead")
+	hard := adminUserRequest(http.MethodDelete, "/api/user/"+strconv.Itoa(target.Id), "", "", identity, common.RoleRootUser,
+		gin.Params{{Key: "id", Value: strconv.Itoa(target.Id)}}, DeleteUser)
+	assertConsoleFailure(t, hard, "Partner sub-accounts cannot be deleted; disable them instead")
+	_, err := model.GetUserById(target.Id, true)
+	require.NoError(t, err, "the sub-account still exists")
+}
+
+func TestPartnerServerReplayWaitsForAnInFlightCheckout(t *testing.T) {
+	engine := setupPartnerServerPaymentController(t)
+	zpay := startFakeZPay(t)
+	zpay.reply = func(w http.ResponseWriter) { _, _ = io.WriteString(w, `{"code":-1}`) }
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	ordersPath := "/api/partner/v1/accounts/" + partnerServerTestUser + "/payment/orders"
+	key := map[string]string{"Idempotency-Key": "order-000000000000020"}
+	assertPartnerError(t, partnerServerPost(engine, ordersPath, token, `{"amount":10,"payment_method":"alipay"}`, key), http.StatusServiceUnavailable, "payment_unavailable")
+
+	// Another request has just claimed the gateway call for this order.
+	require.NoError(t, model.DB.Model(&model.PartnerAccountPaymentOrder{}).Where("1 = 1").Update("checkout_attempted_at", common.GetTimestamp()).Error)
+	before := len(zpay.requests)
+	replay := partnerServerPost(engine, ordersPath, token, `{"amount":10,"payment_method":"alipay"}`, key)
+	assertPartnerError(t, replay, http.StatusServiceUnavailable, "payment_unavailable")
+	assert.Equal(t, "3", replay.Header().Get("Retry-After"))
+	assert.Len(t, zpay.requests, before, "the replay does not call the gateway while another request may")
 }

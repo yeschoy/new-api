@@ -115,7 +115,16 @@ func partnerKey(t *testing.T) PartnerAccountKey {
 	t.Helper()
 	key, err := common.GenerateKey()
 	require.NoError(t, err)
-	return PartnerAccountKey{Key: key, Name: "partner:Kede Finance", AutoGroups: []string{"partner_kede", "default"}}
+	return PartnerAccountKey{Key: key, Name: "partner:Kede Finance"}
+}
+
+// issueCredential returns the account, its key and whether the key was created.
+func issueCredential(owner PartnerAccountOwner, spec PartnerAccountKey) (*PartnerAccount, *Token, bool, error) {
+	result, err := IssuePartnerAccountCredential(owner, spec)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	return result.Account, result.Token, result.KeyCreated, nil
 }
 
 func partnerHash(value string) string {
@@ -135,10 +144,10 @@ func TestPartnerAccountFirstUseCreatesBareSubAccountAndOneKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, count, "a lookup must not create an account")
 
-	account, token, created, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	account, token, created, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 	assert.True(t, created)
-	again, sameToken, createdAgain, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	again, sameToken, createdAgain, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 	assert.False(t, createdAgain)
 	assert.Equal(t, account.Id, again.Id)
@@ -172,7 +181,7 @@ func TestPartnerAccountFirstUseCreatesBareSubAccountAndOneKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"partner_kede", "default"}, groups)
 
-	other, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, strings.ToUpper(partnerTestUserID)), partnerKey(t))
+	other, _, _, err := issueCredential(partnerOwner(client, strings.ToUpper(partnerTestUserID)), partnerKey(t))
 	require.NoError(t, err)
 	assert.NotEqual(t, account.Id, other.Id, "external IDs are case-sensitive")
 }
@@ -193,10 +202,10 @@ func TestPartnerAccountCreationGuards(t *testing.T) {
 			usePartnerAccountTestDB(t)
 			client := seedPartnerServer(t, tt.mutate)
 			for i := range tt.seed {
-				_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, fmt.Sprintf("kede-seed-%030d", i)), partnerKey(t))
+				_, _, _, err := issueCredential(partnerOwner(client, fmt.Sprintf("kede-seed-%030d", i)), partnerKey(t))
 				require.NoError(t, err)
 			}
-			_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+			_, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 			require.ErrorIs(t, err, tt.want)
 			count, err := CountPartnerAccounts(client.ClientId)
 			require.NoError(t, err)
@@ -210,9 +219,9 @@ func TestPartnerAccountCreationGuards(t *testing.T) {
 	t.Run("suspended partner", func(t *testing.T) {
 		usePartnerAccountTestDB(t)
 		client := seedPartnerServer(t, nil)
-		_, err := SetPartnerServerSuspended(client.ClientId, true)
+		_, err := SetPartnerOAuthClientStatus(client.ClientId, PartnerOAuthClientStatusDisabled)
 		require.NoError(t, err)
-		_, _, _, err = IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+		_, _, _, err = issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 		require.ErrorIs(t, err, ErrPartnerServerUnavailable)
 	})
 }
@@ -227,7 +236,7 @@ func TestPartnerAccountConcurrentFirstUseCreatesOneAccount(t *testing.T) {
 	errs := make([]error, 8)
 	for i := range 8 {
 		wg.Go(func() {
-			_, token, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+			_, token, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 			errs[i] = err
 			if token != nil {
 				keys[i] = token.Key
@@ -265,7 +274,7 @@ func loadToken(t *testing.T, id int) Token {
 func TestPartnerAccountRotation(t *testing.T) {
 	usePartnerAccountTestDB(t)
 	client := seedPartnerServer(t, nil)
-	_, first, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	_, first, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 
 	before := common.GetTimestamp()
@@ -312,14 +321,14 @@ func userStatus(t *testing.T, id int) int {
 func TestPartnerAccountStatusChanges(t *testing.T) {
 	usePartnerAccountTestDB(t)
 	client := seedPartnerServer(t, nil)
-	account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	account, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 
 	_, changed, err := SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, false)
 	require.NoError(t, err)
 	assert.Equal(t, []int{account.UserId}, changed)
 	assert.Equal(t, common.UserStatusDisabled, userStatus(t, account.UserId))
-	_, _, _, err = IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	_, _, _, err = issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.ErrorIs(t, err, ErrPartnerAccountInactive)
 
 	_, changed, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, true)
@@ -327,10 +336,26 @@ func TestPartnerAccountStatusChanges(t *testing.T) {
 	assert.Equal(t, []int{account.UserId}, changed)
 	assert.Equal(t, common.UserStatusEnabled, userStatus(t, account.UserId))
 
-	require.NoError(t, SyncPartnerAccountAdminStatus(account.UserId, false))
+	isSubAccount, changed, err := SetPartnerAccountAdminDisabled(account.UserId, true)
+	require.NoError(t, err)
+	assert.True(t, isSubAccount)
+	assert.Equal(t, []int{account.UserId}, changed)
 	_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, true)
 	require.ErrorIs(t, err, ErrPartnerAccountAdminDisabled, "a partner cannot undo an administrator's disable")
-	require.NoError(t, SyncPartnerAccountAdminStatus(-1, false), "non sub-accounts are ignored")
+	isSubAccount, _, err = SetPartnerAccountAdminDisabled(-1, true)
+	require.NoError(t, err)
+	assert.False(t, isSubAccount, "other users are left alone")
+
+	// Each switch only clears itself: the partner's disable survives an
+	// administrator's re-enable, and the reverse.
+	_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, false)
+	require.NoError(t, err)
+	_, _, err = SetPartnerAccountAdminDisabled(account.UserId, false)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusDisabled, userStatus(t, account.UserId), "the partner still has it disabled")
+	_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, true)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusEnabled, userStatus(t, account.UserId))
 }
 
 func runSuspension(t *testing.T, clientID string) {
@@ -352,7 +377,7 @@ func TestPartnerAccountSuspensionRestoresOnlyWhatItDisabled(t *testing.T) {
 	ids := map[string]int{}
 	for _, name := range []string{"active", "partner-off", "admin-off"} {
 		eid := "kede-" + name + strings.Repeat("0", 32-len(name))
-		account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, eid), partnerKey(t))
+		account, _, _, err := issueCredential(partnerOwner(client, eid), partnerKey(t))
 		require.NoError(t, err)
 		ids[name] = account.UserId
 		switch name {
@@ -360,12 +385,12 @@ func TestPartnerAccountSuspensionRestoresOnlyWhatItDisabled(t *testing.T) {
 			_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, eid, false)
 			require.NoError(t, err)
 		case "admin-off":
-			require.NoError(t, DB.Model(&User{}).Where("id = ?", account.UserId).Update("status", common.UserStatusDisabled).Error)
-			require.NoError(t, SyncPartnerAccountAdminStatus(account.UserId, false))
+			_, _, err = SetPartnerAccountAdminDisabled(account.UserId, true)
+			require.NoError(t, err)
 		}
 	}
 
-	_, err := SetPartnerServerSuspended(client.ClientId, true)
+	_, err := SetPartnerOAuthClientStatus(client.ClientId, PartnerOAuthClientStatusDisabled)
 	require.NoError(t, err)
 	runSuspension(t, client.ClientId)
 	for name, id := range ids {
@@ -377,7 +402,7 @@ func TestPartnerAccountSuspensionRestoresOnlyWhatItDisabled(t *testing.T) {
 	assert.Empty(t, changed)
 	assert.Equal(t, common.UserStatusDisabled, userStatus(t, ids["partner-off"]))
 
-	_, err = SetPartnerServerSuspended(client.ClientId, false)
+	_, err = SetPartnerOAuthClientStatus(client.ClientId, PartnerOAuthClientStatusEnabled)
 	require.NoError(t, err)
 	runSuspension(t, client.ClientId)
 	assert.Equal(t, common.UserStatusEnabled, userStatus(t, ids["active"]))
@@ -388,7 +413,7 @@ func TestPartnerAccountSuspensionRestoresOnlyWhatItDisabled(t *testing.T) {
 func TestPartnerAccountRevokeAllKeys(t *testing.T) {
 	usePartnerAccountTestDB(t)
 	client := seedPartnerServer(t, nil)
-	_, first, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	_, first, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 	graced, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-1", false))
 	require.NoError(t, err)
@@ -399,12 +424,12 @@ func TestPartnerAccountRevokeAllKeys(t *testing.T) {
 	assert.Equal(t, common.TokenStatusDisabled, loadToken(t, first.Id).Status)
 	assert.Equal(t, common.TokenStatusDisabled, loadToken(t, graced.Token.Id).Status)
 
-	_, _, _, err = IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	_, _, _, err = issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.ErrorIs(t, err, ErrPartnerAccountCredentialDisabled, "a revoked key is never silently replaced")
 	fresh, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-2", true))
 	require.NoError(t, err)
 	assert.Equal(t, common.TokenStatusEnabled, loadToken(t, fresh.Token.Id).Status)
-	_, current, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	_, current, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 	assert.Equal(t, fresh.Token.Key, current.Key)
 }
@@ -416,7 +441,7 @@ func partnerOrderInput(client *PartnerOAuthClient, externalUserID, key string) P
 		RequestHash:        partnerHash("10|alipay"),
 		RequestedAmount:    10,
 		StoredAmount:       10,
-		Money:              70,
+		Price:              func(string) (float64, error) { return 70, nil },
 		PaymentMethod:      "alipay",
 		PaymentProvider:    PaymentProviderEpay,
 		CreditedQuota:      5_000_000,
@@ -438,8 +463,10 @@ func TestPartnerAccountPaymentOrders(t *testing.T) {
 	usePartnerAccountTestDB(t)
 	client := seedPartnerServer(t, nil)
 
-	order, topUp, err := CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-1"), partnerOrderLimits(5))
+	created, err := CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-1"), partnerOrderLimits(5))
 	require.NoError(t, err)
+	assert.True(t, created.AccountCreated)
+	order, topUp := created.Order, created.TopUp
 	account, err := GetPartnerAccount(client.ClientId, partnerTestUserID)
 	require.NoError(t, err, "the order created the sub-account")
 	assert.Equal(t, account.UserId, topUp.UserId)
@@ -451,12 +478,12 @@ func TestPartnerAccountPaymentOrders(t *testing.T) {
 	assert.Equal(t, CashbackIneligiblePartnerOAuth, context.IneligibleReason)
 	assert.Empty(t, context.RequestIP, "the partner server's address is not payer evidence")
 
-	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-1"), partnerOrderLimits(5))
+	_, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-1"), partnerOrderLimits(5))
 	require.ErrorIs(t, err, ErrPartnerAccountPaymentIdempotencyRace)
-	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, "kede-other-00000000000000000000000000", "order-key-1"), partnerOrderLimits(5))
+	_, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, "kede-other-00000000000000000000000000", "order-key-1"), partnerOrderLimits(5))
 	require.ErrorIs(t, err, ErrPartnerAccountPaymentIdempotencyRace, "keys are scoped to the partner, not the account")
 
-	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-2"), partnerOrderLimits(1))
+	_, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-2"), partnerOrderLimits(1))
 	require.ErrorIs(t, err, ErrPartnerAccountPaymentRateLimited)
 
 	require.NoError(t, SetPartnerAccountPaymentCheckout(order.Id, "https://qr.example/abc", ""))
@@ -472,7 +499,7 @@ func TestPartnerAccountPaymentOrders(t *testing.T) {
 
 	_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, false)
 	require.NoError(t, err)
-	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-3"), partnerOrderLimits(5))
+	_, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-3"), partnerOrderLimits(5))
 	require.ErrorIs(t, err, ErrPartnerAccountInactive)
 }
 
@@ -502,7 +529,7 @@ func TestPartnerServerSecretsAndTokens(t *testing.T) {
 func TestDeletePartnerClientRefusedWhileItOwnsAccounts(t *testing.T) {
 	usePartnerAccountTestDB(t)
 	client := seedPartnerServer(t, nil)
-	_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	_, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 	_, err = DeletePartnerOAuthClient(client.ClientId)
 	require.ErrorIs(t, err, ErrPartnerOAuthClientHasAccounts)
@@ -514,7 +541,7 @@ func TestTwoFAStatsLeaveOutPartnerSubAccounts(t *testing.T) {
 	usePartnerAccountTestDB(t)
 	client := seedPartnerServer(t, nil)
 	require.NoError(t, DB.Create(&User{Username: "regular-user", Password: "x", Status: common.UserStatusEnabled, AffCode: "regular", AuthVersion: 1}).Error)
-	_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	_, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 	stats, err := GetTwoFAStats()
 	require.NoError(t, err)
@@ -524,7 +551,7 @@ func TestTwoFAStatsLeaveOutPartnerSubAccounts(t *testing.T) {
 func TestPartnerAccountUsageIsScopedBoundedAndPaged(t *testing.T) {
 	usePartnerAccountTestDB(t)
 	client := seedPartnerServer(t, nil)
-	account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	account, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 	now := common.GetTimestamp()
 	logs := []Log{
@@ -556,7 +583,7 @@ func TestUserListShowsAndFiltersPartnerOwners(t *testing.T) {
 	client := seedPartnerServer(t, nil)
 	regular := &User{Username: "regular-user", Password: "x", Status: common.UserStatusEnabled, AffCode: "regular", AuthVersion: 1}
 	require.NoError(t, DB.Create(regular).Error)
-	account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	account, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
 	require.NoError(t, err)
 
 	owners, err := PartnerAccountOwners([]int{regular.Id, account.UserId})
@@ -572,4 +599,106 @@ func TestUserListShowsAndFiltersPartnerOwners(t *testing.T) {
 	_, all, err := SearchUsers("", "", nil, nil, "", 0, 10)
 	require.NoError(t, err)
 	assert.EqualValues(t, 2, all)
+}
+
+func TestPartnerSuspensionCannotBeBypassedByAdminEnable(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	account, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+
+	changed, err := SetPartnerOAuthClientStatus(client.ClientId, PartnerOAuthClientStatusDisabled)
+	require.NoError(t, err)
+	assert.True(t, changed)
+	stored, err := GetPartnerOAuthClientByClientID(client.ClientId)
+	require.NoError(t, err)
+	assert.Equal(t, PartnerOAuthClientStatusDisabled, stored.Status, "client status and suspension change together")
+	runSuspension(t, client.ClientId)
+	assert.Equal(t, common.UserStatusDisabled, userStatus(t, account.UserId))
+
+	_, _, err = SetPartnerAccountAdminDisabled(account.UserId, false)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusDisabled, userStatus(t, account.UserId), "an administrator's enable does not lift a partner suspension")
+
+	_, err = SetPartnerOAuthClientStatus(client.ClientId, PartnerOAuthClientStatusEnabled)
+	require.NoError(t, err)
+	runSuspension(t, client.ClientId)
+	assert.Equal(t, common.UserStatusEnabled, userStatus(t, account.UserId))
+}
+
+func TestPartnerKeyRevocationMarkerSurvivesUntilItsOwnRunFinishes(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	first, err := RequestPartnerKeyRevocation(client.ClientId)
+	require.NoError(t, err)
+	_, pending, err := PartnerServerJobsToResume()
+	require.NoError(t, err)
+	assert.Equal(t, []string{client.ClientId}, pending, "a restart resumes the pending revocation")
+
+	require.NoError(t, DB.Model(&PartnerServerConfig{}).Where("client_id = ?", client.ClientId).Update("key_revocation_requested_at", first+10).Error)
+	require.NoError(t, FinishPartnerKeyRevocation(client.ClientId, first))
+	requestedAt, err := PartnerKeyRevocationRequestedAt(client.ClientId)
+	require.NoError(t, err)
+	assert.Equal(t, first+10, requestedAt, "an older run does not clear a newer request")
+
+	require.NoError(t, FinishPartnerKeyRevocation(client.ClientId, first+10))
+	requestedAt, err = PartnerKeyRevocationRequestedAt(client.ClientId)
+	require.NoError(t, err)
+	assert.Zero(t, requestedAt)
+}
+
+func TestPartnerPaymentCheckoutIsClaimedOnce(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	created, err := CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-claim-1"), partnerOrderLimits(5))
+	require.NoError(t, err)
+	now := common.GetTimestamp()
+
+	claimed, err := ClaimPartnerAccountPaymentCheckout(created.Order.Id, now, now-15)
+	require.NoError(t, err)
+	assert.False(t, claimed, "the creating request holds the claim")
+
+	later := now + 20
+	claimed, err = ClaimPartnerAccountPaymentCheckout(created.Order.Id, later, later-15)
+	require.NoError(t, err)
+	assert.True(t, claimed, "a stale claim can be taken over")
+	claimed, err = ClaimPartnerAccountPaymentCheckout(created.Order.Id, later, later-15)
+	require.NoError(t, err)
+	assert.False(t, claimed, "but only by one caller")
+
+	require.NoError(t, SetPartnerAccountPaymentCheckout(created.Order.Id, "qr", ""))
+	claimed, err = ClaimPartnerAccountPaymentCheckout(created.Order.Id, later+100, later+85)
+	require.NoError(t, err)
+	assert.False(t, claimed, "an order with a checkout is never claimed again")
+}
+
+func TestPartnerAccountPricingAndKeysFollowTheUsersGroup(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	_, _, _, err := issueCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	require.NoError(t, SavePartnerServerConfig(&PartnerServerConfig{ClientId: client.ClientId, Enabled: true, AccountGroup: "vip",
+		MaxAccounts: PartnerServerDefaultMaxAccounts, AccountsPerMinute: PartnerServerDefaultAccountsPerMinute}))
+
+	var pricedFor string
+	input := partnerOrderInput(client, partnerTestUserID, "order-group-1")
+	input.Price = func(group string) (float64, error) {
+		pricedFor = group
+		return 70, nil
+	}
+	_, err = CreatePartnerAccountPaymentOrder(input, partnerOrderLimits(5))
+	require.NoError(t, err)
+	assert.Equal(t, "partner_kede", pricedFor, "existing sub-accounts keep their own group's price")
+
+	rotated, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-group", true))
+	require.NoError(t, err)
+	groups, err := rotated.Token.GetAutoGroups()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"partner_kede", "default"}, groups)
+
+	newcomer, _, _, err := issueCredential(partnerOwner(client, "kede-newcomer-0000000000000000000000"), partnerKey(t))
+	require.NoError(t, err)
+	var user User
+	require.NoError(t, DB.First(&user, newcomer.UserId).Error)
+	assert.Equal(t, "vip", user.Group, "new sub-accounts join the partner's current group")
 }

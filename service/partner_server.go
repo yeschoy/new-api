@@ -171,11 +171,16 @@ func LoadPartnerServerSnapshot(clientID string) (*PartnerServerSnapshot, error) 
 	return snapshot, nil
 }
 
+var (
+	ErrPartnerServerIPAllowlistTooLong = errors.New("the IP allowlist has too many entries")
+	ErrPartnerServerIPAllowlistInvalid = errors.New("the IP allowlist has an invalid entry")
+)
+
 // NormalizePartnerServerIPAllowlist validates administrator input (IPs or
 // CIDR prefixes) and returns canonical prefixes.
 func NormalizePartnerServerIPAllowlist(entries []string) ([]string, error) {
 	if len(entries) > PartnerServerMaxIPEntries {
-		return nil, errors.New("the IP allowlist has too many entries")
+		return nil, ErrPartnerServerIPAllowlistTooLong
 	}
 	normalized := make([]string, 0, len(entries))
 	for _, raw := range entries {
@@ -187,13 +192,13 @@ func NormalizePartnerServerIPAllowlist(entries []string) ([]string, error) {
 		if strings.Contains(raw, "/") {
 			parsed, err := netip.ParsePrefix(raw)
 			if err != nil {
-				return nil, errors.New("invalid IP allowlist entry: " + raw)
+				return nil, ErrPartnerServerIPAllowlistInvalid
 			}
 			prefix = parsed.Masked()
 		} else {
 			addr, err := netip.ParseAddr(raw)
 			if err != nil {
-				return nil, errors.New("invalid IP allowlist entry: " + raw)
+				return nil, ErrPartnerServerIPAllowlistInvalid
 			}
 			addr = addr.Unmap()
 			prefix = netip.PrefixFrom(addr, addr.BitLen())

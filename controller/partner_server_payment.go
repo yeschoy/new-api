@@ -23,7 +23,6 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 )
 
 const (
@@ -31,6 +30,9 @@ const (
 	partnerServerAccountPendingLimit     = 5
 	partnerServerClientHourlyOrderLimit  = 2000
 	partnerServerMapiResponseLimit       = 64 << 10
+	// partnerServerCheckoutClaimSeconds outlasts the gateway timeout, so a
+	// claim is only taken over once its holder has certainly given up.
+	partnerServerCheckoutClaimSeconds = 15
 )
 
 // partnerServerMapiHTTPClient calls the Epay gateway's API ordering endpoint.
@@ -135,6 +137,9 @@ func completePartnerServerCheckout(c *gin.Context, order *model.PartnerAccountPa
 	checkout, err := partnerServerEpayAPIPurchase(topUp, order.RequestedAmount, clientIP)
 	if err != nil {
 		logger.LogError(c.Request.Context(), common.LogText("partner server payment checkout failed (request_id=%s) trade_no=%s: %s", c.GetString(common.RequestIdKey), topUp.TradeNo, err.Error()))
+		if releaseErr := model.ReleasePartnerAccountPaymentCheckout(order.Id); releaseErr != nil {
+			logger.LogError(c.Request.Context(), common.LogText("partner server payment claim release failed (request_id=%s) trade_no=%s: %s", c.GetString(common.RequestIdKey), topUp.TradeNo, releaseErr.Error()))
+		}
 		return partnerServerPaymentUnavailable()
 	}
 	if err := model.SetPartnerAccountPaymentCheckout(order.Id, checkout.QRCode, checkout.PayURL); err != nil {
@@ -158,6 +163,19 @@ func replayPartnerServerOrder(c *gin.Context, requestHash, externalUserID, clien
 			return
 		}
 		if order.QRCode == "" && order.PayURL == "" {
+			// Only one request may contact the gateway for an order; another
+			// one still waiting for it means this replay retries shortly.
+			now := time.Now().Unix()
+			claimed, err := model.ClaimPartnerAccountPaymentCheckout(order.Id, now, now-partnerServerCheckoutClaimSeconds)
+			if err != nil {
+				writePartnerServerError(c, err)
+				return
+			}
+			if !claimed {
+				c.Header("Retry-After", "3")
+				writePartnerServerError(c, &service.PartnerOAuthError{Status: http.StatusServiceUnavailable, Code: "payment_unavailable", Description: "the payment is being prepared, please retry shortly"})
+				return
+			}
 			if err := completePartnerServerCheckout(c, order, topUp, clientIP); err != nil {
 				writePartnerServerError(c, err)
 				return
@@ -223,42 +241,28 @@ func PartnerServerCreatePaymentOrder(c *gin.Context) {
 		invalid("invalid_payment_method", "payment_method is not available")
 		return
 	}
-	if amount < getMinTopup() {
-		invalid("invalid_amount", fmt.Sprintf("amount must be at least %d", getMinTopup()))
-		return
-	}
-	creditedQuota, err := validateTopUpQuota(amount)
+	quote, err := quotePartnerTopUp(amount)
 	if err != nil {
-		invalid("invalid_amount", err.Error())
+		writePartnerServerError(c, err)
 		return
-	}
-	payMoney := getPayMoney(amount, partner.AccountGroup)
-	if payMoney < 0.01 {
-		invalid("invalid_amount", "payment amount is too low")
-		return
-	}
-	baseQuota, err := cashbackBaseQuotaFromTopUpAmount(amount)
-	if err != nil || baseQuota <= 0 {
-		invalid("invalid_amount", "invalid top-up amount")
-		return
-	}
-	storedAmount := amount
-	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
-		storedAmount = decimal.NewFromInt(amount).Div(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart()
 	}
 	now := time.Now()
-	order, topUp, err := model.CreatePartnerAccountPaymentOrder(model.PartnerAccountPaymentOrderInput{
+	created, err := model.CreatePartnerAccountPaymentOrder(model.PartnerAccountPaymentOrderInput{
 		Owner:              model.PartnerAccountOwner{ClientId: partner.ClientId, ExternalUserId: externalUserID, DisplayName: partner.Name},
 		IdempotencyKeyHash: keyHash,
 		RequestHash:        requestHash,
 		RequestedAmount:    amount,
-		StoredAmount:       storedAmount,
-		Money:              payMoney,
-		PaymentMethod:      method,
-		PaymentProvider:    model.PaymentProviderEpay,
-		CreditedQuota:      creditedQuota,
-		BaseQuota:          baseQuota,
-		Metadata:           onlineTopUpCashbackMetadata(c, baseQuota, amount, false),
+		StoredAmount:       quote.StoredAmount,
+		// Priced for the sub-account user's own group, read in the order
+		// transaction, not the partner's current default group.
+		Price: func(group string) (float64, error) {
+			return partnerTopUpPayMoney(amount, group)
+		},
+		PaymentMethod:   method,
+		PaymentProvider: model.PaymentProviderEpay,
+		CreditedQuota:   quote.CreditedQuota,
+		BaseQuota:       quote.BaseQuota,
+		Metadata:        onlineTopUpCashbackMetadata(c, quote.BaseQuota, amount, false),
 	}, model.PartnerAccountPaymentLimits{
 		AccountRecentSince:  now.Add(-time.Hour).Unix(),
 		AccountMaxRecent:    partnerServerAccountHourlyOrderLimit,
@@ -287,13 +291,17 @@ func PartnerServerCreatePaymentOrder(c *gin.Context) {
 		writePartnerServerError(c, err)
 		return
 	}
+	if created.AccountCreated {
+		recordPartnerAccountLog(c, "partner_account.create", partner, created.TopUp.UserId, "", http.StatusCreated)
+	}
 	model.RecordPartnerOAuthAuthorizationLog(c, model.PartnerOauthAuthorizationLog{Action: "partner_account.payment_order_create", Success: true,
-		ClientId: partner.ClientId, TargetUserId: topUp.UserId, Status: http.StatusCreated})
-	if err := completePartnerServerCheckout(c, order, topUp, clientIP); err != nil {
+		ClientId: partner.ClientId, TargetUserId: created.TopUp.UserId, Status: http.StatusCreated})
+	// The order was created with its gateway call claimed by this request.
+	if err := completePartnerServerCheckout(c, created.Order, created.TopUp, clientIP); err != nil {
 		writePartnerServerError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, partnerServerOrderView(order, topUp, externalUserID))
+	c.JSON(http.StatusCreated, partnerServerOrderView(created.Order, created.TopUp, externalUserID))
 }
 
 func PartnerServerGetPaymentOrder(c *gin.Context) {

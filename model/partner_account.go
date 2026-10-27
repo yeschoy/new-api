@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	PartnerAccountStatusActive        = "active"
-	PartnerAccountStatusDisabled      = "disabled"
+	PartnerAccountStatusActive   = "active"
+	PartnerAccountStatusDisabled = "disabled"
+	// PartnerAccountStatusAdminDisabled is how an administrator's disable is
+	// reported; it is stored separately as AdminDisabled.
 	PartnerAccountStatusAdminDisabled = "admin_disabled"
 
 	// PartnerAccountKeyGraceSeconds keeps the replaced key usable after a
@@ -34,6 +36,7 @@ var (
 	ErrPartnerAccountCredentialDisabled  = errors.New("partner account credential is disabled")
 	ErrPartnerAccountIdempotencyConflict = errors.New("partner account idempotency key reused with a different request")
 	ErrPartnerOAuthClientHasAccounts     = errors.New("partner oauth client still owns partner accounts")
+	ErrPartnerSubAccountUndeletable      = errors.New("partner sub-accounts cannot be deleted")
 
 	ErrPartnerAccountPaymentOrderNotFound   = errors.New("partner account payment order not found")
 	ErrPartnerAccountPaymentIdempotencyRace = errors.New("partner account payment idempotency key already used")
@@ -44,15 +47,22 @@ var (
 // that holds the user's wallet. The mapping never changes once created. The
 // unique key uses a hash of the external ID so that case-sensitive matching is
 // identical on SQLite, MySQL and PostgreSQL.
+//
+// Three independent switches decide whether the sub-account's user is
+// enabled: the partner's own Status, an administrator's AdminDisabled, and the
+// partner's suspension. applyPartnerAccountUserStatusTx derives users.status
+// from all three, so no switch can undo another.
 type PartnerAccount struct {
 	Id                 int64  `json:"id" gorm:"primaryKey"`
 	ClientId           string `json:"client_id" gorm:"type:varchar(64);not null;uniqueIndex:ux_partner_account_external,priority:1;index:idx_partner_account_client_created,priority:1"`
 	ExternalUserId     string `json:"external_user_id" gorm:"type:varchar(64);not null"`
 	ExternalUserIdHash string `json:"-" gorm:"type:char(64);not null;uniqueIndex:ux_partner_account_external,priority:2"`
 	UserId             int    `json:"user_id" gorm:"not null;uniqueIndex"`
-	Status             string `json:"status" gorm:"type:varchar(16);not null"`
-	// SuspendedByPartner marks accounts whose user this system disabled when
-	// the partner was suspended; resuming the partner re-enables only these.
+	// Status is the partner's choice: active or disabled.
+	Status        string `json:"status" gorm:"type:varchar(16);not null"`
+	AdminDisabled bool   `json:"admin_disabled"`
+	// SuspendedByPartner records that the user's status currently reflects the
+	// partner's suspension; it lets a restart finish an interrupted resume.
 	SuspendedByPartner bool `json:"suspended_by_partner"`
 	TokenId            int  `json:"token_id" gorm:"default:0"`
 	// PreviousTokenId is the key replaced by the last rotation while it may
@@ -66,6 +76,20 @@ type PartnerAccount struct {
 
 func (PartnerAccount) TableName() string {
 	return "partner_accounts"
+}
+
+// Usable reports whether neither the partner nor an administrator disabled
+// the account. Suspension is checked separately, per partner.
+func (account *PartnerAccount) Usable() bool {
+	return account.Status == PartnerAccountStatusActive && !account.AdminDisabled
+}
+
+// ReportedStatus is the status partners and administrators see.
+func (account *PartnerAccount) ReportedStatus() string {
+	if account.AdminDisabled {
+		return PartnerAccountStatusAdminDisabled
+	}
+	return account.Status
 }
 
 // PartnerAccountPaymentOrder links a top-up to the partner sub-account it was
@@ -83,7 +107,10 @@ type PartnerAccountPaymentOrder struct {
 	RequestedAmount    int64  `json:"requested_amount" gorm:"type:bigint;not null"`
 	QRCode             string `json:"-" gorm:"column:qr_code;type:text"`
 	PayURL             string `json:"-" gorm:"column:pay_url;type:text"`
-	CreatedAt          int64  `json:"created_at" gorm:"type:bigint;not null;index:idx_partner_account_payment_account_created,priority:2;index:idx_partner_account_payment_client_created,priority:2"`
+	// CheckoutAttemptedAt is when a caller last claimed the gateway call, so
+	// concurrent requests for one order never contact the gateway twice.
+	CheckoutAttemptedAt int64 `json:"-" gorm:"type:bigint;default:0"`
+	CreatedAt           int64 `json:"created_at" gorm:"type:bigint;not null;index:idx_partner_account_payment_account_created,priority:2;index:idx_partner_account_payment_client_created,priority:2"`
 }
 
 func (PartnerAccountPaymentOrder) TableName() string {
@@ -150,62 +177,61 @@ func ListPartnerAccounts(clientID string, offset, limit int) ([]PartnerAccount, 
 	return accounts, total, err
 }
 
-// ensurePartnerAccountTx returns the owner's sub-account, creating it first
-// when the partner has none for this external ID. Creation locks the
-// partner's server config row, so the account cap and creation rate are
-// checked one creation at a time and two concurrent first requests for the
-// same ID cannot both insert.
-func ensurePartnerAccountTx(tx *gorm.DB, owner PartnerAccountOwner) (*PartnerAccount, error) {
+// ensurePartnerAccountTx returns the owner's sub-account and whether this call
+// created it. Creation locks the partner's server config row, so the account
+// cap and creation rate are checked one creation at a time and two concurrent
+// first requests for the same ID cannot both insert.
+func ensurePartnerAccountTx(tx *gorm.DB, owner PartnerAccountOwner) (*PartnerAccount, bool, error) {
 	if owner.ClientId == "" || owner.ExternalUserId == "" {
-		return nil, errors.New("invalid partner account owner")
+		return nil, false, errors.New("invalid partner account owner")
 	}
 	hash := HashPartnerExternalUserID(owner.ExternalUserId)
 	var account PartnerAccount
 	err := tx.Where("client_id = ? AND external_user_id_hash = ?", owner.ClientId, hash).First(&account).Error
 	if err == nil {
-		return &account, nil
+		return &account, false, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	var config PartnerServerConfig
 	if err := lockForUpdate(tx).Where("client_id = ?", owner.ClientId).First(&config).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrPartnerServerUnavailable
+			return nil, false, ErrPartnerServerUnavailable
 		}
-		return nil, err
+		return nil, false, err
 	}
 	if !config.Enabled || config.SuspendedAt != 0 {
-		return nil, ErrPartnerServerUnavailable
+		return nil, false, ErrPartnerServerUnavailable
 	}
 	err = tx.Where("client_id = ? AND external_user_id_hash = ?", owner.ClientId, hash).First(&account).Error
 	if err == nil {
-		return &account, nil
+		return &account, false, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		return nil, false, err
 	}
 
 	now := common.GetTimestamp()
 	var total int64
 	if err := tx.Model(&PartnerAccount{}).Where("client_id = ?", owner.ClientId).Count(&total).Error; err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if total >= int64(config.MaxAccounts) {
-		return nil, ErrPartnerAccountLimit
+		return nil, false, ErrPartnerAccountLimit
 	}
 	var recent int64
 	if err := tx.Model(&PartnerAccount{}).Where("client_id = ? AND created_at > ?", owner.ClientId, now-60).Count(&recent).Error; err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if recent >= int64(config.AccountsPerMinute) {
-		return nil, ErrPartnerAccountRateLimited
+		return nil, false, ErrPartnerAccountRateLimited
 	}
 
 	user, err := createPartnerSubAccountUserTx(tx, owner.DisplayName, config.AccountGroup)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	account = PartnerAccount{
 		ClientId:           owner.ClientId,
@@ -217,9 +243,9 @@ func ensurePartnerAccountTx(tx *gorm.DB, owner PartnerAccountOwner) (*PartnerAcc
 		UpdatedAt:          now,
 	}
 	if err := tx.Create(&account).Error; err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return &account, nil
+	return &account, true, nil
 }
 
 // createPartnerSubAccountUserTx creates the wallet user behind a partner
@@ -278,17 +304,36 @@ func lockPartnerAccountTx(tx *gorm.DB, id int64) (*PartnerAccount, error) {
 	return &account, nil
 }
 
+func partnerAccountUserTx(tx *gorm.DB, userID int) (*User, error) {
+	var user User
+	if err := tx.Unscoped().Where("id = ?", userID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// partnerSuspendedTx reports whether the partner is currently suspended.
+func partnerSuspendedTx(tx *gorm.DB, clientID string) (bool, error) {
+	var config PartnerServerConfig
+	err := tx.Select("suspended_at").Where("client_id = ?", clientID).First(&config).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return config.SuspendedAt != 0, err
+}
+
 // PartnerAccountKey describes the model API key to create for a sub-account.
 // The key string is generated by the caller and used only if a key is created.
 type PartnerAccountKey struct {
-	Key        string
-	Name       string
-	AutoGroups []string
+	Key  string
+	Name string
 }
 
-func newPartnerAccountToken(userID int, spec PartnerAccountKey, now int64) (*Token, error) {
+// newPartnerAccountToken builds a sub-account key that tries the user's own
+// group first and then default.
+func newPartnerAccountToken(user *User, spec PartnerAccountKey, now int64) (*Token, error) {
 	token := &Token{
-		UserId:         userID,
+		UserId:         user.Id,
 		Name:           spec.Name,
 		Key:            spec.Key,
 		CreatedTime:    now,
@@ -298,7 +343,11 @@ func newPartnerAccountToken(userID int, spec PartnerAccountKey, now int64) (*Tok
 		Status:         common.TokenStatusEnabled,
 		Group:          "auto",
 	}
-	if err := token.SetAutoGroups(spec.AutoGroups); err != nil {
+	groups := []string{"default"}
+	if user.Group != "" && user.Group != "default" {
+		groups = []string{user.Group, "default"}
+	}
+	if err := token.SetAutoGroups(groups); err != nil {
 		return nil, err
 	}
 	return token, nil
@@ -307,26 +356,35 @@ func newPartnerAccountToken(userID int, spec PartnerAccountKey, now int64) (*Tok
 // partnerAccountTokenUsable reports whether a key can still serve requests:
 // enabled and not past its expiry.
 func partnerAccountTokenUsable(token *Token, now int64) bool {
-	return token.Status == common.TokenStatusEnabled && (token.ExpiredTime == -1 || token.ExpiredTime > now)
+	return token.Status == common.TokenStatusEnabled && (token.ExpiredTime == -1 || token.ExpiredTime > now) && !token.DeletedAt.Valid
+}
+
+// PartnerAccountCredentialResult is the sub-account's current key and what
+// the call created.
+type PartnerAccountCredentialResult struct {
+	Account        *PartnerAccount
+	Token          *Token
+	AccountCreated bool
+	KeyCreated     bool
 }
 
 // IssuePartnerAccountCredential returns the sub-account's current key,
 // creating the account and the key on first use. A key that was disabled or
 // has expired is reported, never silently replaced; rotation issues a new one.
-func IssuePartnerAccountCredential(owner PartnerAccountOwner, spec PartnerAccountKey) (*PartnerAccount, *Token, bool, error) {
-	var account *PartnerAccount
-	var issued *Token
-	created := false
+func IssuePartnerAccountCredential(owner PartnerAccountOwner, spec PartnerAccountKey) (*PartnerAccountCredentialResult, error) {
+	result := &PartnerAccountCredentialResult{}
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		ensured, err := ensurePartnerAccountTx(tx, owner)
+		ensured, created, err := ensurePartnerAccountTx(tx, owner)
 		if err != nil {
 			return err
 		}
-		account, err = lockPartnerAccountTx(tx, ensured.Id)
+		result.AccountCreated = created
+		account, err := lockPartnerAccountTx(tx, ensured.Id)
 		if err != nil {
 			return err
 		}
-		if account.Status != PartnerAccountStatusActive {
+		result.Account = account
+		if !account.Usable() {
 			return ErrPartnerAccountInactive
 		}
 		now := common.GetTimestamp()
@@ -335,13 +393,17 @@ func IssuePartnerAccountCredential(owner PartnerAccountOwner, spec PartnerAccoun
 			if err := tx.Unscoped().Where("id = ? AND user_id = ?", account.TokenId, account.UserId).First(&existing).Error; err != nil {
 				return err
 			}
-			if !partnerAccountTokenUsable(&existing, now) || existing.DeletedAt.Valid {
+			if !partnerAccountTokenUsable(&existing, now) {
 				return ErrPartnerAccountCredentialDisabled
 			}
-			issued = &existing
+			result.Token = &existing
 			return nil
 		}
-		token, err := newPartnerAccountToken(account.UserId, spec, now)
+		user, err := partnerAccountUserTx(tx, account.UserId)
+		if err != nil {
+			return err
+		}
+		token, err := newPartnerAccountToken(user, spec, now)
 		if err != nil {
 			return err
 		}
@@ -352,14 +414,14 @@ func IssuePartnerAccountCredential(owner PartnerAccountOwner, spec PartnerAccoun
 			return err
 		}
 		account.TokenId = token.Id
-		issued = token
-		created = true
+		result.Token = token
+		result.KeyCreated = true
 		return nil
 	})
 	if err != nil {
-		return nil, nil, false, err
+		return nil, err
 	}
-	return account, issued, created, nil
+	return result, nil
 }
 
 // PartnerAccountRotation is one key rotation request. KeyHash and RequestHash
@@ -375,11 +437,10 @@ type PartnerAccountRotation struct {
 // it replaced stops working (0 when that key was revoked at once or there was
 // no usable key to replace).
 type PartnerAccountRotationResult struct {
-	Account           *PartnerAccount
-	Token             *Token
-	OldKeyExpiresAt   int64
-	Replayed          bool
-	invalidatedTokens []string
+	Account         *PartnerAccount
+	Token           *Token
+	OldKeyExpiresAt int64
+	Replayed        bool
 }
 
 // RotatePartnerAccountCredential issues a new key for an existing
@@ -421,12 +482,12 @@ func RotatePartnerAccountCredential(clientID, externalUserID string, rotation Pa
 			}
 			return nil
 		}
-		if account.Status != PartnerAccountStatusActive {
+		if !account.Usable() {
 			return ErrPartnerAccountInactive
 		}
 		now := common.GetTimestamp()
 		if account.PreviousTokenId > 0 {
-			if err := disablePartnerAccountTokenTx(tx, account.UserId, account.PreviousTokenId, &result.invalidatedTokens); err != nil {
+			if err := disablePartnerAccountTokenTx(tx, account.UserId, account.PreviousTokenId); err != nil {
 				return err
 			}
 		}
@@ -437,10 +498,10 @@ func RotatePartnerAccountCredential(clientID, externalUserID string, rotation Pa
 				return err
 			}
 			switch {
-			case !partnerAccountTokenUsable(&old, now) || old.DeletedAt.Valid:
+			case !partnerAccountTokenUsable(&old, now):
 				// Nothing usable to keep alive.
 			case rotation.Immediately:
-				if err := disablePartnerAccountTokenTx(tx, account.UserId, old.Id, &result.invalidatedTokens); err != nil {
+				if err := disablePartnerAccountTokenTx(tx, account.UserId, old.Id); err != nil {
 					return err
 				}
 			default:
@@ -451,7 +512,6 @@ func RotatePartnerAccountCredential(clientID, externalUserID string, rotation Pa
 				if err := invalidateTokenCacheForMutation(old.Key); err != nil {
 					return err
 				}
-				result.invalidatedTokens = append(result.invalidatedTokens, old.Key)
 				if err := tx.Model(&old).Update("expired_time", expiresAt).Error; err != nil {
 					return err
 				}
@@ -459,7 +519,11 @@ func RotatePartnerAccountCredential(clientID, externalUserID string, rotation Pa
 				result.OldKeyExpiresAt = expiresAt
 			}
 		}
-		token, err := newPartnerAccountToken(account.UserId, rotation.Key, now)
+		user, err := partnerAccountUserTx(tx, account.UserId)
+		if err != nil {
+			return err
+		}
+		token, err := newPartnerAccountToken(user, rotation.Key, now)
 		if err != nil {
 			return err
 		}
@@ -489,7 +553,7 @@ func RotatePartnerAccountCredential(clientID, externalUserID string, rotation Pa
 
 // disablePartnerAccountTokenTx disables one of a sub-account's keys, raising
 // the key cache fence before the write as every token mutation must.
-func disablePartnerAccountTokenTx(tx *gorm.DB, userID, tokenID int, invalidated *[]string) error {
+func disablePartnerAccountTokenTx(tx *gorm.DB, userID, tokenID int) error {
 	var token Token
 	err := tx.Unscoped().Where("id = ? AND user_id = ?", tokenID, userID).First(&token).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -504,7 +568,6 @@ func disablePartnerAccountTokenTx(tx *gorm.DB, userID, tokenID int, invalidated 
 	if err := invalidateTokenCacheForMutation(token.Key); err != nil {
 		return err
 	}
-	*invalidated = append(*invalidated, token.Key)
 	return tx.Unscoped().Model(&token).Update("status", common.TokenStatusDisabled).Error
 }
 
@@ -528,23 +591,34 @@ func setPartnerSubAccountUserStatusTx(tx *gorm.DB, userID int, status int) (bool
 	return true, nil
 }
 
+// applyPartnerAccountUserStatusTx sets the sub-account user's status from the
+// account's switches and the partner's suspension: enabled only when the
+// partner and administrators both allow it and the partner is not suspended.
+func applyPartnerAccountUserStatusTx(tx *gorm.DB, account *PartnerAccount, suspended bool) (bool, error) {
+	status := common.UserStatusDisabled
+	if account.Usable() && !suspended {
+		status = common.UserStatusEnabled
+	}
+	return setPartnerSubAccountUserStatusTx(tx, account.UserId, status)
+}
+
 // FinalizePartnerAccountUserStatusChanges publishes committed status changes:
 // it refreshes each user's auth cache, revokes browser sessions and drops the
 // cached keys so the next model request reloads the user's status.
 func FinalizePartnerAccountUserStatusChanges(userIDs []int) {
 	for _, userID := range userIDs {
 		if err := finalizeCommittedUserAuthMutation(userID, "partner_account_status"); err != nil {
-			common.SysError(fmt.Sprintf("failed to finalize partner account status for user %d: %v", userID, err))
+			common.SysError(common.LogText("failed to finalize partner account status for user %d: %s", userID, err.Error()))
 		}
 		if err := InvalidateUserTokensCache(userID); err != nil {
-			common.SysError(fmt.Sprintf("failed to invalidate tokens cache for user %d: %v", userID, err))
+			common.SysError(common.LogText("failed to invalidate tokens cache for user %d: %s", userID, err.Error()))
 		}
 	}
 }
 
-// SetPartnerAccountEnabledByPartner disables or re-enables a sub-account on the
-// partner's request. An account an administrator disabled cannot be enabled
-// by the partner. It returns the user IDs whose status changed.
+// SetPartnerAccountEnabledByPartner records the partner's disable or re-enable
+// of a sub-account. A partner cannot re-enable an account an administrator
+// disabled. It returns the user IDs whose status changed.
 func SetPartnerAccountEnabledByPartner(clientID, externalUserID string, enabled bool) (*PartnerAccount, []int, error) {
 	current, err := GetPartnerAccount(clientID, externalUserID)
 	if err != nil {
@@ -557,48 +631,30 @@ func SetPartnerAccountEnabledByPartner(clientID, externalUserID string, enabled 
 		if err != nil {
 			return err
 		}
-		if account.Status == PartnerAccountStatusAdminDisabled {
-			if enabled {
-				return ErrPartnerAccountAdminDisabled
-			}
-			return nil
+		if enabled && account.AdminDisabled {
+			return ErrPartnerAccountAdminDisabled
 		}
 		target := PartnerAccountStatusDisabled
-		userStatus := common.UserStatusDisabled
 		if enabled {
 			target = PartnerAccountStatusActive
-			userStatus = common.UserStatusEnabled
 		}
-		if account.Status == target {
-			return nil
-		}
-		updates := map[string]any{"status": target, "updated_at": common.GetTimestamp()}
-		// While the partner is suspended an enabled account keeps its user
-		// disabled; the resume reconciliation re-enables it.
-		suspended := false
-		if enabled {
-			var config PartnerServerConfig
-			if err := tx.Select("suspended_at").Where("client_id = ?", clientID).First(&config).Error; err != nil {
+		if account.Status != target {
+			if err := tx.Model(account).Updates(map[string]any{"status": target, "updated_at": common.GetTimestamp()}).Error; err != nil {
 				return err
 			}
-			suspended = config.SuspendedAt != 0
+			account.Status = target
 		}
-		if suspended {
-			updates["suspended_by_partner"] = true
-		} else {
-			updates["suspended_by_partner"] = false
-			userChanged, err := setPartnerSubAccountUserStatusTx(tx, account.UserId, userStatus)
-			if err != nil {
-				return err
-			}
-			if userChanged {
-				changed = append(changed, account.UserId)
-			}
-		}
-		if err := tx.Model(account).Updates(updates).Error; err != nil {
+		suspended, err := partnerSuspendedTx(tx, clientID)
+		if err != nil {
 			return err
 		}
-		account.Status = target
+		userChanged, err := applyPartnerAccountUserStatusTx(tx, account, suspended)
+		if err != nil {
+			return err
+		}
+		if userChanged {
+			changed = append(changed, account.UserId)
+		}
 		return nil
 	})
 	if err != nil {
@@ -607,12 +663,15 @@ func SetPartnerAccountEnabledByPartner(clientID, externalUserID string, enabled 
 	return account, changed, nil
 }
 
-// SyncPartnerAccountAdminStatus records an administrator's status change of a
-// sub-account user, so the partner cannot re-enable an account an
-// administrator disabled and a partner resume skips it. It is a no-op for
-// users that are not sub-accounts.
-func SyncPartnerAccountAdminStatus(userID int, enabled bool) error {
-	return DB.Transaction(func(tx *gorm.DB) error {
+// SetPartnerAccountAdminDisabled records an administrator's disable or
+// re-enable of a sub-account user and applies the resulting status in one
+// transaction. Re-enabling clears only the administrator's switch: a partner
+// disable or a partner suspension still keeps the user disabled. It reports
+// whether the user is a sub-account at all; for other users nothing changes.
+func SetPartnerAccountAdminDisabled(userID int, disabled bool) (bool, []int, error) {
+	isSubAccount := false
+	var changed []int
+	err := DB.Transaction(func(tx *gorm.DB) error {
 		var account PartnerAccount
 		err := lockForUpdate(tx).Where("user_id = ?", userID).First(&account).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -621,12 +680,27 @@ func SyncPartnerAccountAdminStatus(userID int, enabled bool) error {
 		if err != nil {
 			return err
 		}
-		status := PartnerAccountStatusAdminDisabled
-		if enabled {
-			status = PartnerAccountStatusActive
+		isSubAccount = true
+		if account.AdminDisabled != disabled {
+			if err := tx.Model(&account).Updates(map[string]any{"admin_disabled": disabled, "updated_at": common.GetTimestamp()}).Error; err != nil {
+				return err
+			}
+			account.AdminDisabled = disabled
 		}
-		return tx.Model(&account).Updates(map[string]any{"status": status, "suspended_by_partner": false, "updated_at": common.GetTimestamp()}).Error
+		suspended, err := partnerSuspendedTx(tx, account.ClientId)
+		if err != nil {
+			return err
+		}
+		userChanged, err := applyPartnerAccountUserStatusTx(tx, &account, suspended)
+		if err != nil {
+			return err
+		}
+		if userChanged {
+			changed = append(changed, account.UserId)
+		}
+		return nil
 	})
+	return isSubAccount, changed, err
 }
 
 // PartnerAccountBatch is one page of a per-partner batch job over its
@@ -638,19 +712,19 @@ type PartnerAccountBatch struct {
 	ChangedUserIds []int
 }
 
-// ReconcilePartnerAccountSuspensionBatch moves one page of the partner's
-// sub-accounts toward the partner's current suspension state. Suspending
-// disables enabled users of active accounts and marks them; resuming
-// re-enables only marked active accounts. Each account commits on its own, so
-// a crash leaves a consistent prefix and the job can simply run again.
-func ReconcilePartnerAccountSuspensionBatch(clientID string, afterID int64, limit int) (*PartnerAccountBatch, error) {
-	config, err := GetPartnerServerConfig(clientID)
-	if err != nil {
-		return nil, err
-	}
-	suspend := config.SuspendedAt != 0
+func partnerAccountIDsAfter(clientID string, afterID int64, limit int) ([]int64, error) {
 	var ids []int64
-	if err := DB.Model(&PartnerAccount{}).Where("client_id = ? AND id > ?", clientID, afterID).Order("id").Limit(limit).Pluck("id", &ids).Error; err != nil {
+	err := DB.Model(&PartnerAccount{}).Where("client_id = ? AND id > ?", clientID, afterID).Order("id").Limit(limit).Pluck("id", &ids).Error
+	return ids, err
+}
+
+// ReconcilePartnerAccountSuspensionBatch brings one page of the partner's
+// sub-accounts in line with the partner's current suspension state. Each
+// account commits on its own, so a crash leaves a consistent prefix and the
+// job can simply run again.
+func ReconcilePartnerAccountSuspensionBatch(clientID string, afterID int64, limit int) (*PartnerAccountBatch, error) {
+	ids, err := partnerAccountIDsAfter(clientID, afterID, limit)
+	if err != nil {
 		return nil, err
 	}
 	batch := &PartnerAccountBatch{LastId: afterID, Done: len(ids) < limit}
@@ -660,38 +734,23 @@ func ReconcilePartnerAccountSuspensionBatch(clientID string, afterID int64, limi
 			if err != nil {
 				return err
 			}
-			updates := map[string]any{}
-			userStatus := 0
-			switch {
-			case suspend && account.Status == PartnerAccountStatusActive && !account.SuspendedByPartner:
-				var user User
-				if err := tx.Unscoped().Select("status").Where("id = ?", account.UserId).First(&user).Error; err != nil {
-					return err
-				}
-				if user.Status != common.UserStatusEnabled {
-					return nil
-				}
-				updates["suspended_by_partner"] = true
-				userStatus = common.UserStatusDisabled
-			case !suspend && account.SuspendedByPartner:
-				updates["suspended_by_partner"] = false
-				if account.Status == PartnerAccountStatusActive {
-					userStatus = common.UserStatusEnabled
-				}
-			default:
+			// Read under the account lock so a suspend and resume racing with
+			// this batch always end in the latest state.
+			suspended, err := partnerSuspendedTx(tx, clientID)
+			if err != nil {
+				return err
+			}
+			userChanged, err := applyPartnerAccountUserStatusTx(tx, account, suspended)
+			if err != nil {
+				return err
+			}
+			if userChanged {
+				batch.ChangedUserIds = append(batch.ChangedUserIds, account.UserId)
+			}
+			if account.SuspendedByPartner == suspended {
 				return nil
 			}
-			if userStatus != 0 {
-				userChanged, err := setPartnerSubAccountUserStatusTx(tx, account.UserId, userStatus)
-				if err != nil {
-					return err
-				}
-				if userChanged {
-					batch.ChangedUserIds = append(batch.ChangedUserIds, account.UserId)
-				}
-			}
-			updates["updated_at"] = common.GetTimestamp()
-			return tx.Model(account).Updates(updates).Error
+			return tx.Model(account).Updates(map[string]any{"suspended_by_partner": suspended, "updated_at": common.GetTimestamp()}).Error
 		})
 		if err != nil {
 			return batch, err
@@ -703,22 +762,27 @@ func ReconcilePartnerAccountSuspensionBatch(clientID string, afterID int64, limi
 }
 
 // RevokePartnerAccountKeysBatch disables the current key and any key still in
-// grace for one page of the partner's sub-accounts. Accounts and balances are
-// untouched; the partner obtains new keys through rotation.
+// grace for one page of the partner's sub-accounts. The account row is locked
+// before its key IDs are read, so a rotation racing with the revocation
+// cannot leave a fresh key behind. Accounts and balances are untouched; the
+// partner obtains new keys through rotation.
 func RevokePartnerAccountKeysBatch(clientID string, afterID int64, limit int) (*PartnerAccountBatch, error) {
-	var accounts []PartnerAccount
-	if err := DB.Where("client_id = ? AND id > ?", clientID, afterID).Order("id").Limit(limit).Find(&accounts).Error; err != nil {
+	ids, err := partnerAccountIDsAfter(clientID, afterID, limit)
+	if err != nil {
 		return nil, err
 	}
-	batch := &PartnerAccountBatch{LastId: afterID, Done: len(accounts) < limit}
-	for _, account := range accounts {
+	batch := &PartnerAccountBatch{LastId: afterID, Done: len(ids) < limit}
+	for _, id := range ids {
 		err := DB.Transaction(func(tx *gorm.DB) error {
-			var invalidated []string
+			account, err := lockPartnerAccountTx(tx, id)
+			if err != nil {
+				return err
+			}
 			for _, tokenID := range []int{account.TokenId, account.PreviousTokenId} {
 				if tokenID <= 0 {
 					continue
 				}
-				if err := disablePartnerAccountTokenTx(tx, account.UserId, tokenID, &invalidated); err != nil {
+				if err := disablePartnerAccountTokenTx(tx, account.UserId, tokenID); err != nil {
 					return err
 				}
 			}
@@ -727,22 +791,23 @@ func RevokePartnerAccountKeysBatch(clientID string, afterID int64, limit int) (*
 		if err != nil {
 			return batch, err
 		}
-		batch.LastId = account.Id
+		batch.LastId = id
 		batch.Processed++
 	}
 	return batch, nil
 }
 
 // PartnerAccountPaymentOrderInput is a top-up a partner places for its user.
-// Amounts are validated and priced by the caller; the sub-account is created
-// on first use inside the same transaction as the order.
+// The amount is validated by the caller; Price prices it for the sub-account
+// user's group inside the order transaction. The sub-account is created on
+// first use inside the same transaction.
 type PartnerAccountPaymentOrderInput struct {
 	Owner              PartnerAccountOwner
 	IdempotencyKeyHash string
 	RequestHash        string
 	RequestedAmount    int64
 	StoredAmount       int64
-	Money              float64
+	Price              func(group string) (float64, error)
 	PaymentMethod      string
 	PaymentProvider    string
 	CreditedQuota      int
@@ -762,32 +827,36 @@ type PartnerAccountPaymentLimits struct {
 	ClientMaxRecent     int64
 }
 
+// PartnerAccountPaymentOrderResult is the created order and whether the call
+// also created the sub-account.
+type PartnerAccountPaymentOrderResult struct {
+	Order          *PartnerAccountPaymentOrder
+	TopUp          *TopUp
+	AccountCreated bool
+}
+
 // CreatePartnerAccountPaymentOrder commits the sub-account (on first use), the
 // top-up, its cashback context and the partner link together. The account row
-// is locked so its limits are checked one order at a time.
-func CreatePartnerAccountPaymentOrder(input PartnerAccountPaymentOrderInput, limits PartnerAccountPaymentLimits) (*PartnerAccountPaymentOrder, *TopUp, error) {
-	if input.IdempotencyKeyHash == "" || input.RequestHash == "" {
-		return nil, nil, errors.New("invalid partner account payment order")
+// is locked so its limits are checked one order at a time. The order starts
+// with its gateway call claimed by this caller.
+func CreatePartnerAccountPaymentOrder(input PartnerAccountPaymentOrderInput, limits PartnerAccountPaymentLimits) (*PartnerAccountPaymentOrderResult, error) {
+	if input.IdempotencyKeyHash == "" || input.RequestHash == "" || input.Price == nil {
+		return nil, errors.New("invalid partner account payment order")
 	}
 	metadata := input.Metadata
 	metadata.IneligibleReason = CashbackIneligiblePartnerOAuth
-	order := &PartnerAccountPaymentOrder{
-		ClientId:           input.Owner.ClientId,
-		IdempotencyKeyHash: input.IdempotencyKeyHash,
-		RequestHash:        input.RequestHash,
-		RequestedAmount:    input.RequestedAmount,
-	}
-	var topUp *TopUp
+	result := &PartnerAccountPaymentOrderResult{}
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		ensured, err := ensurePartnerAccountTx(tx, input.Owner)
+		ensured, created, err := ensurePartnerAccountTx(tx, input.Owner)
 		if err != nil {
 			return err
 		}
+		result.AccountCreated = created
 		account, err := lockPartnerAccountTx(tx, ensured.Id)
 		if err != nil {
 			return err
 		}
-		if account.Status != PartnerAccountStatusActive {
+		if !account.Usable() {
 			return ErrPartnerAccountInactive
 		}
 		var used int64
@@ -799,37 +868,41 @@ func CreatePartnerAccountPaymentOrder(input PartnerAccountPaymentOrderInput, lim
 		if used > 0 {
 			return ErrPartnerAccountPaymentIdempotencyRace
 		}
-		recent, err := countPartnerAccountPaymentOrdersTx(tx, "partner_account_id = ?", account.Id, limits.AccountRecentSince, false)
+		recent, err := countPartnerTopUpLinksTx(tx, &PartnerAccountPaymentOrder{}, "partner_account_id = ?", account.Id, limits.AccountRecentSince, false)
 		if err != nil {
 			return err
 		}
-		pending, err := countPartnerAccountPaymentOrdersTx(tx, "partner_account_id = ?", account.Id, limits.AccountPendingSince, true)
+		pending, err := countPartnerTopUpLinksTx(tx, &PartnerAccountPaymentOrder{}, "partner_account_id = ?", account.Id, limits.AccountPendingSince, true)
 		if err != nil {
 			return err
 		}
-		clientRecent, err := countPartnerAccountPaymentOrdersTx(tx, "client_id = ?", input.Owner.ClientId, limits.ClientRecentSince, false)
+		clientRecent, err := countPartnerTopUpLinksTx(tx, &PartnerAccountPaymentOrder{}, "client_id = ?", input.Owner.ClientId, limits.ClientRecentSince, false)
 		if err != nil {
 			return err
 		}
 		if recent >= limits.AccountMaxRecent || pending >= limits.AccountMaxPending || clientRecent >= limits.ClientMaxRecent {
 			return ErrPartnerAccountPaymentRateLimited
 		}
-		maxCurrentQuota, err := topUpQuotaMaxCurrent(input.CreditedQuota)
+		user, err := partnerAccountUserTx(tx, account.UserId)
 		if err != nil {
 			return err
 		}
-		var user User
-		if err := tx.Select("quota").Where("id = ?", account.UserId).First(&user).Error; err != nil {
+		maxCurrentQuota, err := topUpQuotaMaxCurrent(input.CreditedQuota)
+		if err != nil {
 			return err
 		}
 		if user.Quota > maxCurrentQuota {
 			return ErrTopUpQuotaLimitExceeded
 		}
+		money, err := input.Price(user.Group)
+		if err != nil {
+			return err
+		}
 		now := common.GetTimestamp()
-		topUp = &TopUp{
+		topUp := &TopUp{
 			UserId:          account.UserId,
 			Amount:          input.StoredAmount,
-			Money:           input.Money,
+			Money:           money,
 			TradeNo:         fmt.Sprintf("USR%dNO%s%d", account.UserId, common.GetRandomString(6), now),
 			PaymentMethod:   input.PaymentMethod,
 			PaymentProvider: input.PaymentProvider,
@@ -839,11 +912,22 @@ func CreatePartnerAccountPaymentOrder(input PartnerAccountPaymentOrderInput, lim
 		if err := InsertOnlineTopUpTx(tx, topUp, input.BaseQuota, metadata); err != nil {
 			return err
 		}
-		order.PartnerAccountId = account.Id
-		order.UserId = account.UserId
-		order.TopUpId = topUp.Id
-		order.CreatedAt = now
-		return tx.Create(order).Error
+		order := &PartnerAccountPaymentOrder{
+			ClientId:            input.Owner.ClientId,
+			IdempotencyKeyHash:  input.IdempotencyKeyHash,
+			RequestHash:         input.RequestHash,
+			PartnerAccountId:    account.Id,
+			UserId:              account.UserId,
+			TopUpId:             topUp.Id,
+			RequestedAmount:     input.RequestedAmount,
+			CheckoutAttemptedAt: now,
+			CreatedAt:           now,
+		}
+		if err := tx.Create(order).Error; err != nil {
+			return err
+		}
+		result.Order, result.TopUp = order, topUp
+		return nil
 	})
 	if isDatabaseDuplicatedKey(DB, err) {
 		// Only a stored order with this key is an idempotency race; any other
@@ -853,26 +937,46 @@ func CreatePartnerAccountPaymentOrder(input PartnerAccountPaymentOrderInput, lim
 		if countErr := DB.Model(&PartnerAccountPaymentOrder{}).
 			Where("client_id = ? AND idempotency_key_hash = ?", input.Owner.ClientId, input.IdempotencyKeyHash).
 			Count(&used).Error; countErr == nil && used > 0 {
-			return nil, nil, ErrPartnerAccountPaymentIdempotencyRace
+			return nil, ErrPartnerAccountPaymentIdempotencyRace
 		}
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return order, topUp, nil
+	return result, nil
 }
 
-// countPartnerAccountPaymentOrdersTx counts orders matching scope created at
-// or after since; pendingOnly restricts the count to orders awaiting payment.
-func countPartnerAccountPaymentOrdersTx(tx *gorm.DB, scope string, value any, since int64, pendingOnly bool) (int64, error) {
-	query := tx.Model(&PartnerAccountPaymentOrder{}).Where(scope, value).Where("created_at >= ?", since)
+// countPartnerTopUpLinksTx counts rows of a partner top-up link table (OAuth
+// or sub-account orders) matching scope and created at or after since;
+// pendingOnly restricts the count to orders still awaiting payment.
+func countPartnerTopUpLinksTx(tx *gorm.DB, link any, scope string, value any, since int64, pendingOnly bool) (int64, error) {
+	query := tx.Model(link).Where(scope, value).Where("created_at >= ?", since)
 	if pendingOnly {
+		// A subquery keeps both table names under GORM's naming strategy.
 		pending := tx.Model(&TopUp{}).Select("id").Where("status = ?", common.TopUpStatusPending)
 		query = query.Where("top_up_id IN (?)", pending)
 	}
 	var count int64
 	err := query.Count(&count).Error
 	return count, err
+}
+
+// ClaimPartnerAccountPaymentCheckout lets one caller contact the gateway for
+// an order that still has no checkout, unless another caller claimed it after
+// staleBefore and may still be waiting for the gateway.
+func ClaimPartnerAccountPaymentCheckout(orderID int64, now, staleBefore int64) (bool, error) {
+	result := DB.Model(&PartnerAccountPaymentOrder{}).
+		Where("id = ? AND qr_code = ? AND pay_url = ? AND checkout_attempted_at < ?", orderID, "", "", staleBefore).
+		Update("checkout_attempted_at", now)
+	return result.RowsAffected == 1, result.Error
+}
+
+// ReleasePartnerAccountPaymentCheckout gives up a claim after a failed gateway
+// call, so the partner's retry can try again at once.
+func ReleasePartnerAccountPaymentCheckout(orderID int64) error {
+	return DB.Model(&PartnerAccountPaymentOrder{}).
+		Where("id = ? AND qr_code = ? AND pay_url = ?", orderID, "", "").
+		Update("checkout_attempted_at", 0).Error
 }
 
 // SetPartnerAccountPaymentCheckout stores the checkout the gateway returned so
@@ -920,25 +1024,27 @@ func GetPartnerAccountPaymentOrder(clientID, tradeNo string) (*PartnerAccountPay
 	return &order, &topUp, nil
 }
 
-// ListPartnerServerClientsToReconcile returns partners whose sub-accounts may
-// not match their suspension state yet: suspended partners, and partners with
-// accounts still marked as suspended. It lets a restart finish interrupted
-// suspension and resume jobs.
-func ListPartnerServerClientsToReconcile() ([]string, error) {
-	var suspended []string
-	if err := DB.Model(&PartnerServerConfig{}).Where("suspended_at <> ?", 0).Pluck("client_id", &suspended).Error; err != nil {
-		return nil, err
+// PartnerServerJobsToResume lists partners whose background jobs a restart
+// may have interrupted: suspended partners and partners with accounts still
+// marked as suspended (suspension reconciliation), and partners with a
+// pending key revocation.
+func PartnerServerJobsToResume() (suspension []string, keyRevocation []string, err error) {
+	if err = DB.Model(&PartnerServerConfig{}).Where("suspended_at <> ?", 0).Pluck("client_id", &suspension).Error; err != nil {
+		return nil, nil, err
 	}
 	var marked []string
-	if err := DB.Model(&PartnerAccount{}).Where("suspended_by_partner = ?", true).Distinct("client_id").Pluck("client_id", &marked).Error; err != nil {
-		return nil, err
+	if err = DB.Model(&PartnerAccount{}).Where("suspended_by_partner = ?", true).Distinct("client_id").Pluck("client_id", &marked).Error; err != nil {
+		return nil, nil, err
 	}
 	for _, clientID := range marked {
-		if !slices.Contains(suspended, clientID) {
-			suspended = append(suspended, clientID)
+		if !slices.Contains(suspension, clientID) {
+			suspension = append(suspension, clientID)
 		}
 	}
-	return suspended, nil
+	if err = DB.Model(&PartnerServerConfig{}).Where("key_revocation_requested_at <> ?", 0).Pluck("client_id", &keyRevocation).Error; err != nil {
+		return nil, nil, err
+	}
+	return suspension, keyRevocation, nil
 }
 
 // PartnerAccountUsage is one consume-log entry as a partner may see it. It

@@ -183,25 +183,29 @@ func UpdatePartnerServerConfig(c *gin.Context) {
 	}
 	var req partnerServerConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid request"})
+		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
 	req.AccountGroup = strings.TrimSpace(req.AccountGroup)
 	if req.AccountGroup == "" || !ratio_setting.ContainsGroupRatio(req.AccountGroup) {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "account_group must be an existing group"})
+		common.ApiErrorT(c, "Select an existing user group")
 		return
 	}
 	if req.MaxAccounts < 1 || req.MaxAccounts > partnerServerMaxAccountsLimit {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "max_accounts must be between 1 and " + strconv.Itoa(partnerServerMaxAccountsLimit)})
+		common.ApiErrorT(c, "The sub-account limit must be between 1 and {{max}}", map[string]any{"max": partnerServerMaxAccountsLimit})
 		return
 	}
 	if req.AccountsPerMinute < 1 || req.AccountsPerMinute > partnerServerAccountsPerMinuteLimit {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "accounts_per_minute must be between 1 and " + strconv.Itoa(partnerServerAccountsPerMinuteLimit)})
+		common.ApiErrorT(c, "New sub-accounts per minute must be between 1 and {{max}}", map[string]any{"max": partnerServerAccountsPerMinuteLimit})
 		return
 	}
 	allowlist, err := service.NormalizePartnerServerIPAllowlist(req.IPAllowlist)
+	if errors.Is(err, service.ErrPartnerServerIPAllowlistTooLong) {
+		common.ApiErrorT(c, "At most 64 entries")
+		return
+	}
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+		common.ApiErrorT(c, "Enter IP addresses or CIDR ranges, one per line")
 		return
 	}
 	if middleware.RequireSecurityProof(c, service.VerificationOperation{
@@ -255,10 +259,10 @@ func CreatePartnerServerSecret(c *gin.Context) {
 	stored, err := model.CreatePartnerServerSecret(client.ClientId, model.HashPartnerOAuthSecret(secret))
 	switch {
 	case errors.Is(err, model.ErrPartnerServerConfigNotFound):
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "configure server access before issuing a secret"})
+		common.ApiErrorT(c, "Save the server access settings before issuing a secret.")
 		return
 	case errors.Is(err, model.ErrPartnerServerSecretLimit):
-		c.JSON(http.StatusConflict, gin.H{"success": false, "message": "revoke an existing secret first; at most two can be active"})
+		common.ApiErrorT(c, "Revoke an existing secret first; at most two can be active")
 		return
 	case err != nil:
 		common.ApiError(c, err)
@@ -282,7 +286,7 @@ func RevokePartnerServerSecret(c *gin.Context) {
 	}
 	secretID, err := strconv.ParseInt(c.Param("secret_id"), 10, 64)
 	if err != nil || secretID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid secret id"})
+		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
 	if middleware.RequireSecurityProof(c, service.VerificationOperation{
@@ -293,7 +297,7 @@ func RevokePartnerServerSecret(c *gin.Context) {
 	}
 	if err := model.RevokePartnerServerSecret(client.ClientId, secretID); err != nil {
 		if errors.Is(err, model.ErrPartnerServerSecretNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "secret not found"})
+			common.ApiErrorT(c, "Server secret not found")
 			return
 		}
 		common.ApiError(c, err)
@@ -320,7 +324,14 @@ func RevokePartnerServerKeys(c *gin.Context) {
 	}) == nil {
 		return
 	}
-	service.StartPartnerServerJob(service.PartnerServerJobKeyRevocation, client.ClientId)
+	if err := service.StartPartnerKeyRevocation(client.ClientId); err != nil {
+		if errors.Is(err, model.ErrPartnerServerConfigNotFound) {
+			common.ApiErrorT(c, "Save the server access settings before issuing a secret.")
+			return
+		}
+		common.ApiError(c, err)
+		return
+	}
 	model.RecordPartnerOAuthAuthorizationLog(c, model.PartnerOauthAuthorizationLog{Action: "partner_server.keys_revoke_all", Success: true,
 		ActorUserId: c.GetInt("id"), ClientId: client.ClientId, Status: http.StatusAccepted})
 	recordPartnerOAuthAdminAudit(c, "partner_server.keys.revoke_all", client.ClientId, nil)
@@ -368,7 +379,7 @@ func GetPartnerServerAccounts(c *gin.Context) {
 	for _, account := range accounts {
 		wallet := wallets[account.UserId]
 		items = append(items, partnerServerAccountAdminView{
-			Id: account.Id, ExternalUserId: account.ExternalUserId, UserId: account.UserId, Status: account.Status,
+			Id: account.Id, ExternalUserId: account.ExternalUserId, UserId: account.UserId, Status: account.ReportedStatus(),
 			SuspendedByPartner: account.SuspendedByPartner, Quota: wallet.Quota, UsedQuota: wallet.UsedQuota, CreatedAt: account.CreatedAt,
 		})
 	}
