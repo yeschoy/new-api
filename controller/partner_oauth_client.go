@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -234,6 +235,7 @@ func UpdatePartnerOAuthClient(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	service.InvalidatePartnerServerSnapshot(client.ClientId)
 	recordPartnerOAuthAdminAudit(c, "partner_oauth.client.update", client.ClientId, []string{"name", "redirect_uris", "scopes"})
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": partnerOAuthClientToView(client, "")})
 }
@@ -285,6 +287,7 @@ func UpdatePartnerOAuthClientStatus(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	service.InvalidatePartnerServerSnapshot(client.ClientId)
 	action := "partner_oauth.client.enable"
 	if req.Status == model.PartnerOAuthClientStatusDisabled {
 		action = "partner_oauth.client.disable"
@@ -305,10 +308,15 @@ func DeletePartnerOAuthClient(c *gin.Context) {
 		return
 	}
 	revoked, err := model.DeletePartnerOAuthClient(client.ClientId)
+	if errors.Is(err, model.ErrPartnerOAuthClientHasAccounts) {
+		c.JSON(http.StatusConflict, gin.H{"success": false, "message": "this client still owns partner sub-accounts; disable it instead"})
+		return
+	}
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
+	service.InvalidatePartnerServerSnapshot(client.ClientId)
 	entries := make([]model.PartnerOauthAuthorizationLog, 0, len(revoked))
 	for _, binding := range revoked {
 		entries = append(entries, model.PartnerOauthAuthorizationLog{Action: "partner_oauth.binding.client_delete", Success: true,
