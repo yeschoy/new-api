@@ -91,16 +91,17 @@ func parsePartnerServerBasic(header string) (string, string, bool) {
 }
 
 type partnerServerConfigView struct {
-	ClientId          string                    `json:"client_id"`
-	Configured        bool                      `json:"configured"`
-	Enabled           bool                      `json:"enabled"`
-	AccountGroup      string                    `json:"account_group"`
-	IPAllowlist       []string                  `json:"ip_allowlist"`
-	MaxAccounts       int                       `json:"max_accounts"`
-	AccountsPerMinute int                       `json:"accounts_per_minute"`
-	Suspended         bool                      `json:"suspended"`
-	AccountCount      int64                     `json:"account_count"`
-	Secrets           []partnerServerSecretView `json:"secrets"`
+	ClientId          string                                      `json:"client_id"`
+	Configured        bool                                        `json:"configured"`
+	Enabled           bool                                        `json:"enabled"`
+	AccountGroup      string                                      `json:"account_group"`
+	IPAllowlist       []string                                    `json:"ip_allowlist"`
+	MaxAccounts       int                                         `json:"max_accounts"`
+	AccountsPerMinute int                                         `json:"accounts_per_minute"`
+	Suspended         bool                                        `json:"suspended"`
+	AccountCount      int64                                       `json:"account_count"`
+	Jobs              map[string]service.PartnerServerJobProgress `json:"jobs"`
+	Secrets           []partnerServerSecretView                   `json:"secrets"`
 }
 
 type partnerServerSecretView struct {
@@ -136,6 +137,10 @@ func buildPartnerServerConfigView(clientID string) (*partnerServerConfigView, er
 		view.MaxAccounts = config.MaxAccounts
 		view.AccountsPerMinute = config.AccountsPerMinute
 		view.Suspended = config.SuspendedAt != 0
+	}
+	view.Jobs = map[string]service.PartnerServerJobProgress{
+		service.PartnerServerJobSuspension:    service.GetPartnerServerJobProgress(service.PartnerServerJobSuspension, clientID),
+		service.PartnerServerJobKeyRevocation: service.GetPartnerServerJobProgress(service.PartnerServerJobKeyRevocation, clientID),
 	}
 	if view.AccountCount, err = model.CountPartnerAccounts(clientID); err != nil {
 		return nil, err
@@ -299,4 +304,75 @@ func RevokePartnerServerSecret(c *gin.Context) {
 		ActorUserId: c.GetInt("id"), ClientId: client.ClientId, Status: http.StatusOK})
 	recordPartnerOAuthAdminAudit(c, "partner_server.secret.revoke", client.ClientId, []string{"server_secret"})
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// RevokePartnerServerKeys disables every key of the partner's sub-accounts in
+// the background, for a partner secret suspected to be leaked. Accounts and
+// balances are untouched; the partner rotates to obtain new keys.
+func RevokePartnerServerKeys(c *gin.Context) {
+	client, ok := loadPartnerOAuthClientByParam(c)
+	if !ok {
+		return
+	}
+	if middleware.RequireSecurityProof(c, service.VerificationOperation{
+		Scope:   service.VerificationScopePartnerOAuthClientSensitiveWrite,
+		Context: mustPartnerOAuthProofContext(`{"action":"revoke_server_keys","client_id":"` + client.ClientId + `"}`),
+	}) == nil {
+		return
+	}
+	service.StartPartnerServerJob(service.PartnerServerJobKeyRevocation, client.ClientId)
+	model.RecordPartnerOAuthAuthorizationLog(c, model.PartnerOauthAuthorizationLog{Action: "partner_server.keys_revoke_all", Success: true,
+		ActorUserId: c.GetInt("id"), ClientId: client.ClientId, Status: http.StatusAccepted})
+	recordPartnerOAuthAdminAudit(c, "partner_server.keys.revoke_all", client.ClientId, nil)
+	c.JSON(http.StatusAccepted, gin.H{"success": true})
+}
+
+type partnerServerAccountAdminView struct {
+	Id                 int64  `json:"id"`
+	ExternalUserId     string `json:"external_user_id"`
+	UserId             int    `json:"user_id"`
+	Status             string `json:"status"`
+	SuspendedByPartner bool   `json:"suspended_by_partner"`
+	Quota              int    `json:"quota"`
+	UsedQuota          int    `json:"used_quota"`
+	CreatedAt          int64  `json:"created_at"`
+}
+
+func GetPartnerServerAccounts(c *gin.Context) {
+	client, ok := loadPartnerOAuthClientByParam(c)
+	if !ok {
+		return
+	}
+	pageInfo := common.GetPageQuery(c)
+	accounts, total, err := model.ListPartnerAccounts(client.ClientId, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	userIDs := make([]int, 0, len(accounts))
+	for _, account := range accounts {
+		userIDs = append(userIDs, account.UserId)
+	}
+	var users []model.User
+	if len(userIDs) > 0 {
+		if err := model.DB.Unscoped().Select("id", "quota", "used_quota").Where("id IN ?", userIDs).Find(&users).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
+	}
+	wallets := make(map[int]model.User, len(users))
+	for _, user := range users {
+		wallets[user.Id] = user
+	}
+	items := make([]partnerServerAccountAdminView, 0, len(accounts))
+	for _, account := range accounts {
+		wallet := wallets[account.UserId]
+		items = append(items, partnerServerAccountAdminView{
+			Id: account.Id, ExternalUserId: account.ExternalUserId, UserId: account.UserId, Status: account.Status,
+			SuspendedByPartner: account.SuspendedByPartner, Quota: wallet.Quota, UsedQuota: wallet.UsedQuota, CreatedAt: account.CreatedAt,
+		})
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(items)
+	common.ApiSuccess(c, pageInfo)
 }

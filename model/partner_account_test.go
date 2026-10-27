@@ -17,7 +17,7 @@ import (
 )
 
 var partnerAccountTestModels = []any{
-	&User{}, &UserSession{}, &UserAccessToken{}, &Token{}, &Log{}, &Option{},
+	&User{}, &UserSession{}, &UserAccessToken{}, &Token{}, &Log{}, &Option{}, &TwoFA{},
 	&TopUp{}, &CashbackOrderContext{}, &CashbackCampaign{}, &WalletRefundCreditEvent{},
 	&PartnerOAuthClient{}, &PartnerOAuthBinding{}, &PartnerOAuthToken{},
 	&PartnerServerConfig{}, &PartnerServerSecret{}, &PartnerServerToken{},
@@ -508,4 +508,15 @@ func TestDeletePartnerClientRefusedWhileItOwnsAccounts(t *testing.T) {
 	require.ErrorIs(t, err, ErrPartnerOAuthClientHasAccounts)
 	_, err = GetPartnerOAuthClientByClientID(client.ClientId)
 	require.NoError(t, err)
+}
+
+func TestTwoFAStatsLeaveOutPartnerSubAccounts(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	require.NoError(t, DB.Create(&User{Username: "regular-user", Password: "x", Status: common.UserStatusEnabled, AffCode: "regular", AuthVersion: 1}).Error)
+	_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	stats, err := GetTwoFAStats()
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, stats["total_users"], "sub-accounts can never enable 2FA")
 }

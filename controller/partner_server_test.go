@@ -23,6 +23,7 @@ import (
 var partnerServerTestModels = []any{
 	&model.PartnerServerConfig{}, &model.PartnerServerSecret{}, &model.PartnerServerToken{},
 	&model.PartnerAccount{}, &model.PartnerAccountPaymentOrder{},
+	&model.WalletRefundCreditEvent{}, &model.UserAccessToken{},
 }
 
 // setupPartnerServerController extends the partner OAuth test engine with a
@@ -39,6 +40,16 @@ func setupPartnerServerController(t *testing.T) *gin.Engine {
 	engine.GET("/api/partner/v1/limited", middleware.PartnerServerBearer(), middleware.PartnerServerRateLimit("PSV-TEST", 1, "partner_account.credential_rate_limited"), func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
+	// Mirrors router.SetPartnerServerRouter (router imports this package).
+	accounts := engine.Group("/api/partner/v1/accounts/:external_user_id", middleware.PartnerServerBearer())
+	accounts.GET("", PartnerServerGetAccount)
+	accounts.POST("/credential", PartnerServerIssueCredential)
+	accounts.POST("/credential/rotate", PartnerServerRotateCredential)
+	accounts.POST("/disable", PartnerServerDisableAccount)
+	accounts.POST("/enable", PartnerServerEnableAccount)
+	previousRunner := service.PartnerServerJobRunner
+	service.PartnerServerJobRunner = func(task func()) { task() }
+	t.Cleanup(func() { service.PartnerServerJobRunner = previousRunner })
 	return engine
 }
 
@@ -304,4 +315,188 @@ func TestPartnerServerAdminConfigAndSecrets(t *testing.T) {
 	require.Equal(t, http.StatusOK, revoked.Code, revoked.Body.String())
 	assert.Len(t, partnerServerLogs(t, "partner_server.secret_issue"), 2)
 	assert.Len(t, partnerServerLogs(t, "partner_server.secret_revoke"), 1)
+}
+
+const partnerServerTestUser = "kede-user-0000000000000000000000001"
+
+func partnerServerPost(engine http.Handler, path, token, body string, headers map[string]string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Host = "localhost:3000"
+	req.RemoteAddr = "203.0.113.10:40000"
+	req.Header.Set("Authorization", "Bearer "+token)
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	return rec
+}
+
+func decodePartnerCredential(t *testing.T, rec *httptest.ResponseRecorder) service.PartnerAccountCredentialView {
+	t.Helper()
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var view service.PartnerAccountCredentialView
+	require.NoError(t, common.Unmarshal(rec.Body.Bytes(), &view))
+	return view
+}
+
+func assertPartnerError(t *testing.T, rec *httptest.ResponseRecorder, status int, code string) {
+	t.Helper()
+	assert.Equal(t, status, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"code":"`+code+`"`)
+}
+
+func TestPartnerServerAccountLifecycle(t *testing.T) {
+	engine := setupPartnerServerController(t)
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	base := "/api/partner/v1/accounts/" + partnerServerTestUser
+
+	assertPartnerError(t, partnerServerGet(engine, base, token, "203.0.113.10"), http.StatusNotFound, "account_not_found")
+	assertPartnerError(t, partnerServerGet(engine, "/api/partner/v1/accounts/too-short", token, "203.0.113.10"), http.StatusBadRequest, "invalid_external_user_id")
+	count, err := model.CountPartnerAccounts(fixture.client.ClientId)
+	require.NoError(t, err)
+	assert.Zero(t, count, "lookups never create accounts")
+
+	assertPartnerError(t, partnerServerPost(engine, base+"/credential", token, `{"extra":1}`, nil), http.StatusBadRequest, "invalid_request")
+	first := decodePartnerCredential(t, partnerServerPost(engine, base+"/credential", token, "{}", nil))
+	assert.True(t, strings.HasPrefix(first.APIKey, "sk-"))
+	assert.Equal(t, "http://localhost:3000/v1", first.BaseURL)
+	assert.Equal(t, partnerServerTestUser, first.ExternalUserID)
+	again := decodePartnerCredential(t, partnerServerPost(engine, base+"/credential", token, "", nil))
+	assert.Equal(t, first.APIKey, again.APIKey, "the key can be fetched again")
+	assert.Len(t, partnerServerLogs(t, "partner_account.create"), 1)
+	assert.Len(t, partnerServerLogs(t, "partner_account.credential_issue"), 1)
+
+	account := partnerServerGet(engine, base, token, "203.0.113.10")
+	require.Equal(t, http.StatusOK, account.Code)
+	var view service.PartnerAccountView
+	require.NoError(t, common.Unmarshal(account.Body.Bytes(), &view))
+	assert.Equal(t, first.AccountID, view.AccountID)
+	assert.Zero(t, view.Quota)
+	assert.Equal(t, model.PartnerAccountStatusActive, view.Status)
+
+	other := seedPartnerServerFixture(t, "")
+	otherToken := issuePartnerServerTestToken(t, engine, other)
+	assertPartnerError(t, partnerServerGet(engine, base, otherToken, "203.0.113.10"), http.StatusNotFound, "account_not_found")
+}
+
+func TestPartnerServerRotationOverHTTP(t *testing.T) {
+	engine := setupPartnerServerController(t)
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	base := "/api/partner/v1/accounts/" + partnerServerTestUser
+	first := decodePartnerCredential(t, partnerServerPost(engine, base+"/credential", token, "{}", nil))
+
+	assertPartnerError(t, partnerServerPost(engine, base+"/credential/rotate", token, "{}", nil), http.StatusBadRequest, "invalid_request")
+	key := map[string]string{"Idempotency-Key": "rotate-0000000000000001"}
+	graced := decodePartnerCredential(t, partnerServerPost(engine, base+"/credential/rotate", token, "{}", key))
+	assert.NotEqual(t, first.APIKey, graced.APIKey)
+	require.NotNil(t, graced.OldKeyExpiresAt, "a graced rotation reports when the old key stops")
+	replay := decodePartnerCredential(t, partnerServerPost(engine, base+"/credential/rotate", token, "", key))
+	assert.Equal(t, graced.APIKey, replay.APIKey, "retrying with the same key does not rotate again")
+	assertPartnerError(t, partnerServerPost(engine, base+"/credential/rotate", token, `{"revoke_old":"immediately"}`, key), http.StatusConflict, "idempotency_conflict")
+	assertPartnerError(t, partnerServerPost(engine, base+"/credential/rotate", token, `{"revoke_old":"later"}`, map[string]string{"Idempotency-Key": "rotate-0000000000000002"}), http.StatusBadRequest, "invalid_request")
+
+	now := decodePartnerCredential(t, partnerServerPost(engine, base+"/credential/rotate", token, `{"revoke_old":"immediately"}`, map[string]string{"Idempotency-Key": "rotate-0000000000000003"}))
+	assert.Nil(t, now.OldKeyExpiresAt)
+	logs := partnerServerLogs(t, "partner_account.credential_rotate")
+	require.Len(t, logs, 2, "replays are not audited again")
+	assert.Equal(t, service.PartnerAccountRevokeAfterGrace, logs[0].Reason)
+	assert.Equal(t, service.PartnerAccountRevokeImmediately, logs[1].Reason)
+
+	assertPartnerError(t, partnerServerPost(engine, "/api/partner/v1/accounts/kede-unknown-00000000000000000000000/credential/rotate", token, "{}", map[string]string{"Idempotency-Key": "rotate-0000000000000004"}), http.StatusNotFound, "account_not_found")
+}
+
+func TestPartnerServerAccountDisableAndAdminPrecedence(t *testing.T) {
+	engine := setupPartnerServerController(t)
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	base := "/api/partner/v1/accounts/" + partnerServerTestUser
+	decodePartnerCredential(t, partnerServerPost(engine, base+"/credential", token, "{}", nil))
+	account, err := model.GetPartnerAccount(fixture.client.ClientId, partnerServerTestUser)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, partnerServerPost(engine, base+"/disable", token, "", nil).Code)
+	user, err := model.GetUserById(account.UserId, true)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusDisabled, user.Status)
+	assertPartnerError(t, partnerServerPost(engine, base+"/credential", token, "{}", nil), http.StatusForbidden, "account_disabled")
+
+	require.Equal(t, http.StatusOK, partnerServerPost(engine, base+"/enable", token, "", nil).Code)
+	decodePartnerCredential(t, partnerServerPost(engine, base+"/credential", token, "{}", nil))
+
+	require.NoError(t, model.SyncPartnerAccountAdminStatus(account.UserId, false))
+	assertPartnerError(t, partnerServerPost(engine, base+"/enable", token, "", nil), http.StatusForbidden, "account_disabled_by_admin")
+	assert.Len(t, partnerServerLogs(t, "partner_account.disable"), 1)
+	assert.Len(t, partnerServerLogs(t, "partner_account.enable"), 1)
+}
+
+func TestAdminCannotGivePartnerSubAccountAPassword(t *testing.T) {
+	engine := setupPartnerServerController(t)
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	decodePartnerCredential(t, partnerServerPost(engine, "/api/partner/v1/accounts/"+partnerServerTestUser+"/credential", token, "{}", nil))
+	account, err := model.GetPartnerAccount(fixture.client.ClientId, partnerServerTestUser)
+	require.NoError(t, err)
+	user, err := model.GetUserById(account.UserId, true)
+	require.NoError(t, err)
+
+	probe := model.User{Username: user.Username, Password: "any-password-1"}
+	assert.ErrorIs(t, probe.ValidateAndFill(), model.ErrInvalidCredentials, "password sign-in cannot reach a sub-account")
+
+	body := `{"id":` + strconv.Itoa(user.Id) + `,"username":"` + user.Username + `","password":"new-password-123","display_name":"x","group":"default"}`
+	ctx, rec := newAdminUpdateContext(t, body)
+	UpdateUser(ctx)
+	assert.Contains(t, rec.Body.String(), `"success":false`)
+	stored, err := model.GetUserById(user.Id, true)
+	require.NoError(t, err)
+	assert.Empty(t, stored.Password)
+}
+
+func newAdminUpdateContext(t *testing.T, body string) (*gin.Context, *httptest.ResponseRecorder) {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPut, "/api/user/", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Set("id", 1)
+	ctx.Set("role", common.RoleRootUser)
+	return ctx, rec
+}
+
+func TestPartnerSuspensionThroughClientStatus(t *testing.T) {
+	engine := setupPartnerOAuthAdminController(t)
+	require.NoError(t, model.DB.AutoMigrate(partnerServerTestModels...))
+	previousRunner := service.PartnerServerJobRunner
+	service.PartnerServerJobRunner = func(task func()) { task() }
+	t.Cleanup(func() { service.PartnerServerJobRunner = previousRunner })
+	root := createPartnerOAuthAdminActor(t, "partner-suspend-root", common.RoleRootUser)
+	fixture := seedPartnerServerFixture(t, "")
+	account, _, _, err := model.IssuePartnerAccountCredential(model.PartnerAccountOwner{ClientId: fixture.client.ClientId, ExternalUserId: partnerServerTestUser, DisplayName: "Kede"},
+		model.PartnerAccountKey{Key: strings.Repeat("k", 48), Name: "partner:Kede", AutoGroups: []string{"default"}})
+	require.NoError(t, err)
+
+	status := func(value int) {
+		rec := partnerOAuthAdminRequest(engine, http.MethodPost, "/api/partner-oauth/clients/"+strconv.FormatInt(fixture.client.Id, 10)+"/status", root.token, "", `{"status":`+strconv.Itoa(value)+`}`)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+	status(model.PartnerOAuthClientStatusDisabled)
+	user, err := model.GetUserById(account.UserId, true)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusDisabled, user.Status, "suspending the partner disables its sub-accounts")
+	config, err := model.GetPartnerServerConfig(fixture.client.ClientId)
+	require.NoError(t, err)
+	assert.NotZero(t, config.SuspendedAt)
+
+	status(model.PartnerOAuthClientStatusEnabled)
+	user, err = model.GetUserById(account.UserId, true)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusEnabled, user.Status, "resuming restores them")
+	assert.Len(t, partnerServerLogs(t, "partner_server.suspend"), 1)
+	assert.Len(t, partnerServerLogs(t, "partner_server.resume"), 1)
+	assert.Equal(t, service.PartnerServerJobProgress{Processed: 1}, service.GetPartnerServerJobProgress(service.PartnerServerJobSuspension, fixture.client.ClientId))
 }

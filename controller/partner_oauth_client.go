@@ -288,6 +288,7 @@ func UpdatePartnerOAuthClientStatus(c *gin.Context) {
 		return
 	}
 	service.InvalidatePartnerServerSnapshot(client.ClientId)
+	syncPartnerServerSuspension(c, client)
 	action := "partner_oauth.client.enable"
 	if req.Status == model.PartnerOAuthClientStatusDisabled {
 		action = "partner_oauth.client.disable"
@@ -384,4 +385,30 @@ func recordPartnerOAuthAdminAudit(c *gin.Context, action, clientID string, field
 		Other:     model.AuditOther{Op: &model.AuditOperation{Action: action, Params: params}},
 	})
 	markAuditLogged(c)
+}
+
+// syncPartnerServerSuspension suspends a disabled partner's server access and
+// sub-accounts, or resumes them when it is enabled again. The reconciliation
+// always runs, so repeating the status request also retries a job that
+// stopped early.
+func syncPartnerServerSuspension(c *gin.Context, client *model.PartnerOAuthClient) {
+	suspend := client.Status == model.PartnerOAuthClientStatusDisabled
+	changed, err := model.SetPartnerServerSuspended(client.ClientId, suspend)
+	if errors.Is(err, model.ErrPartnerServerConfigNotFound) {
+		return
+	}
+	if err != nil {
+		logger.LogError(c.Request.Context(), common.LogText("partner server suspension update failed client_id=%s: %s", client.ClientId, err.Error()))
+		return
+	}
+	service.InvalidatePartnerServerSnapshot(client.ClientId)
+	service.StartPartnerServerJob(service.PartnerServerJobSuspension, client.ClientId)
+	if changed {
+		action := "partner_server.resume"
+		if suspend {
+			action = "partner_server.suspend"
+		}
+		model.RecordPartnerOAuthAuthorizationLog(c, model.PartnerOauthAuthorizationLog{Action: action, Success: true,
+			ActorUserId: c.GetInt("id"), ClientId: client.ClientId, Status: http.StatusOK})
+	}
 }

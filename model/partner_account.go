@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
@@ -917,4 +918,25 @@ func GetPartnerAccountPaymentOrder(clientID, tradeNo string) (*PartnerAccountPay
 		return nil, nil, err
 	}
 	return &order, &topUp, nil
+}
+
+// ListPartnerServerClientsToReconcile returns partners whose sub-accounts may
+// not match their suspension state yet: suspended partners, and partners with
+// accounts still marked as suspended. It lets a restart finish interrupted
+// suspension and resume jobs.
+func ListPartnerServerClientsToReconcile() ([]string, error) {
+	var suspended []string
+	if err := DB.Model(&PartnerServerConfig{}).Where("suspended_at <> ?", 0).Pluck("client_id", &suspended).Error; err != nil {
+		return nil, err
+	}
+	var marked []string
+	if err := DB.Model(&PartnerAccount{}).Where("suspended_by_partner = ?", true).Distinct("client_id").Pluck("client_id", &marked).Error; err != nil {
+		return nil, err
+	}
+	for _, clientID := range marked {
+		if !slices.Contains(suspended, clientID) {
+			suspended = append(suspended, clientID)
+		}
+	}
+	return suspended, nil
 }

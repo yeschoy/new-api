@@ -715,6 +715,18 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 	updatePassword := updatedUser.Password != ""
+	if updatePassword {
+		// A partner sub-account has no password so no sign-in path can reach it.
+		isSubAccount, err := model.IsPartnerSubAccount(updatedUser.Id)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if isSubAccount {
+			common.ApiErrorT(c, "Partner sub-accounts cannot sign in, so they cannot have a password")
+			return
+		}
+	}
 	auditParams := map[string]any{
 		"username": originUser.Username,
 		"id":       updatedUser.Id,
@@ -1245,6 +1257,13 @@ func ManageUser(c *gin.Context) {
 		if err := user.Update(false); err != nil {
 			common.ApiError(c, err)
 			return
+		}
+	}
+	if req.Action == "disable" || req.Action == "enable" {
+		// Keep a partner from re-enabling, and a partner resume from
+		// restoring, an account an administrator disabled.
+		if err := model.SyncPartnerAccountAdminStatus(user.Id, req.Action == "enable"); err != nil {
+			common.SysLog(common.LogText("failed to record admin status of partner account user %d: %s", user.Id, err.Error()))
 		}
 	}
 	// Update/UpdateWithTx has already published the new user hash and revoked

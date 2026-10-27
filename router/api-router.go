@@ -285,6 +285,8 @@ func SetApiRouter(router *gin.Engine) {
 			handlePermissionRoute(partnerOAuthClientRoute, http.MethodPut, "/:id/server", authz.PartnerOAuthClientSensitiveWrite, controller.UpdatePartnerServerConfig)
 			handlePermissionRoute(partnerOAuthClientRoute, http.MethodPost, "/:id/server-secrets", authz.PartnerOAuthClientSensitiveWrite, controller.CreatePartnerServerSecret)
 			handlePermissionRoute(partnerOAuthClientRoute, http.MethodDelete, "/:id/server-secrets/:secret_id", authz.PartnerOAuthClientSensitiveWrite, controller.RevokePartnerServerSecret)
+			handlePermissionRoute(partnerOAuthClientRoute, http.MethodPost, "/:id/server-keys/revoke-all", authz.PartnerOAuthClientSensitiveWrite, controller.RevokePartnerServerKeys)
+			handlePermissionRoute(partnerOAuthClientRoute, http.MethodGet, "/:id/accounts", authz.PartnerOAuthClientRead, controller.GetPartnerServerAccounts)
 		}
 
 		// Custom OAuth provider management (root only)
