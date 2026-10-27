@@ -940,3 +940,35 @@ func ListPartnerServerClientsToReconcile() ([]string, error) {
 	}
 	return suspended, nil
 }
+
+// PartnerAccountUsage is one consume-log entry as a partner may see it. It
+// carries no request content, IP, channel or internal billing detail.
+type PartnerAccountUsage struct {
+	CreatedAt        int64  `json:"created_at"`
+	ModelName        string `json:"model_name"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	Quota            int    `json:"quota"`
+	UseTime          int    `json:"use_time"`
+	IsStream         bool   `json:"is_stream"`
+	RequestId        string `json:"request_id"`
+}
+
+// ListPartnerAccountUsage pages a sub-account's consume logs in
+// [startTime, endTime], newest first. It fetches one extra row to report
+// whether more follow instead of counting the whole range.
+func ListPartnerAccountUsage(userID int, startTime, endTime int64, offset, limit int) ([]PartnerAccountUsage, bool, error) {
+	var rows []PartnerAccountUsage
+	err := LOG_DB.Model(&Log{}).
+		Select("created_at", "model_name", "prompt_tokens", "completion_tokens", "quota", "use_time", "is_stream", "request_id").
+		Where("user_id = ? AND type = ? AND created_at >= ? AND created_at <= ?", userID, LogTypeConsume, startTime, endTime).
+		Order("id desc").Offset(offset).Limit(limit + 1).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, false, err
+	}
+	if len(rows) > limit {
+		return rows[:limit], true, nil
+	}
+	return rows, false, nil
+}

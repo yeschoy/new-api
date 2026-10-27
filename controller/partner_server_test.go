@@ -27,7 +27,7 @@ import (
 var partnerServerTestModels = []any{
 	&model.PartnerServerConfig{}, &model.PartnerServerSecret{}, &model.PartnerServerToken{},
 	&model.PartnerAccount{}, &model.PartnerAccountPaymentOrder{},
-	&model.WalletRefundCreditEvent{}, &model.UserAccessToken{},
+	&model.WalletRefundCreditEvent{}, &model.UserAccessToken{}, &model.Log{},
 }
 
 // setupPartnerServerController extends the partner OAuth test engine with a
@@ -51,6 +51,7 @@ func setupPartnerServerController(t *testing.T) *gin.Engine {
 	accounts.POST("/credential/rotate", PartnerServerRotateCredential)
 	accounts.POST("/disable", PartnerServerDisableAccount)
 	accounts.POST("/enable", PartnerServerEnableAccount)
+	accounts.GET("/usage", PartnerServerAccountUsage)
 	previousRunner := service.PartnerServerJobRunner
 	service.PartnerServerJobRunner = func(task func()) { task() }
 	t.Cleanup(func() { service.PartnerServerJobRunner = previousRunner })
@@ -704,4 +705,49 @@ func TestPartnerServerPaymentOrderValidation(t *testing.T) {
 	count, err := model.CountPartnerAccounts(fixture.client.ClientId)
 	require.NoError(t, err)
 	assert.Zero(t, count, "a rejected order creates no account")
+}
+
+func TestPartnerServerAccountUsage(t *testing.T) {
+	engine := setupPartnerServerController(t)
+	fixture := seedPartnerServerFixture(t, "")
+	token := issuePartnerServerTestToken(t, engine, fixture)
+	base := "/api/partner/v1/accounts/" + partnerServerTestUser + "/usage"
+	assertPartnerError(t, partnerServerGet(engine, base, token, "203.0.113.10"), http.StatusNotFound, "account_not_found")
+
+	decodePartnerCredential(t, partnerServerPost(engine, "/api/partner/v1/accounts/"+partnerServerTestUser+"/credential", token, "{}", nil))
+	account, err := model.GetPartnerAccount(fixture.client.ClientId, partnerServerTestUser)
+	require.NoError(t, err)
+	now := common.GetTimestamp()
+	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: account.UserId, Type: model.LogTypeConsume, CreatedAt: now - 60, ModelName: "gpt-x",
+		Quota: 42, Ip: "203.0.113.9", Content: "secret prompt", Other: `{"admin_info":{}}`, ChannelId: 3, RequestId: "req-usage"}).Error)
+
+	ok := partnerServerGet(engine, base, token, "203.0.113.10")
+	require.Equal(t, http.StatusOK, ok.Code, ok.Body.String())
+	var body struct {
+		Items   []map[string]any `json:"items"`
+		HasMore bool             `json:"has_more"`
+	}
+	require.NoError(t, json.Unmarshal(ok.Body.Bytes(), &body))
+	require.Len(t, body.Items, 1)
+	assert.Equal(t, "gpt-x", body.Items[0]["model_name"])
+	for _, hidden := range []string{"ip", "content", "other", "channel", "group", "token_name", "user_id"} {
+		assert.NotContains(t, body.Items[0], hidden)
+	}
+	assert.NotContains(t, ok.Body.String(), "secret prompt")
+
+	day := int64(24 * 60 * 60)
+	for name, query := range map[string]string{
+		"span over 31 days":  "?start_time=" + strconv.FormatInt(now-32*day, 10) + "&end_time=" + strconv.FormatInt(now, 10),
+		"older than 90 days": "?start_time=" + strconv.FormatInt(now-91*day, 10) + "&end_time=" + strconv.FormatInt(now-90*day+60, 10),
+		"reversed range":     "?start_time=" + strconv.FormatInt(now, 10) + "&end_time=" + strconv.FormatInt(now-60, 10),
+		"unknown parameter":  "?model=gpt-x",
+		"repeated parameter": "?page=1&page=2",
+		"page size too big":  "?page_size=101",
+		"page too deep":      "?page=101&page_size=100",
+		"not a number":       "?page=one",
+	} {
+		t.Run(name, func(t *testing.T) {
+			assertPartnerError(t, partnerServerGet(engine, base+query, token, "203.0.113.10"), http.StatusBadRequest, "invalid_request")
+		})
+	}
 }

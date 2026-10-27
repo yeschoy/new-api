@@ -520,3 +520,33 @@ func TestTwoFAStatsLeaveOutPartnerSubAccounts(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, stats["total_users"], "sub-accounts can never enable 2FA")
 }
+
+func TestPartnerAccountUsageIsScopedBoundedAndPaged(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	now := common.GetTimestamp()
+	logs := []Log{
+		{UserId: account.UserId, Type: LogTypeConsume, CreatedAt: now - 30, ModelName: "gpt-a", PromptTokens: 10, CompletionTokens: 5, Quota: 100, Ip: "203.0.113.9", Content: "secret prompt", Other: `{"admin_info":{}}`, ChannelId: 7, RequestId: "req-1"},
+		{UserId: account.UserId, Type: LogTypeConsume, CreatedAt: now - 20, ModelName: "gpt-b", Quota: 200, RequestId: "req-2"},
+		{UserId: account.UserId, Type: LogTypeConsume, CreatedAt: now - 10, ModelName: "gpt-c", Quota: 300, RequestId: "req-3"},
+		{UserId: account.UserId, Type: LogTypeTopup, CreatedAt: now - 5, Quota: 999},
+		{UserId: account.UserId, Type: LogTypeConsume, CreatedAt: now - 100000, ModelName: "too-old", Quota: 1},
+		{UserId: account.UserId + 1000, Type: LogTypeConsume, CreatedAt: now - 15, ModelName: "someone-else", Quota: 1},
+	}
+	require.NoError(t, LOG_DB.Create(&logs).Error)
+
+	page, more, err := ListPartnerAccountUsage(account.UserId, now-3600, now, 0, 2)
+	require.NoError(t, err)
+	assert.True(t, more)
+	require.Len(t, page, 2)
+	assert.Equal(t, "gpt-c", page[0].ModelName, "newest first")
+	assert.Equal(t, "gpt-b", page[1].ModelName)
+	last, more, err := ListPartnerAccountUsage(account.UserId, now-3600, now, 2, 2)
+	require.NoError(t, err)
+	assert.False(t, more)
+	require.Len(t, last, 1)
+	assert.Equal(t, PartnerAccountUsage{CreatedAt: now - 30, ModelName: "gpt-a", PromptTokens: 10, CompletionTokens: 5, Quota: 100, RequestId: "req-1"}, last[0],
+		"only allowlisted columns, no top-ups, other users or out-of-range rows")
+}

@@ -24,6 +24,7 @@ func SetPartnerServerRouter(router *gin.Engine) {
 		accounts.POST("/disable", controller.PartnerServerDisableAccount)
 		accounts.POST("/enable", controller.PartnerServerEnableAccount)
 		accounts.POST("/payment/orders", controller.PartnerServerCreatePaymentOrder)
+		accounts.GET("/usage", middleware.PartnerServerRateLimit("PSV-USAGE", middleware.PartnerServerUsageRateLimit, ""), controller.PartnerServerAccountUsage)
 	}
 	partner.GET("/payment/options", middleware.PartnerServerBearer(), controller.PartnerServerPaymentOptions)
 	partner.GET("/payment/orders/:order_id", middleware.PartnerServerBearer(), controller.PartnerServerGetPaymentOrder)
