@@ -308,7 +308,41 @@ GET /api/partner/v1/accounts/{eid}/usage?start_time=&end_time=&page=1&page_size=
 - 修改后需要通过“主动删除缓存”来生效的数据，用 `HybridCache`，这样以后扩成多实例也能正确失效（AGENTS §1）；
 - 纯进程内缓存只用于**永不变化**的数据，多实例下也不会读到旧值。
 
-### 10.1 要缓存的
+### 10.0 首期范围（2026-10-28 用户确认）
+
+**首期只做“合作方快照”。** §10.1 表中的其他几项（服务端访问令牌、子账号映射、已付款订单）留到后续按需要再做；§10.3 列出的现有缓存失效是正确性要求，首期必须做。
+
+合作方快照是一个对象，按 `client_id` 存在 `HybridCache` 中，有效期 60 秒：
+
+| 字段 | 来源 | 用途 |
+|---|---|---|
+| `client_id`、`name` | `partner_oauth_clients` | 识别合作方；`name` 用于给新 Key 命名 |
+| `client_enabled` | `partner_oauth_clients.status` | client 被停用时拒绝所有服务端请求 |
+| `server_enabled` | `partner_server_configs.enabled` | 服务端接入开关 |
+| `suspended` | `partner_server_configs.suspended_at != 0` | 合作方停用中，拒绝所有服务端请求 |
+| `account_group` | `partner_server_configs.account_group` | 计算付款方式的价格（`/payment/options`） |
+| `ip_allowlist` | `partner_server_configs.ip_allowlist`，预先解析成 CIDR 列表 | 每个请求的 IP 白名单检查 |
+| `active_secret_ids` | `partner_server_secrets` 中 `status=active` 的 ID 列表（**不含哈希**） | 判断令牌是不是由仍然有效的密钥签发的 |
+
+**快照里没有的：**
+- 密钥哈希。换令牌时的密钥校验总是直接查数据库。
+- `max_accounts`、`accounts_per_minute`，以及开户时使用的 `account_group`。开户在事务里锁住配置行后直接读数据库，以数据库为准，快照只用于鉴权和展示。
+- 令牌、子账号、订单的任何数据。
+
+**读取位置：** `PartnerServerBearer` 每个请求先按哈希查令牌（数据库），再从快照判断：令牌的 `secret_id` 是否在 `active_secret_ids` 中、client 和服务端接入是否启用、是否处于停用状态、IP 是否在白名单内。`POST /oauth/token` 的 `client_credentials` 分支频率很低，全部查数据库，不读快照。
+
+**主动删除（在数据库事务提交之后）：**
+- 编辑合作方（名称、状态）；
+- 修改服务端配置（开关、分组、白名单、上限）；
+- 签发或吊销服务端密钥；
+- 停用或恢复合作方；
+- 删除合作方。
+
+删除失败只记录服务端日志，靠 60 秒有效期兜底。所以安全相关的变更（吊销密钥、停用）最坏 60 秒后生效。这个上限写进契约。
+
+**收益：** 鉴权阶段的数据库查询从每个请求 4 次（令牌、密钥、client、配置）降到 1 次（令牌）。
+
+### 10.1 要缓存的（完整清单；首期只做第一行，其余后续再做）
 
 | 数据 | 缓存方式 | 有效期 | 失效时机 | 理由 |
 |---|---|---|---|---|
