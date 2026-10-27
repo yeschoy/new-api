@@ -550,3 +550,26 @@ func TestPartnerAccountUsageIsScopedBoundedAndPaged(t *testing.T) {
 	assert.Equal(t, PartnerAccountUsage{CreatedAt: now - 30, ModelName: "gpt-a", PromptTokens: 10, CompletionTokens: 5, Quota: 100, RequestId: "req-1"}, last[0],
 		"only allowlisted columns, no top-ups, other users or out-of-range rows")
 }
+
+func TestUserListShowsAndFiltersPartnerOwners(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	regular := &User{Username: "regular-user", Password: "x", Status: common.UserStatusEnabled, AffCode: "regular", AuthVersion: 1}
+	require.NoError(t, DB.Create(regular).Error)
+	account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+
+	owners, err := PartnerAccountOwners([]int{regular.Id, account.UserId})
+	require.NoError(t, err)
+	assert.NotContains(t, owners, regular.Id)
+	assert.Equal(t, client.ClientId, owners[account.UserId].ClientId)
+	assert.Equal(t, client.Name, owners[account.UserId].Name)
+
+	users, total, err := SearchUsers("", "", nil, nil, client.ClientId, 0, 10)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, total)
+	assert.Equal(t, account.UserId, users[0].Id)
+	_, all, err := SearchUsers("", "", nil, nil, "", 0, 10)
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, all)
+}

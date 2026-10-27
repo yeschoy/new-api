@@ -972,3 +972,37 @@ func ListPartnerAccountUsage(userID int, startTime, endTime int64, offset, limit
 	}
 	return rows, false, nil
 }
+
+// PartnerAccountOwners maps sub-account user IDs to their partner's client ID
+// and name; users that are not sub-accounts are absent.
+func PartnerAccountOwners(userIDs []int) (map[int]PartnerOAuthClient, error) {
+	owners := map[int]PartnerOAuthClient{}
+	if len(userIDs) == 0 {
+		return owners, nil
+	}
+	var accounts []PartnerAccount
+	if err := DB.Select("user_id", "client_id").Where("user_id IN ?", userIDs).Find(&accounts).Error; err != nil {
+		return nil, err
+	}
+	if len(accounts) == 0 {
+		return owners, nil
+	}
+	clientIDs := make([]string, 0, len(accounts))
+	for _, account := range accounts {
+		if !slices.Contains(clientIDs, account.ClientId) {
+			clientIDs = append(clientIDs, account.ClientId)
+		}
+	}
+	var clients []PartnerOAuthClient
+	if err := DB.Select("client_id", "name").Where("client_id IN ?", clientIDs).Find(&clients).Error; err != nil {
+		return nil, err
+	}
+	names := make(map[string]string, len(clients))
+	for _, client := range clients {
+		names[client.ClientId] = client.Name
+	}
+	for _, account := range accounts {
+		owners[account.UserId] = PartnerOAuthClient{ClientId: account.ClientId, Name: names[account.ClientId]}
+	}
+	return owners, nil
+}

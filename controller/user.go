@@ -378,11 +378,41 @@ func GetAllUsers(c *gin.Context) {
 		return
 	}
 
+	items, err := withPartnerAccountOwners(users)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(users)
+	pageInfo.SetItems(items)
 
 	common.ApiSuccess(c, pageInfo)
 	return
+}
+
+// adminUserListItem is a listed user plus, for partner sub-accounts, the
+// partner that owns it.
+type adminUserListItem struct {
+	*model.User
+	PartnerClientId   string `json:"partner_client_id,omitempty"`
+	PartnerClientName string `json:"partner_client_name,omitempty"`
+}
+
+func withPartnerAccountOwners(users []*model.User) ([]adminUserListItem, error) {
+	ids := make([]int, 0, len(users))
+	for _, user := range users {
+		ids = append(ids, user.Id)
+	}
+	owners, err := model.PartnerAccountOwners(ids)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]adminUserListItem, 0, len(users))
+	for _, user := range users {
+		owner := owners[user.Id]
+		items = append(items, adminUserListItem{User: user, PartnerClientId: owner.ClientId, PartnerClientName: owner.Name})
+	}
+	return items, nil
 }
 
 func SearchUsers(c *gin.Context) {
@@ -402,14 +432,18 @@ func SearchUsers(c *gin.Context) {
 	}
 	pageInfo := common.GetPageQuery(c)
 	sortOptions := model.NewUserSortOptions(c.Query("sort_by"), c.Query("sort_order"))
-	users, total, err := model.SearchUsers(keyword, group, role, status, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), sortOptions)
+	users, total, err := model.SearchUsers(keyword, group, role, status, c.Query("partner_client_id"), pageInfo.GetStartIdx(), pageInfo.GetPageSize(), sortOptions)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-
+	items, err := withPartnerAccountOwners(users)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(users)
+	pageInfo.SetItems(items)
 	common.ApiSuccess(c, pageInfo)
 	return
 }
