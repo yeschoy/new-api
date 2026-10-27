@@ -117,7 +117,7 @@
 ## 阶段 8：契约与文档
 
 - [ ] 新建 `.trellis/spec/backend/partner-server-accounts.md`；在 `partner-oauth.md` 中补充 scope 隔离与交叉引用。
-- [ ] 对外接入文档按 Q14 的决定处理（未经同意不在 `docs/` 新建文件）。
+- [ ] 新建对外接入文档 `docs/partner-server-api.md`（D24），风格与 `docs/partner-oauth-api.md` 一致：换令牌、自动开户、领取与轮换 Key、充值二维码、轮询到账、消耗明细、错误码、限流。并在 `docs/partner-oauth-api.md` 开头加一句指向它的说明。
 - 提交：`docs(spec): record the partner server accounts contract`
 
 ## 上线（需要用户操作或同意）

@@ -278,7 +278,8 @@ GET /api/partner/v1/accounts/{eid}/usage?start_time=&end_time=&page=1&page_size=
 
 - 合作方编辑页新增“服务端接入”区块，包括：启用开关、专用分组下拉框（选项来自 `GroupRatio`）、IP 白名单、子账号上限、每分钟开户上限；密钥列表（签发后只展示一次，可以吊销）。复用现有的合作方表单和 secret 展示组件。
 - 新增"子账号"列表：按合作方筛选，显示 `external_user_id`、用户 ID、状态、余额、创建时间；支持管理员停用和恢复。
-- 用户列表给子账号加"合作方子账号"标记，并支持按合作方筛选（Q12）。
+- 用户列表给子账号加"合作方子账号"标记，并支持按合作方筛选（D23）。
+- 2FA 统计（`GetTwoFAStats`，[model/twofa.go:339](../../../model/twofa.go)）的总用户数排除 `partner_accounts` 中的用户（D23）。
 - 文案按七种语言提供 i18n。
 
 ## 9. 安全对照（OWASP）
