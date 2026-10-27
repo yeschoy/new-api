@@ -1,0 +1,511 @@
+package model
+
+import (
+	"fmt"
+	"os"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+var partnerAccountTestModels = []any{
+	&User{}, &UserSession{}, &UserAccessToken{}, &Token{}, &Log{}, &Option{},
+	&TopUp{}, &CashbackOrderContext{}, &CashbackCampaign{}, &WalletRefundCreditEvent{},
+	&PartnerOAuthClient{}, &PartnerOAuthBinding{}, &PartnerOAuthToken{},
+	&PartnerServerConfig{}, &PartnerServerSecret{}, &PartnerServerToken{},
+	&PartnerAccount{}, &PartnerAccountPaymentOrder{},
+}
+
+// usePartnerAccountTestDB points the package at a fresh database for one test.
+// With TEST_POSTGRES_DSN it creates a throwaway PostgreSQL schema (these
+// models fix their table names, so a table prefix would not isolate them);
+// otherwise it uses an in-memory SQLite database. Migration runs twice to
+// prove it is repeatable on the engine under test.
+func usePartnerAccountTestDB(t *testing.T) common.DatabaseType {
+	t.Helper()
+	dsn := os.Getenv("TEST_POSTGRES_DSN")
+	dbType := common.DatabaseTypeSQLite
+	var db *gorm.DB
+	var err error
+	if dsn == "" {
+		db, err = gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		sqlDB.SetMaxOpenConns(1)
+	} else {
+		dbType = common.DatabaseTypePostgreSQL
+		admin, err := gorm.Open(postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true}), &gorm.Config{})
+		require.NoError(t, err)
+		schema := fmt.Sprintf("pa_%d", time.Now().UnixNano())
+		require.NoError(t, admin.Exec("CREATE SCHEMA "+schema).Error)
+		t.Cleanup(func() {
+			admin.Exec("DROP SCHEMA " + schema + " CASCADE")
+			if sqlDB, err := admin.DB(); err == nil {
+				_ = sqlDB.Close()
+			}
+		})
+		db, err = gorm.Open(postgres.New(postgres.Config{DSN: dsn + " search_path=" + schema, PreferSimpleProtocol: true}), &gorm.Config{})
+		require.NoError(t, err)
+		var version string
+		require.NoError(t, db.Raw("SHOW server_version").Scan(&version).Error)
+		t.Logf("database: postgres %s", version)
+	}
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+
+	oldDB, oldLogDB := DB, LOG_DB
+	oldMain, oldLog := common.MainDatabaseType(), common.LogDatabaseType()
+	oldRedis, oldNewUserQuota := common.RedisEnabled, common.QuotaForNewUser
+	DB, LOG_DB = db, db
+	common.SetDatabaseTypes(dbType, dbType)
+	common.RedisEnabled = false
+	initCol()
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+		DB, LOG_DB = oldDB, oldLogDB
+		common.SetDatabaseTypes(oldMain, oldLog)
+		common.RedisEnabled = oldRedis
+		common.QuotaForNewUser = oldNewUserQuota
+		initCol()
+	})
+	require.NoError(t, db.AutoMigrate(partnerAccountTestModels...))
+	require.NoError(t, db.AutoMigrate(partnerAccountTestModels...))
+	return dbType
+}
+
+func seedPartnerServer(t *testing.T, mutate func(*PartnerServerConfig)) *PartnerOAuthClient {
+	t.Helper()
+	client := &PartnerOAuthClient{
+		Name:            "Kede Finance",
+		TokenAuthMethod: PartnerOAuthTokenAuthMethodBasic,
+		SecretHash:      HashPartnerOAuthSecret("pcs_example"),
+		RedirectURIs:    `["https://partner.example.com/oauth/callback"]`,
+		Scopes:          "account:read",
+		Status:          PartnerOAuthClientStatusEnabled,
+	}
+	require.NoError(t, CreatePartnerOAuthClient(client))
+	config := &PartnerServerConfig{
+		ClientId:          client.ClientId,
+		Enabled:           true,
+		AccountGroup:      "partner_kede",
+		MaxAccounts:       PartnerServerDefaultMaxAccounts,
+		AccountsPerMinute: PartnerServerDefaultAccountsPerMinute,
+	}
+	if mutate != nil {
+		mutate(config)
+	}
+	require.NoError(t, SavePartnerServerConfig(config))
+	return client
+}
+
+func partnerOwner(client *PartnerOAuthClient, externalUserID string) PartnerAccountOwner {
+	return PartnerAccountOwner{ClientId: client.ClientId, ExternalUserId: externalUserID, DisplayName: client.Name}
+}
+
+func partnerKey(t *testing.T) PartnerAccountKey {
+	t.Helper()
+	key, err := common.GenerateKey()
+	require.NoError(t, err)
+	return PartnerAccountKey{Key: key, Name: "partner:Kede Finance", AutoGroups: []string{"partner_kede", "default"}}
+}
+
+func partnerHash(value string) string {
+	return HashPartnerExternalUserID(value)
+}
+
+const partnerTestUserID = "kede-user-0000000000000000000000001"
+
+func TestPartnerAccountFirstUseCreatesBareSubAccountAndOneKey(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	common.QuotaForNewUser = 500
+	client := seedPartnerServer(t, nil)
+
+	_, err := GetPartnerAccount(client.ClientId, partnerTestUserID)
+	require.ErrorIs(t, err, ErrPartnerAccountNotFound)
+	count, err := CountPartnerAccounts(client.ClientId)
+	require.NoError(t, err)
+	assert.Zero(t, count, "a lookup must not create an account")
+
+	account, token, created, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	assert.True(t, created)
+	again, sameToken, createdAgain, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	assert.False(t, createdAgain)
+	assert.Equal(t, account.Id, again.Id)
+	assert.Equal(t, token.Key, sameToken.Key)
+
+	var user User
+	require.NoError(t, DB.First(&user, account.UserId).Error)
+	assert.True(t, strings.HasPrefix(user.Username, "pa_"))
+	assert.LessOrEqual(t, len(user.Username), 20)
+	assert.Empty(t, user.Password)
+	assert.Empty(t, user.Email)
+	assert.Zero(t, user.Quota, "sub-accounts get no sign-up bonus")
+	assert.Zero(t, user.InviterId)
+	assert.Equal(t, "partner_kede", user.Group)
+	assert.Len(t, user.AffCode, 16)
+
+	var events []WalletRefundCreditEvent
+	require.NoError(t, DB.Where("user_id = ?", user.Id).Find(&events).Error)
+	require.Len(t, events, 1)
+	assert.Equal(t, walletRefundOpening, events[0].Kind)
+	assert.Equal(t, "registration", events[0].SourceType)
+	assert.Zero(t, events[0].Quota)
+	var logs int64
+	require.NoError(t, DB.Model(&Log{}).Where("user_id = ?", user.Id).Count(&logs).Error)
+	assert.Zero(t, logs, "no sign-up bonus log")
+
+	assert.True(t, token.UnlimitedQuota)
+	assert.Equal(t, int64(-1), token.ExpiredTime)
+	assert.Equal(t, "auto", token.Group)
+	groups, err := token.GetAutoGroups()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"partner_kede", "default"}, groups)
+
+	other, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, strings.ToUpper(partnerTestUserID)), partnerKey(t))
+	require.NoError(t, err)
+	assert.NotEqual(t, account.Id, other.Id, "external IDs are case-sensitive")
+}
+
+func TestPartnerAccountCreationGuards(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*PartnerServerConfig)
+		seed   int
+		want   error
+	}{
+		{name: "server access disabled", mutate: func(c *PartnerServerConfig) { c.Enabled = false }, want: ErrPartnerServerUnavailable},
+		{name: "account cap reached", mutate: func(c *PartnerServerConfig) { c.MaxAccounts = 1 }, seed: 1, want: ErrPartnerAccountLimit},
+		{name: "creation rate reached", mutate: func(c *PartnerServerConfig) { c.AccountsPerMinute = 1 }, seed: 1, want: ErrPartnerAccountRateLimited},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			usePartnerAccountTestDB(t)
+			client := seedPartnerServer(t, tt.mutate)
+			for i := range tt.seed {
+				_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, fmt.Sprintf("kede-seed-%030d", i)), partnerKey(t))
+				require.NoError(t, err)
+			}
+			_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+			require.ErrorIs(t, err, tt.want)
+			count, err := CountPartnerAccounts(client.ClientId)
+			require.NoError(t, err)
+			assert.Equal(t, int64(tt.seed), count)
+			var users int64
+			require.NoError(t, DB.Model(&User{}).Count(&users).Error)
+			assert.Equal(t, int64(tt.seed), users, "a refused creation leaves no user behind")
+		})
+	}
+
+	t.Run("suspended partner", func(t *testing.T) {
+		usePartnerAccountTestDB(t)
+		client := seedPartnerServer(t, nil)
+		_, err := SetPartnerServerSuspended(client.ClientId, true)
+		require.NoError(t, err)
+		_, _, _, err = IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+		require.ErrorIs(t, err, ErrPartnerServerUnavailable)
+	})
+}
+
+func TestPartnerAccountConcurrentFirstUseCreatesOneAccount(t *testing.T) {
+	if usePartnerAccountTestDB(t) != common.DatabaseTypePostgreSQL {
+		t.Skip("row-lock concurrency needs TEST_POSTGRES_DSN")
+	}
+	client := seedPartnerServer(t, nil)
+	var wg sync.WaitGroup
+	keys := make([]string, 8)
+	errs := make([]error, 8)
+	for i := range 8 {
+		wg.Go(func() {
+			_, token, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+			errs[i] = err
+			if token != nil {
+				keys[i] = token.Key
+			}
+		})
+	}
+	wg.Wait()
+	for i := range errs {
+		require.NoError(t, errs[i])
+		assert.Equal(t, keys[0], keys[i])
+	}
+	var accounts, users, tokens int64
+	require.NoError(t, DB.Model(&PartnerAccount{}).Count(&accounts).Error)
+	require.NoError(t, DB.Model(&User{}).Count(&users).Error)
+	require.NoError(t, DB.Model(&Token{}).Count(&tokens).Error)
+	assert.Equal(t, []int64{1, 1, 1}, []int64{accounts, users, tokens})
+}
+
+func rotation(t *testing.T, key string, immediately bool) PartnerAccountRotation {
+	t.Helper()
+	mode := "after_grace"
+	if immediately {
+		mode = "immediately"
+	}
+	return PartnerAccountRotation{KeyHash: partnerHash(key), RequestHash: partnerHash(mode), Immediately: immediately, Key: partnerKey(t)}
+}
+
+func loadToken(t *testing.T, id int) Token {
+	t.Helper()
+	var token Token
+	require.NoError(t, DB.Unscoped().First(&token, id).Error)
+	return token
+}
+
+func TestPartnerAccountRotation(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	_, first, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+
+	before := common.GetTimestamp()
+	graced, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-1", false))
+	require.NoError(t, err)
+	assert.NotEqual(t, first.Key, graced.Token.Key)
+	old := loadToken(t, first.Id)
+	assert.Equal(t, common.TokenStatusEnabled, old.Status, "a graced key keeps working")
+	assert.GreaterOrEqual(t, old.ExpiredTime, before+PartnerAccountKeyGraceSeconds)
+	assert.Equal(t, old.ExpiredTime, graced.OldKeyExpiresAt)
+
+	replay, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-1", false))
+	require.NoError(t, err)
+	assert.True(t, replay.Replayed)
+	assert.Equal(t, graced.Token.Key, replay.Token.Key, "a retried rotation returns the key it issued")
+
+	conflict := rotation(t, "rotate-1", true)
+	_, err = RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, conflict)
+	require.ErrorIs(t, err, ErrPartnerAccountIdempotencyConflict)
+
+	second, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-2", false))
+	require.NoError(t, err)
+	assert.Equal(t, common.TokenStatusDisabled, loadToken(t, first.Id).Status, "the key still in grace is disabled, so at most two keys work")
+	assert.Equal(t, common.TokenStatusEnabled, loadToken(t, graced.Token.Id).Status)
+
+	immediate, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-3", true))
+	require.NoError(t, err)
+	assert.Zero(t, immediate.OldKeyExpiresAt)
+	assert.Equal(t, common.TokenStatusDisabled, loadToken(t, second.Token.Id).Status)
+	assert.Equal(t, common.TokenStatusDisabled, loadToken(t, graced.Token.Id).Status)
+	assert.Equal(t, common.TokenStatusEnabled, loadToken(t, immediate.Token.Id).Status)
+
+	_, err = RotatePartnerAccountCredential(client.ClientId, "kede-unknown-00000000000000000000000", rotation(t, "rotate-4", true))
+	require.ErrorIs(t, err, ErrPartnerAccountNotFound, "rotation never creates an account")
+}
+
+func userStatus(t *testing.T, id int) int {
+	t.Helper()
+	var user User
+	require.NoError(t, DB.Unscoped().Select("status").First(&user, id).Error)
+	return user.Status
+}
+
+func TestPartnerAccountStatusChanges(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+
+	_, changed, err := SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, false)
+	require.NoError(t, err)
+	assert.Equal(t, []int{account.UserId}, changed)
+	assert.Equal(t, common.UserStatusDisabled, userStatus(t, account.UserId))
+	_, _, _, err = IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.ErrorIs(t, err, ErrPartnerAccountInactive)
+
+	_, changed, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, true)
+	require.NoError(t, err)
+	assert.Equal(t, []int{account.UserId}, changed)
+	assert.Equal(t, common.UserStatusEnabled, userStatus(t, account.UserId))
+
+	require.NoError(t, SyncPartnerAccountAdminStatus(account.UserId, false))
+	_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, true)
+	require.ErrorIs(t, err, ErrPartnerAccountAdminDisabled, "a partner cannot undo an administrator's disable")
+	require.NoError(t, SyncPartnerAccountAdminStatus(-1, false), "non sub-accounts are ignored")
+}
+
+func runSuspension(t *testing.T, clientID string) {
+	t.Helper()
+	var after int64
+	for {
+		batch, err := ReconcilePartnerAccountSuspensionBatch(clientID, after, 2)
+		require.NoError(t, err)
+		after = batch.LastId
+		if batch.Done {
+			return
+		}
+	}
+}
+
+func TestPartnerAccountSuspensionRestoresOnlyWhatItDisabled(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	ids := map[string]int{}
+	for _, name := range []string{"active", "partner-off", "admin-off"} {
+		eid := "kede-" + name + strings.Repeat("0", 32-len(name))
+		account, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, eid), partnerKey(t))
+		require.NoError(t, err)
+		ids[name] = account.UserId
+		switch name {
+		case "partner-off":
+			_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, eid, false)
+			require.NoError(t, err)
+		case "admin-off":
+			require.NoError(t, DB.Model(&User{}).Where("id = ?", account.UserId).Update("status", common.UserStatusDisabled).Error)
+			require.NoError(t, SyncPartnerAccountAdminStatus(account.UserId, false))
+		}
+	}
+
+	_, err := SetPartnerServerSuspended(client.ClientId, true)
+	require.NoError(t, err)
+	runSuspension(t, client.ClientId)
+	for name, id := range ids {
+		assert.Equal(t, common.UserStatusDisabled, userStatus(t, id), name)
+	}
+	// Enabling an account while suspended keeps its user disabled until resume.
+	_, changed, err := SetPartnerAccountEnabledByPartner(client.ClientId, "kede-partner-off"+strings.Repeat("0", 21), true)
+	require.NoError(t, err)
+	assert.Empty(t, changed)
+	assert.Equal(t, common.UserStatusDisabled, userStatus(t, ids["partner-off"]))
+
+	_, err = SetPartnerServerSuspended(client.ClientId, false)
+	require.NoError(t, err)
+	runSuspension(t, client.ClientId)
+	assert.Equal(t, common.UserStatusEnabled, userStatus(t, ids["active"]))
+	assert.Equal(t, common.UserStatusEnabled, userStatus(t, ids["partner-off"]), "enabled during suspension")
+	assert.Equal(t, common.UserStatusDisabled, userStatus(t, ids["admin-off"]), "an administrator's disable survives resume")
+}
+
+func TestPartnerAccountRevokeAllKeys(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	_, first, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	graced, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-1", false))
+	require.NoError(t, err)
+
+	batch, err := RevokePartnerAccountKeysBatch(client.ClientId, 0, 100)
+	require.NoError(t, err)
+	assert.True(t, batch.Done)
+	assert.Equal(t, common.TokenStatusDisabled, loadToken(t, first.Id).Status)
+	assert.Equal(t, common.TokenStatusDisabled, loadToken(t, graced.Token.Id).Status)
+
+	_, _, _, err = IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.ErrorIs(t, err, ErrPartnerAccountCredentialDisabled, "a revoked key is never silently replaced")
+	fresh, err := RotatePartnerAccountCredential(client.ClientId, partnerTestUserID, rotation(t, "rotate-2", true))
+	require.NoError(t, err)
+	assert.Equal(t, common.TokenStatusEnabled, loadToken(t, fresh.Token.Id).Status)
+	_, current, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	assert.Equal(t, fresh.Token.Key, current.Key)
+}
+
+func partnerOrderInput(client *PartnerOAuthClient, externalUserID, key string) PartnerAccountPaymentOrderInput {
+	return PartnerAccountPaymentOrderInput{
+		Owner:              partnerOwner(client, externalUserID),
+		IdempotencyKeyHash: partnerHash(key),
+		RequestHash:        partnerHash("10|alipay"),
+		RequestedAmount:    10,
+		StoredAmount:       10,
+		Money:              70,
+		PaymentMethod:      "alipay",
+		PaymentProvider:    PaymentProviderEpay,
+		CreditedQuota:      5_000_000,
+		BaseQuota:          5_000_000,
+		Metadata:           CashbackRequestMetadata{FaceAmount: 10, QuotaPerFaceUnit: "500000", RequestIP: "203.0.113.9"},
+	}
+}
+
+func partnerOrderLimits(maxPending int64) PartnerAccountPaymentLimits {
+	now := common.GetTimestamp()
+	return PartnerAccountPaymentLimits{
+		AccountRecentSince: now - 3600, AccountMaxRecent: 20,
+		AccountPendingSince: now - 1800, AccountMaxPending: maxPending,
+		ClientRecentSince: now - 3600, ClientMaxRecent: 2000,
+	}
+}
+
+func TestPartnerAccountPaymentOrders(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+
+	order, topUp, err := CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-1"), partnerOrderLimits(5))
+	require.NoError(t, err)
+	account, err := GetPartnerAccount(client.ClientId, partnerTestUserID)
+	require.NoError(t, err, "the order created the sub-account")
+	assert.Equal(t, account.UserId, topUp.UserId)
+	assert.Equal(t, common.TopUpStatusPending, topUp.Status)
+	assert.Equal(t, topUp.Id, order.TopUpId)
+
+	var context CashbackOrderContext
+	require.NoError(t, DB.Where("top_up_id = ?", topUp.Id).First(&context).Error)
+	assert.Equal(t, CashbackIneligiblePartnerOAuth, context.IneligibleReason)
+	assert.Empty(t, context.RequestIP, "the partner server's address is not payer evidence")
+
+	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-1"), partnerOrderLimits(5))
+	require.ErrorIs(t, err, ErrPartnerAccountPaymentIdempotencyRace)
+	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, "kede-other-00000000000000000000000000", "order-key-1"), partnerOrderLimits(5))
+	require.ErrorIs(t, err, ErrPartnerAccountPaymentIdempotencyRace, "keys are scoped to the partner, not the account")
+
+	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-2"), partnerOrderLimits(1))
+	require.ErrorIs(t, err, ErrPartnerAccountPaymentRateLimited)
+
+	require.NoError(t, SetPartnerAccountPaymentCheckout(order.Id, "https://qr.example/abc", ""))
+	stored, _, err := FindPartnerAccountPaymentOrderByIdempotency(client.ClientId, partnerHash("order-key-1"))
+	require.NoError(t, err)
+	assert.Equal(t, "https://qr.example/abc", stored.QRCode)
+
+	_, _, err = GetPartnerAccountPaymentOrder(client.ClientId, topUp.TradeNo)
+	require.NoError(t, err)
+	other := seedPartnerServer(t, nil)
+	_, _, err = GetPartnerAccountPaymentOrder(other.ClientId, topUp.TradeNo)
+	require.ErrorIs(t, err, ErrPartnerAccountPaymentOrderNotFound)
+
+	_, _, err = SetPartnerAccountEnabledByPartner(client.ClientId, partnerTestUserID, false)
+	require.NoError(t, err)
+	_, _, err = CreatePartnerAccountPaymentOrder(partnerOrderInput(client, partnerTestUserID, "order-key-3"), partnerOrderLimits(5))
+	require.ErrorIs(t, err, ErrPartnerAccountInactive)
+}
+
+func TestPartnerServerSecretsAndTokens(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	first, err := CreatePartnerServerSecret(client.ClientId, partnerHash("pss_one"))
+	require.NoError(t, err)
+	_, err = CreatePartnerServerSecret(client.ClientId, partnerHash("pss_two"))
+	require.NoError(t, err)
+	_, err = CreatePartnerServerSecret(client.ClientId, partnerHash("pss_three"))
+	require.ErrorIs(t, err, ErrPartnerServerSecretLimit)
+
+	token := &PartnerServerToken{TokenHash: partnerHash("pst_one"), ClientId: client.ClientId, SecretId: first.Id, ExpiresAt: common.GetTimestamp() + 3600}
+	require.NoError(t, CreatePartnerServerToken(token))
+	require.NoError(t, RevokePartnerServerSecret(client.ClientId, first.Id))
+	_, err = FindPartnerServerToken(partnerHash("pst_one"))
+	require.ErrorIs(t, err, ErrPartnerServerTokenNotFound, "revoking a secret deletes its tokens")
+	err = CreatePartnerServerToken(&PartnerServerToken{TokenHash: partnerHash("pst_two"), ClientId: client.ClientId, SecretId: first.Id, ExpiresAt: common.GetTimestamp() + 3600})
+	require.ErrorIs(t, err, ErrPartnerServerSecretNotFound)
+	_, err = CreatePartnerServerSecret(client.ClientId, partnerHash("pss_three"))
+	require.NoError(t, err, "a revoked secret frees its slot")
+
+	require.NoError(t, RevokePartnerServerSecret(client.ClientId, first.Id), "revoking twice is a no-op")
+}
+
+func TestDeletePartnerClientRefusedWhileItOwnsAccounts(t *testing.T) {
+	usePartnerAccountTestDB(t)
+	client := seedPartnerServer(t, nil)
+	_, _, _, err := IssuePartnerAccountCredential(partnerOwner(client, partnerTestUserID), partnerKey(t))
+	require.NoError(t, err)
+	_, err = DeletePartnerOAuthClient(client.ClientId)
+	require.ErrorIs(t, err, ErrPartnerOAuthClientHasAccounts)
+	_, err = GetPartnerOAuthClientByClientID(client.ClientId)
+	require.NoError(t, err)
+}

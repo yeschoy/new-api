@@ -391,6 +391,11 @@ func migrateDB() error {
 		&PartnerOAuthBinding{},
 		&PartnerOAuthToken{},
 		&PartnerOAuthPaymentOrder{},
+		&PartnerServerConfig{},
+		&PartnerServerSecret{},
+		&PartnerServerToken{},
+		&PartnerAccount{},
+		&PartnerAccountPaymentOrder{},
 		&UserAccessToken{},
 	)
 	if err != nil {
