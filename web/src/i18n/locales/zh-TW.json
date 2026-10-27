@@ -7226,6 +7226,7 @@
     "socks5://user:pass@host:port": "socks5://user:pass@host:port",
     "Soft Errors": "軟錯誤",
     "Solo or teams of up to 4": "個人或最多 4 人組隊",
+    "Accommodation at your own expense": "住宿需自費",
     "Some billing routes could not be checked. Retry to see all available routes.": "部分計費路由無法檢查，請重試以查看所有可用路由。",
     "Some channels failed: {{errorMsg}}": "部分渠道失敗：{{errorMsg}}",
     "Some files could not be deleted ({{failed}}/{{total}})": "部分檔案刪除失敗（{{failed}}/{{total}}）",

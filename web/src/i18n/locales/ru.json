@@ -7226,6 +7226,7 @@
     "socks5://user:pass@host:port": "socks5://user:pass@host:port",
     "Soft Errors": "Мягкие ошибки",
     "Solo or teams of up to 4": "Соло или команда до 4 человек",
+    "Accommodation at your own expense": "Проживание за свой счёт",
     "Some billing routes could not be checked. Retry to see all available routes.": "Не удалось проверить некоторые маршруты тарификации. Повторите попытку, чтобы увидеть все доступные маршруты.",
     "Some channels failed: {{errorMsg}}": "Некоторые каналы не удались: {{errorMsg}}",
     "Some files could not be deleted ({{failed}}/{{total}})": "Не удалось удалить некоторые файлы ({{failed}}/{{total}})",
