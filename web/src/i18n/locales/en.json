@@ -7238,6 +7238,7 @@
     "socks5://user:pass@host:port": "socks5://user:pass@host:port",
     "Soft Errors": "Soft Errors",
     "Solo or teams of up to 4": "Solo or teams of up to 4",
+    "Accommodation at your own expense": "Accommodation at your own expense",
     "Some billing routes could not be checked. Retry to see all available routes.": "Some billing routes could not be checked. Retry to see all available routes.",
     "Some channels failed: {{errorMsg}}": "Some channels failed: {{errorMsg}}",
     "Some files could not be deleted ({{failed}}/{{total}})": "Some files could not be deleted ({{failed}}/{{total}})",

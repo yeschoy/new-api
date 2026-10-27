@@ -7226,6 +7226,7 @@
     "socks5://user:pass@host:port": "socks5://user:pass@host:port",
     "Soft Errors": "Erreurs douces",
     "Solo or teams of up to 4": "En solo ou en équipe de 4 maximum",
+    "Accommodation at your own expense": "Hébergement à vos frais",
     "Some billing routes could not be checked. Retry to see all available routes.": "Certaines routes de facturation n’ont pas pu être vérifiées. Réessayez pour afficher toutes les routes disponibles.",
     "Some channels failed: {{errorMsg}}": "Certains canaux ont échoué : {{errorMsg}}",
     "Some files could not be deleted ({{failed}}/{{total}})": "Certains fichiers n'ont pas pu être supprimés ({{failed}}/{{total}})",

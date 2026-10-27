@@ -7226,6 +7226,7 @@
     "socks5://user:pass@host:port": "socks5://user:pass@host:port",
     "Soft Errors": "Lỗi mềm",
     "Solo or teams of up to 4": "Cá nhân hoặc đội tối đa 4 người",
+    "Accommodation at your own expense": "Tự chi trả chỗ ở",
     "Some billing routes could not be checked. Retry to see all available routes.": "Không thể kiểm tra một số tuyến tính phí. Hãy thử lại để xem mọi tuyến khả dụng.",
     "Some channels failed: {{errorMsg}}": "Một số kênh thất bại: {{errorMsg}}",
     "Some files could not be deleted ({{failed}}/{{total}})": "Không thể xóa một số tệp ({{failed}}/{{total}})",

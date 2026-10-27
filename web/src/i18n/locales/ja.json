@@ -7226,6 +7226,7 @@
     "socks5://user:pass@host:port": "socks5://user:pass@host:port",
     "Soft Errors": "ソフトエラー",
     "Solo or teams of up to 4": "個人または最大 4 人のチーム",
+    "Accommodation at your own expense": "宿泊費は自己負担",
     "Some billing routes could not be checked. Retry to see all available routes.": "一部の課金ルートを確認できませんでした。再試行して利用可能なルートをすべて表示してください。",
     "Some channels failed: {{errorMsg}}": "一部のチャネルが失敗しました：{{errorMsg}}",
     "Some files could not be deleted ({{failed}}/{{total}})": "一部のファイルを削除できませんでした（{{failed}}/{{total}}）",
