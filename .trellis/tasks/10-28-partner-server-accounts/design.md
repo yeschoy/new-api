@@ -252,7 +252,7 @@ grant_type=client_credentials&scope=partner:accounts
    - 把结果写回订单关联行，然后返回 201。
 5. ZPay 调用失败时返回 `503 payment_unavailable`，订单保持 pending、没有二维码。合作方用同一个 Key 重试时，会对这笔订单重新调用 `mapi.php`。
 
-   如果 ZPay 报订单号重复（第一次其实成功了但响应丢失），仍然返回 503，并在错误说明里要求换一个新 Key 重新下单；这笔订单一直不付款，不影响任何钱。这种情况由 Q16 联调确认 ZPay 的实际行为。
+   第一次其实成功但响应丢失时，ZPay 对同一订单号会返回同一笔订单（`O_id` 不变）和新的支付宝链接，不报重复（Q16 联调确认），所以重试直接拿到二维码。
 6. 入账：完全沿用 `EpayNotify` → `rechargeEpayWithSource`，不改。
 
 出站调用约束（L5）：

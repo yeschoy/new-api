@@ -204,7 +204,7 @@ Idempotency-Key: {每次新的充值意图生成一个新值}
   "payment_method": "alipay",
   "created_at": "2026-10-28T08:00:00Z",
   "external_user_id": "3f2b8c1e9a4d4e7fb6a1c0d2e5f70819",
-  "qr_code": "weixin://wxpay/bizpayurl?pr=abc"
+  "qr_code": "https://qr.alipay.com/bax00000000000000000000"
 }
 ```
 

@@ -94,6 +94,7 @@
   - 模拟 notify 回调后：订单查询为 `success`、余额增加、没有产生返现、有 `ineligible_reason=partner_oauth`；
   - 查询其他合作方的订单返回 404。
 - **评审关口 A（需要用户同意）：** 用生产 ZPay 商户号对 `mapi.php` 发一笔小额测试订单（Q16），确认 alipay 和 wxpay 各自返回哪些字段。不付款，ZPay 那边的订单保持未支付。根据结果调整字段处理逻辑。
+  - 已完成（2026-10-28，用户同意）：alipay 返回 `qrcode`/`payurl` 为支付宝链接，同订单号重试返回同一订单；无需改代码。生产未开 wxpay，未验证。详见 PRD Resolved。
 - 提交：`feat(partner): create sub-account top-ups with ZPay QR codes`
 
 ## 阶段 5：消耗明细与审计
