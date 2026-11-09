@@ -233,3 +233,39 @@ Implemented administrator-configured prompts, concrete group/model targets, inte
 ### Next Steps
 
 - Push iq-test branch to origin; request consent before deleting inventoried temporary outputs. Keep Trellis logs and default-disabled schedules.
+
+
+## Session 8: Fix PostgreSQL IQ migration startup failure
+<!-- trellis-session: v=2 fp=cf15d62472654cd7 -->
+
+**Date**: 2026-11-09
+**Task**: Fix PostgreSQL IQ migration startup failure
+**Branch**: `iq-test`
+
+### Summary
+
+Confirmed production deployment failed on introduced iq_configs.targets varchar(16777215), SQLSTATE 22023. Replaced size inference with portable text mapping and added a required PostgreSQL check before image build/deployment. User prioritizes PostgreSQL; real isolated PostgreSQL 15.19 migration, repeat migration, config round trip and full application startup/health passed. No production mutation or main merge.
+
+### Main Changes
+
+- Fix IQTargets JSON column mapping; record PostgreSQL-first acceptance and the actual production incident.
+- Add a PostgreSQL 15 service/regression gate to the deployment workflow before build and deploy.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2089840ad` | fix(iq-tests): prevent PostgreSQL migration startup failure |
+
+### Testing
+
+- [OK] Actual PostgreSQL 15.19 rejects the legacy varchar with 22023; fixed TEXT migration/repeat and exact JSON/prompt round trip pass in a verified isolated schema.
+- [OK] Native application build passes, full PostgreSQL-backed startup succeeds, and /api/status returns success=true. Workflow YAML/dependency checks pass.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Push only iq-test. Main merge/deployment needs owner authorization; temporary local PG resources remain inventoried for approved cleanup.
