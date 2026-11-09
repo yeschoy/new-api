@@ -44,6 +44,10 @@ The controller owns orchestration to avoid a service/controller import cycle.
   also replace/remove old artwork. Cleanup touches only IQ artwork, not generic
   tasks/audits. Private snapshots/checkpoints retain operational metadata, not
   user-facing artwork history. Use MySQL MEDIUMTEXT, SQLite/PostgreSQL TEXT.
+  JSON `IQConfig.Targets` uses `IQTargets.GormDBDataType`, delegating to IQText;
+  never replace this with `size:16777215`. The PostgreSQL dialect emits
+  varchar(16777215) for that tag, exceeding its 10485760 varchar limit and
+  fatally blocking application startup even though SQLite tests pass.
 - Every data read requires authentication and current usable-group membership;
   administrators see configured groups. Protect direct artifact IDs identically.
   Return private/no-store JSON, never executable same-origin HTML. List/task
@@ -73,6 +77,18 @@ The controller owns orchestration to avoid a service/controller import cycle.
 
 ## 6. Tests Required
 
+- `model/iq_schema_test.go`: PostgreSQL is the deployment gate. Set
+  TEST_POSTGRES_DSN to a disposable PostgreSQL service and run
+  `go test ./model -run '^TestIQPostgresMigrationAndConfigRoundTrip$' -count=1`.
+  The test creates and verifies a unique search_path schema, reproduces the
+  old SQLSTATE 22023, applies/repeats migrations, checks targets is TEXT, and
+  verifies exact prompt/JSON configuration persistence. It never uses public
+  schema for fixture writes. A missing DSN skips local tests, NOT CI acceptance.
+- `.github/workflows/yeschoy-deploy.yml` requires the PostgreSQL 15 service/test
+  job before building images; deployment still requires that build. Never
+  replace this with a manual production migration check.
+- Supplementary dialect-only checks assert targets/prompt/snapshot/artifact
+  resolve to TEXT or MEDIUMTEXT. They are not a live migration/startup check.
 - `model/iq_config_test.go`: deterministic calendar/bounds, optimistic edits,
   duplicate enqueue/checkpoints, latest replacement, lease recovery and cadence.
 - `controller/iq_tests_test.go`: mocked call counts, exact prompt, group routing,

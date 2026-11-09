@@ -46,20 +46,29 @@ type IQTarget struct {
 	Group  string   `json:"group"`
 	Models []string `json:"models"`
 }
+
+// IQTargets preserves JSON serialization while selecting a portable large-text
+// column. A large size tag would become an invalid varchar(N) on PostgreSQL.
+type IQTargets []IQTarget
+
+func (IQTargets) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	return IQText("").GormDBDataType(db, field)
+}
+
 type IQConfig struct {
-	ID            int        `json:"-" gorm:"primaryKey;autoIncrement:false"`
-	Version       int64      `json:"version"`
-	Prompt        IQText     `json:"prompt"`
-	Targets       []IQTarget `json:"targets" gorm:"serializer:json;size:16777215"`
-	Enabled       bool       `json:"enabled"`
-	ScheduleMode  string     `json:"schedule_mode"`
-	IntervalHours int        `json:"interval_hours"`
-	DailyTime     string     `json:"daily_time"`
-	Timezone      string     `json:"timezone"`
-	NextRunAt     int64      `json:"next_run_at"`
-	UpdatedAt     int64      `json:"updated_at"`
-	UpdatedBy     int        `json:"updated_by"`
-	DispatchSeq   int64      `json:"-"`
+	ID            int       `json:"-" gorm:"primaryKey;autoIncrement:false"`
+	Version       int64     `json:"version"`
+	Prompt        IQText    `json:"prompt"`
+	Targets       IQTargets `json:"targets" gorm:"serializer:json"`
+	Enabled       bool      `json:"enabled"`
+	ScheduleMode  string    `json:"schedule_mode"`
+	IntervalHours int       `json:"interval_hours"`
+	DailyTime     string    `json:"daily_time"`
+	Timezone      string    `json:"timezone"`
+	NextRunAt     int64     `json:"next_run_at"`
+	UpdatedAt     int64     `json:"updated_at"`
+	UpdatedBy     int       `json:"updated_by"`
+	DispatchSeq   int64     `json:"-"`
 }
 
 // No artwork or prompt snapshot belongs in SystemTask's publicly listed bodies.

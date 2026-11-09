@@ -30,9 +30,31 @@ Questions to answer:
 
 ## Migrations
 
-<!-- How to create and run migrations -->
+### PostgreSQL is the deployment acceptance target
 
-(To be filled by the team)
+The user explicitly prioritizes PostgreSQL (also called "pq") for this site.
+Do not substitute SQLite success or a MySQL/SQLite compatibility matrix for
+PostgreSQL validation, or expand unrelated database testing without a reason.
+Preserve existing shared-driver support; this priority is not permission to
+remove it.
+
+- Inspect the PostgreSQL DDL produced by the actual GORM dialect. JSON
+  serialization does not imply a TEXT/JSON column: `serializer:json;size:16777215`
+  produces `varchar(16777215)`, exceeding PostgreSQL's 10485760 varchar limit.
+  Use an explicit text type or the established GormDBDataType implementation.
+- Before declaring a schema change ready for deployment, apply the affected
+  migration to an isolated test PostgreSQL database and verify the relevant
+  persistence path. Check upgrade behavior when changing an existing column.
+- Dialect-only regression tests are useful but are not a live PostgreSQL
+  migration/startup check. SQLite round trips cannot enforce PostgreSQL limits.
+- If a PostgreSQL test service is unavailable, report that exact verification
+  gap. Never label the migration, application startup, or production recovery
+  verified based only on another database, compilation or an image build.
+- Never use production DDL, destructive resets, restarts or deployment retries
+  as an unapproved substitute for isolated verification.
+
+Incident reference: IQ targets caused SQLSTATE 22023 and fatal startup migration
+failure after merge; see `model/iq_schema_test.go` and `group-iq-tests.md`.
 
 ---
 
