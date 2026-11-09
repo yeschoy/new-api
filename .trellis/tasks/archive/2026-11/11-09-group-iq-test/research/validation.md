@@ -135,6 +135,65 @@ provider-specific live acceptance (notably Codex output-cap rejection), and a
 cross-browser/device matrix. These are explicitly outside this focused local
 verification budget and are not represented as passing tests.
 
+## Post-Merge Production Incident: PostgreSQL Targets Type
+
+Deployment run `42628586857`, job `129200814278`, merged main commit
+`7c37f20c529ad6dc2940144edac4939558dd743b`: Docker image build succeeded,
+but application startup failed during migration. The introduced Targets tag
+`serializer:json;size:16777215` generated `iq_configs.targets varchar(16777215)`.
+PostgreSQL rejects varchar lengths above 10485760 (SQLSTATE 22023), causing
+repeated fatal initialization exits and the deployment health-check timeout.
+This was an introduced code defect, not CI infrastructure flakiness. The prior
+structural portability review was insufficient; SQLite did not expose it.
+
+Local hotfix: use a named IQTargets slice with GormDBDataType delegated to the
+existing IQText portable large-text implementation; keep JSON serialization and
+API shape unchanged. Add `model/iq_schema_test.go` to check all four large IQ
+columns through real PostgreSQL/MySQL/SQLite migration type resolvers without
+network/database connections. Reproduced the PostgreSQL regression as a failing
+assertion (`text` expected, `varchar(16777215)` actual) before the fix.
+
+After the fix:
+- `GOTOOLCHAIN=auto go test ./model ./controller ./router -run 'TestIQ' -count=1` PASSED.
+- `GOTOOLCHAIN=auto go test ./model -run 'TestIQSchemaPortableTextColumns' -count=1 -v`
+  PASSED: PostgreSQL/SQLite use text and MySQL uses mediumtext for targets,
+  prompt, snapshot and artifact.
+- `git diff --check` PASSED.
+
+The user then requested PostgreSQL-only acceptance and authorized repair.
+Real isolated PostgreSQL 15.19 validation was subsequently completed:
+- Docker Desktop was initially stopped. A local PostgreSQL container remained
+  Created through bounded startup attempts; no container/server success was
+  inferred. No further Docker start retries were made.
+- Downloaded the native darwin-arm64v8 PostgreSQL 15.19 package from Maven
+  Central (io.zonky.test.postgres); verified its published SHA-256 checksum.
+  Started a fresh loopback-only cluster with synthetic fixture data.
+- Added `TestIQPostgresMigrationAndConfigRoundTrip`. With TEST_POSTGRES_DSN
+  pointing only to that local cluster, it PASSED against the actual server:
+  old varchar rejected with SQLSTATE 22023; fresh/repeated migration succeeds;
+  information_schema confirms targets=text; exact prompt/JSON config survives.
+  It checks current_schema before any fixture migration and overrides existing
+  URI search_path values, keeping fixture writes out of public schema.
+- Ran the exact targeted Go test with both keyword DSN and, after adding the
+  URI isolation guard, URI DSN containing search_path=public; both PASSED.
+- `GOTOOLCHAIN=auto CGO_ENABLED=0 go build -o .local-tests/iq-postgres-hotfix/new-api .`
+  PASSED. Launched that actual application with a fresh environment/local DB.
+  Startup logged using PostgreSQL, database migration started, then New API
+  started. Its real /api/status returned success=true. No production data or
+  provider credentials were present.
+- Added a PostgreSQL 15 service/regression job to the deployment workflow;
+  image build depends on its success, and deploy still depends on build.
+  Parsed the YAML with the installed yaml package and verified that dependency
+  chain. No unrelated frontend/database suites were rerun.
+- Stopped the isolated application and native PostgreSQL cleanly. The never-
+  started Docker container, volume and scratch artifacts are inventoried in
+  .iq-postgres-hotfix-temp-artifacts.md, retained for cleanup approval.
+
+No production SSH/DDL, rollback, restart, main merge or deployment rerun was
+performed. Real local PostgreSQL startup is proven, not production recovery.
+Repair is committed/pushed only to iq-test; main deployment needs explicit
+owner authorization. The new remote workflow has not yet run on main.
+
 ## Commit Plan
 
 One cohesive work commit: `feat(iq-tests): add scheduled group artwork tests`.

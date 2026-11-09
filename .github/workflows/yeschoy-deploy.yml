@@ -25,12 +25,44 @@ env:
 
 jobs:
 
+  verify-postgres:
+    name: Verify PostgreSQL Migration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: iq_test
+          POSTGRES_PASSWORD: iq_ci_fixture_only
+          POSTGRES_DB: iq_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U iq_test -d iq_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify IQ migration and configuration on PostgreSQL
+        env:
+          TEST_POSTGRES_DSN: "host=127.0.0.1 port=5432 user=iq_test password=iq_ci_fixture_only dbname=iq_test sslmode=disable"
+        run: go test ./model -run '^TestIQPostgresMigrationAndConfigRoundTrip$' -count=1 -v
+
   # ============================================================
   # 1. 构建并推送 Docker 镜像
   # ============================================================
 
   build:
     name: Build Docker Image
+    needs: verify-postgres
     runs-on: ubuntu-latest
 
     steps:
