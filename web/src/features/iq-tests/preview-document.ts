@@ -83,6 +83,7 @@ export function buildIQPreviewDocument(artifact: string): string {
 
   // HTML template parsing ignores document-level tags. Preserve common scene
   // styling/language attributes using inert parsing, never raw interpolation.
+  let htmlAttributes: [string, string][] = []
   function sceneAttributes(tag: 'html' | 'body'): string {
     const attributes = artifact.match(
       new RegExp(`<${tag}\\b([^>]*)>`, 'i')
@@ -98,9 +99,18 @@ export function buildIQPreviewDocument(artifact: string): string {
         safe.setAttribute(name, element.getAttribute(name) ?? '')
       }
     }
+    if (tag === 'html') {
+      htmlAttributes = safe
+        .getAttributeNames()
+        .map((name) => [name, safe.getAttribute(name) ?? ''])
+    }
     return safe.outerHTML.slice(4, -7)
   }
+  sceneAttributes('html')
+  const applyHTMLAttributes = htmlAttributes.length
+    ? `<script>for(const [name,value] of ${JSON.stringify(htmlAttributes).replaceAll('<', '\\u003c')})document.documentElement.setAttribute(name,value)</script>`
+    : ''
 
   // The trusted policy precedes ALL model-controlled attributes and markup.
-  return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${IQ_PREVIEW_CSP}"><meta name="referrer" content="no-referrer"><style>html,body{margin:0;min-height:100%;}svg{max-width:100%;}</style></head><body${sceneAttributes('body')}><div${sceneAttributes('html')}>${template.innerHTML}</div></body></html>`
+  return `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${IQ_PREVIEW_CSP}"><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;min-height:100%;}svg{max-width:100%;}</style>${applyHTMLAttributes}</head><body${sceneAttributes('body')}>${template.innerHTML}</body></html>`
 }

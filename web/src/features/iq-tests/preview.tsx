@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ErrorState } from '@/components/error-state'
@@ -50,18 +50,56 @@ export function IQPreview(props: {
       />
     )
   }
+  const title = t('Artwork by {{model}}', { model: props.result.model })
+  if (!props.expanded) return <IQThumbnail srcDoc={srcDoc} title={title} />
   return (
     <iframe
-      title={t('Artwork by {{model}}', { model: props.result.model })}
+      title={title}
       sandbox={IQ_PREVIEW_SANDBOX}
       referrerPolicy='no-referrer'
       srcDoc={srcDoc}
-      tabIndex={props.expanded ? 0 : -1}
-      className={
-        props.expanded
-          ? 'h-[65dvh] w-full border-0 bg-white'
-          : 'pointer-events-none h-64 w-full border-0 bg-white'
-      }
+      className='h-[65dvh] w-full border-0 bg-white'
     />
+  )
+}
+
+// Render at a desktop viewport, then scale the whole scene. Giving the artwork
+// the card's narrow viewport breaks fixed-width scenes, vh layouts and typography.
+function IQThumbnail(props: { srcDoc: string; title: string }) {
+  const container = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(320)
+  useEffect(() => {
+    const element = container.current
+    if (!element) return
+    const measure = () => {
+      const next = element.getBoundingClientRect().width
+      if (next > 0) setWidth(next)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  return (
+    <div
+      ref={container}
+      className='relative aspect-[4/3] w-full overflow-hidden'
+    >
+      <iframe
+        title={props.title}
+        sandbox={IQ_PREVIEW_SANDBOX}
+        referrerPolicy='no-referrer'
+        srcDoc={props.srcDoc}
+        tabIndex={-1}
+        className='pointer-events-none absolute top-0 left-0 border-0 bg-white'
+        style={{
+          width: 1280,
+          height: 960,
+          transform: `scale(${width / 1280})`,
+          transformOrigin: 'top left',
+        }}
+      />
+    </div>
   )
 }

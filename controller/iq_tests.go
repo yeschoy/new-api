@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -115,7 +116,16 @@ func iqError(c *gin.Context, status int, message string) {
 	c.JSON(status, gin.H{"success": false, "message": message, "data": nil})
 }
 func GetIQConfig(c *gin.Context) {
-	cfg, err := model.GetIQConfig()
+	if c.Query("list") == "true" {
+		configs, err := model.ListIQConfigs()
+		if err != nil {
+			iqError(c, 500, "Unable to load IQ configuration")
+			return
+		}
+		iqOK(c, gin.H{"tasks": configs, "default_prompt": model.IQDefaultPrompt})
+		return
+	}
+	cfg, err := model.GetIQGroupConfig(c.Query("group"))
 	if err != nil {
 		iqError(c, 500, "Unable to load IQ configuration")
 		return
@@ -123,13 +133,17 @@ func GetIQConfig(c *gin.Context) {
 	iqOK(c, cfg)
 }
 func PutIQConfig(c *gin.Context) {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 128<<10)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8<<20)
 	var cfg model.IQConfig
 	if err := c.ShouldBindJSON(&cfg); err != nil {
 		iqError(c, 400, "Invalid IQ configuration JSON")
 		return
 	}
-	if _, err := model.GetIQConfig(); err != nil {
+	if cfg.Group == "" {
+		iqError(c, 400, "Each IQ task requires one group")
+		return
+	}
+	if _, err := model.ListIQConfigs(); err != nil {
 		iqError(c, 500, "Unable to load IQ configuration")
 		return
 	}
@@ -157,16 +171,12 @@ func GetIQTargets(c *gin.Context) {
 	iqOK(c, targets)
 }
 func RunIQTests(c *gin.Context) {
-	active, err := model.GetActiveSystemTask(model.SystemTaskTypeIQTest)
-	if err != nil {
-		iqError(c, 500, "Unable to load IQ progress")
+	group := c.Query("group")
+	if group == "" {
+		iqError(c, 400, "Select one IQ task group")
 		return
 	}
-	if active != nil {
-		iqOK(c, gin.H{"task_id": active.TaskID, "status": active.Status, "created": false})
-		return
-	}
-	cfg, err := model.GetIQConfig()
+	cfg, err := model.GetIQGroupConfig(group)
 	if err != nil {
 		iqError(c, 500, "Unable to load IQ configuration")
 		return
@@ -175,7 +185,7 @@ func RunIQTests(c *gin.Context) {
 		iqError(c, 400, "Configured targets are no longer available; update the configuration")
 		return
 	}
-	task, created, err := model.EnqueueIQBatch(false, time.Now())
+	task, created, err := model.EnqueueIQGroup(group, false, time.Now())
 	if err != nil {
 		iqError(c, 409, "Unable to enqueue IQ run; select targets or reload configuration")
 		return
@@ -183,7 +193,7 @@ func RunIQTests(c *gin.Context) {
 	iqOK(c, gin.H{"task_id": task.TaskID, "status": task.Status, "created": created})
 }
 func iqVisibleGroups(c *gin.Context) (map[string]bool, error) {
-	cfg, err := model.GetIQConfig()
+	configs, err := model.ListIQConfigs()
 	if err != nil {
 		return nil, err
 	}
@@ -196,9 +206,9 @@ func iqVisibleGroups(c *gin.Context) (map[string]bool, error) {
 			return nil, err
 		}
 	}
-	for _, target := range cfg.Targets {
-		if admin || service.IsUserSelectableGroup(userGroup, target.Group) {
-			visible[target.Group] = true
+	for _, cfg := range configs {
+		if admin || service.IsUserSelectableGroup(userGroup, cfg.Group) {
+			visible[cfg.Group] = true
 		}
 	}
 	return visible, nil
@@ -210,8 +220,13 @@ type iqModelCard struct {
 	Progress *model.IQAttempt `json:"progress"`
 }
 type iqGroupCards struct {
-	Group  string        `json:"group"`
-	Models []iqModelCard `json:"models"`
+	Group           string        `json:"group"`
+	TaskID          string        `json:"task_id"`
+	CreatedAt       int64         `json:"created_at"`
+	Models          []iqModelCard `json:"models"`
+	ActiveRun       *iqActiveRun  `json:"active_run"`
+	NextRunAt       int64         `json:"next_run_at"`
+	ScheduleEnabled bool          `json:"schedule_enabled"`
 }
 type iqActiveRun struct {
 	TaskID        string                 `json:"task_id"`
@@ -225,7 +240,7 @@ type iqActiveRun struct {
 }
 
 func GetIQResults(c *gin.Context) {
-	cfg, err := model.GetIQConfig()
+	configs, err := model.ListIQConfigs()
 	if err != nil {
 		iqError(c, 500, "Unable to load IQ results")
 		return
@@ -235,29 +250,37 @@ func GetIQResults(c *gin.Context) {
 		iqError(c, 500, "Unable to resolve group access")
 		return
 	}
-	rows, err := model.ListIQLatest()
+	allowedGroups := []string{}
+	for group := range visible {
+		allowedGroups = append(allowedGroups, group)
+	}
+	before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
+	rows, nextCursor, err := model.ListIQHistory(allowedGroups, before)
 	if err != nil {
 		iqError(c, 500, "Unable to load IQ results")
 		return
 	}
-	latest := map[string]*model.IQResult{}
-	for i := range rows {
-		latest[rows[i].ID] = &rows[i]
-	}
-	activeTask, err := model.GetActiveSystemTask(model.SystemTaskTypeIQTest)
+	activeTasks, err := model.ListActiveIQTasks()
 	if err != nil {
 		iqError(c, 500, "Unable to load IQ progress")
 		return
 	}
 	var active *iqActiveRun
+	groupRuns := map[string]*iqActiveRun{}
 	progress := map[string]*model.IQAttempt{}
+	rowOrder := map[string]int64{}
 	current := map[string]bool{}
-	for _, t := range cfg.Targets {
-		for _, name := range t.Models {
-			current[model.IQPairID(t.Group, name)] = true
+	for _, cfg := range configs {
+		for _, target := range cfg.Targets {
+			for _, name := range target.Models {
+				current[model.IQPairID(target.Group, name)] = true
+			}
 		}
 	}
-	if activeTask != nil {
+	for _, activeTask := range activeTasks {
+		if before > 0 {
+			continue // Active runs belong only to the newest page.
+		}
 		attempts, err := model.GetIQAttempts(activeTask.TaskID)
 		if err != nil {
 			iqError(c, 500, "Unable to load IQ progress")
@@ -268,40 +291,107 @@ func GetIQResults(c *gin.Context) {
 			iqError(c, 500, "Unable to load IQ progress")
 			return
 		}
-		active = &iqActiveRun{TaskID: activeTask.TaskID, Status: activeTask.Status, ConfigVersion: snapshot.Version, CreatedAt: activeTask.CreatedAt}
 		for i := range attempts {
 			a := &attempts[i]
 			if !visible[a.Group] || !current[a.PairID] {
 				continue
 			}
 			progress[a.PairID] = a
-			active.Total++
+			rowOrder[activeTask.TaskID] = activeTask.ID
+			run := groupRuns[a.Group]
+			if run == nil || run.TaskID != activeTask.TaskID {
+				run = &iqActiveRun{TaskID: activeTask.TaskID, Status: activeTask.Status, ConfigVersion: snapshot.Version, CreatedAt: activeTask.CreatedAt}
+				groupRuns[a.Group] = run
+			}
+			if active == nil {
+				active = run // Legacy summary; each group owns its authoritative status.
+			}
+			run.Total++
 			switch a.Status {
 			case "pending":
-				active.Pending++
+				run.Pending++
 			case "running":
-				active.Running++
+				run.Running++
 			default:
-				active.Completed++
+				run.Completed++
 			}
-		}
-		if active.Total == 0 {
-			active = nil
 		}
 	}
 	groups := []iqGroupCards{}
-	for _, t := range cfg.Targets {
-		if !visible[t.Group] {
+	indices := map[string]int{}
+	ensureRow := func(group, taskID string, createdAt int64) *iqGroupCards {
+		key := taskID + "\x00" + group
+		if index, ok := indices[key]; ok {
+			return &groups[index]
+		}
+		indices[key] = len(groups)
+		groups = append(groups, iqGroupCards{Group: group, TaskID: taskID, CreatedAt: createdAt, Models: []iqModelCard{}})
+		return &groups[len(groups)-1]
+	}
+	for i := range rows {
+		r := &rows[i]
+		rowOrder[r.TaskID] = r.RunSeq
+		g := ensureRow(r.Group, r.TaskID, r.StartedAt)
+		g.Models = append(g.Models, iqModelCard{Model: r.Model, Latest: r})
+	}
+	nextRunAt := int64(0)
+	scheduleEnabled := false
+	for _, cfg := range configs {
+		if !visible[cfg.Group] {
 			continue
 		}
-		g := iqGroupCards{Group: t.Group, Models: []iqModelCard{}}
-		for _, name := range t.Models {
-			id := model.IQPairID(t.Group, name)
-			g.Models = append(g.Models, iqModelCard{Model: name, Latest: latest[id], Progress: progress[id]})
+		run := groupRuns[cfg.Group]
+		if before == 0 && run != nil {
+			g := ensureRow(cfg.Group, run.TaskID, run.CreatedAt)
+			g.ActiveRun = run
+			for _, target := range cfg.Targets {
+				for _, name := range target.Models {
+					a := progress[model.IQPairID(cfg.Group, name)]
+					if a == nil || a.TaskID != run.TaskID {
+						continue
+					}
+					found := false
+					for i := range g.Models {
+						if g.Models[i].Model == name {
+							g.Models[i].Progress = a
+							found = true
+						}
+					}
+					if !found {
+						g.Models = append(g.Models, iqModelCard{Model: name, Progress: a})
+					}
+				}
+			}
 		}
-		groups = append(groups, g)
+		hasRow := false
+		for i := range groups {
+			if groups[i].Group == cfg.Group {
+				groups[i].ScheduleEnabled = cfg.Enabled
+				groups[i].NextRunAt = cfg.NextRunAt
+				hasRow = true
+			}
+		}
+		if !hasRow && before == 0 {
+			g := ensureRow(cfg.Group, "", 0)
+			g.ScheduleEnabled, g.NextRunAt = cfg.Enabled, cfg.NextRunAt
+			for _, target := range cfg.Targets {
+				for _, name := range target.Models {
+					g.Models = append(g.Models, iqModelCard{Model: name})
+				}
+			}
+		}
+		scheduleEnabled = scheduleEnabled || cfg.Enabled
+		if cfg.NextRunAt > 0 && (nextRunAt == 0 || cfg.NextRunAt < nextRunAt) {
+			nextRunAt = cfg.NextRunAt
+		}
 	}
-	iqOK(c, gin.H{"groups": groups, "active_run": active, "next_run_at": cfg.NextRunAt, "schedule_enabled": cfg.Enabled, "timezone": cfg.Timezone})
+	sort.SliceStable(groups, func(i, j int) bool {
+		if rowOrder[groups[i].TaskID] != rowOrder[groups[j].TaskID] {
+			return rowOrder[groups[i].TaskID] > rowOrder[groups[j].TaskID]
+		}
+		return groups[i].Group < groups[j].Group
+	})
+	iqOK(c, gin.H{"groups": groups, "active_run": active, "next_cursor": nextCursor, "next_run_at": nextRunAt, "schedule_enabled": scheduleEnabled, "timezone": "Asia/Shanghai"})
 }
 func GetIQArtifact(c *gin.Context) {
 	visible, err := iqVisibleGroups(c)
@@ -309,20 +399,8 @@ func GetIQArtifact(c *gin.Context) {
 		iqError(c, 500, "Unable to resolve group access")
 		return
 	}
-	// Authorization and current target membership are checked before reading a body.
-	rows, err := model.ListIQLatest()
-	if err != nil {
-		iqError(c, 500, "Unable to load IQ artifact")
-		return
-	}
-	var metadata *model.IQResult
-	for i := range rows {
-		if rows[i].ID == c.Param("id") {
-			metadata = &rows[i]
-			break
-		}
-	}
-	if metadata == nil || !visible[metadata.Group] || metadata.Status != "success" {
+	metadata, err := model.GetIQResultMetadata(c.Param("id"))
+	if err != nil || !visible[metadata.Group] || metadata.Status != "success" {
 		iqError(c, 404, "IQ artifact not found")
 		return
 	}
@@ -331,21 +409,8 @@ func GetIQArtifact(c *gin.Context) {
 		iqError(c, 404, "IQ artifact not found")
 		return
 	}
-	// Read authorization again after body retrieval to fail closed on target edits.
-	cfg, err := model.GetIQConfig()
-	if err != nil {
-		iqError(c, 500, "Unable to load IQ artifact")
-		return
-	}
-	selected := false
-	for _, t := range cfg.Targets {
-		for _, name := range t.Models {
-			if model.IQPairID(t.Group, name) == r.ID {
-				selected = true
-			}
-		}
-	}
-	if !selected {
+	visible, err = iqVisibleGroups(c)
+	if err != nil || !visible[r.Group] {
 		iqError(c, 404, "IQ artifact not found")
 		return
 	}

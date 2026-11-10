@@ -71,9 +71,15 @@ function IQGallery(props: { scope: string }) {
   const query = useIQResults(props.scope)
   useIQScopeCleanup(props.scope)
   const [selected, setSelected] = useState<string | null>(null)
-  const [settings, setSettings] = useState(false)
-  const [confirmRun, setConfirmRun] = useState(false)
-  const data = query.isError ? undefined : query.data
+  const [settings, setSettings] = useState<string | null>(null)
+  const [confirmRun, setConfirmRun] = useState<string | null>(null)
+  const pages = query.isError ? undefined : query.data?.pages
+  const data = pages?.[0]
+    ? {
+        ...pages[0],
+        groups: pages.flatMap((page) => page.groups),
+      }
+    : undefined
   const results =
     data?.groups.flatMap((group) =>
       group.models.flatMap((card) => (card.latest ? [card.latest] : []))
@@ -86,14 +92,14 @@ function IQGallery(props: { scope: string }) {
     results
       .filter((result) => result.status === 'success')
       .map(artifactRevision),
-    Boolean(expanded) || settings || confirmRun || !data
+    Boolean(expanded) || settings !== null || confirmRun !== null || !data
   )
   const run = useMutation({
     mutationFn: runIQTests,
     retry: false,
     onSuccess: (result) => {
       if (!isCurrentIQScope(props.scope)) return
-      setConfirmRun(false)
+      setConfirmRun(null)
       toast.success(
         result.created ? t('IQ run queued') : t('An IQ run is already active')
       )
@@ -121,16 +127,8 @@ function IQGallery(props: { scope: string }) {
               {t('Refresh')}
             </Button>
             {canRead && (
-              <Button variant='outline' onClick={() => setSettings(true)}>
+              <Button variant='outline' onClick={() => setSettings('')}>
                 {t('IQ test settings')}
-              </Button>
-            )}
-            {canRun && (
-              <Button
-                onClick={() => setConfirmRun(true)}
-                disabled={run.isPending || Boolean(data?.active_run)}
-              >
-                {t('Run now')}
               </Button>
             )}
           </div>
@@ -152,20 +150,10 @@ function IQGallery(props: { scope: string }) {
                 {t('Next run')}: <IQTime seconds={data.next_run_at} /> ·{' '}
                 {t('Beijing time')}
               </p>
-              {data.active_run && (
-                <p role='status'>
-                  {t('Current run')}:{' '}
-                  <IQStatusLabel status={data.active_run.status} /> ·{' '}
-                  {t('{{completed}} / {{total}} completed', {
-                    completed: data.active_run.completed,
-                    total: data.active_run.total,
-                  })}
-                </p>
-              )}
             </section>
             <p className='text-muted-foreground text-sm'>
               {t(
-                'Only the latest result is kept. Previous artwork stays dated until its replacement finishes. Times are shown in Beijing time.'
+                'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.'
               )}
             </p>
             {data.groups.length === 0 && (
@@ -177,15 +165,75 @@ function IQGallery(props: { scope: string }) {
               />
             )}
             <div ref={previews.root} className='space-y-8'>
-              {data.groups.map((group) => (
+              {data.groups.map((group, index) => (
                 <section
-                  key={group.group}
+                  key={`${group.task_id}:${group.group}`}
                   className='min-w-0 space-y-4'
                   aria-label={group.group}
                 >
-                  <h2 className='text-xl font-semibold break-all'>
-                    {group.group}
-                  </h2>
+                  <div className='flex flex-wrap items-center justify-between gap-3'>
+                    <div className='space-y-1'>
+                      <h2 className='text-xl font-semibold break-all'>
+                        {group.group}
+                      </h2>
+                      {group.created_at > 0 && (
+                        <p className='text-muted-foreground text-sm'>
+                          <IQTime seconds={group.created_at} /> ·{' '}
+                          {t('Beijing time')}
+                        </p>
+                      )}
+                    </div>
+                    {data.groups.findIndex(
+                      (row) => row.group === group.group
+                    ) === index && (
+                      <div className='flex flex-wrap gap-2'>
+                        {canRead && (
+                          <Button
+                            variant='outline'
+                            onClick={() => setSettings(group.group)}
+                          >
+                            {t('IQ test settings')}
+                          </Button>
+                        )}
+                        {canRun && (
+                          <Button
+                            onClick={() => setConfirmRun(group.group)}
+                            disabled={
+                              run.isPending ||
+                              data.groups.some(
+                                (row) =>
+                                  row.group === group.group &&
+                                  Boolean(row.active_run)
+                              )
+                            }
+                          >
+                            {t('Run now')}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className='text-muted-foreground flex flex-wrap items-center gap-3 text-sm'>
+                    <Badge variant='secondary'>
+                      {group.schedule_enabled
+                        ? t('Schedule enabled')
+                        : t('Schedule disabled')}
+                    </Badge>
+                    <p>
+                      {t('Next run')}: <IQTime seconds={group.next_run_at} /> ·{' '}
+                      {t('Beijing time')}
+                    </p>
+                    {group.active_run && (
+                      <p role='status'>
+                        {t('Current run')}:{' '}
+                        <IQStatusLabel status={group.active_run.status} /> ·{' '}
+                        {t('{{completed}} / {{total}} completed', {
+                          completed: group.active_run.completed,
+                          total: group.active_run.total,
+                        })}
+                      </p>
+                    )}
+                  </div>
                   <div
                     role='region'
                     aria-label={t('Models in {{group}}', {
@@ -215,6 +263,15 @@ function IQGallery(props: { scope: string }) {
                 </section>
               ))}
             </div>
+            {query.hasNextPage && (
+              <Button
+                variant='outline'
+                disabled={query.isFetchingNextPage}
+                onClick={() => void query.fetchNextPage()}
+              >
+                {t('Load older runs')}
+              </Button>
+            )}
           </>
         )}
         {expanded && (
@@ -251,24 +308,29 @@ function IQGallery(props: { scope: string }) {
             />
           </Dialog>
         )}
-        {settings && canRead && (
+        {settings !== null && canRead && (
           <IQSettings
             scope={props.scope}
             canWrite={canWrite}
-            onClose={() => setSettings(false)}
+            group={settings}
+            onClose={() => setSettings(null)}
           />
         )}
         {canRun && (
           <ConfirmDialog
-            open={confirmRun}
-            onOpenChange={setConfirmRun}
-            title={t('Run IQ tests?')}
+            open={confirmRun !== null}
+            onOpenChange={(open) => {
+              if (!open) setConfirmRun(null)
+            }}
+            title={`${t('Run IQ tests?')} ${confirmRun ?? ''}`}
             desc={t(
               'Run the saved targets once using site resources. This may incur provider costs. No retries or extra samples.'
             )}
             confirmText={t('Run now')}
             isLoading={run.isPending}
-            handleConfirm={() => run.mutate()}
+            handleConfirm={() => {
+              if (confirmRun) run.mutate(confirmRun)
+            }}
           />
         )}
       </div>

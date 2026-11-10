@@ -43,6 +43,8 @@ export const IQ_REASONING_EFFORTS = [
 ] as const
 
 export interface IQConfig {
+  group: string
+  prompts: string[] | null
   version: number
   prompt: string
   reasoning_effort: (typeof IQ_REASONING_EFFORTS)[number]
@@ -59,8 +61,8 @@ export interface IQConfig {
 
 export type IQConfigInput = Omit<
   IQConfig,
-  'next_run_at' | 'updated_at' | 'updated_by'
->
+  'next_run_at' | 'updated_at' | 'updated_by' | 'prompts'
+> & { prompts: string[] }
 
 export interface IQResult {
   id: string
@@ -88,7 +90,15 @@ export interface IQModelCard {
 }
 
 export interface IQResults {
-  groups: { group: string; models: IQModelCard[] }[]
+  groups: {
+    group: string
+    task_id: string
+    created_at: number
+    models: IQModelCard[]
+    active_run: IQResults['active_run']
+    next_run_at: number
+    schedule_enabled: boolean
+  }[]
   active_run: {
     task_id: string
     status: 'pending' | 'running'
@@ -100,6 +110,7 @@ export interface IQResults {
     pending: number
   } | null
   next_run_at: number
+  next_cursor: number
   schedule_enabled: boolean
   timezone: 'Asia/Shanghai'
 }
@@ -115,7 +126,7 @@ export interface IQArtifact {
   artifact: string
 }
 
-// Pair IDs are stable across replacements; metadata is part of artifact identity.
+// Results are run-scoped. Metadata also guards legacy pair-keyed responses.
 export function artifactRevision(
   result: Pick<IQResult, 'id' | 'task_id' | 'config_version' | 'completed_at'>
 ): string {

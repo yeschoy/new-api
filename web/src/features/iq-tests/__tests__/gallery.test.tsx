@@ -40,6 +40,8 @@ let requests: string[]
 let results: IQResults
 let staleArtifact = false
 const config: IQConfig = {
+  group: 'public',
+  prompts: [],
   version: 2,
   prompt: 'Draw a pelican.',
   reasoning_effort: '',
@@ -131,6 +133,11 @@ beforeEach(() => {
     groups: [
       {
         group: 'public',
+        task_id: 'current-run',
+        created_at: 1_794_297_595,
+        active_run: null,
+        next_run_at: 0,
+        schedule_enabled: false,
         models: Array.from({ length: 5 }, (_, index) => ({
           model: `model-${index}`,
           latest: latest(index),
@@ -153,17 +160,22 @@ beforeEach(() => {
       pending: 3,
     },
     next_run_at: 0,
+    next_cursor: 0,
     schedule_enabled: false,
     timezone: 'Asia/Shanghai',
   }
+  results.groups[0].active_run = results.active_run
   vi.stubGlobal('IntersectionObserver', VisibilityObserver)
   login()
   const adapter: AxiosAdapter = async (request) => {
     requests.push(request.url ?? '')
     let data: unknown
     if (request.url === '/api/iq-tests/results') data = results
-    else if (request.url === '/api/iq-tests/config') data = config
-    else if (request.url === '/api/iq-tests/targets') {
+    else if (request.url === '/api/iq-tests/config?list=true') {
+      data = { tasks: [config], default_prompt: config.prompt }
+    } else if (request.url?.startsWith('/api/iq-tests/run?group=')) {
+      data = { task_id: 'new-run', status: 'pending', created: true }
+    } else if (request.url === '/api/iq-tests/targets') {
       data = [{ group: 'public', models: ['model-0', 'model-1'] }]
     } else if (request.url?.startsWith('/api/iq-tests/results/')) {
       const id = request.url.split('/').at(-1)
@@ -217,7 +229,7 @@ describe('authenticated IQ gallery', () => {
     mount()
     await screen.findByRole('heading', { name: 'public' })
     expect(screen.getByRole('status')).toHaveTextContent('0 / 5 completed')
-    expect(screen.getAllByText(/Latest result/)).toHaveLength(5)
+    expect(screen.getAllByText(/Run result/)).toHaveLength(5)
     expect(screen.getAllByText(/Current run/)).toHaveLength(6)
     expect(
       screen.queryByRole('button', { name: 'Run now' })
@@ -242,6 +254,11 @@ describe('authenticated IQ gallery', () => {
     expect(frame).toHaveAttribute('sandbox', 'allow-scripts')
     expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
     expect(frame.srcdoc).not.toContain('fixture-token')
+    expect(frame).toHaveStyle({
+      width: '1280px',
+      height: '960px',
+      transformOrigin: 'top left',
+    })
     await showCards([])
     expect(document.querySelector('iframe')).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Preview model-0' }))
@@ -279,6 +296,11 @@ describe('authenticated IQ gallery', () => {
   it('renders multiple groups as separate single horizontal model rows', async () => {
     results.groups.push({
       group: 'private',
+      task_id: 'private-run',
+      created_at: 1_794_297_590,
+      active_run: null,
+      next_run_at: 0,
+      schedule_enabled: false,
       models: [0, 1].map((index) => ({
         model: `private-${index}`,
         latest: null,
@@ -300,17 +322,77 @@ describe('authenticated IQ gallery', () => {
     expect(requests).toEqual(['/api/iq-tests/results'])
   })
 
+  it('keeps multiple runs of the same group in separate rows with distinct artwork', async () => {
+    const older = latest(0)
+    results.groups.push({
+      group: 'public',
+      task_id: 'older-run',
+      created_at: 1_794_211_000,
+      active_run: null,
+      next_run_at: 0,
+      schedule_enabled: false,
+      models: [
+        {
+          model: older.model,
+          latest: { ...older, id: 'older-result', task_id: 'older-run' },
+          progress: null,
+        },
+      ],
+    })
+    mount()
+    const rows = await screen.findAllByRole('region', {
+      name: 'Models in public',
+    })
+    expect(rows).toHaveLength(2)
+    expect(within(rows[0]).getAllByRole('listitem')).toHaveLength(5)
+    expect(within(rows[1]).getAllByRole('listitem')).toHaveLength(1)
+    expect(
+      screen.getAllByRole('button', { name: 'Preview model-0' })
+    ).toHaveLength(2)
+  })
+
+  it('runs one group independently while another group is active', async () => {
+    login(1, 100)
+    results.groups.push({
+      group: 'private',
+      task_id: 'private-run',
+      created_at: 1_794_297_590,
+      models: [],
+      active_run: null,
+      next_run_at: 0,
+      schedule_enabled: false,
+    })
+    mount()
+    const publicGroup = await screen.findByRole('region', { name: 'public' })
+    const privateGroup = screen.getByRole('region', { name: 'private' })
+    expect(
+      within(publicGroup).getByRole('button', { name: 'Run now' })
+    ).toBeDisabled()
+    const user = userEvent.setup()
+    await user.click(
+      within(privateGroup).getByRole('button', { name: 'Run now' })
+    )
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Run now' }))
+    await waitFor(() =>
+      expect(requests).toContain('/api/iq-tests/run?group=private')
+    )
+    expect(requests).not.toContain('/api/iq-tests/run?group=public')
+  })
+
   it('shows settings and manual execution only to authorized administrators', async () => {
     login(1, 100)
     results = { ...results, groups: [], active_run: null }
     mount()
     await screen.findByText('No IQ results available')
-    expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled()
+    expect(
+      screen.queryByRole('button', { name: 'Run now' })
+    ).not.toBeInTheDocument()
     await userEvent.click(
       screen.getByRole('button', { name: 'IQ test settings' })
     )
     await screen.findByLabelText('Test prompt')
-    expect(requests).toContain('/api/iq-tests/config')
+    expect(requests).toContain('/api/iq-tests/config?list=true')
     expect(requests).toContain('/api/iq-tests/targets')
     expect(screen.getByLabelText('Test prompt')).toHaveValue('Draw a pelican.')
   })
