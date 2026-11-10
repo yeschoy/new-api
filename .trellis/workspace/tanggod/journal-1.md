@@ -197,3 +197,25 @@ Implemented partner tenant accounts, unlimited quota and per-user RPM; fixed rev
 ### Next Steps
 
 - Review items 1 (video remix limiter coverage) and 2 (partner plan compliance UI gate) remain open; the user requested only fixes 3/4 and commit/push.
+
+
+## Session 10: Tenant paid checkout implementation; DB verification blocked
+<!-- trellis-session: v=2 fp=b73bd25ae5faec8e -->
+
+**Date**: 2026-11-11
+**Task**: Tenant paid checkout implementation; DB verification blocked
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+Implemented paid Tenant subscription orders, order-scoped public cashier, strict Epay CNY confirmation, atomic provisioning/fulfillment and recovery, removed direct grants, forced subscription-only funding including legacy MJ guard. Updated dirty merchant docs and code-spec; two independent reviews fixed issues. Go build/vet and frontend typecheck/build pass; cashier/subscription 85 tests pass. Global frontend lint has pre-existing failures. Docker containers remain created/not-running after start/restart, so all Go/DB runtime tests remain unrun; task kept in_progress, no archive/deploy/live payment/data deletion. Temporary resources inventoried and retained pending cleanup approval.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a117c925f` | feat(partner): add paid subscription checkout and automatic delivery |
+
+### Status
+
+[OK] **Completed**
