@@ -185,6 +185,72 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 		require.Zero(t, ch.TestTime)
 	}
 }
+func TestIQBatchPairDeadline(t *testing.T) {
+	for _, parentTimeout := range []time.Duration{0, 5 * time.Minute} {
+		t.Run(parentTimeout.String(), func(t *testing.T) {
+			root, _ := setupIQController(t)
+			cfg, err := model.GetIQConfig()
+			require.NoError(t, err)
+			cfg.Targets = []model.IQTarget{{Group: "public", Models: []string{"gpt-4o"}}}
+			cfg, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+			require.NoError(t, err)
+			task, _, err := model.EnqueueIQBatch(false, time.Now())
+			require.NoError(t, err)
+			task, claimed, err := model.ClaimSystemTask(task.ID, model.SystemTaskTypeIQTest, "iq-deadline-runner", common.GetTimestamp()+60)
+			require.NoError(t, err)
+			require.True(t, claimed)
+
+			ctx := context.Background()
+			if parentTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, parentTimeout)
+				defer cancel()
+			}
+			var calledCtx context.Context
+			var calledAt time.Time
+			calls := 0
+			require.NoError(t, runIQBatch(ctx, task, "iq-deadline-runner", *cfg, root.Id, func(pairCtx context.Context, _ int, _, _, _ string) model.IQResult {
+				calls++
+				calledCtx = pairCtx
+				calledAt = time.Now()
+				return model.IQResult{Status: "success", ArtifactKind: "svg", Artifact: "<svg></svg>"}
+			}))
+			require.Equal(t, 1, calls)
+			require.NotNil(t, calledCtx)
+			deadline, ok := calledCtx.Deadline()
+			require.True(t, ok)
+			if parentTimeout == 0 {
+				require.WithinDuration(t, calledAt.Add(25*time.Minute), deadline, time.Second)
+			} else {
+				parentDeadline, _ := ctx.Deadline()
+				require.Equal(t, parentDeadline, deadline, "the IQ limit must not extend an earlier parent deadline")
+			}
+			require.ErrorIs(t, calledCtx.Err(), context.Canceled, "completed pairs must release their deadline timer")
+		})
+	}
+}
+
+func TestIQPairTimeoutResult(t *testing.T) {
+	root, _ := setupIQController(t)
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = io.Copy(io.Discard, r.Body)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	ch := &model.Channel{Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled, Key: "mock", BaseURL: &server.URL, Models: "gpt-4o", Group: "public"}
+	require.NoError(t, model.DB.Create(ch).Error)
+	require.NoError(t, ch.AddAbilities(nil))
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	result := executeIQPair(ctx, root.Id, "public", "gpt-4o", "test")
+	require.Equal(t, "timeout", result.Status)
+	require.Equal(t, "timeout", result.ErrorCode)
+	require.Equal(t, "IQ request exceeded the 25-minute limit", result.ErrorMessage)
+	require.EqualValues(t, 1, calls.Load(), "timed-out requests must not be retried")
+}
+
 func TestIQNativeRequestsAndOutputBounds(t *testing.T) {
 	protected, err := restoreIQInput([]byte(`{"messages":[{"role":"user","content":"overridden"}],"tools":[{}],"n":4}`), []byte(`{"messages":[{"role":"user","content":"exact"}]}`))
 	require.NoError(t, err)

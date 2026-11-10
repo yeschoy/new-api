@@ -10,6 +10,8 @@ import (
 	"github.com/QuantumNous/new-api/service"
 )
 
+const iqPairTimeout = 25 * time.Minute
+
 type iqTaskHandler struct{}
 
 func (iqTaskHandler) Type() string { return model.SystemTaskTypeIQTest }
@@ -91,7 +93,7 @@ func runIQBatch(ctx context.Context, task *model.SystemTask, runner string, cfg 
 					fail(ctx.Err())
 					continue
 				}
-				pairCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+				pairCtx, cancel := context.WithTimeout(ctx, iqPairTimeout)
 				r := execute(pairCtx, userID, a.Group, a.Model, string(cfg.Prompt))
 				cancel()
 				r.ID = a.PairID

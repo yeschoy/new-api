@@ -28,9 +28,13 @@ The controller owns orchestration to avoid a service/controller import cycle.
   schedule_mode, interval_hours, daily_time and timezone. Calendar is explicitly
   Asia/Shanghai, never server-local time. Save recomputes the next slot;
   a manual run preserves recurring cadence. Skip backlog and overlapping slots.
-- A batch has two workers, a three-minute pair deadline, a 16,384-token wire
-  limit, one retry=0 group selector, and at most one non-replayable outbound POST
-  per pair. Never enumerate channels, fail over, retry or replay started work.
+- A batch has two workers, a 25-minute pair deadline (`iqPairTimeout`), a
+  16,384-token wire limit, one retry=0 group selector, and at most one
+  non-replayable outbound POST per pair. Never enumerate channels, fail over,
+  retry or replay started work. Derive timeout messages from the same constant;
+  preserve earlier parent cancellation/deadlines. Deployment HTTP limits must
+  allow this budget: `RELAY_TIMEOUT` and, for non-streaming output,
+  `RELAY_RESPONSE_HEADER_TIMEOUT` must be 0 (disabled) or at least 1500 seconds.
 - Propagate the deadline to the final HTTP request, clear `GetBody` and
   idempotency keys, and retain upstream redirects rather than following them.
 - Set `ContextKeyUsingGroup` before relay-info generation. Use the root/system
@@ -93,6 +97,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   duplicate enqueue/checkpoints, latest replacement, lease recovery and cadence.
 - `controller/iq_tests_test.go`: mocked call counts, exact prompt, group routing,
   viewer/artifact denial, quota and health non-mutation, native request bounds.
+  Assert the executor receives a 25-minute deadline without waiting for it,
+  preserves earlier parent deadlines, cancels completed pair contexts, and
+  reports the same configured limit on timeout without retrying.
 - `service/iq_artifact_test.go`: full/fenced markup and final native text,
   incomplete/oversized output, preservation of active self-contained content.
 - `router/iq_router_test.go`: all six anonymous denials and admin/member scopes.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -238,7 +239,7 @@ func executeIQPair(ctx context.Context, userID int, group, name, prompt string) 
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			r.Status = "timeout"
 			r.ErrorCode = "timeout"
-			r.ErrorMessage = "IQ request exceeded the three-minute limit"
+			r.ErrorMessage = fmt.Sprintf("IQ request exceeded the %d-minute limit", int(iqPairTimeout/time.Minute))
 		} else if ctx.Err() != nil {
 			r.Status = "interrupted"
 			r.ErrorCode = "interrupted"
