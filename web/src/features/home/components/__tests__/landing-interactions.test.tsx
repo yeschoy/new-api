@@ -44,6 +44,9 @@ let style: HTMLStyleElement
 const originalConfig = useSystemConfigStore.getState()
 const originalAuth = useAuthStore.getState()
 beforeEach(() => {
+  // Non-seasonal regressions must not depend on the day CI happens to run.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-19T00:00:00+08:00'))
   useAuthStore.getState().auth.reset()
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
@@ -57,6 +60,7 @@ afterEach(() => {
   useAuthStore.setState(originalAuth)
   client.clear()
   style.remove()
+  vi.useRealTimers()
 })
 const models = buildModelCatalog(
   [

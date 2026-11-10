@@ -18,26 +18,22 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, CalendarDays, Gift } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowRight, ChevronDown, Gift, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { getPublicCashbackOffers } from '@/features/cashback/api'
 import { formatCashbackCents } from '@/features/cashback/lib/format'
 import { toIntlLocale } from '@/i18n/languages'
 
-import './double-eleven-promo.css'
+import { useDoubleElevenWindow } from '../hooks/use-double-eleven-window'
+import { useOfferSpotlight } from '../hooks/use-offer-spotlight'
 
-// Announcement dates only, not payment eligibility. The server owns the live
-// offer; announce one day ahead and remove after November 18 in Beijing time.
-const ANNOUNCE_AT = Date.parse('2026-11-10T00:00:00+08:00')
-const START_AT = Date.parse('2026-11-11T00:00:00+08:00')
-const END_AT = Date.parse('2026-11-19T00:00:00+08:00')
+import './double-eleven-promo.css'
 
 export function DoubleElevenPromo(props: { isAuthenticated: boolean }) {
   const { t, i18n } = useTranslation()
-  const [now, setNow] = useState(Date.now)
-  const visible = now >= ANNOUNCE_AT && now < END_AT
+  const { visible, upcoming } = useDoubleElevenWindow()
+  const spotlightRef = useOfferSpotlight(visible)
   const offers = useQuery({
     queryKey: ['cashback', 'public-offers'],
     queryFn: getPublicCashbackOffers,
@@ -48,35 +44,6 @@ export function DoubleElevenPromo(props: { isAuthenticated: boolean }) {
     refetchOnWindowFocus: 'always',
     meta: { errorToast: false },
   })
-
-  useEffect(() => {
-    let timer: number
-    const checkDates = () => {
-      const current = Date.now()
-      setNow(current)
-      window.clearTimeout(timer)
-      const next = [ANNOUNCE_AT, START_AT, END_AT].find(
-        (boundary) => boundary > current
-      )
-      if (next) {
-        timer = window.setTimeout(
-          checkDates,
-          Math.min(next - current, 2_147_483_647)
-        )
-      }
-    }
-    const checkWhenVisible = () => {
-      if (!document.hidden) checkDates()
-    }
-    checkDates()
-    window.addEventListener('focus', checkDates)
-    document.addEventListener('visibilitychange', checkWhenVisible)
-    return () => {
-      window.clearTimeout(timer)
-      window.removeEventListener('focus', checkDates)
-      document.removeEventListener('visibilitychange', checkWhenVisible)
-    }
-  }, [])
 
   if (!visible) return null
 
@@ -97,10 +64,9 @@ export function DoubleElevenPromo(props: { isAuthenticated: boolean }) {
   } else if (offers.isPending || offers.isFetching) {
     message = t('Checking current offers…')
   } else if (!payer) {
-    message =
-      now < START_AT
-        ? t('Offer details will appear when the campaign starts.')
-        : t('No active top-up payer offer right now.')
+    message = upcoming
+      ? t('Offer details will appear when the campaign starts.')
+      : t('No active top-up payer offer right now.')
   }
 
   let actionTo: '/activity' | '/wallet' | '/sign-up' = '/activity'
@@ -110,66 +76,107 @@ export function DoubleElevenPromo(props: { isAuthenticated: boolean }) {
     actionLabel = props.isAuthenticated ? t('Top up now') : t('Get started')
   }
 
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
+  const reward = formatCashbackCents(giftCents, locale, { wholeYuan: true })
+
   return (
-    <section className='ci-doubleEleven' aria-labelledby='double-eleven-title'>
-      <div className='ci-doubleElevenCopy'>
+    <section
+      ref={spotlightRef}
+      className='ci-doubleEleven'
+      aria-labelledby='double-eleven-title'
+    >
+      <span className='ci-doubleElevenSpotlight' aria-hidden='true' />
+      <div className='ci-doubleElevenHeader'>
         <div className='ci-doubleElevenEyebrow'>
-          <Gift size={16} aria-hidden='true' />
+          <span className='ci-doubleElevenIcon' aria-hidden='true'>
+            <Gift size={15} />
+          </span>
           <h2 id='double-eleven-title'>{t('Double 11 top-up special')}</h2>
+        </div>
+        <span className='ci-doubleElevenDates'>
+          <time dateTime='2026-11-11'>11.11</time>
+          <span aria-hidden='true'>—</span>
+          <time dateTime='2026-11-18'>11.18</time>
+          <span className='ci-doubleElevenTimezone'>{t('Beijing time')}</span>
+        </span>
+      </div>
+
+      <div className='ci-doubleElevenArtwork' aria-hidden='true'>
+        <span className='ci-doubleElevenOrbit ci-doubleElevenOrbit--one' />
+        <span className='ci-doubleElevenOrbit ci-doubleElevenOrbit--two' />
+        <span className='ci-doubleElevenOrbit ci-doubleElevenOrbit--three' />
+        <span className='ci-doubleElevenEdition'>11.11</span>
+        <span className='ci-doubleElevenStar ci-doubleElevenStar--one'>✦</span>
+        <span className='ci-doubleElevenStar ci-doubleElevenStar--two'>✦</span>
+      </div>
+
+      <div className='ci-doubleElevenMain'>
+        <div className='ci-doubleElevenCopy'>
+          {showPerHundred ? (
+            <>
+              <p className='sr-only' role='status'>
+                {t('Every CNY 100 topped up earns {{reward}} in bonus credit', {
+                  reward,
+                })}
+              </p>
+              <div className='ci-doubleElevenAmounts' aria-hidden='true'>
+                <div className='ci-doubleElevenAmount'>
+                  <span>{t('For each full top-up of')}</span>
+                  <strong>
+                    {formatCashbackCents(10_000, locale, { wholeYuan: true })}
+                  </strong>
+                </div>
+                <span className='ci-doubleElevenPlus'>
+                  <Plus size={18} />
+                </span>
+                <div className='ci-doubleElevenAmount ci-doubleElevenGift'>
+                  <span>{t('Bonus usage credit')}</span>
+                  <strong>{reward}</strong>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className='ci-doubleElevenStatus' role='status'>
+              {message}
+            </p>
+          )}
           {payer?.payer_scope === 'first_top_up' ? (
             <span className='ci-doubleElevenScope'>
               {t('First top-up only')}
             </span>
           ) : null}
         </div>
-        <p
-          className={
-            showPerHundred ? 'ci-doubleElevenOffer' : 'ci-doubleElevenStatus'
-          }
-          role='status'
-        >
-          {showPerHundred
-            ? t('Every CNY 100 topped up earns {{reward}} in bonus credit', {
-                reward: formatCashbackCents(
-                  giftCents,
-                  toIntlLocale(i18n.resolvedLanguage || i18n.language),
-                  { wholeYuan: true }
-                ),
-              })
-            : message}
-        </p>
-        {showPerHundred ? (
-          <p className='ci-doubleElevenNote'>
-            {t(
-              'Complete hundreds per order only; remainders do not carry over.'
-            )}
-          </p>
-        ) : null}
-        <p className='ci-doubleElevenNote'>
-          {t(
-            'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.'
-          )}
-        </p>
-      </div>
-      <div className='ci-doubleElevenActions'>
-        <span className='ci-doubleElevenDates'>
-          <CalendarDays size={14} aria-hidden='true' />
-          <span>
-            <time dateTime='2026-11-11'>11.11</time>
-            {' – '}
-            <time dateTime='2026-11-18'>11.18</time>
-            {' · '}
-            {t('Beijing time')}
-          </span>
-        </span>
-        <Link
-          to={actionTo}
-          className='ci-button ci-button--default ci-button--size-sm'
-        >
+        <Link to={actionTo} className='ci-doubleElevenAction'>
           {actionLabel}
           <ArrowRight size={16} aria-hidden='true' />
         </Link>
       </div>
+
+      <details className='ci-doubleElevenRules'>
+        <summary>
+          <span className='ci-doubleElevenRuleHint'>
+            {t('Per order · Bonus credit is not withdrawable')}
+          </span>
+          <span className='ci-doubleElevenRulesToggle'>
+            {t('Offer rules')}
+            <ChevronDown size={13} aria-hidden='true' />
+          </span>
+        </summary>
+        <div className='ci-doubleElevenRuleContent'>
+          {showPerHundred ? (
+            <p>
+              {t(
+                'Complete hundreds per order only; remainders do not carry over.'
+              )}
+            </p>
+          ) : null}
+          <p>
+            {t(
+              'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.'
+            )}
+          </p>
+        </div>
+      </details>
     </section>
   )
 }

@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { getPublicCashbackOffers } from '@/features/cashback/api'
+import { useDoubleElevenWindow } from '@/features/home/hooks/use-double-eleven-window'
 import {
   FORGE_MARK,
   FORGE_PARTNER_NAME,
@@ -89,6 +90,7 @@ export function RewardBanner() {
   })
   const isAuthenticated = useAuthStore((state) => !!state.auth.user)
   const { status } = useStatus()
+  const doubleEleven = useDoubleElevenWindow()
   const offers = useQuery({
     queryKey: ['cashback', 'public-offers'],
     queryFn: getPublicCashbackOffers,
@@ -114,10 +116,13 @@ export function RewardBanner() {
           },
           { t, locale, formatQuota: (quota) => formatQuotaWithCurrency(quota) }
         )
+  const showDoubleEleven =
+    doubleEleven.visible && !!rewards && !!offers.data?.invitee
   // One dismissal covers the whole strip until either announcement changes.
   const announcementKey = JSON.stringify({
     forge: showForge ? FORGE_ANNOUNCEMENT_ID : null,
     rewards: rewards?.rulesKey ?? null,
+    ...(showDoubleEleven ? { promotion: 'double-eleven-2026' } : {}),
   })
   const visible =
     !hiddenRoute && (showForge || !!rewards) && announcementKey !== dismissedKey
@@ -215,6 +220,11 @@ export function RewardBanner() {
               >
                 <Gift className='size-3' strokeWidth={2.5} />
               </span>
+              {showDoubleEleven ? (
+                <span className='border-foreground/10 bg-background/70 text-foreground rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap'>
+                  {t('Double 11 special')}
+                </span>
+              ) : null}
               <span className='tracking-wide'>
                 {rewards.segments.join(' | ')}
               </span>

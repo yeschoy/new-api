@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs'
 
 import { QueryClient } from '@tanstack/react-query'
 import { act, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderApp } from '@/test-utils/render-app'
@@ -69,6 +70,20 @@ describe('Double Eleven homepage promotion', () => {
         'href',
         href
       )
+      expect(screen.getByText('¥100')).toBeVisible()
+      expect(screen.getByText('¥10')).toBeVisible()
+      expect(
+        screen.getByText('Per order · Bonus credit is not withdrawable')
+      ).toBeVisible()
+      const details = screen.getByText('Offer rules').closest('details')
+      expect(details).not.toHaveAttribute('open')
+      expect(
+        screen.getByText(
+          'Complete hundreds per order only; remainders do not carry over.'
+        )
+      ).not.toBeVisible()
+      await userEvent.click(screen.getByText('Offer rules'))
+      expect(details).toHaveAttribute('open')
       expect(
         screen.getByText(
           'Complete hundreds per order only; remainders do not carry over.'
@@ -79,10 +94,10 @@ describe('Double Eleven homepage promotion', () => {
           'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.'
         )
       ).toBeVisible()
-      expect(screen.getByText('11.11')).toBeVisible()
+      expect(screen.getByText('11.11', { selector: 'time' })).toBeVisible()
       expect(screen.getByText('11.18')).toBeVisible()
       expect(screen.getByText('11.18').parentElement).toHaveTextContent(
-        '11.11 – 11.18 · Beijing time'
+        '11.11—11.18Beijing time'
       )
       expect(screen.queryByText(/unlimited/i)).toBeNull()
     }
@@ -105,6 +120,8 @@ describe('Double Eleven homepage promotion', () => {
       )
     ).toBeVisible()
     expect(screen.getByText('First top-up only')).toBeVisible()
+    expect(screen.getByText('¥6')).toBeVisible()
+    expect(screen.queryByText('¥10')).toBeNull()
     expect(screen.queryByText(offerText)).toBeNull()
   })
 
@@ -222,7 +239,7 @@ describe('Double Eleven homepage promotion', () => {
     )
   })
 
-  it('keeps a modest card inside the product hero and moves the hackathon below it', async () => {
+  it('composes product introduction, promotion and utility actions in accessible mobile order', async () => {
     const { container } = await renderApp(
       <CiLandingPage
         isAuthenticated={false}
@@ -235,6 +252,20 @@ describe('Double Eleven homepage promotion', () => {
     if (!hero) throw new Error('Missing product hero')
     expect(await within(hero).findByText(offerText)).toBeVisible()
     expect(within(hero).getByRole('heading', { level: 1 })).toBeVisible()
+    expect(screen.getAllByRole('banner')).toHaveLength(1)
+    const copy = hero.querySelector('.ci-heroCopy')
+    const intro = hero.querySelector('.ci-heroIntro')
+    const promo = screen.getByRole('region', {
+      name: 'Double 11 top-up special',
+    })
+    const utilities = hero.querySelector('.ci-heroUtilities')
+    expect(copy?.children).toHaveLength(3)
+    expect(intro?.nextElementSibling).toBe(promo)
+    expect(promo.nextElementSibling).toBe(utilities)
+    expect(hero.querySelector('.ci-doubleElevenArtwork')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    )
     expect(
       within(hero).queryByRole('link', { name: /Qupper's Forge/ })
     ).toBeNull()
@@ -246,7 +277,53 @@ describe('Double Eleven homepage promotion', () => {
       'src/features/home/components/double-eleven-promo.css',
       'utf8'
     )
-    expect(styles).not.toMatch(/animation:|min-height:\s*100/)
+    expect(styles).not.toMatch(/min-height:\s*100/)
     expect(styles).toContain('max-width: 640px')
+    expect(styles).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(styles).toContain(
+      '@media (max-width: 760px), (hover: none), (pointer: coarse)'
+    )
+    expect(styles).toContain('@keyframes ci-offer-aurora')
   })
+
+  it('keeps the campaign product headline consistent when live model savings load', async () => {
+    const { container } = await renderApp(
+      <CiLandingPage
+        isAuthenticated={false}
+        models={[]}
+        maxSavingsPercent={90}
+      />,
+      client
+    )
+    const headline = container.querySelector('h1')
+    expect(headline).toHaveTextContent('Great models.')
+    expect(headline).toHaveTextContent('Within reach.')
+    expect(headline).not.toHaveTextContent('Save up to')
+    expect(await screen.findByText('¥10')).toBeVisible()
+  })
+
+  it.each(['en', 'zh', 'zh-TW', 'fr', 'ja', 'ru', 'vi'])(
+    'provides translated offer labels and matching placeholders in %s',
+    (locale) => {
+      const source = readFileSync(
+        'src/features/home/components/double-eleven-promo.tsx',
+        'utf8'
+      )
+      const keys = [
+        ...[...source.matchAll(/\bt\(\s*'([^']+)'/g)].map((match) => match[1]),
+        'Great models.',
+        'Within reach.',
+      ]
+      const translations = JSON.parse(
+        readFileSync(`src/i18n/locales/${locale}.json`, 'utf8')
+      ) as { translation: Record<string, string> }
+      for (const key of keys) {
+        const value = translations.translation[key]
+        expect(value, key).toBeTruthy()
+        expect(value.match(/{{[^}]+}}/g) ?? [], key).toEqual(
+          key.match(/{{[^}]+}}/g) ?? []
+        )
+      }
+    }
+  )
 })
