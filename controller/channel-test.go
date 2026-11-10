@@ -78,8 +78,9 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 // The optional IQ path shares channel setup, mapping, pricing and conversion,
 // but never enters health updates or the public relay retry controller.
 type iqChannelTestOptions struct {
-	group  string
-	prompt string
+	group           string
+	prompt          string
+	reasoningEffort string
 }
 
 func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool, iq *iqChannelTestOptions) testResult {
@@ -265,6 +266,11 @@ func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID i
 		info.DisablePing = true
 	}
 	info.InitChannelMeta(c)
+	if iq != nil {
+		if err := applyIQReasoning(request, info, iq.reasoningEffort); err != nil {
+			return testResult{localErr: err}
+		}
+	}
 
 	err = attachTestBillingRequestInput(info, request)
 	if err != nil {
@@ -440,6 +446,7 @@ func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID i
 	//}
 
 	var iqInput []byte
+	iqReasoningEffort := info.ReasoningEffort
 	if iq != nil {
 		iqInput = bytes.Clone(jsonData)
 	}
@@ -466,6 +473,13 @@ func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID i
 		jsonData, err = restoreIQInput(jsonData, iqInput)
 		if err != nil {
 			return testResult{localErr: err}
+		}
+		if iq.reasoningEffort != "" {
+			jsonData, err = restoreIQReasoning(jsonData, iqInput)
+			if err != nil {
+				return testResult{localErr: err}
+			}
+			info.SetReasoningEffort(iqReasoningEffort)
 		}
 		jsonData, err = boundIQRequest(jsonData, endpointType)
 		if err != nil {

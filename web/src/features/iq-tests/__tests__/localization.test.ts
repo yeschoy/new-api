@@ -29,7 +29,7 @@ it('provides every IQ UI key in all seven locales with the same placeholders', (
       .flatMap((file) =>
         [
           ...readFileSync(path.join(root, file), 'utf8').matchAll(
-            /\bt\('([^']+)'/g
+            /\bt\(\s*'([^']+)'/g
           ),
         ].map((match) => match[1])
       )

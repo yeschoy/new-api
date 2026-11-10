@@ -55,12 +55,40 @@ func TestIQScheduleAndValidation(t *testing.T) {
 	c.Targets = []IQTarget{{Group: "g", Models: names}}
 	require.Error(t, NormalizeIQConfig(&c))
 }
+func TestIQReasoningEffortMigrationDefault(t *testing.T) {
+	iqTestDB(t)
+	cfg, err := GetIQConfig()
+	require.NoError(t, err)
+	require.NoError(t, DB.Migrator().DropColumn(&IQConfig{}, "ReasoningEffort"))
+	require.NoError(t, DB.AutoMigrate(&IQConfig{}))
+	upgraded, err := GetIQConfig()
+	require.NoError(t, err)
+	require.Empty(t, upgraded.ReasoningEffort)
+	require.Equal(t, cfg.Prompt, upgraded.Prompt)
+	require.Equal(t, cfg.Version, upgraded.Version)
+}
+
+func TestIQReasoningEffortValidation(t *testing.T) {
+	for _, effort := range []string{"", "none", "minimal", "low", "medium", "high", "xhigh", "max", " HIGH "} {
+		t.Run(effort, func(t *testing.T) {
+			cfg := defaultIQConfig()
+			cfg.ReasoningEffort = effort
+			require.NoError(t, NormalizeIQConfig(&cfg))
+			require.Equal(t, strings.ToLower(strings.TrimSpace(effort)), cfg.ReasoningEffort)
+		})
+	}
+	cfg := defaultIQConfig()
+	cfg.ReasoningEffort = "unsupported"
+	require.Error(t, NormalizeIQConfig(&cfg))
+}
+
 func TestIQPersistenceSingleCheckpointReplacementAndRecovery(t *testing.T) {
 	iqTestDB(t)
 	cfg, err := GetIQConfig()
 	require.NoError(t, err)
 	cfg.Targets = []IQTarget{{Group: "g", Models: []string{"m"}}}
 	cfg.Prompt = " exact prompt \n"
+	cfg.ReasoningEffort = "xhigh"
 	cfg, err = SaveIQConfig(*cfg, 1, time.Now())
 	require.NoError(t, err)
 	_, err = SaveIQConfig(IQConfig{Version: 1, Prompt: cfg.Prompt, Targets: cfg.Targets, ScheduleMode: "interval", IntervalHours: 1, Timezone: "Asia/Shanghai"}, 1, time.Now())
@@ -75,6 +103,10 @@ func TestIQPersistenceSingleCheckpointReplacementAndRecovery(t *testing.T) {
 	snapshot, err := GetIQBatch(task.TaskID)
 	require.NoError(t, err)
 	require.Equal(t, cfg.Prompt, snapshot.Prompt)
+	require.Equal(t, "xhigh", snapshot.ReasoningEffort)
+	storedConfig, err := GetIQConfig()
+	require.NoError(t, err)
+	require.Equal(t, "xhigh", storedConfig.ReasoningEffort)
 	require.NotContains(t, task.Payload, "exact prompt")
 	_, claimed, err := ClaimSystemTask(task.ID, SystemTaskTypeIQTest, "r", common.GetTimestamp()+60)
 	require.NoError(t, err)
@@ -110,8 +142,12 @@ func TestIQPersistenceSingleCheckpointReplacementAndRecovery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "interrupted", attempts[0].Status)
 	cfg.Targets = []IQTarget{}
+	cfg.ReasoningEffort = ""
 	_, err = SaveIQConfig(*cfg, 1, time.Now())
 	require.NoError(t, err)
+	storedConfig, err = GetIQConfig()
+	require.NoError(t, err)
+	require.Empty(t, storedConfig.ReasoningEffort, "clearing effort must persist the empty default")
 	rows, err := ListIQLatest()
 	require.NoError(t, err)
 	require.Empty(t, rows)

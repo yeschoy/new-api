@@ -33,6 +33,7 @@ import type { IQConfig, IQConfigInput } from '../types'
 const config: IQConfig = {
   version: 2,
   prompt: 'Draw a pelican.',
+  reasoning_effort: '',
   targets: [{ group: 'public', models: ['model-0'] }],
   enabled: false,
   schedule_mode: 'interval',
@@ -111,7 +112,10 @@ function SettingsFixture() {
     <IQConfigForm
       scope={scope}
       config={config}
-      catalog={[{ group: 'public', models: ['model-0', 'model-1'] }]}
+      catalog={[
+        { group: 'public', models: ['model-0', 'model-1'] },
+        { group: 'private', models: ['model-private'] },
+      ]}
       canWrite
     />
   )
@@ -125,7 +129,7 @@ function mount() {
 }
 
 describe('IQ configuration editing', () => {
-  it('round-trips exact prompt, model checkboxes, enable toggle and daily Beijing schedule without server fields', async () => {
+  it('round-trips exact prompt, thinking level, multiple groups and daily Beijing schedule without server fields', async () => {
     const user = userEvent.setup()
     mount()
     await user.clear(screen.getByLabelText('Test prompt'))
@@ -133,7 +137,9 @@ describe('IQ configuration editing', () => {
       screen.getByLabelText('Test prompt'),
       '  Finished artwork.  '
     )
+    await user.selectOptions(screen.getByLabelText('Thinking level'), 'xhigh')
     await user.click(screen.getByRole('checkbox', { name: 'model-1' }))
+    await user.click(screen.getByRole('checkbox', { name: 'model-private' }))
     await user.click(screen.getByRole('switch', { name: 'Enable schedule' }))
     await user.selectOptions(screen.getByLabelText('Schedule'), 'daily')
     expect(screen.queryByLabelText('Interval (hours)')).not.toBeInTheDocument()
@@ -150,7 +156,11 @@ describe('IQ configuration editing', () => {
     expect(saved[0]).toEqual({
       version: 2,
       prompt: '  Finished artwork.  ',
-      targets: [{ group: 'public', models: ['model-0', 'model-1'] }],
+      reasoning_effort: 'xhigh',
+      targets: [
+        { group: 'public', models: ['model-0', 'model-1'] },
+        { group: 'private', models: ['model-private'] },
+      ],
       enabled: true,
       schedule_mode: 'daily',
       interval_hours: 24,
@@ -168,11 +178,13 @@ describe('IQ configuration editing', () => {
     const user = userEvent.setup()
     mount()
     await user.type(screen.getByLabelText('Test prompt'), ' Extra detail.')
+    await user.selectOptions(screen.getByLabelText('Thinking level'), 'high')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await screen.findByRole('alert')
     expect(screen.getByLabelText('Test prompt')).toHaveValue(
       'Draw a pelican. Extra detail.'
     )
+    expect(screen.getByLabelText('Thinking level')).toHaveValue('high')
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     expect(saved).toHaveLength(1)
     await user.click(
@@ -185,6 +197,33 @@ describe('IQ configuration editing', () => {
         'Draw a pelican.'
       )
     )
+    expect(screen.getByLabelText('Thinking level')).toHaveValue('')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('keeps the default optional and validates all supported thinking levels', async () => {
+    mount()
+    expect(screen.getByLabelText('Thinking level')).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0].reasoning_effort).toBe('')
+    for (const reasoning_effort of [
+      '',
+      'none',
+      'minimal',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+    ]) {
+      expect(
+        iqConfigSchema.safeParse({ ...saved[0], reasoning_effort }).success
+      ).toBe(true)
+    }
+    expect(
+      iqConfigSchema.safeParse({ ...saved[0], reasoning_effort: 'invalid' })
+        .success
+    ).toBe(false)
   })
 })

@@ -18,7 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
 
-import type { IQConfig, IQConfigInput, IQTarget } from './types'
+import {
+  IQ_REASONING_EFFORTS,
+  type IQConfig,
+  type IQConfigInput,
+  type IQTarget,
+} from './types'
 
 const message = 'Invalid IQ configuration'
 export const iqConfigSchema = z
@@ -32,6 +37,7 @@ export const iqConfigSchema = z
           new TextEncoder().encode(value).length <= 65_536,
         message
       ),
+    reasoning_effort: z.enum(IQ_REASONING_EFFORTS),
     targets: z.array(
       z.object({ group: z.string(), models: z.array(z.string()) })
     ),
@@ -69,6 +75,7 @@ export function editableIQConfig(config: IQConfig): IQConfigInput {
   return {
     version: config.version,
     prompt: config.prompt,
+    reasoning_effort: config.reasoning_effort ?? '',
     targets: config.targets,
     enabled: config.enabled,
     schedule_mode: config.schedule_mode,
