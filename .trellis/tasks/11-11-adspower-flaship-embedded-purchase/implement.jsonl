@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/11-11-adspower-flaship-embedded-purchase/prd.md","reason":"Research-only requirements and explicit authorization boundaries; not approval to modify business code"}
+{"file":".trellis/tasks/11-11-adspower-flaship-embedded-purchase/design.md","reason":"Candidate API-first versus hosted purchase UI ownership; keep Tenant subscription and legacy recharge identities distinct"}
+{"file":".trellis/tasks/11-11-adspower-flaship-embedded-purchase/research/REPORT.zh-CN.md","reason":"Primary public-code evidence, competitor fact/inference boundaries, proposed interfaces and verification material"}
+{"file":".trellis/spec/backend/partner-server-accounts.md","reason":"Existing server-payment flow is wallet recharge, not paid Tenant subscription purchase"}

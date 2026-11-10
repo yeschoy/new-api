@@ -1,0 +1,686 @@
+[
+  {
+    "command": [
+      "open",
+      "https://help.adspower.com/docs/proxy_list"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "B42E013D98CF0EE02227DF172357DDB0",
+      "title": "Proxies: Add, Buy, Renew, Check, Filter-Help Center - AdsPower",
+      "url": "https://help.adspower.com/docs/proxy_list"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://help.adspower.com/docs/proxy_list",
+      "refs": {
+        "e1": {
+          "name": "",
+          "role": "link"
+        },
+        "e10": {
+          "name": "",
+          "role": "generic"
+        },
+        "e100": {
+          "name": "10 Mbps",
+          "role": "cell"
+        },
+        "e101": {
+          "name": "5 Mbps",
+          "role": "cell"
+        },
+        "e102": {
+          "name": "Typical Use Cases",
+          "role": "cell"
+        },
+        "e103": {
+          "name": "E-commerce, social media, account management",
+          "role": "cell"
+        },
+        "e104": {
+          "name": "Web scraping, automation, bulk tasks",
+          "role": "cell"
+        },
+        "e105": {
+          "name": "✍Get Started",
+          "role": "menuitem"
+        },
+        "e106": {
+          "name": "Settings",
+          "role": "menuitem"
+        },
+        "e107": {
+          "name": "🧷Profiles",
+          "role": "menuitem"
+        },
+        "e108": {
+          "name": "Groups",
+          "role": "menuitem"
+        },
+        "e109": {
+          "name": "🌐Proxy",
+          "role": "menuitem"
+        },
+        "e11": {
+          "name": "",
+          "role": "generic"
+        },
+        "e110": {
+          "name": "📁Extensions",
+          "role": "menuitem"
+        },
+        "e111": {
+          "name": "♻️Trash",
+          "role": "menuitem"
+        },
+        "e112": {
+          "name": "🤖Automation",
+          "role": "menuitem"
+        },
+        "e113": {
+          "name": "👩‍💻Team",
+          "role": "menuitem"
+        },
+        "e114": {
+          "name": "Global Settings",
+          "role": "menuitem"
+        },
+        "e115": {
+          "name": "❓FAQ",
+          "role": "menuitem"
+        },
+        "e116": {
+          "name": "🔧Troubleshootings",
+          "role": "menuitem"
+        },
+        "e117": {
+          "name": "",
+          "role": "generic"
+        },
+        "e118": {
+          "name": "",
+          "role": "generic"
+        },
+        "e119": {
+          "name": "",
+          "role": "generic"
+        },
+        "e12": {
+          "name": "",
+          "role": "generic"
+        },
+        "e120": {
+          "name": "Groups",
+          "role": "link"
+        },
+        "e121": {
+          "name": "",
+          "role": "generic"
+        },
+        "e122": {
+          "name": "",
+          "role": "generic"
+        },
+        "e123": {
+          "name": "♻️Trash",
+          "role": "link"
+        },
+        "e124": {
+          "name": "",
+          "role": "generic"
+        },
+        "e125": {
+          "name": "",
+          "role": "generic"
+        },
+        "e126": {
+          "name": "Global Settings",
+          "role": "link"
+        },
+        "e127": {
+          "name": "",
+          "role": "generic"
+        },
+        "e128": {
+          "name": "",
+          "role": "generic"
+        },
+        "e129": {
+          "name": "✍Get Started",
+          "role": "link"
+        },
+        "e13": {
+          "name": "Homepage",
+          "role": "link"
+        },
+        "e130": {
+          "name": "Settings",
+          "role": "link"
+        },
+        "e131": {
+          "name": "🧷Profiles",
+          "role": "link"
+        },
+        "e132": {
+          "name": "🌐Proxy",
+          "role": "link"
+        },
+        "e133": {
+          "name": "Recommended Proxy Providers",
+          "role": "menuitem"
+        },
+        "e134": {
+          "name": "Proxies: Add, Buy, Renew, Check, Filter",
+          "role": "menuitem"
+        },
+        "e135": {
+          "name": "Export & Update proxies",
+          "role": "menuitem"
+        },
+        "e136": {
+          "name": "Proxy tag & Random proxies",
+          "role": "menuitem"
+        },
+        "e137": {
+          "name": "Proxy Types",
+          "role": "menuitem"
+        },
+        "e138": {
+          "name": "Configuration",
+          "role": "menuitem"
+        },
+        "e139": {
+          "name": "📁Extensions",
+          "role": "link"
+        },
+        "e14": {
+          "name": "🌐Proxy",
+          "role": "link"
+        },
+        "e140": {
+          "name": "🤖Automation",
+          "role": "link"
+        },
+        "e141": {
+          "name": "👩‍💻Team",
+          "role": "link"
+        },
+        "e142": {
+          "name": "❓FAQ",
+          "role": "link"
+        },
+        "e143": {
+          "name": "🔧Troubleshootings",
+          "role": "link"
+        },
+        "e144": {
+          "name": "Recommended Proxy Providers",
+          "role": "link"
+        },
+        "e145": {
+          "name": "Proxies: Add, Buy, Renew, Check, Filter",
+          "role": "link"
+        },
+        "e146": {
+          "name": "Export & Update proxies",
+          "role": "link"
+        },
+        "e147": {
+          "name": "Proxy tag & Random proxies",
+          "role": "link"
+        },
+        "e148": {
+          "name": "Proxy Types",
+          "role": "link"
+        },
+        "e149": {
+          "name": "",
+          "role": "generic"
+        },
+        "e15": {
+          "name": "Proxies: Add, Buy, Renew, Check, Filter",
+          "role": "heading"
+        },
+        "e150": {
+          "name": "Configuration",
+          "role": "link"
+        },
+        "e151": {
+          "name": "隐藏播放器控件",
+          "role": "button"
+        },
+        "e152": {
+          "name": "播放视频",
+          "role": "button"
+        },
+        "e153": {
+          "name": "What Is a Proxy & How to Use It in AdsPower",
+          "role": "link"
+        },
+        "e154": {
+          "name": "AdsPower - Antidetect Browser for Multi-Accounting",
+          "role": "link"
+        },
+        "e155": {
+          "name": "在 YouTube 上观看",
+          "role": "link"
+        },
+        "e156": {
+          "name": "thumbnail-image",
+          "role": "button"
+        },
+        "e157": {
+          "name": "分享",
+          "role": "button"
+        },
+        "e158": {
+          "name": "4140位订阅者",
+          "role": "StaticText"
+        },
+        "e16": {
+          "name": "Powered by",
+          "role": "link"
+        },
+        "e17": {
+          "name": "",
+          "role": "generic"
+        },
+        "e18": {
+          "name": "",
+          "role": "generic"
+        },
+        "e19": {
+          "name": "🌐Proxy",
+          "role": "link"
+        },
+        "e2": {
+          "name": "Official Home",
+          "role": "link"
+        },
+        "e20": {
+          "name": "Proxies: Add, Buy, Renew, Check, Filter",
+          "role": "link"
+        },
+        "e21": {
+          "name": "YouTube video player",
+          "role": "Iframe"
+        },
+        "e22": {
+          "name": "Add proxies",
+          "role": "link"
+        },
+        "e23": {
+          "name": "Buy proxy",
+          "role": "link"
+        },
+        "e24": {
+          "name": "Renew proxy",
+          "role": "link"
+        },
+        "e25": {
+          "name": "Single renew",
+          "role": "link"
+        },
+        "e26": {
+          "name": "Bulk renew",
+          "role": "link"
+        },
+        "e27": {
+          "name": "Auto renew",
+          "role": "link"
+        },
+        "e28": {
+          "name": "Check proxy",
+          "role": "link"
+        },
+        "e29": {
+          "name": "Filter proxies",
+          "role": "link"
+        },
+        "e3": {
+          "name": "Sign up",
+          "role": "link"
+        },
+        "e30": {
+          "name": "Proxies: Add, Buy, Renew, Check, Filter",
+          "role": "link"
+        },
+        "e31": {
+          "name": "文章图片",
+          "role": "image"
+        },
+        "e32": {
+          "name": "Add proxies",
+          "role": "heading"
+        },
+        "e33": {
+          "name": "文章图片",
+          "role": "image"
+        },
+        "e34": {
+          "name": "",
+          "role": "image"
+        },
+        "e35": {
+          "name": "Buy proxy",
+          "role": "heading"
+        },
+        "e36": {
+          "name": "",
+          "role": "image"
+        },
+        "e37": {
+          "name": "",
+          "role": "image"
+        },
+        "e38": {
+          "name": "",
+          "role": "image"
+        },
+        "e39": {
+          "name": "",
+          "role": "image"
+        },
+        "e4": {
+          "name": "Download",
+          "role": "link"
+        },
+        "e40": {
+          "name": "",
+          "role": "image"
+        },
+        "e41": {
+          "name": "",
+          "role": "image"
+        },
+        "e42": {
+          "name": "",
+          "role": "image"
+        },
+        "e43": {
+          "name": "Renew proxy",
+          "role": "heading"
+        },
+        "e44": {
+          "name": "Single renew",
+          "role": "heading"
+        },
+        "e45": {
+          "name": "",
+          "role": "image"
+        },
+        "e46": {
+          "name": "Bulk renew",
+          "role": "heading"
+        },
+        "e47": {
+          "name": "",
+          "role": "image"
+        },
+        "e48": {
+          "name": "",
+          "role": "image"
+        },
+        "e49": {
+          "name": "Auto renew",
+          "role": "heading"
+        },
+        "e5": {
+          "name": "",
+          "role": "generic"
+        },
+        "e50": {
+          "name": "",
+          "role": "image"
+        },
+        "e51": {
+          "name": "",
+          "role": "image"
+        },
+        "e52": {
+          "name": "",
+          "role": "image"
+        },
+        "e53": {
+          "name": "",
+          "role": "image"
+        },
+        "e54": {
+          "name": "",
+          "role": "image"
+        },
+        "e55": {
+          "name": "Check proxy",
+          "role": "heading"
+        },
+        "e56": {
+          "name": "文章图片",
+          "role": "image"
+        },
+        "e57": {
+          "name": "Filter proxies",
+          "role": "heading"
+        },
+        "e58": {
+          "name": "文章图片",
+          "role": "image"
+        },
+        "e59": {
+          "name": "",
+          "role": "image"
+        },
+        "e6": {
+          "name": "EN",
+          "role": "button"
+        },
+        "e60": {
+          "name": "",
+          "role": "image"
+        },
+        "e61": {
+          "name": "Add proxies",
+          "role": "link"
+        },
+        "e62": {
+          "name": "Buy proxy",
+          "role": "link"
+        },
+        "e63": {
+          "name": "Renew proxy",
+          "role": "link"
+        },
+        "e64": {
+          "name": "Single renew",
+          "role": "link"
+        },
+        "e65": {
+          "name": "Bulk renew",
+          "role": "link"
+        },
+        "e66": {
+          "name": "Auto renew",
+          "role": "link"
+        },
+        "e67": {
+          "name": "Check proxy",
+          "role": "link"
+        },
+        "e68": {
+          "name": "Filter proxies",
+          "role": "link"
+        },
+        "e69": {
+          "name": "Type",
+          "role": "columnheader"
+        },
+        "e7": {
+          "name": "Breadcrumb",
+          "role": "navigation"
+        },
+        "e70": {
+          "name": "Residential ISP",
+          "role": "columnheader"
+        },
+        "e71": {
+          "name": "Datacenter",
+          "role": "columnheader"
+        },
+        "e72": {
+          "name": "IP Source",
+          "role": "cell"
+        },
+        "e73": {
+          "name": "Residential network (home broadband)",
+          "role": "cell"
+        },
+        "e74": {
+          "name": "Data center server network",
+          "role": "cell"
+        },
+        "e75": {
+          "name": "ASN Type",
+          "role": "cell"
+        },
+        "e76": {
+          "name": "ISP (telecom operators, e.g. Comcast, AT&T)",
+          "role": "cell"
+        },
+        "e77": {
+          "name": "Hosting (AWS, OVH, DigitalOcean, etc.)",
+          "role": "cell"
+        },
+        "e78": {
+          "name": "IP Attribute",
+          "role": "cell"
+        },
+        "e79": {
+          "name": "Residential",
+          "role": "cell"
+        },
+        "e8": {
+          "name": "",
+          "role": "generic"
+        },
+        "e80": {
+          "name": "Datacenter",
+          "role": "cell"
+        },
+        "e81": {
+          "name": "Real Home Network",
+          "role": "cell"
+        },
+        "e82": {
+          "name": "Yes",
+          "role": "cell"
+        },
+        "e83": {
+          "name": "No",
+          "role": "cell"
+        },
+        "e84": {
+          "name": "Stability",
+          "role": "cell"
+        },
+        "e85": {
+          "name": "High (fixed IP)",
+          "role": "cell"
+        },
+        "e86": {
+          "name": "High (fixed IP)",
+          "role": "cell"
+        },
+        "e87": {
+          "name": "Trust Level",
+          "role": "cell"
+        },
+        "e88": {
+          "name": "High",
+          "role": "cell"
+        },
+        "e89": {
+          "name": "Medium or Low",
+          "role": "cell"
+        },
+        "e9": {
+          "name": "",
+          "role": "generic"
+        },
+        "e90": {
+          "name": "Cost",
+          "role": "cell"
+        },
+        "e91": {
+          "name": "High",
+          "role": "cell"
+        },
+        "e92": {
+          "name": "Low",
+          "role": "cell"
+        },
+        "e93": {
+          "name": "Speed",
+          "role": "cell"
+        },
+        "e94": {
+          "name": "Moderate",
+          "role": "cell"
+        },
+        "e95": {
+          "name": "Fast",
+          "role": "cell"
+        },
+        "e96": {
+          "name": "Detection Risk",
+          "role": "cell"
+        },
+        "e97": {
+          "name": "Low",
+          "role": "cell"
+        },
+        "e98": {
+          "name": "High",
+          "role": "cell"
+        },
+        "e99": {
+          "name": "Bandwidth",
+          "role": "cell"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- link [ref=e1]\n- link \"Official Home\" [ref=e2]\n- link \"Sign up\" [ref=e3]\n- link \"Download\" [ref=e4]\n- button \"EN\" [expanded=false, ref=e6]\n- navigation \"Breadcrumb\" [ref=e7]\n  - link \"Homepage\" [ref=e13]\n  - link \"🌐Proxy\" [ref=e14]\n    - link \"🌐Proxy\" [ref=e19]\n  - link \"Proxies: Add, Buy, Renew, Check, Filter\" [ref=e20]\n    - link \"Proxies: Add, Buy, Renew, Check, Filter\" [ref=e30]\n- heading \"Proxies: Add, Buy, Renew, Check, Filter\" [level=1, ref=e15]\n- Iframe \"YouTube video player\" [ref=e21]\n  - button \"播放视频\" [ref=e152]\n  - button \"隐藏播放器控件\" [ref=e151]\n  - link \"What Is a Proxy & How to Use It in AdsPower\" [ref=e153]\n  - link \"AdsPower - Antidetect Browser for Multi-Accounting\" [ref=e154]\n  - button \"thumbnail-image\" [ref=e156]\n  - StaticText \"4140位订阅者\" [ref=e158] clickable [cursor:pointer]\n  - button \"分享\" [ref=e157]\n  - link \"在 YouTube 上观看\" [ref=e155] clickable [cursor:pointer]\n- image \"文章图片\" [ref=e31] clickable [onclick]\n- link \"Add proxies\" [ref=e22]\n  - heading \"Add proxies\" [level=1, ref=e32]\n- image \"文章图片\" [ref=e33] clickable [onclick]\n- image [ref=e34] clickable [onclick]\n- link \"Buy proxy\" [ref=e23]\n  - heading \"Buy proxy\" [level=1, ref=e35]\n- image [ref=e36] clickable [onclick]\n- image [ref=e37] clickable [onclick]\n- columnheader \"Type\" [ref=e69]\n- columnheader \"Residential ISP\" [ref=e70]\n- columnheader \"Datacenter\" [ref=e71]\n- cell \"IP Source\" [ref=e72]\n- cell \"Residential network (home broadband)\" [ref=e73]\n- cell \"Data center server network\" [ref=e74]\n- cell \"ASN Type\" [ref=e75]\n- cell \"ISP (telecom operators, e.g. Comcast, AT&T)\" [ref=e76]\n- cell \"Hosting (AWS, OVH, DigitalOcean, etc.)\" [ref=e77]\n- cell \"IP Attribute\" [ref=e78]\n- cell \"Residential\" [ref=e79]\n- cell \"Datacenter\" [ref=e80]\n- cell \"Real Home Network\" [ref=e81]\n- cell \"Yes\" [ref=e82]\n- cell \"No\" [ref=e83]\n- cell \"Stability\" [ref=e84]\n- cell \"High (fixed IP)\" [ref=e85]\n- cell \"High (fixed IP)\" [ref=e86]\n- cell \"Trust Level\" [ref=e87]\n- cell \"High\" [ref=e88]\n- cell \"Medium or Low\" [ref=e89]\n- cell \"Cost\" [ref=e90]\n- cell \"High\" [ref=e91]\n- cell \"Low\" [ref=e92]\n- cell \"Speed\" [ref=e93]\n- cell \"Moderate\" [ref=e94]\n- cell \"Fast\" [ref=e95]\n- cell \"Detection Risk\" [ref=e96]\n- cell \"Low\" [ref=e97]\n- cell \"High\" [ref=e98]\n- cell \"Bandwidth\" [ref=e99]\n- cell \"10 Mbps\" [ref=e100]\n- cell \"5 Mbps\" [ref=e101]\n- cell \"Typical Use Cases\" [ref=e102]\n- cell \"E-commerce, social media, account management\" [ref=e103]\n- cell \"Web scraping, automation, bulk tasks\" [ref=e104]\n- image [ref=e38] clickable [onclick]\n- image [ref=e39] clickable [onclick]\n- image [ref=e40] clickable [onclick]\n- image [ref=e41] clickable [onclick]\n- image [ref=e42] clickable [onclick]\n- link \"Renew proxy\" [ref=e24]\n  - heading \"Renew proxy\" [level=1, ref=e43]\n- link \"Single renew\" [ref=e25]\n  - heading \"Single renew\" [level=3, ref=e44]\n- image [ref=e45] clickable [onclick]\n- link \"Bulk renew\" [ref=e26]\n  - heading \"Bulk renew\" [level=3, ref=e46]\n- image [ref=e47] clickable [onclick]\n- image [ref=e48] clickable [onclick]\n- link \"Auto renew\" [ref=e27]\n  - heading \"Auto renew\" [level=3, ref=e49]\n- image [ref=e50] clickable [onclick]\n- image [ref=e51] clickable [onclick]\n- image [ref=e52] clickable [onclick]\n- image [ref=e53] clickable [onclick]\n- image [ref=e54] clickable [onclick]\n- link \"Check proxy\" [ref=e28]\n  - heading \"Check proxy\" [level=1, ref=e55]\n- image \"文章图片\" [ref=e56] clickable [onclick]\n- link \"Filter proxies\" [ref=e29]\n  - heading \"Filter proxies\" [level=1, ref=e57]\n- image \"文章图片\" [ref=e58] clickable [onclick]\n- image [ref=e59] clickable [onclick]\n- image [ref=e60] clickable [onclick]\n- generic \"Yes\" [ref=e8] clickable [cursor:pointer]\n- generic \"No\" [ref=e9] clickable [cursor:pointer]\n- generic \"Give feedback about this article\" [ref=e10] clickable [cursor:pointer]\n- generic \"PreviousRecommended Proxy Providers\" [ref=e11] clickable [cursor:pointer]\n- generic \"NextExport & Update proxies\" [ref=e12] clickable [cursor:pointer]\n- menuitem \"✍Get Started\" [ref=e105]\n  - generic \"✍Get Started\" [ref=e117] clickable [cursor:pointer]\n    - link \"✍Get Started\" [ref=e129]\n- menuitem \"Settings\" [ref=e106]\n  - generic \"Settings\" [ref=e118] clickable [cursor:pointer]\n    - link \"Settings\" [ref=e130]\n- menuitem \"🧷Profiles\" [ref=e107]\n  - generic \"🧷Profiles\" [ref=e119] clickable [cursor:pointer]\n    - link \"🧷Profiles\" [ref=e131]\n- menuitem \"Groups\" [ref=e108]\n  - link \"Groups\" [ref=e120]\n- menuitem \"🌐Proxy\" [expanded=true, ref=e109]\n  - generic \"🌐Proxy\" [ref=e121] clickable [cursor:pointer]\n    - link \"🌐Proxy\" [ref=e132]\n  - menuitem \"Recommended Proxy Providers\" [ref=e133]\n    - link \"Recommended Proxy Providers\" [ref=e144]\n  - menuitem \"Proxies: Add, Buy, Renew, Check, Filter\" [ref=e134]\n    - link \"Proxies: Add, Buy, Renew, Check, Filter\" [ref=e145]\n  - menuitem \"Export & Update proxies\" [ref=e135]\n    - link \"Export & Update proxies\" [ref=e146]\n  - menuitem \"Proxy tag & Random proxies\" [ref=e136]\n    - link \"Proxy tag & Random proxies\" [ref=e147]\n  - menuitem \"Proxy Types\" [ref=e137]\n    - link \"Proxy Types\" [ref=e148]\n  - menuitem \"Configuration\" [ref=e138]\n    - generic \"Configuration\" [ref=e149] clickable [cursor:pointer]\n      - link \"Configuration\" [ref=e150]\n- menuitem \"📁Extensions\" [ref=e110]\n  - generic \"📁Extensions\" [ref=e122] clickable [cursor:pointer]\n    - link \"📁Extensions\" [ref=e139]\n- menuitem \"♻️Trash\" [ref=e111]\n  - link \"♻️Trash\" [ref=e123]\n- menuitem \"🤖Automation\" [ref=e112]\n  - generic \"🤖Automation\" [ref=e124] clickable [cursor:pointer]\n    - link \"🤖Automation\" [ref=e140]\n- menuitem \"👩💻Team\" [ref=e113]\n  - generic \"👩💻Team\" [ref=e125] clickable [cursor:pointer]\n    - link \"👩💻Team\" [ref=e141]\n- menuitem \"Global Settings\" [ref=e114]\n  - link \"Global Settings\" [ref=e126]\n- menuitem \"❓FAQ\" [ref=e115]\n  - generic \"❓FAQ\" [ref=e127] clickable [cursor:pointer]\n    - link \"❓FAQ\" [ref=e142]\n- menuitem \"🔧Troubleshootings\" [ref=e116]\n  - generic \"🔧Troubleshootings\" [ref=e128] clickable [cursor:pointer]\n    - link \"🔧Troubleshootings\" [ref=e143]\n- link \"Powered by\" [ref=e16]\n- generic [ref=e17] clickable [cursor:pointer]\n- generic [ref=e18] clickable [cursor:pointer]\n- link \"Add proxies\" [ref=e61]\n- link \"Buy proxy\" [ref=e62]\n- link \"Renew proxy\" [ref=e63]\n- link \"Single renew\" [ref=e64]\n- link \"Bulk renew\" [ref=e65]\n- link \"Auto renew\" [ref=e66]\n- link \"Check proxy\" [ref=e67]\n- link \"Filter proxies\" [ref=e68]\n- generic [ref=e5] clickable [cursor:pointer]"
+    },
+    "success": true
+  }
+]

@@ -1,0 +1,1810 @@
+[
+  {
+    "command": [
+      "open",
+      "https://www.adspower.com/"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "B42E013D98CF0EE02227DF172357DDB0",
+      "title": "AdsPower - Best Antidetect Browser for Multi-Accounting",
+      "url": "https://www.adspower.com/"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://www.adspower.com/",
+      "refs": {
+        "e244": {
+          "name": "AdsPower",
+          "role": "link"
+        },
+        "e245": {
+          "name": "The #1 Anti-detect Browser Trusted By 10M+ Users",
+          "role": "region"
+        },
+        "e246": {
+          "name": "Manage Multiple Accounts Safely and Efficiently",
+          "role": "region"
+        },
+        "e247": {
+          "name": "AdsPower Antidetect Browser Trusted Across Industries",
+          "role": "region"
+        },
+        "e248": {
+          "name": "Free plan",
+          "role": "region"
+        },
+        "e249": {
+          "name": "Leading the Way in Data and Browser Security",
+          "role": "region"
+        },
+        "e250": {
+          "name": "What Customers Say About AdsPower Antidetect Browser",
+          "role": "region"
+        },
+        "e251": {
+          "name": "Latest Updates & Guides",
+          "role": "region"
+        },
+        "e252": {
+          "name": "AdsPower",
+          "role": "link"
+        },
+        "e253": {
+          "name": "https://www.youtube.com/@adspowerbrowser",
+          "role": "link"
+        },
+        "e254": {
+          "name": "https://www.linkedin.com/company/66754758/",
+          "role": "link"
+        },
+        "e255": {
+          "name": "https://telegram.me/adspoweren",
+          "role": "link"
+        },
+        "e256": {
+          "name": "https://twitter.com/AdsPowerBrowser",
+          "role": "link"
+        },
+        "e257": {
+          "name": "https://www.instagram.com/adspowerbrowser/",
+          "role": "link"
+        },
+        "e258": {
+          "name": "https://www.tiktok.com/@adspowerbrowser",
+          "role": "link"
+        },
+        "e259": {
+          "name": "https://www.facebook.com/adspowerantidetectbrowser",
+          "role": "link"
+        },
+        "e260": {
+          "name": "About Us",
+          "role": "link"
+        },
+        "e261": {
+          "name": "Contact Us",
+          "role": "link"
+        },
+        "e262": {
+          "name": "Blog",
+          "role": "link"
+        },
+        "e263": {
+          "name": "Reviews",
+          "role": "link"
+        },
+        "e264": {
+          "name": "Referral Program",
+          "role": "link"
+        },
+        "e265": {
+          "name": "Bug Bounty",
+          "role": "link"
+        },
+        "e266": {
+          "name": "Legal & Agreements",
+          "role": "link"
+        },
+        "e267": {
+          "name": "Help docs",
+          "role": "link"
+        },
+        "e268": {
+          "name": "API User Guide",
+          "role": "link"
+        },
+        "e269": {
+          "name": "RPA User Guide",
+          "role": "link"
+        },
+        "e270": {
+          "name": "MCP Guide",
+          "role": "link"
+        },
+        "e271": {
+          "name": "Release Notes",
+          "role": "link"
+        },
+        "e272": {
+          "name": "Download",
+          "role": "link"
+        },
+        "e273": {
+          "name": "Pricing",
+          "role": "link"
+        },
+        "e274": {
+          "name": "Proxy Catalog",
+          "role": "link"
+        },
+        "e275": {
+          "name": "Fingerprint Checker",
+          "role": "link"
+        },
+        "e276": {
+          "name": "Partner Center",
+          "role": "link"
+        },
+        "e277": {
+          "name": "AdsPower vs Dolphin {anty}",
+          "role": "link"
+        },
+        "e278": {
+          "name": "AdsPower vs GoLogin",
+          "role": "link"
+        },
+        "e279": {
+          "name": "AdsPower vs Multilogin",
+          "role": "link"
+        },
+        "e280": {
+          "name": "IP Address Lookup",
+          "role": "link"
+        },
+        "e281": {
+          "name": "DNS Leak Test",
+          "role": "link"
+        },
+        "e282": {
+          "name": "Glossary",
+          "role": "link"
+        },
+        "e283": {
+          "name": "Airdrops",
+          "role": "link"
+        },
+        "e284": {
+          "name": "Antidetect Browser for Affiliate Marketing",
+          "role": "link"
+        },
+        "e285": {
+          "name": "Antidetect Browser for E-commerce",
+          "role": "link"
+        },
+        "e286": {
+          "name": "Antidetect Browsers for Social Marketing",
+          "role": "link"
+        },
+        "e287": {
+          "name": "Antidetect Browser for Crypto",
+          "role": "link"
+        },
+        "e288": {
+          "name": "Antidetect Browser for Traffic Arbitrage",
+          "role": "link"
+        },
+        "e289": {
+          "name": "Antidetect Browser for Digital Marketing",
+          "role": "link"
+        },
+        "e290": {
+          "name": "Accept",
+          "role": "button"
+        },
+        "e291": {
+          "name": "更换为简体中文",
+          "role": "link"
+        },
+        "e292": {
+          "name": "不再显示",
+          "role": "button"
+        },
+        "e293": {
+          "name": "",
+          "role": "generic"
+        },
+        "e294": {
+          "name": "",
+          "role": "generic"
+        },
+        "e295": {
+          "name": "",
+          "role": "generic"
+        },
+        "e296": {
+          "name": "",
+          "role": "generic"
+        },
+        "e297": {
+          "name": "",
+          "role": "generic"
+        },
+        "e298": {
+          "name": "Log in",
+          "role": "link"
+        },
+        "e299": {
+          "name": "Sign up",
+          "role": "link"
+        },
+        "e300": {
+          "name": "",
+          "role": "generic"
+        },
+        "e301": {
+          "name": "The #1 Anti-detect Browser Trusted By 10M+ Users",
+          "role": "heading"
+        },
+        "e302": {
+          "name": "Try It Free",
+          "role": "link"
+        },
+        "e303": {
+          "name": "Get Started",
+          "role": "link"
+        },
+        "e304": {
+          "name": "See AdsPower Chrome 156 and Firefox 156 kernel release notes (opens in a new tab)",
+          "role": "link"
+        },
+        "e305": {
+          "name": "Try It Free (opens in a new tab)",
+          "role": "link"
+        },
+        "e306": {
+          "name": "AdsPower Antidetect Browser Trusted Across Industries",
+          "role": "heading"
+        },
+        "e307": {
+          "name": "Ask ChatGPT",
+          "role": "link"
+        },
+        "e308": {
+          "name": "Ask Claude",
+          "role": "link"
+        },
+        "e309": {
+          "name": "Ask Perplexity",
+          "role": "link"
+        },
+        "e310": {
+          "name": "Explore AdsPower Media Buying solution",
+          "role": "link"
+        },
+        "e311": {
+          "name": "Explore AdsPower E-commerce solution",
+          "role": "link"
+        },
+        "e312": {
+          "name": "Explore AdsPower Affiliate Marketing solution",
+          "role": "link"
+        },
+        "e313": {
+          "name": "Explore AdsPower Crypto solution",
+          "role": "link"
+        },
+        "e314": {
+          "name": "Explore AdsPower Social Media Marketing solution",
+          "role": "link"
+        },
+        "e315": {
+          "name": "Explore AdsPower Web Scraping solution",
+          "role": "link"
+        },
+        "e316": {
+          "name": "View All Solutions >",
+          "role": "link"
+        },
+        "e317": {
+          "name": "Manage Multiple Accounts on 1 Device?",
+          "role": "heading"
+        },
+        "e318": {
+          "name": "Sign up for free",
+          "role": "link"
+        },
+        "e319": {
+          "name": "View pricing",
+          "role": "link"
+        },
+        "e320": {
+          "name": "Why Choose AdsPower Antidetect Browser?",
+          "role": "heading"
+        },
+        "e321": {
+          "name": "Fingerprint Isolation",
+          "role": "tabpanel"
+        },
+        "e322": {
+          "name": "Secure Your Accounts and Team Access",
+          "role": "heading"
+        },
+        "e323": {
+          "name": "Protect Your Data with Encryption",
+          "role": "heading"
+        },
+        "e324": {
+          "name": "More Control Over Your Browser Data",
+          "role": "heading"
+        },
+        "e325": {
+          "name": "Bug Bounty Program",
+          "role": "heading"
+        },
+        "e326": {
+          "name": "Submit vulnerability report",
+          "role": "link"
+        },
+        "e327": {
+          "name": "Sign up free and try secure protection",
+          "role": "link"
+        },
+        "e328": {
+          "name": "Previous reviews",
+          "role": "button"
+        },
+        "e329": {
+          "name": "Next reviews",
+          "role": "button"
+        },
+        "e330": {
+          "name": "Sign up free and get started",
+          "role": "link"
+        },
+        "e331": {
+          "name": "What is an antidetect browser?",
+          "role": "heading"
+        },
+        "e332": {
+          "name": "What is an antidetect browser?",
+          "role": "region"
+        },
+        "e333": {
+          "name": "What is AdsPower antidetect browser used for?",
+          "role": "heading"
+        },
+        "e334": {
+          "name": "What IP proxies are supported?",
+          "role": "heading"
+        },
+        "e335": {
+          "name": "Why does AdsPower stand out compared with other antidetect browsers?",
+          "role": "heading"
+        },
+        "e336": {
+          "name": "Is AdsPower browser free?",
+          "role": "heading"
+        },
+        "e337": {
+          "name": "Is AdsPower safe?",
+          "role": "heading"
+        },
+        "e338": {
+          "name": "Is AdsPower antidetect browser suitable for multi-account management?",
+          "role": "heading"
+        },
+        "e339": {
+          "name": "How do I install and register AdsPower Browser?",
+          "role": "heading"
+        },
+        "e340": {
+          "name": "Can AdsPower simulate Android and iOS devices?",
+          "role": "heading"
+        },
+        "e341": {
+          "name": "Cookie Policy",
+          "role": "link"
+        },
+        "e342": {
+          "name": "View AdsPower G2 reviews",
+          "role": "link"
+        },
+        "e343": {
+          "name": "View AdsPower Capterra reviews",
+          "role": "link"
+        },
+        "e344": {
+          "name": "View AdsPower Product Hunt reviews",
+          "role": "link"
+        },
+        "e345": {
+          "name": "Manage Multiple Accounts Safely and Efficiently",
+          "role": "heading"
+        },
+        "e346": {
+          "name": "Media Buying",
+          "role": "heading"
+        },
+        "e347": {
+          "name": "E-commerce",
+          "role": "heading"
+        },
+        "e348": {
+          "name": "Affiliate Marketing",
+          "role": "heading"
+        },
+        "e349": {
+          "name": "Crypto",
+          "role": "heading"
+        },
+        "e350": {
+          "name": "Social Media Marketing",
+          "role": "heading"
+        },
+        "e351": {
+          "name": "Web Scraping",
+          "role": "heading"
+        },
+        "e352": {
+          "name": "Fingerprint Isolation",
+          "role": "tab"
+        },
+        "e353": {
+          "name": "Built-in Proxy",
+          "role": "tab"
+        },
+        "e354": {
+          "name": "Multi-Account",
+          "role": "tab"
+        },
+        "e355": {
+          "name": "RPA & Synchronizer",
+          "role": "tab"
+        },
+        "e356": {
+          "name": "API & AI Agent",
+          "role": "tab"
+        },
+        "e357": {
+          "name": "Video Demo",
+          "role": "tab"
+        },
+        "e358": {
+          "name": "Separate Accounts with Unique Fingerprints",
+          "role": "heading"
+        },
+        "e359": {
+          "name": "Try It Free",
+          "role": "link"
+        },
+        "e360": {
+          "name": "Fingerprint Details >",
+          "role": "link"
+        },
+        "e361": {
+          "name": "Leading the Way in Data and Browser Security",
+          "role": "heading"
+        },
+        "e362": {
+          "name": "What Customers Say About AdsPower Antidetect Browser",
+          "role": "heading"
+        },
+        "e363": {
+          "name": "Yahoo Finance article",
+          "role": "article"
+        },
+        "e364": {
+          "name": "GlobeNewswire article",
+          "role": "article"
+        },
+        "e365": {
+          "name": "AP News article",
+          "role": "article"
+        },
+        "e366": {
+          "name": "TechTimes article",
+          "role": "article"
+        },
+        "e367": {
+          "name": "Digital Trends article",
+          "role": "article"
+        },
+        "e368": {
+          "name": "USA Today article",
+          "role": "article"
+        },
+        "e369": {
+          "name": "All Reviews >",
+          "role": "link"
+        },
+        "e370": {
+          "name": "Latest Updates & Guides",
+          "role": "heading"
+        },
+        "e371": {
+          "name": "View more articles",
+          "role": "link"
+        },
+        "e372": {
+          "name": "Latest Updates & Guides",
+          "role": "region"
+        },
+        "e373": {
+          "name": "Latest Updates & Guides",
+          "role": "navigation"
+        },
+        "e374": {
+          "name": "Frequently asked questions",
+          "role": "heading"
+        },
+        "e375": {
+          "name": "What is an antidetect browser?",
+          "role": "button"
+        },
+        "e376": {
+          "name": "What is AdsPower antidetect browser used for?",
+          "role": "button"
+        },
+        "e377": {
+          "name": "What IP proxies are supported?",
+          "role": "button"
+        },
+        "e378": {
+          "name": "Why does AdsPower stand out compared with other antidetect browsers?",
+          "role": "button"
+        },
+        "e379": {
+          "name": "Is AdsPower browser free?",
+          "role": "button"
+        },
+        "e380": {
+          "name": "Is AdsPower safe?",
+          "role": "button"
+        },
+        "e381": {
+          "name": "Is AdsPower antidetect browser suitable for multi-account management?",
+          "role": "button"
+        },
+        "e382": {
+          "name": "How do I install and register AdsPower Browser?",
+          "role": "button"
+        },
+        "e383": {
+          "name": "Can AdsPower simulate Android and iOS devices?",
+          "role": "button"
+        },
+        "e384": {
+          "name": "Start efficient multi-account management",
+          "role": "heading"
+        },
+        "e385": {
+          "name": "Download for free",
+          "role": "link"
+        },
+        "e386": {
+          "name": "Sign up now",
+          "role": "link"
+        },
+        "e387": {
+          "name": "Google 翻译 翻译",
+          "role": "link"
+        },
+        "e388": {
+          "name": "Terms of Use",
+          "role": "link"
+        },
+        "e389": {
+          "name": "Privacy Policy",
+          "role": "link"
+        },
+        "e390": {
+          "name": "Refund Policy",
+          "role": "link"
+        },
+        "e391": {
+          "name": "Solutions",
+          "role": "button"
+        },
+        "e392": {
+          "name": "Pricing",
+          "role": "link"
+        },
+        "e393": {
+          "name": "Download",
+          "role": "link"
+        },
+        "e394": {
+          "name": "Your browser fingerprints stay separate and consistent Platforms can use browser fingerprints to identify related accounts. With separate fingerprints, cookies, and proxy settings for each account, you can manage stores and social accounts with less risk of them being linked.",
+          "role": "button"
+        },
+        "e395": {
+          "name": "You get more done across your accounts",
+          "role": "button"
+        },
+        "e396": {
+          "name": "One computer is all you need",
+          "role": "button"
+        },
+        "e397": {
+          "name": "About SOC 2 Type II",
+          "role": "button"
+        },
+        "e398": {
+          "name": "About ISO 27001",
+          "role": "button"
+        },
+        "e399": {
+          "name": "About ISO 27701",
+          "role": "button"
+        },
+        "e400": {
+          "name": "How AdsPower counts users",
+          "role": "button"
+        },
+        "e401": {
+          "name": "Read Yahoo Finance coverage",
+          "role": "link"
+        },
+        "e402": {
+          "name": "Read GlobeNewswire coverage",
+          "role": "link"
+        },
+        "e403": {
+          "name": "Read AP News coverage",
+          "role": "link"
+        },
+        "e404": {
+          "name": "Read TechTimes coverage",
+          "role": "link"
+        },
+        "e405": {
+          "name": "Read Digital Trends coverage",
+          "role": "link"
+        },
+        "e406": {
+          "name": "Read USA Today coverage",
+          "role": "link"
+        },
+        "e407": {
+          "name": "Prev",
+          "role": "button"
+        },
+        "e408": {
+          "name": "Next",
+          "role": "button"
+        },
+        "e409": {
+          "name": "Contact support",
+          "role": "link"
+        },
+        "e410": {
+          "name": "antidetect browser",
+          "role": "link"
+        },
+        "e411": {
+          "name": "语言翻译微件",
+          "role": "combobox"
+        },
+        "e412": {
+          "name": "Your browser fingerprints stay separate and consistent",
+          "role": "heading"
+        },
+        "e413": {
+          "name": "You get more done across your accounts",
+          "role": "heading"
+        },
+        "e414": {
+          "name": "One computer is all you need",
+          "role": "heading"
+        },
+        "e415": {
+          "name": "See review ",
+          "role": "link"
+        },
+        "e416": {
+          "name": "See review ",
+          "role": "link"
+        },
+        "e417": {
+          "name": "See review ",
+          "role": "link"
+        },
+        "e418": {
+          "name": "browser fingerprints",
+          "role": "link"
+        },
+        "e419": {
+          "name": "选择语言",
+          "role": "option"
+        },
+        "e420": {
+          "name": "中文（简体）",
+          "role": "option"
+        },
+        "e421": {
+          "name": "阿布哈兹语",
+          "role": "option"
+        },
+        "e422": {
+          "name": "阿尔巴尼亚语",
+          "role": "option"
+        },
+        "e423": {
+          "name": "阿法尔语",
+          "role": "option"
+        },
+        "e424": {
+          "name": "阿拉伯语",
+          "role": "option"
+        },
+        "e425": {
+          "name": "阿卢尔语",
+          "role": "option"
+        },
+        "e426": {
+          "name": "阿姆哈拉语",
+          "role": "option"
+        },
+        "e427": {
+          "name": "阿乔利语",
+          "role": "option"
+        },
+        "e428": {
+          "name": "阿萨姆语",
+          "role": "option"
+        },
+        "e429": {
+          "name": "阿塞拜疆语",
+          "role": "option"
+        },
+        "e430": {
+          "name": "阿瓦德语",
+          "role": "option"
+        },
+        "e431": {
+          "name": "阿瓦尔语",
+          "role": "option"
+        },
+        "e432": {
+          "name": "埃维语",
+          "role": "option"
+        },
+        "e433": {
+          "name": "艾马拉语",
+          "role": "option"
+        },
+        "e434": {
+          "name": "爱尔兰语",
+          "role": "option"
+        },
+        "e435": {
+          "name": "爱沙尼亚语",
+          "role": "option"
+        },
+        "e436": {
+          "name": "奥迪亚语（奥利亚语）",
+          "role": "option"
+        },
+        "e437": {
+          "name": "奥克语",
+          "role": "option"
+        },
+        "e438": {
+          "name": "奥罗莫语",
+          "role": "option"
+        },
+        "e439": {
+          "name": "奥塞梯语",
+          "role": "option"
+        },
+        "e440": {
+          "name": "巴布亚皮钦语",
+          "role": "option"
+        },
+        "e441": {
+          "name": "巴达维语",
+          "role": "option"
+        },
+        "e442": {
+          "name": "巴厘语",
+          "role": "option"
+        },
+        "e443": {
+          "name": "巴什基尔语",
+          "role": "option"
+        },
+        "e444": {
+          "name": "巴斯克语",
+          "role": "option"
+        },
+        "e445": {
+          "name": "巴塔克卡罗语",
+          "role": "option"
+        },
+        "e446": {
+          "name": "巴塔克托巴语",
+          "role": "option"
+        },
+        "e447": {
+          "name": "巴塔克西马隆贡语",
+          "role": "option"
+        },
+        "e448": {
+          "name": "巴乌雷语",
+          "role": "option"
+        },
+        "e449": {
+          "name": "白俄罗斯语",
+          "role": "option"
+        },
+        "e450": {
+          "name": "班巴拉语",
+          "role": "option"
+        },
+        "e451": {
+          "name": "邦阿西楠语",
+          "role": "option"
+        },
+        "e452": {
+          "name": "邦板牙语",
+          "role": "option"
+        },
+        "e453": {
+          "name": "保加利亚语",
+          "role": "option"
+        },
+        "e454": {
+          "name": "北索托语",
+          "role": "option"
+        },
+        "e455": {
+          "name": "奔巴语",
+          "role": "option"
+        },
+        "e456": {
+          "name": "比科尔语",
+          "role": "option"
+        },
+        "e457": {
+          "name": "俾路支语",
+          "role": "option"
+        },
+        "e458": {
+          "name": "冰岛语",
+          "role": "option"
+        },
+        "e459": {
+          "name": "波兰语",
+          "role": "option"
+        },
+        "e460": {
+          "name": "波斯尼亚语",
+          "role": "option"
+        },
+        "e461": {
+          "name": "波斯语",
+          "role": "option"
+        },
+        "e462": {
+          "name": "博杰普尔语",
+          "role": "option"
+        },
+        "e463": {
+          "name": "布里亚特语",
+          "role": "option"
+        },
+        "e464": {
+          "name": "布列塔尼语",
+          "role": "option"
+        },
+        "e465": {
+          "name": "藏语",
+          "role": "option"
+        },
+        "e466": {
+          "name": "草原马里语",
+          "role": "option"
+        },
+        "e467": {
+          "name": "查莫罗语",
+          "role": "option"
+        },
+        "e468": {
+          "name": "车臣语",
+          "role": "option"
+        },
+        "e469": {
+          "name": "楚克语",
+          "role": "option"
+        },
+        "e470": {
+          "name": "楚瓦什语",
+          "role": "option"
+        },
+        "e471": {
+          "name": "茨瓦纳语",
+          "role": "option"
+        },
+        "e472": {
+          "name": "聪加语",
+          "role": "option"
+        },
+        "e473": {
+          "name": "达里语",
+          "role": "option"
+        },
+        "e474": {
+          "name": "鞑靼语",
+          "role": "option"
+        },
+        "e475": {
+          "name": "丹麦语",
+          "role": "option"
+        },
+        "e476": {
+          "name": "掸语",
+          "role": "option"
+        },
+        "e477": {
+          "name": "德顿语",
+          "role": "option"
+        },
+        "e478": {
+          "name": "德语",
+          "role": "option"
+        },
+        "e479": {
+          "name": "迪维希语",
+          "role": "option"
+        },
+        "e480": {
+          "name": "迪尤拉语",
+          "role": "option"
+        },
+        "e481": {
+          "name": "蒂夫语",
+          "role": "option"
+        },
+        "e482": {
+          "name": "丁卡语",
+          "role": "option"
+        },
+        "e483": {
+          "name": "多格拉语",
+          "role": "option"
+        },
+        "e484": {
+          "name": "俄语",
+          "role": "option"
+        },
+        "e485": {
+          "name": "恩道语",
+          "role": "option"
+        },
+        "e486": {
+          "name": "恩德贝莱语（南部）",
+          "role": "option"
+        },
+        "e487": {
+          "name": "恩敦贝语",
+          "role": "option"
+        },
+        "e488": {
+          "name": "恩科语",
+          "role": "option"
+        },
+        "e489": {
+          "name": "法罗语",
+          "role": "option"
+        },
+        "e490": {
+          "name": "法语",
+          "role": "option"
+        },
+        "e491": {
+          "name": "法语（加拿大）",
+          "role": "option"
+        },
+        "e492": {
+          "name": "梵语",
+          "role": "option"
+        },
+        "e493": {
+          "name": "菲律宾语",
+          "role": "option"
+        },
+        "e494": {
+          "name": "斐济语",
+          "role": "option"
+        },
+        "e495": {
+          "name": "芬兰语",
+          "role": "option"
+        },
+        "e496": {
+          "name": "丰语",
+          "role": "option"
+        },
+        "e497": {
+          "name": "弗里西语",
+          "role": "option"
+        },
+        "e498": {
+          "name": "弗留利语",
+          "role": "option"
+        },
+        "e499": {
+          "name": "富拉尼语",
+          "role": "option"
+        },
+        "e500": {
+          "name": "刚果语",
+          "role": "option"
+        },
+        "e501": {
+          "name": "高棉语",
+          "role": "option"
+        },
+        "e502": {
+          "name": "格陵兰语",
+          "role": "option"
+        },
+        "e503": {
+          "name": "格鲁吉亚语",
+          "role": "option"
+        },
+        "e504": {
+          "name": "贡根语",
+          "role": "option"
+        },
+        "e505": {
+          "name": "古吉拉特语",
+          "role": "option"
+        },
+        "e506": {
+          "name": "瓜拉尼语",
+          "role": "option"
+        },
+        "e507": {
+          "name": "哈卡钦语",
+          "role": "option"
+        },
+        "e508": {
+          "name": "哈萨克语",
+          "role": "option"
+        },
+        "e509": {
+          "name": "海地克里奥尔语",
+          "role": "option"
+        },
+        "e510": {
+          "name": "韩语",
+          "role": "option"
+        },
+        "e511": {
+          "name": "豪萨语",
+          "role": "option"
+        },
+        "e512": {
+          "name": "荷兰语",
+          "role": "option"
+        },
+        "e513": {
+          "name": "洪斯吕克语",
+          "role": "option"
+        },
+        "e514": {
+          "name": "吉尔吉斯语",
+          "role": "option"
+        },
+        "e515": {
+          "name": "吉土巴语",
+          "role": "option"
+        },
+        "e516": {
+          "name": "加利西亚语",
+          "role": "option"
+        },
+        "e517": {
+          "name": "加泰罗尼亚语",
+          "role": "option"
+        },
+        "e518": {
+          "name": "加语",
+          "role": "option"
+        },
+        "e519": {
+          "name": "捷克语",
+          "role": "option"
+        },
+        "e520": {
+          "name": "景颇语",
+          "role": "option"
+        },
+        "e521": {
+          "name": "卡纳达语",
+          "role": "option"
+        },
+        "e522": {
+          "name": "卡努里语",
+          "role": "option"
+        },
+        "e523": {
+          "name": "卡西语",
+          "role": "option"
+        },
+        "e524": {
+          "name": "凯克其语",
+          "role": "option"
+        },
+        "e525": {
+          "name": "科米语",
+          "role": "option"
+        },
+        "e526": {
+          "name": "科萨语",
+          "role": "option"
+        },
+        "e527": {
+          "name": "科西嘉语",
+          "role": "option"
+        },
+        "e528": {
+          "name": "克里米亚鞑靼语（拉丁文）",
+          "role": "option"
+        },
+        "e529": {
+          "name": "克里米亚鞑靼语（西里尔文）",
+          "role": "option"
+        },
+        "e530": {
+          "name": "克罗地亚语",
+          "role": "option"
+        },
+        "e531": {
+          "name": "克丘亚语",
+          "role": "option"
+        },
+        "e532": {
+          "name": "库尔德语（库尔曼吉语）",
+          "role": "option"
+        },
+        "e533": {
+          "name": "库尔德语（索拉尼）",
+          "role": "option"
+        },
+        "e534": {
+          "name": "廓克博若克语",
+          "role": "option"
+        },
+        "e535": {
+          "name": "拉丁语",
+          "role": "option"
+        },
+        "e536": {
+          "name": "拉特加莱语",
+          "role": "option"
+        },
+        "e537": {
+          "name": "拉脱维亚语",
+          "role": "option"
+        },
+        "e538": {
+          "name": "老挝语",
+          "role": "option"
+        },
+        "e539": {
+          "name": "立陶宛语",
+          "role": "option"
+        },
+        "e540": {
+          "name": "利古里亚语",
+          "role": "option"
+        },
+        "e541": {
+          "name": "林堡语",
+          "role": "option"
+        },
+        "e542": {
+          "name": "林加拉语",
+          "role": "option"
+        },
+        "e543": {
+          "name": "隆迪语",
+          "role": "option"
+        },
+        "e544": {
+          "name": "卢奥语",
+          "role": "option"
+        },
+        "e545": {
+          "name": "卢干达语",
+          "role": "option"
+        },
+        "e546": {
+          "name": "卢森堡语",
+          "role": "option"
+        },
+        "e547": {
+          "name": "卢旺达语",
+          "role": "option"
+        },
+        "e548": {
+          "name": "伦巴第语",
+          "role": "option"
+        },
+        "e549": {
+          "name": "罗马尼亚语",
+          "role": "option"
+        },
+        "e550": {
+          "name": "罗姆语",
+          "role": "option"
+        },
+        "e551": {
+          "name": "马都拉语",
+          "role": "option"
+        },
+        "e552": {
+          "name": "马恩岛语",
+          "role": "option"
+        },
+        "e553": {
+          "name": "马尔加什语",
+          "role": "option"
+        },
+        "e554": {
+          "name": "马尔瓦迪语",
+          "role": "option"
+        },
+        "e555": {
+          "name": "马耳他语",
+          "role": "option"
+        },
+        "e556": {
+          "name": "马拉地语",
+          "role": "option"
+        },
+        "e557": {
+          "name": "马拉雅拉姆语",
+          "role": "option"
+        },
+        "e558": {
+          "name": "马来语",
+          "role": "option"
+        },
+        "e559": {
+          "name": "马来语（爪夷文）",
+          "role": "option"
+        },
+        "e560": {
+          "name": "马其顿语",
+          "role": "option"
+        },
+        "e561": {
+          "name": "马绍尔语",
+          "role": "option"
+        },
+        "e562": {
+          "name": "玛姆语",
+          "role": "option"
+        },
+        "e563": {
+          "name": "迈蒂利语",
+          "role": "option"
+        },
+        "e564": {
+          "name": "毛里求斯克里奥尔语",
+          "role": "option"
+        },
+        "e565": {
+          "name": "毛利语",
+          "role": "option"
+        },
+        "e566": {
+          "name": "梅泰语（曼尼普尔语）",
+          "role": "option"
+        },
+        "e567": {
+          "name": "蒙古语",
+          "role": "option"
+        },
+        "e568": {
+          "name": "孟加拉语",
+          "role": "option"
+        },
+        "e569": {
+          "name": "米南语",
+          "role": "option"
+        },
+        "e570": {
+          "name": "米佐语",
+          "role": "option"
+        },
+        "e571": {
+          "name": "缅甸语",
+          "role": "option"
+        },
+        "e572": {
+          "name": "苗语",
+          "role": "option"
+        },
+        "e573": {
+          "name": "纳瓦特尔语（东部瓦斯特卡）",
+          "role": "option"
+        },
+        "e574": {
+          "name": "南非荷兰语",
+          "role": "option"
+        },
+        "e575": {
+          "name": "南索托语",
+          "role": "option"
+        },
+        "e576": {
+          "name": "尼泊尔巴萨语",
+          "role": "option"
+        },
+        "e577": {
+          "name": "尼泊尔语",
+          "role": "option"
+        },
+        "e578": {
+          "name": "努尔语",
+          "role": "option"
+        },
+        "e579": {
+          "name": "挪威语",
+          "role": "option"
+        },
+        "e580": {
+          "name": "帕皮阿门托语",
+          "role": "option"
+        },
+        "e581": {
+          "name": "旁遮普语（果鲁穆奇文）",
+          "role": "option"
+        },
+        "e582": {
+          "name": "旁遮普语（沙木基文）",
+          "role": "option"
+        },
+        "e583": {
+          "name": "葡萄牙语（巴西）",
+          "role": "option"
+        },
+        "e584": {
+          "name": "葡萄牙语（葡萄牙）",
+          "role": "option"
+        },
+        "e585": {
+          "name": "普什图语",
+          "role": "option"
+        },
+        "e586": {
+          "name": "齐切瓦语",
+          "role": "option"
+        },
+        "e587": {
+          "name": "奇加语",
+          "role": "option"
+        },
+        "e588": {
+          "name": "奇卢伯语",
+          "role": "option"
+        },
+        "e589": {
+          "name": "契维语",
+          "role": "option"
+        },
+        "e590": {
+          "name": "日语",
+          "role": "option"
+        },
+        "e591": {
+          "name": "瑞典语",
+          "role": "option"
+        },
+        "e592": {
+          "name": "萨巴特克语",
+          "role": "option"
+        },
+        "e593": {
+          "name": "萨米语（北部）",
+          "role": "option"
+        },
+        "e594": {
+          "name": "萨摩亚语",
+          "role": "option"
+        },
+        "e595": {
+          "name": "塞尔维亚语",
+          "role": "option"
+        },
+        "e596": {
+          "name": "塞拉利昂克里奥尔语",
+          "role": "option"
+        },
+        "e597": {
+          "name": "塞舌尔克里奥尔语",
+          "role": "option"
+        },
+        "e598": {
+          "name": "桑戈语",
+          "role": "option"
+        },
+        "e599": {
+          "name": "桑塔利语（奥尔奇基文）",
+          "role": "option"
+        },
+        "e600": {
+          "name": "桑塔利语（拉丁文）",
+          "role": "option"
+        },
+        "e601": {
+          "name": "僧伽罗语",
+          "role": "option"
+        },
+        "e602": {
+          "name": "世界语",
+          "role": "option"
+        },
+        "e603": {
+          "name": "斯洛伐克语",
+          "role": "option"
+        },
+        "e604": {
+          "name": "斯洛文尼亚语",
+          "role": "option"
+        },
+        "e605": {
+          "name": "斯瓦特语",
+          "role": "option"
+        },
+        "e606": {
+          "name": "斯瓦希里语",
+          "role": "option"
+        },
+        "e607": {
+          "name": "苏格兰盖尔语",
+          "role": "option"
+        },
+        "e608": {
+          "name": "苏苏语",
+          "role": "option"
+        },
+        "e609": {
+          "name": "宿务语",
+          "role": "option"
+        },
+        "e610": {
+          "name": "索马里语",
+          "role": "option"
+        },
+        "e611": {
+          "name": "塔吉克语",
+          "role": "option"
+        },
+        "e612": {
+          "name": "塔马齐格特语",
+          "role": "option"
+        },
+        "e613": {
+          "name": "塔马齐格特语（提非纳文）",
+          "role": "option"
+        },
+        "e614": {
+          "name": "塔希提语",
+          "role": "option"
+        },
+        "e615": {
+          "name": "泰卢固语",
+          "role": "option"
+        },
+        "e616": {
+          "name": "泰米尔语",
+          "role": "option"
+        },
+        "e617": {
+          "name": "泰语",
+          "role": "option"
+        },
+        "e618": {
+          "name": "汤加语",
+          "role": "option"
+        },
+        "e619": {
+          "name": "提格里尼亚语",
+          "role": "option"
+        },
+        "e620": {
+          "name": "图鲁语",
+          "role": "option"
+        },
+        "e621": {
+          "name": "图姆布卡语",
+          "role": "option"
+        },
+        "e622": {
+          "name": "图瓦语",
+          "role": "option"
+        },
+        "e623": {
+          "name": "土耳其语",
+          "role": "option"
+        },
+        "e624": {
+          "name": "土库曼语",
+          "role": "option"
+        },
+        "e625": {
+          "name": "瓦瑞语",
+          "role": "option"
+        },
+        "e626": {
+          "name": "望加锡语",
+          "role": "option"
+        },
+        "e627": {
+          "name": "威尔士语",
+          "role": "option"
+        },
+        "e628": {
+          "name": "威尼斯语",
+          "role": "option"
+        },
+        "e629": {
+          "name": "维吾尔语",
+          "role": "option"
+        },
+        "e630": {
+          "name": "文达语",
+          "role": "option"
+        },
+        "e631": {
+          "name": "沃洛夫语",
+          "role": "option"
+        },
+        "e632": {
+          "name": "乌德穆尔特语",
+          "role": "option"
+        },
+        "e633": {
+          "name": "乌尔都语",
+          "role": "option"
+        },
+        "e634": {
+          "name": "乌克兰语",
+          "role": "option"
+        },
+        "e635": {
+          "name": "乌兹别克语",
+          "role": "option"
+        },
+        "e636": {
+          "name": "西班牙语",
+          "role": "option"
+        },
+        "e637": {
+          "name": "西里西亚语",
+          "role": "option"
+        },
+        "e638": {
+          "name": "西西里语",
+          "role": "option"
+        },
+        "e639": {
+          "name": "希伯来语",
+          "role": "option"
+        },
+        "e640": {
+          "name": "希腊语",
+          "role": "option"
+        },
+        "e641": {
+          "name": "希利盖农语",
+          "role": "option"
+        },
+        "e642": {
+          "name": "夏威夷语",
+          "role": "option"
+        },
+        "e643": {
+          "name": "信德语",
+          "role": "option"
+        },
+        "e644": {
+          "name": "匈牙利语",
+          "role": "option"
+        },
+        "e645": {
+          "name": "修纳语",
+          "role": "option"
+        },
+        "e646": {
+          "name": "巽他语",
+          "role": "option"
+        },
+        "e647": {
+          "name": "牙买加土语",
+          "role": "option"
+        },
+        "e648": {
+          "name": "雅库特语",
+          "role": "option"
+        },
+        "e649": {
+          "name": "亚美尼亚语",
+          "role": "option"
+        },
+        "e650": {
+          "name": "亚齐语",
+          "role": "option"
+        },
+        "e651": {
+          "name": "伊班语",
+          "role": "option"
+        },
+        "e652": {
+          "name": "伊博语",
+          "role": "option"
+        },
+        "e653": {
+          "name": "伊洛卡诺语",
+          "role": "option"
+        },
+        "e654": {
+          "name": "意大利语",
+          "role": "option"
+        },
+        "e655": {
+          "name": "意第绪语",
+          "role": "option"
+        },
+        "e656": {
+          "name": "因纽特语（拉丁文）",
+          "role": "option"
+        },
+        "e657": {
+          "name": "因纽特语（音节文字）",
+          "role": "option"
+        },
+        "e658": {
+          "name": "印地语",
+          "role": "option"
+        },
+        "e659": {
+          "name": "印尼语",
+          "role": "option"
+        },
+        "e660": {
+          "name": "尤卡坦玛雅语",
+          "role": "option"
+        },
+        "e661": {
+          "name": "约鲁巴语",
+          "role": "option"
+        },
+        "e662": {
+          "name": "粤语",
+          "role": "option"
+        },
+        "e663": {
+          "name": "越南语",
+          "role": "option"
+        },
+        "e664": {
+          "name": "爪哇语",
+          "role": "option"
+        },
+        "e665": {
+          "name": "中文（繁体）",
+          "role": "option"
+        },
+        "e666": {
+          "name": "宗卡语",
+          "role": "option"
+        },
+        "e667": {
+          "name": "祖鲁语",
+          "role": "option"
+        },
+        "e668": {
+          "name": "Best Anti Detect Browsers in 2026: Evaluated & Compared",
+          "role": "article"
+        },
+        "e669": {
+          "name": "AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award",
+          "role": "article"
+        },
+        "e670": {
+          "name": "What's New in AdsPower Browser in October 2026",
+          "role": "article"
+        },
+        "e671": {
+          "name": "Best Anti Detect Browsers in 2026: Evaluated & Compared Jul 2, 2026 Best Anti Detect Browsers in 2026: Evaluated & Compared Looking for the best antidetect browser in 2026? We tested AdsPower, GoLogin, etc. to compare fingerprint quality, automation, pricing, and security. Read full article",
+          "role": "link"
+        },
+        "e672": {
+          "name": "AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award Nov 5, 2026 AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award AdsPower wraps up SiGMA Rome 2026 with the Best Anti-Detect Browser award at the Affiliate Grand Slam Awards. Explore event highlights, user feedback, Read full article",
+          "role": "link"
+        },
+        "e673": {
+          "name": "What's New in AdsPower Browser in October 2026 Nov 5, 2026 What's New in AdsPower Browser in October 2026 AdsPower Oct 2026 update: Chrome 154/155/156 kernels, remote AI Agent, new APIs, improved SunBrowser and rotating proxy controls. Read full article",
+          "role": "link"
+        },
+        "e674": {
+          "name": "Best Anti Detect Browsers in 2026: Evaluated & Compared",
+          "role": "heading"
+        },
+        "e675": {
+          "name": "AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award",
+          "role": "heading"
+        },
+        "e676": {
+          "name": "What's New in AdsPower Browser in October 2026",
+          "role": "heading"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- link \"更换为简体中文\" [ref=e291]\n- button \"不再显示\" [ref=e292]\n- link \"AdsPower\" [ref=e244]\n- generic \"Features\" [ref=e293] clickable [cursor:pointer]\n- generic \"SolutionsSolutionsE-CommerceSeparate logins for every storeSocial MarketingManage account networks t\" [ref=e294] clickable [cursor:pointer]\n  - button \"Solutions\" [expanded=false, ref=e391]\n- generic \"Resources\" [ref=e295] clickable [cursor:pointer]\n- generic \"PricingPricing\" [ref=e296] clickable [cursor:pointer]\n  - link \"Pricing\" [ref=e392]\n- generic \"DownloadDownload\" [ref=e297] clickable [cursor:pointer]\n  - link \"Download\" [ref=e393]\n- link \"Log in\" [ref=e298]\n- link \"Sign up\" [ref=e299]\n- generic \"EN\" [ref=e300] clickable [cursor:pointer]\n- region \"The #1 Anti-detect Browser Trusted By 10M+ Users\" [ref=e245]\n  - heading \"The #1 Anti-detect Browser Trusted By 10M+ Users\" [level=1, ref=e301]\n  - link \"Try It Free\" [ref=e302]\n  - link \"Get Started\" [ref=e303]\n  - link \"View AdsPower G2 reviews\" [ref=e342]\n  - link \"View AdsPower Capterra reviews\" [ref=e343]\n  - link \"View AdsPower Product Hunt reviews\" [ref=e344]\n  - link \"See AdsPower Chrome 156 and Firefox 156 kernel release notes (opens in a new tab)\" [ref=e304]\n- region \"Manage Multiple Accounts Safely and Efficiently\" [ref=e246]\n  - heading \"Manage Multiple Accounts Safely and Efficiently\" [level=2, ref=e345]\n  - button \"Your browser fingerprints stay separate and consistent Platforms can use browser fingerprints to identify related accounts. With separate fingerprints, cookies, and proxy settings for each account, you can manage stores and social accounts with less risk of them being linked.\" [expanded=true, ref=e394]\n    - heading \"Your browser fingerprints stay separate and consistent\" [level=3, ref=e412]\n  - button \"You get more done across your accounts\" [expanded=false, ref=e395]\n    - heading \"You get more done across your accounts\" [level=3, ref=e413]\n  - button \"One computer is all you need\" [expanded=false, ref=e396]\n    - heading \"One computer is all you need\" [level=3, ref=e414]\n  - link \"Try It Free (opens in a new tab)\" [ref=e305]\n- region \"AdsPower Antidetect Browser Trusted Across Industries\" [ref=e247]\n  - heading \"AdsPower Antidetect Browser Trusted Across Industries\" [level=2, ref=e306]\n  - link \"Ask ChatGPT\" [ref=e307]\n  - link \"Ask Claude\" [ref=e308]\n  - link \"Ask Perplexity\" [ref=e309]\n  - link \"Explore AdsPower Media Buying solution\" [ref=e310]\n    - heading \"Media Buying\" [level=3, ref=e346]\n  - link \"Explore AdsPower E-commerce solution\" [ref=e311]\n    - heading \"E-commerce\" [level=3, ref=e347]\n  - link \"Explore AdsPower Affiliate Marketing solution\" [ref=e312]\n    - heading \"Affiliate Marketing\" [level=3, ref=e348]\n  - link \"Explore AdsPower Crypto solution\" [ref=e313]\n    - heading \"Crypto\" [level=3, ref=e349]\n  - link \"Explore AdsPower Social Media Marketing solution\" [ref=e314]\n    - heading \"Social Media Marketing\" [level=3, ref=e350]\n  - link \"Explore AdsPower Web Scraping solution\" [ref=e315]\n    - heading \"Web Scraping\" [level=3, ref=e351]\n  - link \"View All Solutions >\" [ref=e316]\n- region \"Free plan\" [ref=e248]\n  - heading \"Manage Multiple Accounts on 1 Device?\" [level=2, ref=e317]\n  - link \"Sign up for free\" [ref=e318]\n  - link \"View pricing\" [ref=e319]\n- heading \"Why Choose AdsPower Antidetect Browser?\" [level=2, ref=e320]\n- tab \"Fingerprint Isolation\" [selected, ref=e352]\n- tab \"Built-in Proxy\" [ref=e353]\n- tab \"Multi-Account\" [ref=e354]\n- tab \"RPA & Synchronizer\" [ref=e355]\n- tab \"API & AI Agent\" [ref=e356]\n- tab \"Video Demo\" [ref=e357]\n- tabpanel \"Fingerprint Isolation\" [ref=e321] focusable [tabindex]\n  - heading \"Separate Accounts with Unique Fingerprints\" [level=3, ref=e358]\n  - link \"Try It Free\" [ref=e359]\n  - link \"Fingerprint Details >\" [ref=e360]\n- region \"Leading the Way in Data and Browser Security\" [ref=e249]\n  - heading \"Leading the Way in Data and Browser Security\" [level=2, ref=e361]\n  - button \"About SOC 2 Type II\" [expanded=false, ref=e397]\n  - button \"About ISO 27001\" [expanded=false, ref=e398]\n  - button \"About ISO 27701\" [expanded=false, ref=e399]\n  - heading \"Secure Your Accounts and Team Access\" [level=3, ref=e322]\n  - heading \"Protect Your Data with Encryption\" [level=3, ref=e323]\n  - heading \"More Control Over Your Browser Data\" [level=3, ref=e324]\n  - heading \"Bug Bounty Program\" [level=3, ref=e325]\n  - link \"Submit vulnerability report\" [ref=e326]\n  - link \"Sign up free and try secure protection\" [ref=e327]\n- region \"What Customers Say About AdsPower Antidetect Browser\" [ref=e250]\n  - heading \"What Customers Say About AdsPower Antidetect Browser\" [level=2, ref=e362]\n  - button \"How AdsPower counts users\" [expanded=false, ref=e400]\n  - link \"See review \" [ref=e415]\n  - link \"See review \" [ref=e416]\n  - link \"See review \" [ref=e417]\n  - button \"Previous reviews\" [ref=e328]\n  - button \"Next reviews\" [ref=e329]\n  - article \"Yahoo Finance article\" [ref=e363]\n    - link \"Read Yahoo Finance coverage\" [ref=e401]\n  - article \"GlobeNewswire article\" [ref=e364]\n    - link \"Read GlobeNewswire coverage\" [ref=e402]\n  - article \"AP News article\" [ref=e365]\n    - link \"Read AP News coverage\" [ref=e403]\n  - article \"TechTimes article\" [ref=e366]\n    - link \"Read TechTimes coverage\" [ref=e404]\n  - article \"Digital Trends article\" [ref=e367]\n    - link \"Read Digital Trends coverage\" [ref=e405]\n  - article \"USA Today article\" [ref=e368]\n    - link \"Read USA Today coverage\" [ref=e406]\n  - link \"All Reviews >\" [ref=e369]\n- link \"Sign up free and get started\" [ref=e330]\n- region \"Latest Updates & Guides\" [ref=e251]\n  - heading \"Latest Updates & Guides\" [level=2, ref=e370]\n  - link \"View more articles\" [ref=e371]\n  - region \"Latest Updates & Guides\" [ref=e372]\n    - article \"Best Anti Detect Browsers in 2026: Evaluated & Compared\" [ref=e668]\n      - link \"Best Anti Detect Browsers in 2026: Evaluated & Compared Jul 2, 2026 Best Anti Detect Browsers in 2026: Evaluated & Compared Looking for the best antidetect browser in 2026? We tested AdsPower, GoLogin, etc. to compare fingerprint quality, automation, pricing, and security. Read full article\" [ref=e671]\n        - heading \"Best Anti Detect Browsers in 2026: Evaluated & Compared\" [level=3, ref=e674]\n    - article \"AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award\" [ref=e669]\n      - link \"AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award Nov 5, 2026 AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award AdsPower wraps up SiGMA Rome 2026 with the Best Anti-Detect Browser award at the Affiliate Grand Slam Awards. Explore event highlights, user feedback, Read full article\" [ref=e672]\n        - heading \"AdsPower at SiGMA Rome 2026: Highlights and Best Anti-Detect Browser Award\" [level=3, ref=e675]\n    - article \"What's New in AdsPower Browser in October 2026\" [ref=e670]\n      - link \"What's New in AdsPower Browser in October 2026 Nov 5, 2026 What's New in AdsPower Browser in October 2026 AdsPower Oct 2026 update: Chrome 154/155/156 kernels, remote AI Agent, new APIs, improved SunBrowser and rotating proxy controls. Read full article\" [ref=e673]\n        - heading \"What's New in AdsPower Browser in October 2026\" [level=3, ref=e676]\n  - navigation \"Latest Updates & Guides\" [ref=e373]\n    - button \"Prev\" [ref=e407]\n    - button \"Next\" [ref=e408]\n- heading \"Frequently asked questions\" [level=2, ref=e374]\n- link \"Contact support\" [ref=e409]\n- heading \"What is an antidetect browser?\" [level=3, ref=e331]\n  - button \"What is an antidetect browser?\" [expanded=true, ref=e375]\n- region \"What is an antidetect browser?\" [ref=e332]\n  - link \"antidetect browser\" [ref=e410]\n  - link \"browser fingerprints\" [ref=e418]\n- heading \"What is AdsPower antidetect browser used for?\" [level=3, ref=e333]\n  - button \"What is AdsPower antidetect browser used for?\" [expanded=false, ref=e376]\n- heading \"What IP proxies are supported?\" [level=3, ref=e334]\n  - button \"What IP proxies are supported?\" [expanded=false, ref=e377]\n- heading \"Why does AdsPower stand out compared with other antidetect browsers?\" [level=3, ref=e335]\n  - button \"Why does AdsPower stand out compared with other antidetect browsers?\" [expanded=false, ref=e378]\n- heading \"Is AdsPower browser free?\" [level=3, ref=e336]\n  - button \"Is AdsPower browser free?\" [expanded=false, ref=e379]\n- heading \"Is AdsPower safe?\" [level=3, ref=e337]\n  - button \"Is AdsPower safe?\" [expanded=false, ref=e380]\n- heading \"Is AdsPower antidetect browser suitable for multi-account management?\" [level=3, ref=e338]\n  - button \"Is AdsPower antidetect browser suitable for multi-account management?\" [expanded=false, ref=e381]\n- heading \"How do I install and register AdsPower Browser?\" [level=3, ref=e339]\n  - button \"How do I install and register AdsPower Browser?\" [expanded=false, ref=e382]\n- heading \"Can AdsPower simulate Android and iOS devices?\" [level=3, ref=e340]\n  - button \"Can AdsPower simulate Android and iOS devices?\" [expanded=false, ref=e383]\n- heading \"Start efficient multi-account management\" [level=2, ref=e384]\n- link \"Download for free\" [ref=e385]\n- link \"Sign up now\" [ref=e386]\n- link \"AdsPower\" [ref=e252]\n- link \"https://www.youtube.com/@adspowerbrowser\" [ref=e253]\n- link \"https://www.linkedin.com/company/66754758/\" [ref=e254]\n- link \"https://telegram.me/adspoweren\" [ref=e255]\n- link \"https://twitter.com/AdsPowerBrowser\" [ref=e256]\n- link \"https://www.instagram.com/adspowerbrowser/\" [ref=e257]\n- link \"https://www.tiktok.com/@adspowerbrowser\" [ref=e258]\n- link \"https://www.facebook.com/adspowerantidetectbrowser\" [ref=e259]\n- combobox \"语言翻译微件\" [expanded=false, ref=e411]: 选择语言\n  - option \"选择语言\" [selected, ref=e419]\n  - option \"中文（简体）\" [ref=e420]\n  - option \"阿布哈兹语\" [ref=e421]\n  - option \"阿尔巴尼亚语\" [ref=e422]\n  - option \"阿法尔语\" [ref=e423]\n  - option \"阿拉伯语\" [ref=e424]\n  - option \"阿卢尔语\" [ref=e425]\n  - option \"阿姆哈拉语\" [ref=e426]\n  - option \"阿乔利语\" [ref=e427]\n  - option \"阿萨姆语\" [ref=e428]\n  - option \"阿塞拜疆语\" [ref=e429]\n  - option \"阿瓦德语\" [ref=e430]\n  - option \"阿瓦尔语\" [ref=e431]\n  - option \"埃维语\" [ref=e432]\n  - option \"艾马拉语\" [ref=e433]\n  - option \"爱尔兰语\" [ref=e434]\n  - option \"爱沙尼亚语\" [ref=e435]\n  - option \"奥迪亚语（奥利亚语）\" [ref=e436]\n  - option \"奥克语\" [ref=e437]\n  - option \"奥罗莫语\" [ref=e438]\n  - option \"奥塞梯语\" [ref=e439]\n  - option \"巴布亚皮钦语\" [ref=e440]\n  - option \"巴达维语\" [ref=e441]\n  - option \"巴厘语\" [ref=e442]\n  - option \"巴什基尔语\" [ref=e443]\n  - option \"巴斯克语\" [ref=e444]\n  - option \"巴塔克卡罗语\" [ref=e445]\n  - option \"巴塔克托巴语\" [ref=e446]\n  - option \"巴塔克西马隆贡语\" [ref=e447]\n  - option \"巴乌雷语\" [ref=e448]\n  - option \"白俄罗斯语\" [ref=e449]\n  - option \"班巴拉语\" [ref=e450]\n  - option \"邦阿西楠语\" [ref=e451]\n  - option \"邦板牙语\" [ref=e452]\n  - option \"保加利亚语\" [ref=e453]\n  - option \"北索托语\" [ref=e454]\n  - option \"奔巴语\" [ref=e455]\n  - option \"比科尔语\" [ref=e456]\n  - option \"俾路支语\" [ref=e457]\n  - option \"冰岛语\" [ref=e458]\n  - option \"波兰语\" [ref=e459]\n  - option \"波斯尼亚语\" [ref=e460]\n  - option \"波斯语\" [ref=e461]\n  - option \"博杰普尔语\" [ref=e462]\n  - option \"布里亚特语\" [ref=e463]\n  - option \"布列塔尼语\" [ref=e464]\n  - option \"藏语\" [ref=e465]\n  - option \"草原马里语\" [ref=e466]\n  - option \"查莫罗语\" [ref=e467]\n  - option \"车臣语\" [ref=e468]\n  - option \"楚克语\" [ref=e469]\n  - option \"楚瓦什语\" [ref=e470]\n  - option \"茨瓦纳语\" [ref=e471]\n  - option \"聪加语\" [ref=e472]\n  - option \"达里语\" [ref=e473]\n  - option \"鞑靼语\" [ref=e474]\n  - option \"丹麦语\" [ref=e475]\n  - option \"掸语\" [ref=e476]\n  - option \"德顿语\" [ref=e477]\n  - option \"德语\" [ref=e478]\n  - option \"迪维希语\" [ref=e479]\n  - option \"迪尤拉语\" [ref=e480]\n  - option \"蒂夫语\" [ref=e481]\n  - option \"丁卡语\" [ref=e482]\n  - option \"多格拉语\" [ref=e483]\n  - option \"俄语\" [ref=e484]\n  - option \"恩道语\" [ref=e485]\n  - option \"恩德贝莱语（南部）\" [ref=e486]\n  - option \"恩敦贝语\" [ref=e487]\n  - option \"恩科语\" [ref=e488]\n  - option \"法罗语\" [ref=e489]\n  - option \"法语\" [ref=e490]\n  - option \"法语（加拿大）\" [ref=e491]\n  - option \"梵语\" [ref=e492]\n  - option \"菲律宾语\" [ref=e493]\n  - option \"斐济语\" [ref=e494]\n  - option \"芬兰语\" [ref=e495]\n  - option \"丰语\" [ref=e496]\n  - option \"弗里西语\" [ref=e497]\n  - option \"弗留利语\" [ref=e498]\n  - option \"富拉尼语\" [ref=e499]\n  - option \"刚果语\" [ref=e500]\n  - option \"高棉语\" [ref=e501]\n  - option \"格陵兰语\" [ref=e502]\n  - option \"格鲁吉亚语\" [ref=e503]\n  - option \"贡根语\" [ref=e504]\n  - option \"古吉拉特语\" [ref=e505]\n  - option \"瓜拉尼语\" [ref=e506]\n  - option \"哈卡钦语\" [ref=e507]\n  - option \"哈萨克语\" [ref=e508]\n  - option \"海地克里奥尔语\" [ref=e509]\n  - option \"韩语\" [ref=e510]\n  - option \"豪萨语\" [ref=e511]\n  - option \"荷兰语\" [ref=e512]\n  - option \"洪斯吕克语\" [ref=e513]\n  - option \"吉尔吉斯语\" [ref=e514]\n  - option \"吉土巴语\" [ref=e515]\n  - option \"加利西亚语\" [ref=e516]\n  - option \"加泰罗尼亚语\" [ref=e517]\n  - option \"加语\" [ref=e518]\n  - option \"捷克语\" [ref=e519]\n  - option \"景颇语\" [ref=e520]\n  - option \"卡纳达语\" [ref=e521]\n  - option \"卡努里语\" [ref=e522]\n  - option \"卡西语\" [ref=e523]\n  - option \"凯克其语\" [ref=e524]\n  - option \"科米语\" [ref=e525]\n  - option \"科萨语\" [ref=e526]\n  - option \"科西嘉语\" [ref=e527]\n  - option \"克里米亚鞑靼语（拉丁文）\" [ref=e528]\n  - option \"克里米亚鞑靼语（西里尔文）\" [ref=e529]\n  - option \"克罗地亚语\" [ref=e530]\n  - option \"克丘亚语\" [ref=e531]\n  - option \"库尔德语（库尔曼吉语）\" [ref=e532]\n  - option \"库尔德语（索拉尼）\" [ref=e533]\n  - option \"廓克博若克语\" [ref=e534]\n  - option \"拉丁语\" [ref=e535]\n  - option \"拉特加莱语\" [ref=e536]\n  - option \"拉脱维亚语\" [ref=e537]\n  - option \"老挝语\" [ref=e538]\n  - option \"立陶宛语\" [ref=e539]\n  - option \"利古里亚语\" [ref=e540]\n  - option \"林堡语\" [ref=e541]\n  - option \"林加拉语\" [ref=e542]\n  - option \"隆迪语\" [ref=e543]\n  - option \"卢奥语\" [ref=e544]\n  - option \"卢干达语\" [ref=e545]\n  - option \"卢森堡语\" [ref=e546]\n  - option \"卢旺达语\" [ref=e547]\n  - option \"伦巴第语\" [ref=e548]\n  - option \"罗马尼亚语\" [ref=e549]\n  - option \"罗姆语\" [ref=e550]\n  - option \"马都拉语\" [ref=e551]\n  - option \"马恩岛语\" [ref=e552]\n  - option \"马尔加什语\" [ref=e553]\n  - option \"马尔瓦迪语\" [ref=e554]\n  - option \"马耳他语\" [ref=e555]\n  - option \"马拉地语\" [ref=e556]\n  - option \"马拉雅拉姆语\" [ref=e557]\n  - option \"马来语\" [ref=e558]\n  - option \"马来语（爪夷文）\" [ref=e559]\n  - option \"马其顿语\" [ref=e560]\n  - option \"马绍尔语\" [ref=e561]\n  - option \"玛姆语\" [ref=e562]\n  - option \"迈蒂利语\" [ref=e563]\n  - option \"毛里求斯克里奥尔语\" [ref=e564]\n  - option \"毛利语\" [ref=e565]\n  - option \"梅泰语（曼尼普尔语）\" [ref=e566]\n  - option \"蒙古语\" [ref=e567]\n  - option \"孟加拉语\" [ref=e568]\n  - option \"米南语\" [ref=e569]\n  - option \"米佐语\" [ref=e570]\n  - option \"缅甸语\" [ref=e571]\n  - option \"苗语\" [ref=e572]\n  - option \"纳瓦特尔语（东部瓦斯特卡）\" [ref=e573]\n  - option \"南非荷兰语\" [ref=e574]\n  - option \"南索托语\" [ref=e575]\n  - option \"尼泊尔巴萨语\" [ref=e576]\n  - option \"尼泊尔语\" [ref=e577]\n  - option \"努尔语\" [ref=e578]\n  - option \"挪威语\" [ref=e579]\n  - option \"帕皮阿门托语\" [ref=e580]\n  - option \"旁遮普语（果鲁穆奇文）\" [ref=e581]\n  - option \"旁遮普语（沙木基文）\" [ref=e582]\n  - option \"葡萄牙语（巴西）\" [ref=e583]\n  - option \"葡萄牙语（葡萄牙）\" [ref=e584]\n  - option \"普什图语\" [ref=e585]\n  - option \"齐切瓦语\" [ref=e586]\n  - option \"奇加语\" [ref=e587]\n  - option \"奇卢伯语\" [ref=e588]\n  - option \"契维语\" [ref=e589]\n  - option \"日语\" [ref=e590]\n  - option \"瑞典语\" [ref=e591]\n  - option \"萨巴特克语\" [ref=e592]\n  - option \"萨米语（北部）\" [ref=e593]\n  - option \"萨摩亚语\" [ref=e594]\n  - option \"塞尔维亚语\" [ref=e595]\n  - option \"塞拉利昂克里奥尔语\" [ref=e596]\n  - option \"塞舌尔克里奥尔语\" [ref=e597]\n  - option \"桑戈语\" [ref=e598]\n  - option \"桑塔利语（奥尔奇基文）\" [ref=e599]\n  - option \"桑塔利语（拉丁文）\" [ref=e600]\n  - option \"僧伽罗语\" [ref=e601]\n  - option \"世界语\" [ref=e602]\n  - option \"斯洛伐克语\" [ref=e603]\n  - option \"斯洛文尼亚语\" [ref=e604]\n  - option \"斯瓦特语\" [ref=e605]\n  - option \"斯瓦希里语\" [ref=e606]\n  - option \"苏格兰盖尔语\" [ref=e607]\n  - option \"苏苏语\" [ref=e608]\n  - option \"宿务语\" [ref=e609]\n  - option \"索马里语\" [ref=e610]\n  - option \"塔吉克语\" [ref=e611]\n  - option \"塔马齐格特语\" [ref=e612]\n  - option \"塔马齐格特语（提非纳文）\" [ref=e613]\n  - option \"塔希提语\" [ref=e614]\n  - option \"泰卢固语\" [ref=e615]\n  - option \"泰米尔语\" [ref=e616]\n  - option \"泰语\" [ref=e617]\n  - option \"汤加语\" [ref=e618]\n  - option \"提格里尼亚语\" [ref=e619]\n  - option \"图鲁语\" [ref=e620]\n  - option \"图姆布卡语\" [ref=e621]\n  - option \"图瓦语\" [ref=e622]\n  - option \"土耳其语\" [ref=e623]\n  - option \"土库曼语\" [ref=e624]\n  - option \"瓦瑞语\" [ref=e625]\n  - option \"望加锡语\" [ref=e626]\n  - option \"威尔士语\" [ref=e627]\n  - option \"威尼斯语\" [ref=e628]\n  - option \"维吾尔语\" [ref=e629]\n  - option \"文达语\" [ref=e630]\n  - option \"沃洛夫语\" [ref=e631]\n  - option \"乌德穆尔特语\" [ref=e632]\n  - option \"乌尔都语\" [ref=e633]\n  - option \"乌克兰语\" [ref=e634]\n  - option \"乌兹别克语\" [ref=e635]\n  - option \"西班牙语\" [ref=e636]\n  - option \"西里西亚语\" [ref=e637]\n  - option \"西西里语\" [ref=e638]\n  - option \"希伯来语\" [ref=e639]\n  - option \"希腊语\" [ref=e640]\n  - option \"希利盖农语\" [ref=e641]\n  - option \"夏威夷语\" [ref=e642]\n  - option \"信德语\" [ref=e643]\n  - option \"匈牙利语\" [ref=e644]\n  - option \"修纳语\" [ref=e645]\n  - option \"巽他语\" [ref=e646]\n  - option \"牙买加土语\" [ref=e647]\n  - option \"雅库特语\" [ref=e648]\n  - option \"亚美尼亚语\" [ref=e649]\n  - option \"亚齐语\" [ref=e650]\n  - option \"伊班语\" [ref=e651]\n  - option \"伊博语\" [ref=e652]\n  - option \"伊洛卡诺语\" [ref=e653]\n  - option \"意大利语\" [ref=e654]\n  - option \"意第绪语\" [ref=e655]\n  - option \"因纽特语（拉丁文）\" [ref=e656]\n  - option \"因纽特语（音节文字）\" [ref=e657]\n  - option \"印地语\" [ref=e658]\n  - option \"印尼语\" [ref=e659]\n  - option \"尤卡坦玛雅语\" [ref=e660]\n  - option \"约鲁巴语\" [ref=e661]\n  - option \"粤语\" [ref=e662]\n  - option \"越南语\" [ref=e663]\n  - option \"爪哇语\" [ref=e664]\n  - option \"中文（繁体）\" [ref=e665]\n  - option \"宗卡语\" [ref=e666]\n  - option \"祖鲁语\" [ref=e667]\n- link \"Google 翻译 翻译\" [ref=e387]\n- link \"About Us\" [ref=e260]\n- link \"Contact Us\" [ref=e261]\n- link \"Blog\" [ref=e262]\n- link \"Reviews\" [ref=e263]\n- link \"Referral Program\" [ref=e264]\n- link \"Bug Bounty\" [ref=e265]\n- link \"Legal & Agreements\" [ref=e266]\n- link \"Help docs\" [ref=e267]\n- link \"API User Guide\" [ref=e268]\n- link \"RPA User Guide\" [ref=e269]\n- link \"MCP Guide\" [ref=e270]\n- link \"Release Notes\" [ref=e271]\n- link \"Download\" [ref=e272]\n- link \"Pricing\" [ref=e273]\n- link \"Proxy Catalog\" [ref=e274]\n- link \"Fingerprint Checker\" [ref=e275]\n- link \"Partner Center\" [ref=e276]\n- link \"AdsPower vs Dolphin {anty}\" [ref=e277]\n- link \"AdsPower vs GoLogin\" [ref=e278]\n- link \"AdsPower vs Multilogin\" [ref=e279]\n- link \"IP Address Lookup\" [ref=e280]\n- link \"DNS Leak Test\" [ref=e281]\n- link \"Glossary\" [ref=e282]\n- link \"Airdrops\" [ref=e283]\n- link \"Antidetect Browser for Affiliate Marketing\" [ref=e284]\n- link \"Antidetect Browser for E-commerce\" [ref=e285]\n- link \"Antidetect Browsers for Social Marketing\" [ref=e286]\n- link \"Antidetect Browser for Crypto\" [ref=e287]\n- link \"Antidetect Browser for Traffic Arbitrage\" [ref=e288]\n- link \"Antidetect Browser for Digital Marketing\" [ref=e289]\n- link \"Terms of Use\" [ref=e388]\n- link \"Privacy Policy\" [ref=e389]\n- link \"Refund Policy\" [ref=e390]\n- link \"Cookie Policy\" [ref=e341]\n- button \"Accept\" [ref=e290]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify(Array.from(document.querySelectorAll('a[href]')).map(a=>({text:a.textContent.trim().slice(0,80),href:a.href})).filter(a=>/log in|login|sign in|web app|app.adspower|start/i.test(a.text+' '+a.href)))"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://www.adspower.com/",
+      "result": "[{\"text\":\"E-CommerceSeparate logins for every store\",\"href\":\"https://www.adspower.com/solutions/e-commerce\"},{\"text\":\"Log in\",\"href\":\"https://app.adspower.com/login?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Sign up\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Try It Free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Get Started\",\"href\":\"https://www.adspower.com/download\"},{\"text\":\"Try It Free →\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Sign up for free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Try It Free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Try It Free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Try It Free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Try It Free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Try It Free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Try It Free\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Sign up free and try secure protection\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Sign up free and get started\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Sep 23, 2026 Marketing Automation for Startups and Small Teams: How AdsPower AI \",\"href\":\"https://www.adspower.com/blog/marketing-automation-startups-small-teams-ai-agents\"},{\"text\":\"Sign up now\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"AdsPower vs GoLogin\",\"href\":\"https://www.adspower.com/alternatives/gologin-alternative\"},{\"text\":\"AdsPower vs Multilogin\",\"href\":\"https://www.adspower.com/alternatives/multilogin-alternative\"},{\"text\":\"E-CommerceSeparate logins for every store\",\"href\":\"https://www.adspower.com/solutions/e-commerce\"},{\"text\":\"Log in\",\"href\":\"https://app.adspower.com/login?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"},{\"text\":\"Sign up\",\"href\":\"https://app.adspower.com/registration?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\"}]"
+    },
+    "success": true
+  }
+]
