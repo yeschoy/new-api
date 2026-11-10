@@ -42,6 +42,7 @@ let staleArtifact = false
 const config: IQConfig = {
   version: 2,
   prompt: 'Draw a pelican.',
+  reasoning_effort: '',
   targets: [{ group: 'public', models: ['model-0'] }],
   enabled: false,
   schedule_mode: 'interval',
@@ -273,6 +274,30 @@ describe('authenticated IQ gallery', () => {
     await screen.findByText('Preview unavailable. Refresh the gallery.')
     expect(document.querySelector('iframe')).toBeNull()
     expect(artifactRevision(latest(0))).toContain('previous-run')
+  })
+
+  it('renders multiple groups as separate single horizontal model rows', async () => {
+    results.groups.push({
+      group: 'private',
+      models: [0, 1].map((index) => ({
+        model: `private-${index}`,
+        latest: null,
+        progress: null,
+      })),
+    })
+    mount()
+    const publicRow = await screen.findByRole('region', {
+      name: 'Models in public',
+    })
+    const privateRow = screen.getByRole('region', { name: 'Models in private' })
+    expect(publicRow).toHaveAttribute('tabindex', '0')
+    expect(publicRow).toHaveClass('overflow-x-auto')
+    expect(within(publicRow).getByRole('list')).toHaveClass('grid-flow-col')
+    expect(within(publicRow).getAllByRole('listitem')).toHaveLength(5)
+    expect(within(privateRow).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(publicRow).queryByText('private-0')).not.toBeInTheDocument()
+    expect(document.querySelector('iframe')).toBeNull()
+    expect(requests).toEqual(['/api/iq-tests/results'])
   })
 
   it('shows settings and manual execution only to authorized administrators', async () => {

@@ -85,7 +85,7 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		body, _ := io.ReadAll(r.Body)
-		if gjson.GetBytes(body, "messages.0.content").String() != prompt || gjson.GetBytes(body, "max_tokens").Int() != model.IQOutputTokens {
+		if gjson.GetBytes(body, "messages.0.content").String() != prompt || gjson.GetBytes(body, "max_tokens").Int() != model.IQOutputTokens || gjson.GetBytes(body, "reasoning_effort").String() != "high" {
 			wrong.Store(true)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -118,6 +118,7 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 	cfg, err := model.GetIQConfig()
 	require.NoError(t, err)
 	cfg.Prompt = model.IQText(prompt)
+	cfg.ReasoningEffort = "high"
 	cfg.Targets = []model.IQTarget{{Group: "public", Models: []string{"gpt-4o"}}, {Group: "private", Models: []string{"gpt-4o-mini"}}}
 	require.NoError(t, validateIQTargets(cfg))
 	cfg, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
@@ -209,7 +210,7 @@ func TestIQBatchPairDeadline(t *testing.T) {
 			var calledCtx context.Context
 			var calledAt time.Time
 			calls := 0
-			require.NoError(t, runIQBatch(ctx, task, "iq-deadline-runner", *cfg, root.Id, func(pairCtx context.Context, _ int, _, _, _ string) model.IQResult {
+			require.NoError(t, runIQBatch(ctx, task, "iq-deadline-runner", *cfg, root.Id, func(pairCtx context.Context, _ int, _, _, _, _ string) model.IQResult {
 				calls++
 				calledCtx = pairCtx
 				calledAt = time.Now()
@@ -244,7 +245,7 @@ func TestIQPairTimeoutResult(t *testing.T) {
 	require.NoError(t, ch.AddAbilities(nil))
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
-	result := executeIQPair(ctx, root.Id, "public", "gpt-4o", "test")
+	result := executeIQPair(ctx, root.Id, "public", "gpt-4o", "test", "")
 	require.Equal(t, "timeout", result.Status)
 	require.Equal(t, "timeout", result.ErrorCode)
 	require.Equal(t, "IQ request exceeded the 25-minute limit", result.ErrorMessage)
@@ -275,6 +276,88 @@ func TestIQNativeRequestsAndOutputBounds(t *testing.T) {
 	require.Empty(t, iqEndpoint(&model.Channel{Type: constant.ChannelTypeOpenAI}, "text-embedding-3-small"))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	r := executeIQPair(ctx, 1, "public", "m", "p")
+	r := executeIQPair(ctx, 1, "public", "m", "p", "")
 	require.NotEqual(t, "success", r.Status)
+}
+
+func TestIQReasoningEffortWireRequests(t *testing.T) {
+	for _, tc := range []struct {
+		name, upstream, effort, path, want, tokenPath string
+		channelType                                   int
+	}{
+		{"chat", "gpt-5", "high", "reasoning_effort", "high", "max_completion_tokens", constant.ChannelTypeOpenAI},
+		{"responses", "gpt-5-codex", "xhigh", "reasoning.effort", "xhigh", "max_output_tokens", constant.ChannelTypeOpenAI},
+		{"codex", "gpt-5-codex", "xhigh", "reasoning.effort", "xhigh", "max_output_tokens", constant.ChannelTypeCodex},
+		{"claude-adaptive", "claude-sonnet-4-6", "high", "output_config.effort", "high", "max_tokens", constant.ChannelTypeAnthropic},
+		{"claude-manual", "claude-3-7-sonnet-latest", "high", "thinking.type", "enabled", "max_tokens", constant.ChannelTypeAnthropic},
+		{"gemini-level", "gemini-3-pro-preview", "high", "generationConfig.thinkingConfig.thinkingLevel", "high", "generationConfig.maxOutputTokens", constant.ChannelTypeGemini},
+		{"gemini-budget", "gemini-2.5-flash", "none", "generationConfig.thinkingConfig.thinkingBudget", "0", "generationConfig.maxOutputTokens", constant.ChannelTypeGemini},
+		{"model-modifier", "gpt-5@thinking:on@effort:low", "high", "reasoning_effort", "low", "max_completion_tokens", constant.ChannelTypeOpenAI},
+		{"channel-default", "gpt-4o", "", "reasoning_effort", "low", "max_tokens", constant.ChannelTypeOpenAI},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, _ := setupIQController(t)
+			bodies := make(chan []byte, 1)
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				body, _ := io.ReadAll(r.Body)
+				select {
+				case bodies <- body:
+				default:
+				}
+				if tc.channelType == constant.ChannelTypeCodex {
+					w.Header().Set("Content-Type", "text/event-stream")
+					fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"<svg></svg>\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<svg></svg>\"}]}]}}\n\n")
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, `{"choices":[{"message":{"content":"<svg></svg>"}}]}`)
+			}))
+			defer server.Close()
+			mapping, err := common.Marshal(map[string]string{"gpt-4o": tc.upstream})
+			require.NoError(t, err)
+			mappingJSON := string(mapping)
+			override := `{"reasoning_effort":"low"}`
+			switch tc.channelType {
+			case constant.ChannelTypeAnthropic:
+				override = `{"reasoning_effort":"low","thinking":{"type":"disabled"},"output_config":{"effort":"low"}}`
+			case constant.ChannelTypeGemini:
+				override = `{"reasoning_effort":"low","generationConfig":{"thinkingConfig":{"thinkingLevel":"low"}}}`
+			default:
+				if tc.path == "reasoning.effort" {
+					override = `{"reasoning_effort":"low","reasoning":{"effort":"low"}}`
+				}
+			}
+			ch := &model.Channel{Type: tc.channelType, Status: common.ChannelStatusEnabled, Key: "mock", BaseURL: &server.URL, Models: "gpt-4o", Group: "public", ModelMapping: &mappingJSON, ParamOverride: &override}
+			if tc.channelType == constant.ChannelTypeCodex {
+				ch.Key = `{"access_token":"mock","account_id":"mock-account"}`
+			}
+			require.NoError(t, model.DB.Create(ch).Error)
+			require.NoError(t, ch.AddAbilities(nil))
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			result := executeIQPair(ctx, root.Id, "public", "gpt-4o", "exact", tc.effort)
+			require.Equal(t, "success", result.Status, result.ErrorMessage)
+			body := <-bodies
+			require.Equal(t, tc.want, gjson.GetBytes(body, tc.path).String(), string(body))
+			require.EqualValues(t, model.IQOutputTokens, gjson.GetBytes(body, tc.tokenPath).Int())
+			if tc.channelType != constant.ChannelTypeOpenAI && tc.effort != "" {
+				require.False(t, gjson.GetBytes(body, "reasoning_effort").Exists(), "channel overrides must not add the wrong protocol's thinking controls")
+			}
+			if tc.name == "claude-manual" {
+				budget := gjson.GetBytes(body, "thinking.budget_tokens").Int()
+				require.GreaterOrEqual(t, budget, int64(1024))
+				require.Less(t, budget, int64(model.IQOutputTokens))
+			}
+			require.EqualValues(t, 1, calls.Load(), "every pair must issue exactly one request")
+			var log model.Log
+			require.NoError(t, model.DB.Where("token_name = ?", "IQ test").First(&log).Error)
+			wantEffort := tc.effort
+			if tc.name == "model-modifier" || tc.name == "channel-default" {
+				wantEffort = "low"
+			}
+			require.Equal(t, wantEffort, gjson.Get(log.Other, "reasoning_effort").String(), "usage metadata must match the final reasoning controls")
+		})
+	}
 }

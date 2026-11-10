@@ -14,6 +14,9 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 - `IQ_PREVIEW_SANDBOX = 'allow-scripts'`; `MAX_LIVE_IQ_PREVIEWS = 4`.
 - Configuration uses a complete versioned PUT; result/artifact DTOs are owned
   by `types.ts` and `api.ts`. API timestamps are Unix seconds.
+- `IQ_REASONING_EFFORTS` in `types.ts` owns the frontend effort union and Zod
+  enum: '', none, minimal, low, medium, high, xhigh, max. An absent backend
+  effort is displayed/submitted as the empty default by `editableIQConfig`.
 
 ## 3. Contracts
 
@@ -23,6 +26,10 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 - Fetch list metadata once per page (poll every 10 seconds while foreground).
   Fetch artifacts lazily for visible cards or the open preview. Compare artifact
   revisions against metadata and fail closed on replacement races.
+- Each group occupies one gallery row. Its model list uses column-flow grid
+  with bounded responsive card widths, in a labeled keyboard-focusable horizontal
+  scroll region; never wrap a group across multiple rows or overflow the page.
+  Retain lazy observation and the global live-preview cap across all rows.
 - Preserve the date/status of old results during a pending/running replacement.
   Members see only backend-authorized groups and no configuration/run controls;
   administrators additionally follow channel RBAC capabilities.
@@ -42,6 +49,11 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   consume resources or navigate their own frame. A local browser probe observed
   a dynamic download link falling back to self-navigation; no download sandbox
   capability was granted. Do not misreport this as universal egress prevention.
+- The shared thinking-level setting applies to all selected group/model pairs.
+  Default retains model/channel behavior; model-name modifiers take precedence,
+  and supported levels depend on the model. Preserve effort and multiple group
+  selections through saves and conflict recovery; saving settings never runs
+  a paid test automatically.
 - Retain exact prompt whitespace and edits after recoverable/stale save errors.
   Daily uses Beijing time. Give interval/daily branches distinct React keys so
   native number/time inputs and react-hook-form refs are not incorrectly reused
@@ -74,9 +86,11 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 - `preview-document.test.ts`: policy ordering, unsafe nodes/URLs, Canvas/SVG
   preservation and size bound; jsdom is construction evidence, not isolation.
 - `gallery.test.tsx`: admin/member controls, lazy bounded previews and expanded
-  lifecycle, current status, account changes and artifact revision mismatches.
+  lifecycle, current status, account changes, artifact revision mismatches and
+  multiple independent horizontal group rows.
 - `settings.test.tsx`: exact prompt/targets/schedule save, mode round-trip values,
-  stale-save input preservation and explicit discard/reload.
+  stale-save prompt/effort preservation, shared effort enum/default, multiple
+  group selection and explicit discard/reload.
 - `localization.test.ts`: all static/dynamic feature keys in seven locales.
 - One local mock-backed browser smoke: real Canvas/SVG render, blocked parent
   DOM/storage/cookies, subresource/fetch/worker/popup/top/form attempts, mobile

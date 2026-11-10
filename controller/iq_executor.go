@@ -17,6 +17,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/relayconvert/reasoning"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
@@ -102,6 +103,46 @@ func buildIQRequest(name, endpoint, prompt string, stream bool) dto.Request {
 	default:
 		return &dto.GeneralOpenAIRequest{Model: name, Stream: &stream, MaxTokens: &limit, Messages: []dto.Message{{Role: "user", Content: prompt}}}
 	}
+}
+
+// Reuse the production reasoning renderers after model mapping. Native Claude
+// and Gemini requests consume the portable state; OpenAI also needs its explicit
+// request field. Model modifiers keep their normal precedence over these defaults.
+func applyIQReasoning(request dto.Request, info *relaycommon.RelayInfo, value string) error {
+	effort, err := reasoning.ParseEffort(value)
+	if err != nil || effort == "" {
+		return err
+	}
+	intent := reasoning.Intent{Mode: reasoning.ModeEnabled, Effort: effort}
+	if effort == reasoning.EffortNone {
+		intent.Mode = reasoning.ModeDisabled
+	}
+	info.ReasoningConversion = reasoning.StateFromIntent(intent)
+	info.SetReasoningEffort(string(effort))
+	switch request := request.(type) {
+	case *dto.GeneralOpenAIRequest:
+		request.ReasoningEffort = string(effort)
+	case *dto.OpenAIResponsesRequest:
+		request.Reasoning = &dto.Reasoning{Effort: string(effort)}
+	}
+	return nil
+}
+
+// Preserve the already-converted reasoning controls for an explicitly configured
+// IQ run, without inventing provider-native fields or bypassing model modifiers.
+func restoreIQReasoning(body, original []byte) ([]byte, error) {
+	for _, key := range []string{"reasoning_effort", "reasoning", "thinking", "output_config.effort", "generationConfig.thinkingConfig"} {
+		var err error
+		if value := gjson.GetBytes(original, key); value.Exists() {
+			body, err = sjson.SetRawBytes(body, key, []byte(value.Raw))
+		} else {
+			body, err = sjson.DeleteBytes(body, key)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return body, nil
 }
 
 // Keep the converted saved user input intact even when a channel has parameter
@@ -206,9 +247,9 @@ func iqResponseUsage(body []byte, stream bool) *dto.Usage {
 	return &dto.Usage{PromptTokens: int(input), CompletionTokens: int(output), TotalTokens: int(input + output)}
 }
 
-type iqPairExecutor func(context.Context, int, string, string, string) model.IQResult
+type iqPairExecutor func(context.Context, int, string, string, string, string) model.IQResult
 
-func executeIQPair(ctx context.Context, userID int, group, name, prompt string) model.IQResult {
+func executeIQPair(ctx context.Context, userID int, group, name, prompt, reasoningEffort string) model.IQResult {
 	r := model.IQResult{Group: group, Model: name, Status: "unavailable", ErrorCode: "unavailable", ErrorMessage: "No compatible enabled route is available"}
 	if ctx.Err() != nil {
 		r.Status = "interrupted"
@@ -231,7 +272,7 @@ func executeIQPair(ctx context.Context, userID int, group, name, prompt string) 
 	if endpoint == "" {
 		return r
 	}
-	result := testChannelWithIQ(ctx, channel, userID, name, endpoint, channel.Type == constant.ChannelTypeCodex, &iqChannelTestOptions{group: group, prompt: prompt})
+	result := testChannelWithIQ(ctx, channel, userID, name, endpoint, channel.Type == constant.ChannelTypeCodex, &iqChannelTestOptions{group: group, prompt: prompt, reasoningEffort: reasoningEffort})
 	if result.localErr != nil {
 		r.Status = "error"
 		r.ErrorCode = "execution_failed"
