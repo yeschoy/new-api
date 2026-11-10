@@ -101,8 +101,8 @@ function IQGallery(props: { scope: string }) {
     },
   })
   return (
-    <Main className='overflow-y-auto'>
-      <div className='mx-auto w-full max-w-7xl space-y-8 p-4 pb-16 sm:p-8'>
+    <Main className='min-w-0 overflow-y-auto'>
+      <div className='mx-auto w-full max-w-7xl min-w-0 space-y-8 p-4 pb-16 sm:p-8'>
         <header className='flex flex-wrap items-start justify-between gap-4'>
           <div className='max-w-2xl space-y-2'>
             <h1 className='text-2xl font-semibold'>{t('IQ tests')}</h1>
@@ -180,25 +180,37 @@ function IQGallery(props: { scope: string }) {
               {data.groups.map((group) => (
                 <section
                   key={group.group}
-                  className='space-y-4'
+                  className='min-w-0 space-y-4'
                   aria-label={group.group}
                 >
                   <h2 className='text-xl font-semibold break-all'>
                     {group.group}
                   </h2>
-                  <div className='grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3'>
-                    {group.models.map((card) => (
-                      <IQResultCard
-                        key={card.model}
-                        scope={props.scope}
-                        card={card}
-                        live={Boolean(
-                          card.latest &&
-                          previews.live.includes(artifactRevision(card.latest))
-                        )}
-                        onOpen={setSelected}
-                      />
-                    ))}
+                  <div
+                    role='region'
+                    aria-label={t('Models in {{group}}', {
+                      group: group.group,
+                    })}
+                    tabIndex={0}
+                    className='focus-visible:ring-ring overflow-x-auto rounded-lg pb-3 focus-visible:ring-2 focus-visible:outline-none'
+                  >
+                    <ul className='grid auto-cols-[min(100%,22rem)] grid-flow-col gap-5'>
+                      {group.models.map((card) => (
+                        <li key={card.model} className='min-w-0'>
+                          <IQResultCard
+                            scope={props.scope}
+                            card={card}
+                            live={Boolean(
+                              card.latest &&
+                              previews.live.includes(
+                                artifactRevision(card.latest)
+                              )
+                            )}
+                            onOpen={setSelected}
+                          />
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </section>
               ))}

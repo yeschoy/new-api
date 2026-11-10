@@ -26,8 +26,20 @@ The controller owns orchestration to avoid a service/controller import cycle.
   maximum 100 concrete group/model pairs. Reject `auto` and incompatible targets.
 - Complete config PUT includes the last `version`, prompt, targets, enabled,
   schedule_mode, interval_hours, daily_time and timezone. Calendar is explicitly
-  Asia/Shanghai, never server-local time. Save recomputes the next slot;
-  a manual run preserves recurring cadence. Skip backlog and overlapping slots.
+  Asia/Shanghai, never server-local time. Optional `reasoning_effort` is shared
+  across all pairs: empty string (default), none, minimal, low, medium, high,
+  xhigh or max. Normalize with the production reasoning parser; persist empty
+  values when clearing. The column is varchar(16) NOT NULL DEFAULT '' so existing
+  rows and older queued snapshots retain default behavior. Save recomputes the
+  next slot; a manual run preserves recurring cadence. Skip backlog and
+  overlapping slots.
+- Carry the saved effort in the immutable batch snapshot through `runIQBatch`
+  and `executeIQPair`. Attach portable reasoning state **after InitChannelMeta**
+  (it clears this state) and before model modifier handling. Production adapters
+  render mapped-model native controls; model modifiers retain precedence. For
+  explicit effort, restore converted reasoning controls after channel parameter
+  overrides and retain matching usage metadata. Empty effort leaves channel
+  defaults intact. Do not hard-code Claude/Gemini budgets or broaden IQ limits.
 - A batch has two workers, a 25-minute pair deadline (`iqPairTimeout`), a
   16,384-token wire limit, one retry=0 group selector, and at most one
   non-replayable outbound POST per pair. Never enumerate channels, fail over,
@@ -64,7 +76,7 @@ The controller owns orchestration to avoid a service/controller import cycle.
 | Condition | Required result |
 | --- | --- |
 | Stale config version | 409, no write |
-| Invalid prompt/targets/schedule | 400 |
+| Invalid prompt/targets/schedule/unknown reasoning effort | 400 |
 | Anonymous / ordinary member admin action | 401 / 403 |
 | Hidden, removed or unsuccessful artifact ID | Indistinguishable 404 |
 | Duplicate manual enqueue | Existing active task, created=false |
@@ -86,7 +98,8 @@ The controller owns orchestration to avoid a service/controller import cycle.
   `go test ./model -run '^TestIQPostgresMigrationAndConfigRoundTrip$' -count=1`.
   The test creates and verifies a unique search_path schema, reproduces the
   old SQLSTATE 22023, applies/repeats migrations, checks targets is TEXT, and
-  verifies exact prompt/JSON configuration persistence. It never uses public
+  verifies exact prompt/JSON/effort persistence and upgrades an existing row
+  after the optional effort column is removed. It never uses public
   schema for fixture writes. A missing DSN skips local tests, NOT CI acceptance.
 - `.github/workflows/yeschoy-deploy.yml` requires the PostgreSQL 15 service/test
   job before building images; deployment still requires that build. Never
@@ -94,9 +107,15 @@ The controller owns orchestration to avoid a service/controller import cycle.
 - Supplementary dialect-only checks assert targets/prompt/snapshot/artifact
   resolve to TEXT or MEDIUMTEXT. They are not a live migration/startup check.
 - `model/iq_config_test.go`: deterministic calendar/bounds, optimistic edits,
-  duplicate enqueue/checkpoints, latest replacement, lease recovery and cadence.
+  duplicate enqueue/checkpoints, latest replacement, lease recovery and cadence;
+  default/invalid effort validation, adding the effort column to an existing row,
+  clearing a saved effort and immutable batch snapshot persistence.
 - `controller/iq_tests_test.go`: mocked call counts, exact prompt, group routing,
   viewer/artifact denial, quota and health non-mutation, native request bounds.
+  `TestIQReasoningEffortWireRequests` exercises mapped OpenAI/Responses/Codex,
+  adaptive/manual Claude and level/budget Gemini against local HTTP mocks;
+  verify explicit effort survives channel overrides, model modifiers win, empty
+  effort retains defaults, usage metadata agrees, and one request is sent.
   Assert the executor receives a 25-minute deadline without waiting for it,
   preserves earlier parent deadlines, cancels completed pair contexts, and
   reports the same configured limit on timeout without retrying.

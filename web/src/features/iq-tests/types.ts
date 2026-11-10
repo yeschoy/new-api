@@ -31,9 +31,21 @@ export interface IQTarget {
   models: string[]
 }
 
+export const IQ_REASONING_EFFORTS = [
+  '',
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+] as const
+
 export interface IQConfig {
   version: number
   prompt: string
+  reasoning_effort: (typeof IQ_REASONING_EFFORTS)[number]
   targets: IQTarget[]
   enabled: boolean
   schedule_mode: 'interval' | 'daily'

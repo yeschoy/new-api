@@ -94,7 +94,7 @@ func runIQBatch(ctx context.Context, task *model.SystemTask, runner string, cfg 
 					continue
 				}
 				pairCtx, cancel := context.WithTimeout(ctx, iqPairTimeout)
-				r := execute(pairCtx, userID, a.Group, a.Model, string(cfg.Prompt))
+				r := execute(pairCtx, userID, a.Group, a.Model, string(cfg.Prompt), cfg.ReasoningEffort)
 				cancel()
 				r.ID = a.PairID
 				r.Group = a.Group

@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/relaykit/relayconvert/reasoning"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
@@ -56,19 +57,20 @@ func (IQTargets) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 }
 
 type IQConfig struct {
-	ID            int       `json:"-" gorm:"primaryKey;autoIncrement:false"`
-	Version       int64     `json:"version"`
-	Prompt        IQText    `json:"prompt"`
-	Targets       IQTargets `json:"targets" gorm:"serializer:json"`
-	Enabled       bool      `json:"enabled"`
-	ScheduleMode  string    `json:"schedule_mode"`
-	IntervalHours int       `json:"interval_hours"`
-	DailyTime     string    `json:"daily_time"`
-	Timezone      string    `json:"timezone"`
-	NextRunAt     int64     `json:"next_run_at"`
-	UpdatedAt     int64     `json:"updated_at"`
-	UpdatedBy     int       `json:"updated_by"`
-	DispatchSeq   int64     `json:"-"`
+	ID              int       `json:"-" gorm:"primaryKey;autoIncrement:false"`
+	Version         int64     `json:"version"`
+	Prompt          IQText    `json:"prompt"`
+	ReasoningEffort string    `json:"reasoning_effort" gorm:"type:varchar(16);not null;default:''"`
+	Targets         IQTargets `json:"targets" gorm:"serializer:json"`
+	Enabled         bool      `json:"enabled"`
+	ScheduleMode    string    `json:"schedule_mode"`
+	IntervalHours   int       `json:"interval_hours"`
+	DailyTime       string    `json:"daily_time"`
+	Timezone        string    `json:"timezone"`
+	NextRunAt       int64     `json:"next_run_at"`
+	UpdatedAt       int64     `json:"updated_at"`
+	UpdatedBy       int       `json:"updated_by"`
+	DispatchSeq     int64     `json:"-"`
 }
 
 // No artwork or prompt snapshot belongs in SystemTask's publicly listed bodies.
@@ -121,6 +123,11 @@ func GetIQConfig() (*IQConfig, error) {
 
 // NormalizeIQConfig preserves the exact administrator prompt, including whitespace.
 func NormalizeIQConfig(c *IQConfig) error {
+	effort, err := reasoning.ParseEffort(c.ReasoningEffort)
+	if err != nil {
+		return err
+	}
+	c.ReasoningEffort = string(effort)
 	if !utf8.ValidString(string(c.Prompt)) || strings.TrimSpace(string(c.Prompt)) == "" || len(c.Prompt) > IQMaxPromptBytes {
 		return errors.New("prompt must contain 1–65536 UTF-8 bytes")
 	}
@@ -227,7 +234,7 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 	c.NextRunAt = NextIQRun(c, now, 0)
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		targets, _ := json.Marshal(c.Targets)
-		res := tx.Model(&IQConfig{}).Where("id = 1 AND version = ?", c.Version).Updates(map[string]any{"version": c.Version + 1, "prompt": c.Prompt, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
+		res := tx.Model(&IQConfig{}).Where("id = 1 AND version = ?", c.Version).Updates(map[string]any{"version": c.Version + 1, "prompt": c.Prompt, "reasoning_effort": c.ReasoningEffort, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
 		if res.Error != nil {
 			return res.Error
 		}

@@ -77,7 +77,14 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	cfg, err := GetIQConfig()
 	require.NoError(t, err)
 	require.False(t, cfg.Enabled)
+	// Simulate an existing installation without the optional effort column.
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "ReasoningEffort"))
+	require.NoError(t, db.AutoMigrate(models...))
+	cfg, err = GetIQConfig()
+	require.NoError(t, err)
+	require.Empty(t, cfg.ReasoningEffort)
 	cfg.Prompt = " exact saved PostgreSQL prompt\n"
+	cfg.ReasoningEffort = "xhigh"
 	cfg.Targets = []IQTarget{{Group: "fixture", Models: []string{"model-a", "model-b"}}}
 	saved, err := SaveIQConfig(*cfg, 42, time.Now())
 	require.NoError(t, err)
@@ -87,6 +94,7 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, saved.Version, reloaded.Version)
 	require.Equal(t, saved.Prompt, reloaded.Prompt)
+	require.Equal(t, "xhigh", reloaded.ReasoningEffort)
 	require.Equal(t, saved.Targets, reloaded.Targets)
 	require.False(t, reloaded.Enabled)
 	t.Log("PostgreSQL migration, repeat migration, targets TEXT and config round trip passed")

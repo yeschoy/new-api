@@ -27,6 +27,12 @@ import { Dialog } from '@/components/dialog'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
 import { Button } from '@/components/ui/button'
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -158,6 +164,41 @@ export function IQConfigForm(props: {
             aria-invalid={Boolean(form.formState.errors.prompt)}
           />
         </div>
+        <FieldGroup>
+          <Field data-invalid={Boolean(form.formState.errors.reasoning_effort)}>
+            <FieldLabel htmlFor='iq-reasoning'>
+              {t('Thinking level')}
+            </FieldLabel>
+            <NativeSelect
+              id='iq-reasoning'
+              aria-describedby='iq-reasoning-help'
+              aria-invalid={Boolean(form.formState.errors.reasoning_effort)}
+              {...form.register('reasoning_effort')}
+            >
+              <NativeSelectOption value=''>{t('Default')}</NativeSelectOption>
+              <NativeSelectOption value='none'>{t('None')}</NativeSelectOption>
+              <NativeSelectOption value='minimal'>
+                {t('Minimal')}
+              </NativeSelectOption>
+              <NativeSelectOption value='low'>{t('Low')}</NativeSelectOption>
+              <NativeSelectOption value='medium'>
+                {t('Medium')}
+              </NativeSelectOption>
+              <NativeSelectOption value='high'>{t('High')}</NativeSelectOption>
+              <NativeSelectOption value='xhigh'>
+                {t('Extra high')}
+              </NativeSelectOption>
+              <NativeSelectOption value='max'>
+                {t('Maximum')}
+              </NativeSelectOption>
+            </NativeSelect>
+            <FieldDescription id='iq-reasoning-help'>
+              {t(
+                'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.'
+              )}
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
         <div className='space-y-2'>
           <Label>{t('Groups and models')}</Label>
           <p className='text-muted-foreground text-sm'>
