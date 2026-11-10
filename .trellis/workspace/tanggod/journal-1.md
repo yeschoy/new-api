@@ -269,3 +269,25 @@ Confirmed production deployment failed on introduced iq_configs.targets varchar(
 ### Next Steps
 
 - Push only iq-test. Main merge/deployment needs owner authorization; temporary local PG resources remain inventoried for approved cleanup.
+
+
+## Session 9: IQ group tasks, prompt pools and retained run gallery
+<!-- trellis-session: v=2 fp=0e2a9bdec5715419 -->
+
+**Date**: 2026-11-11
+**Task**: IQ group tasks, prompt pools and retained run gallery
+**Branch**: `iq-test`
+
+### Summary
+
+Implemented independent per-group IQ configuration/schedule/run with atomic legacy split, random prompt pool snapshots and existing default prompt. Preserved immutable per-run artwork and descending whole-run cursor pagination. Fixed thumbnail layout with a scaled 1280x960 viewport and direct-body preview markup. IQ-only Go checks, frontend lint/typecheck and 14 targeted checks passed; one local browser visual probe passed. No paid provider calls or deployment. Live PostgreSQL migration check skipped because TEST_POSTGRES_DSN is unset. Temporary artifacts recorded in .iq-independent-tasks-temp-artifacts.md and retained pending user cleanup consent.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `187fc781d` | feat(iq-tests): isolate group tasks and preserve chronological run history |
+
+### Status
+
+[OK] **Completed**
