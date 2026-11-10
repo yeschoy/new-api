@@ -195,6 +195,7 @@ func InitDB() (err error) {
 			db = db.Debug()
 		}
 		DB = db
+		ResetPartnerTenantMembershipCache()
 		// MySQL charset/collation startup check: ensure Chinese-capable charset
 		if common.UsingMainDatabase(common.DatabaseTypeMySQL) {
 			if err := checkMySQLChineseSupport(DB); err != nil {
@@ -394,6 +395,7 @@ func migrateDB() error {
 		&PartnerTenant{},
 		&PartnerTenantAccount{},
 		&PartnerTenantSubscriptionGrant{},
+		&PartnerTenantSubscriptionOrder{},
 		&PartnerServerConfig{},
 		&PartnerServerSecret{},
 		&PartnerServerToken{},
@@ -402,6 +404,9 @@ func migrateDB() error {
 		&UserAccessToken{},
 	)
 	if err != nil {
+		return err
+	}
+	if err := migratePartnerTenantAccountIdentity(DB); err != nil {
 		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {

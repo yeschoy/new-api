@@ -430,7 +430,9 @@ export function SubscriptionsMutateDrawer({
                   name='price_amount'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('Plan Price')}</FormLabel>
+                      <FormLabel>
+                        {t('Plan Price')} ({isPartnerPlan ? 'CNY' : 'USD'})
+                      </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -447,7 +449,7 @@ export function SubscriptionsMutateDrawer({
                       <FormDescription>
                         {isPartnerPlan
                           ? t(
-                              'Reference monthly price; the partner collects payment outside this platform.'
+                              'Enter a positive CNY amount with up to 2 decimal places'
                             )
                           : t(
                               'Amount the user pays to purchase this plan; the actual currency depends on the payment gateway.'

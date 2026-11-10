@@ -1,0 +1,113 @@
+[
+  {
+    "command": [
+      "open",
+      "about:blank"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "BA9DC5C39949C935180F634D10DA321E",
+      "title": "",
+      "url": "about:blank"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "network",
+      "route",
+      "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "--body",
+      "[REDACTED]"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "routed": "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "open",
+      "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=%5BREDACTED%5D"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "BA9DC5C39949C935180F634D10DA321E",
+      "title": "野菜",
+      "url": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "refs": {
+        "e1": {
+          "name": "",
+          "role": "generic"
+        },
+        "e2": {
+          "name": "订阅收银台",
+          "role": "heading"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- generic \"订阅收银台加载中...仅经核实的付款会开通订阅，本页面无法确认收款。\" [ref=e1] clickable [onclick]\n  - heading \"订阅收银台\" [level=1, ref=e2]"
+    },
+    "success": true
+  }
+]

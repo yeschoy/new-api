@@ -1,0 +1,143 @@
+[
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "url": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "set",
+      "viewport",
+      "390",
+      "844"
+    ],
+    "result": {
+      "deviceScaleFactor": 1,
+      "height": 844,
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "mobile": false,
+      "width": 390
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "refs": {
+        "e1": {
+          "name": "",
+          "role": "generic"
+        },
+        "e2": {
+          "name": "订阅收银台",
+          "role": "heading"
+        },
+        "e3": {
+          "name": "商户专属模型月套餐",
+          "role": "heading"
+        },
+        "e4": {
+          "name": "打开安全支付页面",
+          "role": "link"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- generic \"订阅收银台商户专属模型月套餐99.00 CNY订单号PTO0123456789ABCDEFGHIJKLMNOPQRSTUV付款方式alipay收银台访问到期时间2029/11/22 08:00:00等\" [ref=e1] clickable [onclick]\n  - heading \"订阅收银台\" [level=1, ref=e2]\n  - heading \"商户专属模型月套餐\" [level=2, ref=e3]\n  - link \"打开安全支付页面\" [ref=e4]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/Users/lyh_god/GolandProjects/new-api/.trellis/tasks/11-04-partner-subscription-auto-provision/research/cashier-mobile.png"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/Users/lyh_god/GolandProjects/new-api/.trellis/tasks/11-04-partner-subscription-auto-provision/research/cashier-mobile.png"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify({viewport:innerWidth,documentWidth:document.documentElement.scrollWidth,horizontalOverflow:document.documentElement.scrollWidth>innerWidth,fragmentCleared:location.hash===''} )"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "result": "{\"viewport\":390,\"documentWidth\":390,\"horizontalOverflow\":false,\"fragmentCleared\":true}"
+    },
+    "success": true
+  }
+]

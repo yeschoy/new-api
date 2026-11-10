@@ -20,6 +20,7 @@ This directory contains guidelines for frontend development. Fill in each file w
 | [State Management](./state-management.md) | Local state, global state, server state | To fill |
 | [Quality Guidelines](./quality-guidelines.md) | Public pricing previews, savings contracts, sidebar state regression checks | Implemented |
 | [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
+| [Partner checkout](../backend/partner-tenant-checkout.md) | Order-only public cashier, fragment scrub, no login/analytics effects, CNY plan prices | Implemented; DB runtime gate pending |
 | [Registration login](../backend/registration-login.md) | Auth-bundle validation, automatic sign-in and registration-only fallback | Implemented |
 | [Custom-domain callbacks](../backend/custom-domain-callbacks.md) | Cross-layer OAuth bridge and return actions | Implemented |
 | [Dynamic billing logs](../backend/dynamic-billing-logs.md) | Verified dynamic unit prices and historical bill-detail rendering | Implemented |

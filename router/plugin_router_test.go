@@ -904,6 +904,18 @@ func TestWebFallbackDoesNotCacheMissingAPIOrAssets(t *testing.T) {
 	assert.Equal(t, "no-cache", page.Header().Get("Cache-Control"))
 }
 
+func TestPartnerCashierHTMLIsPrivateAndUnframed(t *testing.T) {
+	outer := gin.New()
+	SetWebRouter(outer, WebAssets{IndexPage: []byte("cashier")}, func(c *gin.Context) { c.Next() })
+	response := performPluginRequest(outer, http.MethodGet, "/partner/checkout?order_no=PTOtest")
+	assert.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, "cashier", response.Body.String())
+	assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+	assert.Equal(t, "no-referrer", response.Header().Get("Referrer-Policy"))
+	assert.Equal(t, "DENY", response.Header().Get("X-Frame-Options"))
+	assert.Equal(t, "frame-ancestors 'none'", response.Header().Get("Content-Security-Policy"))
+}
+
 func TestSecurityRoutesDisableCachingBeforeAuthentication(t *testing.T) {
 	outer := gin.New()
 	SetApiRouter(outer)

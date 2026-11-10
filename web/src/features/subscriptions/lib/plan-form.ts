@@ -117,7 +117,7 @@ export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
       ...values,
       partner_tenant_id: Number(values.partner_tenant_id || 0),
       price_amount: Number(values.price_amount || 0),
-      currency: 'USD',
+      currency: isPartnerPlan ? 'CNY' : 'USD',
       duration_unit: isPartnerPlan ? 'month' : values.duration_unit,
       duration_value: isPartnerPlan ? 1 : Number(values.duration_value || 0),
       custom_seconds: isPartnerPlan ? 0 : Number(values.custom_seconds || 0),

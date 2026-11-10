@@ -1,92 +1,106 @@
 # Partner Tenant API
 
-For the merchant-facing integration walkthrough, request examples, and operational checklist, see the [Simplified Chinese integration guide](./partner-tenant-integration.zh-CN.md).
+For request examples and error codes, see the [Chinese API reference](./partner-tenant-integration.zh-CN.md). This describes the current branch implementation, not a claim that it has been deployed or payment/DB integration tests have passed.
 
-This API is for a partner's server. It uses one server secret to manage only that partner's provisioned accounts, subscriptions, and dedicated model group. The partner authenticates its own end users and collects payment itself; this API activates or renews a New API subscription after the partner confirms payment. It does not top up the New API wallet.
+## Contract and authentication
 
-The tenant secret is separate from Partner OAuth client credentials. Do not send it from a browser, mobile app, desktop client, or customer. Send it only over HTTPS from the partner backend:
+The merchant owns its website, user login, plan cards and purchase dialog. **The platform owns subscription orders, checkout, verified payment and delivery.** Merchants do not collect payment or report a paid flag. The old external direct-subscription-grant route is removed, with no legacy mode. This Tenant contract is separate from Partner OAuth and PartnerServer wallet recharge.
+
+Merchant management endpoints use HTTPS and `Authorization: Bearer pt_<server-secret>`, only from the merchant backend. Derive `external_user_id` from that backend's authenticated user; never forward an arbitrary browser-supplied ID without ownership validation. A model request uses the user's `sk-` key, never `pt_`.
+
+- Base prefix: `/api/partner/v1`; plain business JSON, without a `{success,data}` envelope; `Cache-Control: no-store`.
+- `external_user_id`: trimmed, case-sensitive, 1–128 Unicode code points, no control characters; URL-encode it as a path segment. Account identity is `(tenant_id, external_user_id)`.
+- Order writes require `Idempotency-Key`: 16–64 URL-safe letters/digits/`-`/`_`. Keep one stable key per purchase attempt, including network retries. It is not a merchant business order number or the platform-generated order number.
+- Unknown JSON fields/multiple JSON documents are rejected. Account provisioning allows up to 1 KiB; order creation allows up to 2 KiB. Order routes do not accept query parameters.
+- Error body: `{"error":{"code":"order_not_found","message":"order not found"},"request_id":"..."}`.
+
+## Endpoints
+
+| Method and path | Contract |
+| --- | --- |
+| `GET /plans` | Only this tenant's enabled plans. No user/account creation. |
+| `PUT /accounts` | `{external_user_id, display_name?}` → stable `{external_user_id, api_key, created}`; initial create 201, repeat 200. Independent of payment/entitlement. |
+| `POST /subscription-orders` | `{external_user_id, plan_id, payment_method}` + Idempotency-Key → platform order and cashier URL; initial 201, replay 200, conflicting body 409. |
+| `GET /subscription-orders/{order_no}` | Authenticated tenant-scoped order state; no Key, QR, payment link or checkout capability. Merchant BFF must also check its current user's ownership. |
+| `GET /accounts/{external_user_id}/subscription/quota` | Only active tenant-owned subscriptions; returns totals/used/remaining, unlimited flag and reset/expiry times. |
+
+`PUT /accounts` can create an empty account and a fixed-group model Key before purchase; it does not grant quota. Disabled/deleted/wrong-group users and unavailable/expired/revoked credentials fail closed rather than being replaced. First fulfillment can provision an account if the merchant never called this operation.
+
+Plans remain one calendar month with monthly reset and the tenant's dedicated group. `total_amount:0` means unlimited: check `quota_unlimited`, not a zero remaining amount. The highest applicable nonzero plan RPM applies, not the sum; system/group limits also apply. Multi-node shared RPM enforcement requires shared Redis.
+
+## Ordering and cashier
 
 ```http
+POST /api/partner/v1/subscription-orders
 Authorization: Bearer pt_<server-secret>
-```
-
-All partner endpoints are under `/api/partner/v1`, return `Cache-Control: no-store`, and use the standard integration error body:
-
-```json
-{"error":{"code":"account_not_found","message":"account not found"},"request_id":"..."}
-```
-
-The partner-facing API accepts `external_user_id`, never a New API numeric user ID. Account and plan lookups always include the authenticated tenant ID. A guessed or foreign account/plan ID does not cross the tenant boundary.
-
-Account provisioning and plan activation require `external_user_id` to contain 1–128 Unicode characters after trimming surrounding whitespace. Chinese characters and emoji are supported; control characters and longer IDs are rejected with `400 invalid_request`. The limit is measured in Unicode code points, not UTF-8 bytes.
-
-## Provision An Account
-
-```http
-PUT /api/partner/v1/accounts
+Idempotency-Key: purchase_20261111_0001
 Content-Type: application/json
-Authorization: Bearer pt_<server-secret>
+
+{"external_user_id":"customer-7","plan_id":42,"payment_method":"alipay"}
 ```
 
 ```json
-{"external_user_id":"customer-7","display_name":"Customer 7"}
+{
+  "order_no":"PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+  "external_user_id":"customer-7",
+  "plan_id":42,
+  "plan_title":"Monthly model plan",
+  "amount":"99.00",
+  "currency":"CNY",
+  "payment_method":"alipay",
+  "payment_status":"pending",
+  "fulfillment_status":"not_ready",
+  "created_at":1800000000,
+  "expires_at":1800001800,
+  "checkout_url":"https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_<order-capability>"
+}
 ```
 
-The first request creates a non-login New API account with zero wallet quota and issues a model API key fixed to the partner's dedicated group. The response contains the partner's external ID and API key, not the internal user ID:
+Amounts are server-authoritative decimal strings backed by integer cents. The first adapter is **configured Epay methods, CNY plans only**, with positive prices exactly representable in cents. Other currencies fail with `unsupported_currency`; no implicit exchange rate. Newly edited Tenant plans in the admin UI use CNY; ordinary plan currency behavior is unchanged. Existing USD catalog entries are not silently converted.
 
-```json
-{"external_user_id":"customer-7","api_key":"sk-...","created":true}
-```
+Open `checkout_url` after a user action. It is a sensitive, short-lived, order-only bearer capability, not a platform login or model Key. Do not log, embed in analytics, share, put its fragment into a query string, or replace the fragment with the tenant secret. The cashier scrubs the fragment before router initialization and retains only per-order sessionStorage for same-tab reload. It fetches public-safe order data using `GET /api/partner/checkout/{order_no}` with `Authorization: Bearer pc_...`; no merchant management scope or buyer identity is exposed.
 
-Repeated requests return the same key and do not create another account or key. If the associated key was disabled or deleted, the endpoint fails closed with `credential_unavailable` rather than minting another key.
+The cashier displays QR/payment links, and payment and delivery state separately. Payment channels can require a new window; the whole cashier is not an iframe storefront. Public cashier access lasts until the order's initial 30-minute deadline. After it expires, query through the authenticated merchant backend; an expired cashier does not prove that a late payment failed. Repeat create reuses the same order and deadline, not a fresh charge or refreshed expiry.
 
-## List Plans
+## Payment and delivery truth
 
-```http
-GET /api/partner/v1/plans
-Authorization: Bearer pt_<server-secret>
-```
+- `payment_status`: `pending`, `paid`, `failed`, `expired`. `expired` is derived for a pending order past its deadline, not proof of gateway cancellation.
+- `fulfillment_status`: `not_ready`, `pending`, `fulfilled`, `failed_retryable`.
+- `paid` does not mean delivered. Only `paid + fulfilled` means entitlement delivery completed. A paid-but-pending/failed delivery must not prompt another payment.
+- Dedicated Epay notification `/api/partner/subscription/epay/notify` verifies signature, success, merchant ID, order, exact amount, method and unique transaction evidence. Epay does not attest currency in its signed payload; this adapter's accepted currency is fixed to CNY.
+- `/api/partner/subscription/epay/return` is informational only. Browser redirects, “I paid” buttons and merchant assertions never create payment truth.
+- Verified payment commits separately from local delivery. Provision/account/key/entitlement plus the order's unique delivery marker commit atomically. Repeated notifications/recovery do not extend twice.
+- Startup and a 30-second DB scan retry up to 100 due paid-undelivered orders; failures preserve paid status and retry after a bounded delay. Browser closure does not cancel this process.
+- The implementation relies on trusted gateway notification retries to establish payment truth; it does **not** call an insecure gateway query API that exposes merchant keys in URLs. If all notifications are missing, operator/provider reconciliation is still required.
+- Same-plan active renewal extends one month without adding current-period quota. An accepted renewal remains tied to its entitlement if natural expiry occurs before delivery; cancellation/deletion is not reversed.
 
-Only enabled plans owned by the authenticated partner are returned. Platform plans and another partner's plans are never included. Plans are fixed to a one-month term, monthly quota reset, the tenant's dedicated group, and no wallet fallback. `price_amount` is a reference price; the partner collects payment outside this platform.
+### Purchase limits and operational recovery
 
-`total_amount: 0` means unlimited subscription quota. `requests_per_minute` is the plan's per-account request limit; `0` disables the plan-specific limit. Existing system and group limits still apply.
+A known exhausted purchase limit is rejected before checkout (`purchase_limit_reached`). Pending first-purchase orders reserve limited slots, including after cashier expiry, because a genuine late payment remains possible. There is currently no automatic gateway-close/slot-release API: abandoned limited orders require operator/provider reconciliation; do not delete them or release slots solely because a browser timer expired. For a normal renewable merchant monthly product, leave `max_purchase_per_user:0` unless this conservative limit is intended. Current plan removal, disabling, ownership/group or frozen-benefit changes can also leave paid delivery pending for operator recovery; do not charge again.
 
-## Activate Or Renew A Plan
+Configure stable `SESSION_SECRET` / `CRYPTO_SECRET` across restarts and replicas: rotating the cashier signing secret revokes outstanding links. Use the configured canonical HTTPS callback origin, never arbitrary merchant return URLs. Reverse proxies/CDNs must preserve no-store/no-referrer and must not inject analytics on the cashier; the built-in HTML route also denies framing.
 
-The partner calls this only after it has confirmed the customer's payment:
+## Subscription-only model use
 
-```http
-POST /api/partner/v1/accounts/customer-7/subscriptions
-Authorization: Bearer pt_<server-secret>
-Content-Type: application/json
-Idempotency-Key: <16-64 URL-safe characters>
-```
+Tenant membership forces subscription-only funding regardless of mutable billing preferences or a funded wallet. Missing/expired/inapplicable/exhausted subscriptions cannot fall back to wallet. Ordinary users and independent PartnerServer recharge are unchanged. Legacy Midjourney/SwapFace paths do not support subscriptions and reject Tenant members before upstream rather than use wallets. Membership lookup failures fail closed.
 
-```json
-{"plan_id":42}
-```
+Disabling a tenant stops merchant management. It does not automatically revoke already-issued model Keys; existing delivered entitlement/model authentication follow their current policies. Membership is cached for up to one minute in a bounded cache and published after provisioning commits. Current plan rates/validity are read from the DB.
 
-The plan must belong to this partner and the account must be provisioned by this partner. New activation returns `201`. A renewal with a new idempotency key extends the same active subscription by one month and returns `200`; monthly quota resets continue at the plan's calendar-month boundary. Retrying the same key and request does not create or extend a subscription again; it returns `200`, `created: false`, and the current subscription state, not an immutable snapshot of the original response. Later renewals or usage can therefore change the returned end time or used quota. Reusing a key with a different account or plan returns `409 idempotency_conflict`. Persist one key per merchant order and reuse it after timeouts; a new key represents a new operation and can renew the subscription again.
+## Important errors
 
-Relevant errors include `account_not_found`, `plan_not_found`, `invalid_request`, and `idempotency_conflict`. Plan/account misses intentionally do not reveal foreign resource existence.
+| HTTP | Code | Meaning |
+| --- | --- | --- |
+| 400 | `invalid_request` | Bad identity/body/idempotency key or forbidden fields/query |
+| 400 | `unsupported_currency` | Plan cannot be paid by the CNY Epay adapter |
+| 401 | `invalid_partner_secret` | Invalid/rotated secret or disabled tenant |
+| 401 | `invalid_checkout_access` | Invalid/expired order capability; return to merchant status |
+| 403 | `account_disabled` | Existing account/member/user disabled or invalid group |
+| 404 | `account_not_found` / `plan_not_found` / `order_not_found` | Not found/unavailable in caller's tenant |
+| 409 | `credential_unavailable` | Existing Key unusable; never silently replaced |
+| 409 | `idempotency_conflict` | Same retry key with a different user/plan/method |
+| 409 | `purchase_limit_reached` | Already-purchased/reserved limit blocks a new order |
+| 429 | `rate_limited` | Retry-After; per-user 20 recent orders/hour, 5 pending, tenant 2000/hour plus API budgets |
+| 503 | `payment_unavailable` | Configuration/preparation unavailable; retry same request/key after Retry-After |
+| 500 | `server_error` | Server error; do not create a new purchase after an ambiguous timeout |
 
-## Query Subscription Quota
-
-```http
-GET /api/partner/v1/accounts/customer-7/subscription/quota
-Authorization: Bearer pt_<server-secret>
-```
-
-The response includes only active subscriptions owned by this partner, with total quota, used quota, remaining quota, start/end time, status, and next monthly reset. It excludes wallet balance, platform subscriptions, and subscriptions belonging to other partners.
-
-For unlimited subscriptions `quota_unlimited` is `true`, and `quota_total` and `quota_remaining` are both `0`; clients must check the flag instead of interpreting the remaining value as exhausted. The activation response also includes `quota_unlimited`.
-
-## Tenant Administration
-
-Root administrators create a tenant by assigning an unused real model group. The server secret is shown once and stored as a hash. Rotating it immediately invalidates the old secret. Disabling a tenant stops its server secret from managing accounts. Already-issued customer model keys remain enabled; subscription quota is unavailable after active plans expire, and model keys are not automatically revoked.
-
-Partner subscription plans are created in the subscription plan editor by selecting a tenant. The backend enforces the tenant's group and monthly quota rules even if a client submits different values. Partner plans are excluded from the platform-wide user catalog and cannot be purchased through New API's wallet, Epay, Stripe, Creem, Waffo, or Pancake routes.
-
-When an account has several active partner plans applicable to the request group, the highest configured nonzero request limit applies; limits are not added. The per-account limit counts all model request attempts over a rolling 60-second window and returns HTTP 429 when reached. Renewal extends the term without increasing the rate. Each request is also subject to the existing system or group limiter. Changes to a plan's rate affect existing subscriptions immediately. Multi-node deployments must use the same Redis instance for shared enforcement; otherwise the in-memory limit is independent per node.
-
-Partner-account membership is cached locally for one minute in a bounded cache, including non-members. Ordinary users need only an indexed membership lookup on a cache miss and no subscription or clock queries. Provisioning publishes membership after its transaction commits. Plan rates and subscription validity are always read from the database, so rate edits, cancellations, and expiry are not delayed by the membership cache.
+Model endpoints retain their normal protocol error format. No production deployment or live-payment test is implied by this contract; see the task verification report for executed and blocked checks.

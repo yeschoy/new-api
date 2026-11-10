@@ -174,6 +174,26 @@ func normalizePartnerSubscriptionPlan(c *gin.Context, plan *model.SubscriptionPl
 	return true
 }
 
+// Ordinary plans retain the historical USD contract. Tenant plans may be
+// catalogued in USD, but only positive, exact-cent CNY prices can use Epay.
+func normalizeSubscriptionPlanCurrency(plan *model.SubscriptionPlan) bool {
+	if plan.PartnerTenantId == 0 {
+		plan.Currency = "USD"
+		return true
+	}
+	if plan.Currency == "" {
+		plan.Currency = "CNY"
+	}
+	if plan.Currency != "CNY" && plan.Currency != "USD" {
+		return false
+	}
+	if plan.Currency == "CNY" {
+		_, err := model.PartnerTenantPlanCents(plan.PriceAmount)
+		return err == nil
+	}
+	return true
+}
+
 func validateApplicableGroup(plan *model.SubscriptionPlan) bool {
 	plan.ApplicableGroup = strings.TrimSpace(plan.ApplicableGroup)
 	if plan.ApplicableGroup == "" {
@@ -216,10 +236,10 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorT(c, "Price cannot exceed 9999")
 		return
 	}
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
+	if !normalizeSubscriptionPlanCurrency(&req.Plan) {
+		common.ApiErrorT(c, "Invalid parameters")
+		return
 	}
-	req.Plan.Currency = "USD"
 	if req.Plan.AllowBalancePay == nil {
 		req.Plan.AllowBalancePay = common.GetPointer(true)
 	}
@@ -319,10 +339,10 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	req.Plan.Id = id
-	if req.Plan.Currency == "" {
-		req.Plan.Currency = "USD"
+	if !normalizeSubscriptionPlanCurrency(&req.Plan) {
+		common.ApiErrorT(c, "Invalid parameters")
+		return
 	}
-	req.Plan.Currency = "USD"
 	if req.Plan.DurationUnit == "" {
 		req.Plan.DurationUnit = model.SubscriptionDurationMonth
 	}

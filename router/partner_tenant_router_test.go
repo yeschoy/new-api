@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -257,7 +256,7 @@ func TestPartnerTenantPlanCatalogOnlyReturnsItsOwnPlans(t *testing.T) {
 	require.Equal(t, "Partner A monthly", result.Plans[0].Title)
 }
 
-func TestPartnerTenantSubscriptionGrantIsScopedAndIdempotent(t *testing.T) {
+func TestPartnerTenantPaidDeliveryQuotaAndRemovedGrantRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	redisEnabled := common.RedisEnabled
 	common.RedisEnabled = false
@@ -284,19 +283,20 @@ func TestPartnerTenantSubscriptionGrantIsScopedAndIdempotent(t *testing.T) {
 	tenantB, _, err := model.CreatePartnerTenant("Partner B", "partner-b")
 	require.NoError(t, err)
 	planA := model.SubscriptionPlan{
-		PartnerTenantId: tenantA.Id, Title: "A monthly", PriceAmount: 10, Currency: "USD",
+		PartnerTenantId: tenantA.Id, Title: "A monthly", PriceAmount: 10, Currency: "CNY",
 		DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, Enabled: true,
 		ApplicableGroup: "partner-a", TotalAmount: 0, QuotaResetPeriod: model.SubscriptionResetMonthly,
 		AllowBalancePay: common.GetPointer(false), AllowWalletOverflow: common.GetPointer(false),
 	}
 	planB := model.SubscriptionPlan{
-		PartnerTenantId: tenantB.Id, Title: "B monthly", PriceAmount: 10, Currency: "USD",
+		PartnerTenantId: tenantB.Id, Title: "B monthly", PriceAmount: 10, Currency: "CNY",
 		DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, Enabled: true,
 		ApplicableGroup: "partner-b", TotalAmount: 900_000, QuotaResetPeriod: model.SubscriptionResetMonthly,
 		AllowBalancePay: common.GetPointer(false), AllowWalletOverflow: common.GetPointer(false),
 	}
 	require.NoError(t, db.Create(&planA).Error)
 	require.NoError(t, db.Create(&planB).Error)
+	require.NoError(t, db.AutoMigrate(&model.PartnerTenantSubscriptionOrder{}))
 
 	createReq := httptest.NewRequest(http.MethodPut, "/api/partner/v1/accounts", bytes.NewBufferString(`{"external_user_id":"customer-7"}`))
 	createReq.Header.Set("Authorization", "Bearer "+secretA)
@@ -313,73 +313,23 @@ func TestPartnerTenantSubscriptionGrantIsScopedAndIdempotent(t *testing.T) {
 	require.NoError(t, db.Model(&model.User{}).Where("id = ?", account.UserId).Select("quota").Scan(&walletQuota).Error)
 	require.Equal(t, 5_000_000, walletQuota)
 
-	grantPath := "/api/partner/v1/accounts/customer-7/subscriptions"
-	foreignPlanReq := httptest.NewRequest(http.MethodPost, grantPath, bytes.NewBufferString(`{"plan_id":`+strconv.Itoa(planB.Id)+`}`))
-	foreignPlanReq.Header.Set("Authorization", "Bearer "+secretA)
-	foreignPlanReq.Header.Set("Idempotency-Key", "foreign-plan-key-0001")
-	foreignPlanReq.Header.Set("Content-Type", "application/json")
-	foreignPlanReq.Host = "localhost:3000"
-	foreignPlanRec := httptest.NewRecorder()
-	engine.ServeHTTP(foreignPlanRec, foreignPlanReq)
-	require.Equal(t, http.StatusNotFound, foreignPlanRec.Code, foreignPlanRec.Body.String())
-	require.Contains(t, foreignPlanRec.Body.String(), "plan_not_found")
-
-	grant := func() *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodPost, grantPath, bytes.NewBufferString(`{"plan_id":`+strconv.Itoa(planA.Id)+`}`))
-		req.Header.Set("Authorization", "Bearer "+secretA)
-		req.Header.Set("Idempotency-Key", "monthly-payment-ref-0001")
-		req.Header.Set("Content-Type", "application/json")
-		req.Host = "localhost:3000"
-		rec := httptest.NewRecorder()
-		engine.ServeHTTP(rec, req)
-		return rec
-	}
-	first := grant()
-	require.Equal(t, http.StatusCreated, first.Code, first.Body.String())
-	require.Contains(t, first.Body.String(), `"quota_unlimited":true`)
-	var firstGrant struct {
-		SubscriptionID int `json:"subscription_id"`
-		PlanID         int `json:"plan_id"`
-	}
-	require.NoError(t, json.Unmarshal(first.Body.Bytes(), &firstGrant))
-	require.Equal(t, planA.Id, firstGrant.PlanID)
-	require.Positive(t, firstGrant.SubscriptionID)
-
-	replay := grant()
-	require.Equal(t, http.StatusOK, replay.Code, replay.Body.String())
-	var replayGrant struct {
-		SubscriptionID int `json:"subscription_id"`
-	}
-	require.NoError(t, json.Unmarshal(replay.Body.Bytes(), &replayGrant))
-	require.Equal(t, firstGrant.SubscriptionID, replayGrant.SubscriptionID)
+	// The former external grant contract is not registered at all.
+	grantReq := httptest.NewRequest(http.MethodPost, "/api/partner/v1/accounts/customer-7/subscriptions", bytes.NewBufferString(`{"plan_id":`+strconv.Itoa(planA.Id)+`}`))
+	grantReq.Header.Set("Authorization", "Bearer "+secretA)
+	grantRec := httptest.NewRecorder()
+	engine.ServeHTTP(grantRec, grantReq)
+	require.Equal(t, http.StatusNotFound, grantRec.Code)
 	var subscriptions int64
 	require.NoError(t, db.Model(&model.UserSubscription{}).Count(&subscriptions).Error)
-	require.EqualValues(t, 1, subscriptions)
-	var beforeRenewal model.UserSubscription
-	require.NoError(t, db.First(&beforeRenewal, firstGrant.SubscriptionID).Error)
-	renewReq := httptest.NewRequest(http.MethodPost, grantPath, bytes.NewBufferString(`{"plan_id":`+strconv.Itoa(planA.Id)+`}`))
-	renewReq.Header.Set("Authorization", "Bearer "+secretA)
-	renewReq.Header.Set("Idempotency-Key", "monthly-renewal-ref-0001")
-	renewReq.Header.Set("Content-Type", "application/json")
-	renewReq.Host = "localhost:3000"
-	renewRec := httptest.NewRecorder()
-	engine.ServeHTTP(renewRec, renewReq)
-	require.Equal(t, http.StatusOK, renewRec.Code, renewRec.Body.String())
-	var renewed struct {
-		SubscriptionID int   `json:"subscription_id"`
-		EndTime        int64 `json:"end_time"`
-	}
-	require.NoError(t, json.Unmarshal(renewRec.Body.Bytes(), &renewed))
-	require.Equal(t, firstGrant.SubscriptionID, renewed.SubscriptionID)
-	require.GreaterOrEqual(t, renewed.EndTime, beforeRenewal.EndTime+27*24*60*60)
+	require.Zero(t, subscriptions)
+
+	order, _, err := model.CreatePartnerTenantSubscriptionOrder(model.PartnerTenantOrderInput{TenantId: tenantA.Id, ExternalUserId: "customer-7", PlanId: planA.Id, PaymentMethod: "alipay", MerchantId: "test-pid", IdempotencyHash: strings.Repeat("a", 64)})
+	require.NoError(t, err)
+	require.NoError(t, model.RecordPartnerTenantPayment(order.OrderNo, model.PaymentProviderEpay, "test-pid", "alipay", "test-transaction", 1000))
+	require.NoError(t, model.FulfillPartnerTenantSubscriptionOrder(order.OrderNo))
+	require.NoError(t, model.FulfillPartnerTenantSubscriptionOrder(order.OrderNo))
 	require.NoError(t, db.Model(&model.UserSubscription{}).Count(&subscriptions).Error)
 	require.EqualValues(t, 1, subscriptions)
-	var provisionedAccount model.PartnerTenantAccount
-	require.NoError(t, db.Where("tenant_id = ? AND external_user_id = ?", tenantA.Id, "customer-7").First(&provisionedAccount).Error)
-	require.NoError(t, db.Create(&model.UserSubscription{
-		UserId: provisionedAccount.UserId, PlanId: planB.Id, AmountTotal: planB.TotalAmount,
-		StartTime: time.Now().Unix(), EndTime: time.Now().Add(time.Hour).Unix(), Status: "active",
-	}).Error)
 
 	quotaReq := httptest.NewRequest(http.MethodGet, "/api/partner/v1/accounts/customer-7/subscription/quota", nil)
 	quotaReq.Header.Set("Authorization", "Bearer "+secretA)

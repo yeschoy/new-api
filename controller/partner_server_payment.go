@@ -52,12 +52,7 @@ type partnerServerCheckout struct {
 // (mapi.php) so the partner can show the payment QR code itself. It never
 // logs the gateway response; the QR code and payment URL are payment links.
 func partnerServerEpayAPIPurchase(topUp *model.TopUp, requestAmount int64, clientIP string) (*partnerServerCheckout, error) {
-	base, err := url.Parse(strings.TrimSpace(operation_setting.PayAddress))
-	if err != nil || !strings.EqualFold(base.Scheme, "https") || base.Host == "" {
-		return nil, errPartnerServerPaymentInsecure
-	}
-	base.Path = path.Join(base.Path, "mapi.php")
-	params, err := epay.GenerateParamsWithError(map[string]string{
+	return partnerEpayMapiPurchase(map[string]string{
 		"pid":          operation_setting.EpayId,
 		"type":         topUp.PaymentMethod,
 		"out_trade_no": topUp.TradeNo,
@@ -66,7 +61,17 @@ func partnerServerEpayAPIPurchase(topUp *model.TopUp, requestAmount int64, clien
 		"money":        strconv.FormatFloat(topUp.Money, 'f', 2, 64),
 		"clientip":     clientIP,
 		"device":       "pc",
-	}, operation_setting.EpayKey)
+	})
+}
+
+// Shared transport only; callers retain their own order and settlement lanes.
+func partnerEpayMapiPurchase(purchase map[string]string) (*partnerServerCheckout, error) {
+	base, err := url.Parse(strings.TrimSpace(operation_setting.PayAddress))
+	if err != nil || !strings.EqualFold(base.Scheme, "https") || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return nil, errPartnerServerPaymentInsecure
+	}
+	base.Path = path.Join(base.Path, "mapi.php")
+	params, err := epay.GenerateParamsWithError(purchase, operation_setting.EpayKey)
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +79,21 @@ func partnerServerEpayAPIPurchase(topUp *model.TopUp, requestAmount int64, clien
 	for key, value := range params {
 		form.Set(key, value)
 	}
-	resp, err := partnerServerMapiHTTPClient.PostForm(base.String(), form)
+	client := *partnerServerMapiHTTPClient
+	// Redirects could disclose signed form data or downgrade HTTPS. Gateways
+	// must return their JSON checkout directly.
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.PostForm(base.String(), form)
 	if err != nil {
-		return nil, fmt.Errorf("payment gateway request failed: %w", err)
+		return nil, errors.New("payment gateway request failed")
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, partnerServerMapiResponseLimit))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, partnerServerMapiResponseLimit+1))
 	if err != nil {
 		return nil, errors.New("payment gateway response could not be read")
+	}
+	if len(body) > partnerServerMapiResponseLimit {
+		return nil, errors.New("payment gateway response too large")
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("payment gateway returned HTTP %d", resp.StatusCode)
@@ -95,7 +107,7 @@ func partnerServerEpayAPIPurchase(topUp *model.TopUp, requestAmount int64, clien
 		return nil, errors.New("payment gateway response is not JSON")
 	}
 	if code := strings.Trim(string(result.Code), `"`); code != "1" {
-		return nil, fmt.Errorf("payment gateway refused the order (code %s)", code)
+		return nil, errors.New("payment gateway refused the order")
 	}
 	if result.QRCode == "" && result.PayURL == "" {
 		return nil, errors.New("payment gateway returned no QR code or payment URL")

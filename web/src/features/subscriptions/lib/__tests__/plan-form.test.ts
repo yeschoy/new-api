@@ -92,6 +92,28 @@ describe('plan applicability form', () => {
     })
   })
 
+  it.each([
+    { partnerTenantId: 42, currency: 'CNY' },
+    { partnerTenantId: 0, currency: 'USD' },
+  ])(
+    'submits $currency purchase prices without converting price or quota',
+    ({ partnerTenantId, currency }) => {
+      const values = planToFormValues({
+        ...plan,
+        partner_tenant_id: partnerTenantId,
+        currency,
+        price_amount: 9.99,
+      })
+      expect(values.price_amount).toBe(9.99)
+      expect(formValuesToPlanPayload(values).plan).toMatchObject({
+        partner_tenant_id: partnerTenantId,
+        currency,
+        price_amount: 9.99,
+        total_amount: plan.total_amount,
+      })
+    }
+  )
+
   it('preserves partner plan request limits in the form and payload', () => {
     const values = planToFormValues({ ...plan, requests_per_minute: 25 })
     expect(values.requests_per_minute).toBe(25)

@@ -394,6 +394,15 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	}
 
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
+	member, err := model.IsPartnerTenantUser(relayInfo.UserId)
+	if err != nil {
+		return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+	}
+	if member {
+		// Membership, not mutable profile preferences or an initially empty
+		// wallet, is the funding boundary. Never fall back for Tenant users.
+		pref = "subscription_only"
+	}
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {

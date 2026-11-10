@@ -22,6 +22,15 @@ import dayjs from '@/lib/dayjs'
 
 import type { SubscriptionPlan } from '../types'
 
+// Purchase prices carry their own currency; quota display settings must not
+// convert them or change the currency shown for a persisted plan.
+export function formatPlanPrice(plan: Partial<SubscriptionPlan>): string {
+  const currency = plan.currency || 'USD'
+  const symbols: Record<string, string> = { CNY: '¥', USD: '$' }
+  const symbol = symbols[currency] ?? `${currency} `
+  return `${symbol}${Number(plan.price_amount || 0).toFixed(2)}`
+}
+
 export function formatDuration(
   plan: Partial<SubscriptionPlan>,
   t: TFunction

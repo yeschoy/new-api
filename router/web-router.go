@@ -22,6 +22,14 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 	frontendFS := common.EmbedFolder(assets.BuildFS, "web/dist")
 	router.GET("/oauth/handoff", middleware.RouteTag("web"), controller.DomainOAuthHandoffBridge)
 	router.GET("/partner-authorize", middleware.RouteTag("web"), controller.ServePartnerAuthorizePage(assets.IndexPage))
+	// The cashier capability lives in the fragment, but the HTML must also
+	// avoid caches/referrers and must never be embedded by another origin.
+	router.GET("/partner/checkout", middleware.RouteTag("web"), middleware.DisableCache(), func(c *gin.Context) {
+		c.Header("Referrer-Policy", "no-referrer")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Content-Security-Policy", "frame-ancestors 'none'")
+		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
+	})
 	compress := gzip.Gzip(gzip.DefaultCompression)
 	router.GET("/desktop/connect", middleware.RouteTag("web"), middleware.DisableCache(), func(c *gin.Context) {
 		controller.ServeDesktopConnectSPA(c, assets.IndexPage)
