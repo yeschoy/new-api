@@ -125,6 +125,10 @@ describe('RewardBanner', () => {
       'href',
       '/sign-up'
     )
+    expect(banner).not.toHaveTextContent('Fastrun Cloud Hackathon')
+    expect(
+      screen.queryByRole('link', { name: /Explore the hackathon/ })
+    ).toBeNull()
   })
 
   it('sends signed-in users to the wallet', async () => {
@@ -137,9 +141,9 @@ describe('RewardBanner', () => {
     ).toHaveAttribute('href', '/wallet')
   })
 
-  it('keeps only the hackathon when the offers request fails even with a sign-up grant', async () => {
+  it('keeps only the hackathon on other pages when the offers request fails even with a sign-up grant', async () => {
     serveOffers(() => ({ status: 500, data: { success: false } }))
-    await renderAt('/', { quota_for_new_user: 500_000 })
+    await renderAt('/wallet', { quota_for_new_user: 500_000 })
 
     await waitFor(() =>
       expect(client.getQueryState(['cashback', 'public-offers'])?.status).toBe(
@@ -150,6 +154,20 @@ describe('RewardBanner', () => {
     expect(banner).toHaveTextContent('Fastrun Cloud Hackathon')
     expect(banner).not.toHaveTextContent(/New users get/)
     expect(screen.queryByRole('link', { name: /Top up now/ })).toBeNull()
+  })
+
+  it('does not put the hackathon back above the home hero when rewards cannot load', async () => {
+    serveOffers(() => ({ status: 500, data: { success: false } }))
+    await renderAt('/', { quota_for_new_user: 500_000 })
+    await waitFor(() =>
+      expect(client.getQueryState(['cashback', 'public-offers'])?.status).toBe(
+        'error'
+      )
+    )
+    expect(screen.queryByRole('region', { name: 'Announcements' })).toBeNull()
+    expect(
+      document.documentElement.style.getPropertyValue('--reward-banner-height')
+    ).toBe('')
   })
 
   it('links the hackathon to the home spotlight beside the live offer', async () => {

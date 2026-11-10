@@ -1,0 +1,132 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+/* One quiet promotional surface, not a second full-screen hero. */
+.ci-liquidHome .ci-doubleEleven {
+  display: flex;
+  width: min(100%, 860px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  margin: 32px auto 0;
+  padding: 24px 28px;
+  border: 1px solid color-mix(in srgb, var(--hero-icon) 28%, var(--glass-edge));
+  border-radius: 20px;
+  background:
+    linear-gradient(110deg, rgb(108 245 154 / 9%), transparent 65%),
+    var(--glass-surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  color: var(--hero-ink);
+  text-align: left;
+}
+.ci-doubleElevenCopy {
+  min-width: 0;
+}
+.ci-doubleElevenEyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--hero-icon);
+}
+.ci-liquidHome .ci-doubleElevenEyebrow h2 {
+  margin: 0;
+  font-family: var(--ci-font-ui);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+.ci-doubleElevenScope {
+  padding: 2px 7px;
+  border: 1px solid var(--glass-edge-strong);
+  border-radius: 6px;
+  font-size: 11px;
+}
+.ci-liquidHome .ci-doubleElevenOffer {
+  margin: 10px 0 8px;
+  color: var(--hero-ink);
+  font-size: clamp(1.15rem, 2.2vw, 1.65rem);
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.ci-liquidHome .ci-doubleElevenStatus {
+  margin: 10px 0 8px;
+  color: var(--hero-ink);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.ci-liquidHome .ci-doubleElevenNote {
+  margin: 4px 0 0;
+  color: var(--hero-body);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.ci-doubleElevenActions {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 14px;
+}
+.ci-doubleElevenDates {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--hero-body);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ci-liquidHome .ci-doubleElevenActions .ci-button {
+  min-height: 42px;
+  padding-inline: 18px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.ci-liquidHome .ci-doubleElevenActions .ci-button:focus-visible {
+  outline: 2px solid var(--hero-icon);
+  outline-offset: 4px;
+}
+.ci-liquidHome .ci-partnershipAnnouncement {
+  display: flex;
+  justify-content: center;
+  padding: 36px 24px 0;
+}
+.ci-liquidHome .ci-partnershipAnnouncement .ci-forgeBadge {
+  margin-bottom: 0;
+}
+@media (max-width: 640px) {
+  .ci-liquidHome .ci-doubleEleven {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    padding: 20px;
+    border-radius: 16px;
+  }
+  .ci-doubleElevenActions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ci-liquidHome .ci-doubleElevenOffer {
+    font-size: 20px;
+  }
+}

@@ -32,6 +32,13 @@ import { renderApp } from '@/test-utils/render-app'
 import { buildModelCatalog } from '../../lib/catalog'
 import { CiLandingPage } from '../ci-landing-page'
 
+vi.mock('@/features/cashback/api', () => ({
+  getPublicCashbackOffers: vi.fn().mockResolvedValue({
+    active: false,
+    currency: 'CNY',
+  }),
+}))
+
 let client: QueryClient
 let style: HTMLStyleElement
 const originalConfig = useSystemConfigStore.getState()
@@ -221,8 +228,15 @@ describe('landing interactions and price layout', () => {
     [false, '/sign-up'],
     [true, '/dashboard'],
   ])(
-    'jumps from the hero hackathon badge to the Qupper’s Forge spotlight with an external event link (authenticated=%s)',
+    'places the hackathon announcement below the hero and keeps its spotlight link (authenticated=%s)',
     async (isAuthenticated, primaryHref) => {
+      style.textContent = [
+        readFileSync('src/styles/ci-landing.css', 'utf8'),
+        readFileSync(
+          'src/features/home/components/forge-partnership.css',
+          'utf8'
+        ),
+      ].join('\n')
       if (isAuthenticated) {
         useAuthStore.getState().auth.setBundle(createTestAuthBundle())
       }
@@ -237,12 +251,18 @@ describe('landing interactions and price layout', () => {
       const hero = container.querySelector<HTMLElement>('.ci-hero')
       if (!hero) throw new Error('Missing hero')
 
-      const badge = within(hero).getByRole('link', { name: /Qupper's Forge/ })
+      const badge = screen.getByRole('link', { name: /Qupper's Forge/ })
       const spotlight = screen.getByRole('region', {
         name: 'BUILD FOR REAL. SHIP FOR MARKET.',
       })
+      expect(
+        within(hero).queryByRole('link', { name: /Qupper's Forge/ })
+      ).toBeNull()
       expect(badge).toHaveAttribute('href', `#${spotlight.id}`)
-      expect(spotlight.previousElementSibling).toBe(hero)
+      expect(getComputedStyle(badge).color).toBe('var(--forge-ink)')
+      const announcement = badge.closest('.ci-partnershipAnnouncement')
+      expect(announcement?.previousElementSibling).toBe(hero)
+      expect(spotlight.previousElementSibling).toBe(announcement)
 
       const eventLink = within(spotlight).getByRole('link', {
         name: /Explore the hackathon/,
@@ -308,7 +328,7 @@ describe('landing interactions and price layout', () => {
       const hero = container.querySelector<HTMLElement>('.ci-hero')
       const panel = container.querySelector<HTMLElement>('.ci-forgePanel')
       if (!hero || !panel) throw new Error('Missing hero or spotlight panel')
-      const badge = within(hero).getByRole('link', { name: /Qupper's Forge/ })
+      const badge = screen.getByRole('link', { name: /Qupper's Forge/ })
       return { badge, panel }
     }
 
