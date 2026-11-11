@@ -16,13 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getIQArtifact, getIQResults } from './api'
-import { artifactRevision, type IQResult } from './types'
+import { artifactRevision, type IQResult, type IQResults } from './types'
 
 export function useIQViewerScope(): string | null {
   const user = useAuthStore((state) => state.auth.user)
@@ -51,7 +55,9 @@ export function isCurrentIQScope(scope: string): boolean {
 export const iqKeys = {
   scope: (scope: string) => ['iq-tests', scope] as const,
   results: (scope: string) => [...iqKeys.scope(scope), 'results'] as const,
-  config: (scope: string) => [...iqKeys.scope(scope), 'config'] as const,
+  configs: (scope: string) => [...iqKeys.scope(scope), 'configs'] as const,
+  config: (scope: string, group: string) =>
+    [...iqKeys.scope(scope), 'config', group] as const,
   targets: (scope: string) => [...iqKeys.scope(scope), 'targets'] as const,
   artifact: (scope: string, result: IQResult) =>
     [...iqKeys.scope(scope), 'artifact', artifactRevision(result)] as const,
@@ -76,10 +82,12 @@ export function useIQScopeCleanup(scope: string): void {
 }
 
 export function useIQResults(scope: string) {
-  return useQuery({
+  return useInfiniteQuery({
     ...iqQueryOptions,
     queryKey: iqKeys.results(scope),
-    queryFn: ({ signal }) => getIQResults(signal),
+    initialPageParam: 0,
+    getNextPageParam: (page: IQResults) => page.next_cursor || undefined,
+    queryFn: ({ signal, pageParam }) => getIQResults(pageParam, signal),
     // Keep schedules and runs from other administrators visible; pause in background.
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,

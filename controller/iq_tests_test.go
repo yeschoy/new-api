@@ -134,7 +134,7 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 	// Running the same checkpoint again cannot send any pair a second time.
 	require.NoError(t, runIQBatch(context.Background(), task, "iq-runner", *cfg, root.Id, executeIQPair))
 	require.EqualValues(t, 2, calls.Load())
-	publicID, privateID := model.IQPairID("public", "gpt-4o"), model.IQPairID("private", "gpt-4o-mini")
+	publicID, privateID := model.IQResultID(task.TaskID, "public", "gpt-4o"), model.IQResultID(task.TaskID, "private", "gpt-4o-mini")
 	result, err := model.GetIQResult(publicID)
 	require.NoError(t, err)
 	require.Equal(t, "success", result.Status)

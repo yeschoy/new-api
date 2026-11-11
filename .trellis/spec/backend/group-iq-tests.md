@@ -9,8 +9,14 @@ The controller owns orchestration to avoid a service/controller import cycle.
 ## 2. Signatures
 
 - Models: `IQConfig`, `IQBatch`, `IQAttempt`, `IQResult` in `model/iq_test_config.go`.
-- `EnqueueIQBatch(scheduled bool, now time.Time)` snapshots configuration and
-  deduplicates using `SystemTask.ActiveKey = "group_iq_test"`.
+- `ListIQConfigs()` lazily and atomically splits the legacy singleton into one
+  configuration row per routing group. Row 1 remains the template/allocation lock.
+- `EnqueueIQGroup(group, scheduled, now)` snapshots one group and deduplicates
+  with a bounded SHA-256-derived group active key; legacy shared runs still block
+  duplicate requests for groups present in their snapshots. The runner retains
+  its existing per-type lease and bounded worker budget.
+- `ListIQHistory(groups, before)` pages 20 runs at a time, descending by RunSeq.
+  Results are immutable and keyed by SHA-256(taskID + NUL + group + NUL + model).
 - `StartIQAttempt(taskID, pairID, runner, now)` durably claims before sending;
   `CompleteIQAttempt` verifies the lease and replaces the latest row.
 - `NextIQRun(config, now, anchor)` calculates a strictly future UTC Unix second.
@@ -22,8 +28,17 @@ The controller owns orchestration to avoid a service/controller import cycle.
 
 ## 3. Contracts
 
-- Default disabled/targetless. Exact prompt content, maximum 64 KiB UTF-8;
-  maximum 100 concrete group/model pairs. Reject `auto` and incompatible targets.
+- Default disabled/targetless. Each task owns exactly one concrete group, its
+  models, reasoning level, prompt pool and schedule. Exact prompt content,
+  maximum 64 KiB UTF-8 each, 100 prompts / 1 MiB total, 100 models per task.
+  Reject `auto`, cross-group targets and incompatible targets. An empty prompt
+  pool falls back to the saved prompt or IQDefaultPrompt. Draw one prompt once
+  at enqueue, shared by all models, and persist only that selected prompt in the
+  immutable execution snapshot. Configuration saves never trigger paid runs.
+- `GET /config?list=true` returns tasks plus default_prompt; `GET /config?group=...`
+  returns an existing task or an unsaved version=0 default. PUT creates version=0
+  tasks or optimistically updates only that group's version. `POST /run?group=...`
+  requires a saved group task. Independently queued groups never share run IDs.
 - Complete config PUT includes the last `version`, prompt, targets, enabled,
   schedule_mode, interval_hours, daily_time and timezone. Calendar is explicitly
   Asia/Shanghai, never server-local time. Optional `reasoning_effort` is shared
@@ -56,10 +71,14 @@ The controller owns orchestration to avoid a service/controller import cycle.
   direct/fenced HTML or SVG; prefer the whole HTML scene over nested SVG.
   Preserve inline scripts, not thinking/tool-only/file-link outputs. Extraction
   never fetches URLs or executes tools and is not a host-DOM script sanitizer.
-- Latest results are keyed by SHA-256(group + NUL + model). Terminal failures
-  also replace/remove old artwork. Cleanup touches only IQ artwork, not generic
-  tasks/audits. Private snapshots/checkpoints retain operational metadata, not
-  user-facing artwork history. Use MySQL MEDIUMTEXT, SQLite/PostgreSQL TEXT.
+- Every run retains its own result and artwork; failures, interruption, target
+  edits and late cleanup must never overwrite/delete another run. Keep legacy
+  pair-keyed rows readable without rewriting their IDs. List responses group by
+  taskID/group, newest run first, and omit artifact bodies. Historical models
+  remain readable even if deselected later, subject to current group access.
+  Authorization is checked on metadata before fetching an artifact body. Private
+  snapshots/checkpoints stay separate from user-facing immutable IQResult rows.
+  Use MySQL MEDIUMTEXT, SQLite/PostgreSQL TEXT for Prompts, Targets and bodies.
   JSON `IQConfig.Targets` uses `IQTargets.GormDBDataType`, delegating to IQText;
   never replace this with `size:16777215`. The PostgreSQL dialect emits
   varchar(16777215) for that tag, exceeding its 10485760 varchar limit and
@@ -79,7 +98,7 @@ The controller owns orchestration to avoid a service/controller import cycle.
 | Invalid prompt/targets/schedule/unknown reasoning effort | 400 |
 | Anonymous / ordinary member admin action | 401 / 403 |
 | Hidden, removed or unsuccessful artifact ID | Indistinguishable 404 |
-| Duplicate manual enqueue | Existing active task, created=false |
+| Duplicate manual enqueue for the same group | Existing active task, created=false; other groups enqueue independently |
 | Provider failure / timeout / incomplete markup | Sanitized truthful terminal status |
 | Lease loss / crashed started request | interrupted, never resend |
 | Viewer reads results | No upstream call, quota change or channel mutation |
@@ -87,7 +106,7 @@ The controller owns orchestration to avoid a service/controller import cycle.
 ## 5. Good / Base / Bad Cases
 
 - Good: three backing channels for one selected pair produce one IQ request.
-- Base: old dated artwork stays visible until its replacement terminates.
+- Base: old dated artwork remains in its original run row after new work terminates.
 - Bad: putting HTML in SystemTask.Result, exposing a public HTML URL, or using
   the public relay retry controller to implement a supposedly single attempt.
 
@@ -106,8 +125,10 @@ The controller owns orchestration to avoid a service/controller import cycle.
   replace this with a manual production migration check.
 - Supplementary dialect-only checks assert targets/prompt/snapshot/artifact
   resolve to TEXT or MEDIUMTEXT. They are not a live migration/startup check.
-- `model/iq_config_test.go`: deterministic calendar/bounds, optimistic edits,
-  duplicate enqueue/checkpoints, latest replacement, lease recovery and cadence;
+- `model/iq_config_test.go` and `iq_group_config_test.go`: deterministic calendar/
+  bounds, legacy split idempotence, independent group edits/enqueue, immutable
+  random prompt snapshots, descending retained history, optimistic edits,
+  duplicate enqueue/checkpoints, lease recovery and cadence;
   default/invalid effort validation, adding the effort column to an existing row,
   clearing a saved effort and immutable batch snapshot persistence.
 - `controller/iq_tests_test.go`: mocked call counts, exact prompt, group routing,

@@ -46,6 +46,17 @@ describe('IQ active preview construction', () => {
     expect(IQ_PREVIEW_SANDBOX).toBe('allow-scripts')
   })
 
+  it('keeps artwork as direct body content instead of adding a layout-changing wrapper', () => {
+    const result = buildIQPreviewDocument(
+      '<html id="scene-root"><body><main id="scene">art</main></body></html>'
+    )
+    const parsed = new DOMParser().parseFromString(result, 'text/html')
+    expect(parsed.body.firstElementChild?.id).toBe('scene')
+    expect(result.indexOf(IQ_PREVIEW_CSP)).toBeLessThan(
+      result.indexOf('scene-root')
+    )
+  })
+
   it('keeps a self-contained SVG and rejects oversized artifacts before parsing', () => {
     const result = buildIQPreviewDocument(
       '<svg xmlns="http://www.w3.org/2000/svg"><image href="data:image/png;base64,AA=="/><use href="#drawing"/></svg>'

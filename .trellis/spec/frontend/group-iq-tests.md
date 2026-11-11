@@ -23,14 +23,24 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 - Authentication/permission changes synchronously remount the gallery subtree;
   remove old scope queries on unmount. Never retain another viewer's document.
   Stable result IDs are insufficient cache keys: include task/version/completion.
-- Fetch list metadata once per page (poll every 10 seconds while foreground).
-  Fetch artifacts lazily for visible cards or the open preview. Compare artifact
-  revisions against metadata and fail closed on replacement races.
-- Each group occupies one gallery row. Its model list uses column-flow grid
+- Fetch list metadata with cursor-based infinite queries (poll every 10 seconds
+  while foreground). Load older runs explicitly; each backend page retains whole
+  runs. Fetch artifacts lazily for visible cards or the open preview. Compare
+  artifact revisions against metadata and fail closed on inconsistent responses.
+- Each group/run occupies one gallery row, newest run first; key by taskID/group,
+  never group alone. Older rows and failures retain their original artwork.
+  Task controls appear once per group; another group's run does not disable them.
+  Its model list uses column-flow grid
   with bounded responsive card widths, in a labeled keyboard-focusable horizontal
   scroll region; never wrap a group across multiple rows or overflow the page.
   Retain lazy observation and the global live-preview cap across all rows.
-- Preserve the date/status of old results during a pending/running replacement.
+- Preserve old run rows during and after a new run. Do not merge new progress
+  into a previous run or label historical artwork as the latest result.
+- Thumbnail iframes render at a 1280x960 desktop viewport and scale as a whole
+  using ResizeObserver into a 4:3 card. Never render a desktop artwork directly
+  in a narrow 256px-tall viewport. Expanded previews stay interactive/responsive.
+  Preserve html attributes on the actual documentElement after the trusted CSP,
+  and place artwork directly in body, without an extra layout-changing div.
   Members see only backend-authorized groups and no configuration/run controls;
   administrators additionally follow channel RBAC capabilities.
 - Never append generated nodes to the host or pass app tokens/user data into
@@ -49,10 +59,15 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   consume resources or navigate their own frame. A local browser probe observed
   a dynamic download link falling back to self-navigation; no download sandbox
   capability was granted. Do not misreport this as universal egress prevention.
-- The shared thinking-level setting applies to all selected group/model pairs.
+- Each task editor is bound to one routing group. Its thinking-level setting
+  applies to that task's selected models; other tasks keep independent settings.
+  Multiple prompt textareas form a pool; the backend chooses one per task run.
+  The editor starts with the current project prompt and preserves exact text.
+  Each prompt is at most 64 KiB, with at most 100 prompts / 1 MiB total.
+  The first editor prompt plus the additional entries become the complete pool.
   Default retains model/channel behavior; model-name modifiers take precedence,
-  and supported levels depend on the model. Preserve effort and multiple group
-  selections through saves and conflict recovery; saving settings never runs
+  and supported levels depend on the model. Preserve effort, prompt pool and
+  selected models through saves and conflict recovery; saving settings never runs
   a paid test automatically.
 - Retain exact prompt whitespace and edits after recoverable/stale save errors.
   Daily uses Beijing time. Give interval/daily branches distinct React keys so
@@ -67,7 +82,7 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 | --- | --- |
 | Anonymous protected route | Sign-in redirect retaining /iq-tests |
 | Session/account/group/permissions change | Unmount old artwork/forms/dialogs |
-| Artifact revision mismatch or fetch failure | Honest unavailable state |
+| Artifact revision mismatch or fetch failure | Honest unavailable state; no cross-run document reuse |
 | Metadata error | Hide active frames; retryable error, no stale success |
 | Config 409 | Preserve edits; require explicit reload/reconciliation |
 | Expanded preview | One frame; card frames paused; accessible close lifecycle |
@@ -87,10 +102,11 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   preservation and size bound; jsdom is construction evidence, not isolation.
 - `gallery.test.tsx`: admin/member controls, lazy bounded previews and expanded
   lifecycle, current status, account changes, artifact revision mismatches and
-  multiple independent horizontal group rows.
+  multiple independent horizontal group/run rows, retained same-group history,
+  per-group manual execution and fixed desktop thumbnail dimensions.
 - `settings.test.tsx`: exact prompt/targets/schedule save, mode round-trip values,
-  stale-save prompt/effort preservation, shared effort enum/default, multiple
-  group selection and explicit discard/reload.
+  stale-save prompt/effort preservation, effort enum/default, single-group
+  selection, prompt-pool round trips and explicit discard/reload.
 - `localization.test.ts`: all static/dynamic feature keys in seven locales.
 - One local mock-backed browser smoke: real Canvas/SVG render, blocked parent
   DOM/storage/cookies, subresource/fetch/worker/popup/top/form attempts, mobile

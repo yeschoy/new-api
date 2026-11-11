@@ -79,6 +79,8 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.False(t, cfg.Enabled)
 	// Simulate an existing installation without the optional effort column.
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "ReasoningEffort"))
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Prompts"))
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Group"))
 	require.NoError(t, db.AutoMigrate(models...))
 	cfg, err = GetIQConfig()
 	require.NoError(t, err)
@@ -97,6 +99,19 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.Equal(t, "xhigh", reloaded.ReasoningEffort)
 	require.Equal(t, saved.Targets, reloaded.Targets)
 	require.False(t, reloaded.Enabled)
+	groups, err := ListIQConfigs()
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	group := groups[0]
+	group.Prompts = IQPrompts{" exact first PostgreSQL prompt\n", "second prompt"}
+	groupSaved, err := SaveIQConfig(group, 42, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(models...))
+	groupReloaded, err := GetIQGroupConfig("fixture")
+	require.NoError(t, err)
+	require.Equal(t, groupSaved.Prompts, groupReloaded.Prompts)
+	require.Equal(t, groupSaved.ID, groupReloaded.ID)
+	require.Equal(t, groupSaved.Group, groupReloaded.Group)
 	t.Log("PostgreSQL migration, repeat migration, targets TEXT and config round trip passed")
 }
 
@@ -125,6 +140,7 @@ func TestIQSchemaPortableTextColumns(t *testing.T) {
 			}{
 				{&IQConfig{}, "Targets"},
 				{&IQConfig{}, "Prompt"},
+				{&IQConfig{}, "Prompts"},
 				{&IQBatch{}, "Snapshot"},
 				{&IQResult{}, "Artifact"},
 			} {

@@ -39,10 +39,15 @@ async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
   return requireServerSuccess(response.data).data
 }
 
-export const getIQResults = (signal?: AbortSignal) =>
-  read<IQResults>('results', signal)
-export const getIQConfig = (signal?: AbortSignal) =>
-  read<IQConfig>('config', signal)
+export const getIQResults = (before: number, signal?: AbortSignal) =>
+  read<IQResults>(before ? `results?before=${before}` : 'results', signal)
+export const getIQConfig = (group: string, signal?: AbortSignal) =>
+  read<IQConfig>(`config?group=${encodeURIComponent(group)}`, signal)
+export const getIQConfigs = (signal?: AbortSignal) =>
+  read<{ tasks: IQConfig[]; default_prompt: string }>(
+    'config?list=true',
+    signal
+  )
 export const getIQTargets = (signal?: AbortSignal) =>
   read<IQTarget[]>('targets', signal)
 export const getIQArtifact = (id: string, signal?: AbortSignal) =>
@@ -56,7 +61,7 @@ export async function saveIQConfig(input: IQConfigInput): Promise<IQConfig> {
   return requireServerSuccess(response.data).data
 }
 
-export async function runIQTests(): Promise<{
+export async function runIQTests(group: string): Promise<{
   task_id: string
   status: 'pending' | 'running'
   created: boolean
@@ -67,6 +72,6 @@ export async function runIQTests(): Promise<{
       status: 'pending' | 'running'
       created: boolean
     }>
-  >('/api/iq-tests/run')
+  >(`/api/iq-tests/run?group=${encodeURIComponent(group)}`)
   return requireServerSuccess(response.data).data
 }

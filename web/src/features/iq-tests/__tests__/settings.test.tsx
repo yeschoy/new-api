@@ -31,6 +31,8 @@ import { IQConfigForm } from '../settings'
 import type { IQConfig, IQConfigInput } from '../types'
 
 const config: IQConfig = {
+  group: 'public',
+  prompts: [],
   version: 2,
   prompt: 'Draw a pelican.',
   reasoning_effort: '',
@@ -70,7 +72,7 @@ beforeEach(() => {
     },
   })
   const adapter: AxiosAdapter = async (request) => {
-    if (request.url !== '/api/iq-tests/config') {
+    if (!request.url?.startsWith('/api/iq-tests/config')) {
       throw new Error('Unexpected API request')
     }
     const response = {
@@ -129,7 +131,7 @@ function mount() {
 }
 
 describe('IQ configuration editing', () => {
-  it('round-trips exact prompt, thinking level, multiple groups and daily Beijing schedule without server fields', async () => {
+  it('round-trips exact prompts, one group and daily Beijing schedule without server fields', async () => {
     const user = userEvent.setup()
     mount()
     await user.clear(screen.getByLabelText('Test prompt'))
@@ -139,7 +141,11 @@ describe('IQ configuration editing', () => {
     )
     await user.selectOptions(screen.getByLabelText('Thinking level'), 'xhigh')
     await user.click(screen.getByRole('checkbox', { name: 'model-1' }))
-    await user.click(screen.getByRole('checkbox', { name: 'model-private' }))
+    expect(
+      screen.queryByRole('checkbox', { name: 'model-private' })
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add prompt' }))
+    await user.type(screen.getByLabelText('Prompt 2'), '  Another scene.\n')
     await user.click(screen.getByRole('switch', { name: 'Enable schedule' }))
     await user.selectOptions(screen.getByLabelText('Schedule'), 'daily')
     expect(screen.queryByLabelText('Interval (hours)')).not.toBeInTheDocument()
@@ -154,19 +160,24 @@ describe('IQ configuration editing', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(saved).toHaveLength(1))
     expect(saved[0]).toEqual({
+      group: 'public',
+      prompts: ['  Finished artwork.  ', '  Another scene.\n'],
       version: 2,
       prompt: '  Finished artwork.  ',
       reasoning_effort: 'xhigh',
-      targets: [
-        { group: 'public', models: ['model-0', 'model-1'] },
-        { group: 'private', models: ['model-private'] },
-      ],
+      targets: [{ group: 'public', models: ['model-0', 'model-1'] }],
       enabled: true,
       schedule_mode: 'daily',
       interval_hours: 24,
       daily_time: '23:30',
       timezone: 'Asia/Shanghai',
     })
+    expect(
+      iqConfigSchema.safeParse({
+        ...saved[0],
+        targets: [{ group: 'private', models: ['model-private'] }],
+      }).success
+    ).toBe(false)
     expect(
       iqConfigSchema.safeParse({ ...saved[0], enabled: true, targets: [] })
         .success
@@ -207,6 +218,7 @@ describe('IQ configuration editing', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(saved).toHaveLength(1))
     expect(saved[0].reasoning_effort).toBe('')
+    expect(saved[0].prompts).toEqual(['Draw a pelican.'])
     for (const reasoning_effort of [
       '',
       'none',

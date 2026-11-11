@@ -23,6 +23,12 @@ tiktoken_cache
 .gocache
 .gomodcache/
 .cache
+# npm/pnpm local caches and diagnostic logs
+.npm/
+.pnpm-store/
+npm-debug.log*
+pnpm-debug.log*
+.pnpm-debug.log*
 .plans
 .claude
 .cursor

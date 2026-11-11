@@ -10,6 +10,18 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
+    'Run result': 'Run result',
+    'Load older runs': 'Load older runs',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.',
+    'Task group': 'Task group',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Each group has its own task, models, prompts and schedule. Save changes before switching groups.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.',
+    'Prompt {{number}}': 'Prompt {{number}}',
+    'Remove prompt': 'Remove prompt',
+    'Add prompt': 'Add prompt',
     'Thinking level': 'Thinking level',
     Minimal: 'Minimal',
     Low: 'Low',
@@ -27,6 +39,18 @@ const newKeys = {
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
   },
   zh: {
+    'Run result': '本次结果',
+    'Load older runs': '加载更早的记录',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '每次运行结果独立保存，最新的排在前面。每行展示一个分组的一次运行，时间均为北京时间。',
+    'Task group': '任务分组',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      '每个分组独立配置任务、模型、提示词和定时。切换分组前请先保存修改。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '每次运行随机抽取一条提示词，该任务内所有模型共用。默认使用项目现有提示词。',
+    'Prompt {{number}}': '提示词 {{number}}',
+    'Remove prompt': '移除提示词',
+    'Add prompt': '添加提示词',
     'Thinking level': '思考等级',
     Minimal: '极低',
     Low: '低',
@@ -44,6 +68,18 @@ const newKeys = {
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
   },
   'zh-TW': {
+    'Run result': '本次結果',
+    'Load older runs': '載入更早的記錄',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '每次執行結果獨立儲存，最新的排在前面。每行顯示一個群組的一次執行，時間均為北京時間。',
+    'Task group': '任務群組',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      '每個群組獨立設定任務、模型、提示詞和排程。切換群組前請先儲存修改。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '每次執行隨機抽取一條提示詞，此任務內所有模型共用。預設使用專案現有提示詞。',
+    'Prompt {{number}}': '提示詞 {{number}}',
+    'Remove prompt': '移除提示詞',
+    'Add prompt': '新增提示詞',
     'Thinking level': '思考等級',
     Minimal: '極低',
     Low: '低',
@@ -61,6 +97,18 @@ const newKeys = {
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
   },
   fr: {
+    'Run result': 'Résultat de l’exécution',
+    'Load older runs': 'Charger les exécutions précédentes',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Chaque exécution est conservée, de la plus récente à la plus ancienne. Une ligne par exécution de groupe. Horaires de Pékin.',
+    'Task group': 'Groupe de la tâche',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Chaque groupe a sa tâche, ses modèles, ses prompts et sa planification. Enregistrez avant de changer de groupe.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Un prompt est tiré au sort à chaque exécution et partagé par tous les modèles de la tâche. Le prompt actuel du projet est utilisé par défaut.',
+    'Prompt {{number}}': 'Prompt {{number}}',
+    'Remove prompt': 'Retirer le prompt',
+    'Add prompt': 'Ajouter un prompt',
     'Thinking level': 'Niveau de réflexion',
     Minimal: 'Minimal',
     Low: 'Faible',
@@ -79,6 +127,18 @@ const newKeys = {
       "Abonnement {{plan}} activé avec un code d'échange (ID du code : {{id}})",
   },
   ja: {
+    'Run result': '今回の結果',
+    'Load older runs': '以前の実行を読み込む',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '実行結果は毎回個別に保存され、新しい順に表示されます。1行が1グループの1回の実行です。時刻は北京時間です。',
+    'Task group': 'タスクのグループ',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'グループごとにタスク、モデル、プロンプト、スケジュールを個別に設定します。グループを切り替える前に変更を保存してください。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '実行ごとにプロンプトを1つランダムに選び、タスク内の全モデルで共有します。既定ではプロジェクトの既存プロンプトを使います。',
+    'Prompt {{number}}': 'プロンプト {{number}}',
+    'Remove prompt': 'プロンプトを削除',
+    'Add prompt': 'プロンプトを追加',
     'Thinking level': '思考レベル',
     Minimal: '最小',
     Low: '低',
@@ -96,6 +156,18 @@ const newKeys = {
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
   },
   ru: {
+    'Run result': 'Результат запуска',
+    'Load older runs': 'Загрузить более ранние запуски',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Все запуски сохраняются отдельно, новые сверху. Одна строка — один запуск группы. Время пекинское.',
+    'Task group': 'Группа задачи',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'У каждой группы свои задача, модели, запросы и расписание. Сохраните изменения перед сменой группы.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Для каждого запуска случайно выбирается один запрос, общий для всех моделей задачи. По умолчанию используется текущий запрос проекта.',
+    'Prompt {{number}}': 'Запрос {{number}}',
+    'Remove prompt': 'Удалить запрос',
+    'Add prompt': 'Добавить запрос',
     'Thinking level': 'Уровень размышления',
     Minimal: 'Минимальный',
     Low: 'Низкий',
@@ -113,6 +185,18 @@ const newKeys = {
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
   },
   vi: {
+    'Run result': 'Kết quả lần chạy',
+    'Load older runs': 'Tải các lần chạy cũ hơn',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Mỗi lần chạy được lưu riêng, mới nhất ở trên. Mỗi hàng là một lần chạy của một nhóm. Thời gian theo giờ Bắc Kinh.',
+    'Task group': 'Nhóm tác vụ',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Mỗi nhóm có tác vụ, mô hình, câu lệnh và lịch chạy riêng. Hãy lưu thay đổi trước khi chuyển nhóm.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Mỗi lần chạy chọn ngẫu nhiên một câu lệnh dùng chung cho mọi mô hình trong tác vụ. Mặc định dùng câu lệnh hiện có của dự án.',
+    'Prompt {{number}}': 'Câu lệnh {{number}}',
+    'Remove prompt': 'Xóa câu lệnh',
+    'Add prompt': 'Thêm câu lệnh',
     'Thinking level': 'Mức độ suy nghĩ',
     Minimal: 'Tối thiểu',
     Low: 'Thấp',

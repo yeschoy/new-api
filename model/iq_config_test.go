@@ -82,7 +82,7 @@ func TestIQReasoningEffortValidation(t *testing.T) {
 	require.Error(t, NormalizeIQConfig(&cfg))
 }
 
-func TestIQPersistenceSingleCheckpointReplacementAndRecovery(t *testing.T) {
+func TestIQPersistenceRunHistoryAndRecovery(t *testing.T) {
 	iqTestDB(t)
 	cfg, err := GetIQConfig()
 	require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestIQPersistenceSingleCheckpointReplacementAndRecovery(t *testing.T) {
 	require.False(t, started)
 	r := IQResult{ID: id, Group: "g", Model: "m", TaskID: task.TaskID, ConfigVersion: cfg.Version, Status: "success", Artifact: IQText(strings.Repeat("x", 70<<10)), CompletedAt: common.GetTimestamp()}
 	require.NoError(t, CompleteIQAttempt(r, "r"))
-	stored, err := GetIQResult(id)
+	stored, err := GetIQResult(IQResultID(task.TaskID, "g", "m"))
 	require.NoError(t, err)
 	require.Len(t, stored.Artifact, 70<<10)
 	require.NoError(t, FinishSystemTask(task.TaskID, "r", SystemTaskStatusSucceeded, nil, ""))
@@ -133,7 +133,7 @@ func TestIQPersistenceSingleCheckpointReplacementAndRecovery(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, DB.Model(&SystemTaskLock{}).Where("task_id = ?", next.TaskID).Update("locked_until", common.GetTimestamp()-1).Error)
 	require.NoError(t, ExpireStaleSystemTaskLocks(common.GetTimestamp()))
-	stored, err = GetIQResult(id)
+	stored, err = GetIQResult(IQResultID(next.TaskID, "g", "m"))
 	require.NoError(t, err)
 	require.Equal(t, "interrupted", stored.Status)
 	require.Empty(t, stored.Artifact)
@@ -148,9 +148,13 @@ func TestIQPersistenceSingleCheckpointReplacementAndRecovery(t *testing.T) {
 	storedConfig, err = GetIQConfig()
 	require.NoError(t, err)
 	require.Empty(t, storedConfig.ReasoningEffort, "clearing effort must persist the empty default")
-	rows, err := ListIQLatest()
+	rows, _, err := ListIQHistory([]string{"g"}, 0)
 	require.NoError(t, err)
-	require.Empty(t, rows)
+	require.Len(t, rows, 2, "editing targets must preserve previous runs")
+	first, err := GetIQResult(IQResultID(task.TaskID, "g", "m"))
+	require.NoError(t, err)
+	require.Equal(t, "success", first.Status)
+	require.Len(t, first.Artifact, 70<<10)
 	oldTask, err := GetSystemTaskByTaskID(task.TaskID)
 	require.NoError(t, err)
 	require.NotNil(t, oldTask) // artwork cleanup never deletes audit/task traces
