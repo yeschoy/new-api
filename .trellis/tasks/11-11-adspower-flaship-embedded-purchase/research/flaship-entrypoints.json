@@ -1,0 +1,325 @@
+[
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://www.flaship.net/",
+      "refs": {
+        "e159": {
+          "name": "Skip to content",
+          "role": "link"
+        },
+        "e160": {
+          "name": "FlashIP home",
+          "role": "link"
+        },
+        "e161": {
+          "name": "Main navigation",
+          "role": "navigation"
+        },
+        "e162": {
+          "name": "Get Started",
+          "role": "link"
+        },
+        "e163": {
+          "name": "FlashIP",
+          "role": "region"
+        },
+        "e164": {
+          "name": "The right proxy for the way you work",
+          "role": "region"
+        },
+        "e165": {
+          "name": "Global coverage Local possibilities",
+          "role": "region"
+        },
+        "e166": {
+          "name": "Power your work across industries",
+          "role": "region"
+        },
+        "e167": {
+          "name": "Trusted by businesses worldwide",
+          "role": "region"
+        },
+        "e168": {
+          "name": "Access a borderless world today",
+          "role": "region"
+        },
+        "e169": {
+          "name": "FlashIP home",
+          "role": "link"
+        },
+        "e170": {
+          "name": "Terms & Conditions",
+          "role": "link"
+        },
+        "e171": {
+          "name": "Privacy Policy",
+          "role": "link"
+        },
+        "e172": {
+          "name": "Blog",
+          "role": "link"
+        },
+        "e173": {
+          "name": "Global coverage Local possibilities",
+          "role": "heading"
+        },
+        "e174": {
+          "name": "View all locations",
+          "role": "link"
+        },
+        "e175": {
+          "name": "Power your work across industries",
+          "role": "heading"
+        },
+        "e176": {
+          "name": "eCommerce",
+          "role": "link"
+        },
+        "e177": {
+          "name": "Travel & hospitality",
+          "role": "link"
+        },
+        "e178": {
+          "name": "Digital marketing",
+          "role": "link"
+        },
+        "e179": {
+          "name": "Social media",
+          "role": "link"
+        },
+        "e180": {
+          "name": "Market research",
+          "role": "link"
+        },
+        "e181": {
+          "name": "More use cases",
+          "role": "link"
+        },
+        "e182": {
+          "name": "Multiple Proxy Types for Any Scenario",
+          "role": "navigation"
+        },
+        "e183": {
+          "name": "United States — New York",
+          "role": "button"
+        },
+        "e184": {
+          "name": "Germany — Frankfurt",
+          "role": "button"
+        },
+        "e185": {
+          "name": "Singapore — Singapore",
+          "role": "button"
+        },
+        "e186": {
+          "name": "Japan — Tokyo",
+          "role": "button"
+        },
+        "e187": {
+          "name": "Brazil — Sao Paulo",
+          "role": "button"
+        },
+        "e188": {
+          "name": "Explore use cases",
+          "role": "link"
+        },
+        "e189": {
+          "name": "Residential Proxies",
+          "role": "link"
+        },
+        "e190": {
+          "name": "Mobile Proxies",
+          "role": "link"
+        },
+        "e191": {
+          "name": "ISP Proxies",
+          "role": "link"
+        },
+        "e192": {
+          "name": "Datacenter Proxies",
+          "role": "link"
+        },
+        "e193": {
+          "name": "Blog",
+          "role": "link"
+        },
+        "e194": {
+          "name": "Partners",
+          "role": "link"
+        },
+        "e195": {
+          "name": "Contact support",
+          "role": "link"
+        },
+        "e196": {
+          "name": "Privacy Policy",
+          "role": "link"
+        },
+        "e197": {
+          "name": "Products",
+          "role": "link"
+        },
+        "e198": {
+          "name": "Pricing",
+          "role": "link"
+        },
+        "e199": {
+          "name": "Use cases",
+          "role": "link"
+        },
+        "e200": {
+          "name": "Locations",
+          "role": "link"
+        },
+        "e201": {
+          "name": "Reliable Proxies for a Borderless World",
+          "role": "heading"
+        },
+        "e202": {
+          "name": "Get proxies",
+          "role": "link"
+        },
+        "e203": {
+          "name": "View pricing",
+          "role": "link"
+        },
+        "e204": {
+          "name": "Multiple Proxy Types for Any Scenario",
+          "role": "heading"
+        },
+        "e205": {
+          "name": "Residential Proxies Real household IPs High anonymity",
+          "role": "link"
+        },
+        "e206": {
+          "name": "Mobile Proxies 4G/5G carrier IPs Lower ban risk",
+          "role": "link"
+        },
+        "e207": {
+          "name": "ISP Proxies Static residential IPs Stable & reliable",
+          "role": "link"
+        },
+        "e208": {
+          "name": "Datacenter Proxies High speed & low cost For large-scale tasks",
+          "role": "link"
+        },
+        "e209": {
+          "name": "The right proxy for the way you work",
+          "role": "heading"
+        },
+        "e210": {
+          "name": "Residential Proxies: Local insights",
+          "role": "tab"
+        },
+        "e211": {
+          "name": "Mobile Proxies: Mobile experiences",
+          "role": "tab"
+        },
+        "e212": {
+          "name": "ISP Proxies: Consistent IPs",
+          "role": "tab"
+        },
+        "e213": {
+          "name": "Datacenter Proxies: Everyday automation",
+          "role": "tab"
+        },
+        "e214": {
+          "name": "Trusted by businesses worldwide",
+          "role": "heading"
+        },
+        "e215": {
+          "name": "Previous testimonials",
+          "role": "button"
+        },
+        "e216": {
+          "name": "Next testimonials",
+          "role": "button"
+        },
+        "e217": {
+          "name": "Access a borderless world today",
+          "role": "heading"
+        },
+        "e218": {
+          "name": "Get proxies",
+          "role": "link"
+        },
+        "e219": {
+          "name": "Talk to sales",
+          "role": "link"
+        },
+        "e220": {
+          "name": "Highlight connections for United Kingdom, 1.9M+ IPs",
+          "role": "button"
+        },
+        "e221": {
+          "name": "Highlight connections for Germany, 800K+ IPs",
+          "role": "button"
+        },
+        "e222": {
+          "name": "Highlight connections for United States, 2.4M+ IPs",
+          "role": "button"
+        },
+        "e223": {
+          "name": "Highlight connections for Singapore, 700K+ IPs",
+          "role": "button"
+        },
+        "e224": {
+          "name": "Highlight connections for Brazil, 620K+ IPs",
+          "role": "button"
+        },
+        "e225": {
+          "name": "See the web from a local perspective",
+          "role": "heading"
+        },
+        "e226": {
+          "name": "Explore residential proxies",
+          "role": "link"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- link \"Skip to content\" [ref=e159]\n- link \"FlashIP home\" [ref=e160]\n- navigation \"Main navigation\" [ref=e161]\n  - link \"Products\" [ref=e197]\n  - link \"Pricing\" [ref=e198]\n  - link \"Use cases\" [ref=e199]\n  - link \"Locations\" [ref=e200]\n  - link \"Blog\" [ref=e172]\n- link \"Get Started\" [ref=e162]\n- region \"FlashIP\" [ref=e163]\n  - heading \"Reliable Proxies for a Borderless World\" [level=1, ref=e201]\n  - link \"Get proxies\" [ref=e202]\n  - link \"View pricing\" [ref=e203]\n  - button \"Highlight connections for United Kingdom, 1.9M+ IPs\" [ref=e220]\n  - button \"Highlight connections for Germany, 800K+ IPs\" [ref=e221]\n  - button \"Highlight connections for United States, 2.4M+ IPs\" [ref=e222]\n  - button \"Highlight connections for Singapore, 700K+ IPs\" [ref=e223]\n  - button \"Highlight connections for Brazil, 620K+ IPs\" [ref=e224]\n  - navigation \"Multiple Proxy Types for Any Scenario\" [ref=e182]\n    - heading \"Multiple Proxy Types for Any Scenario\" [level=2, ref=e204]\n    - link \"Residential Proxies Real household IPs High anonymity\" [ref=e205]\n    - link \"Mobile Proxies 4G/5G carrier IPs Lower ban risk\" [ref=e206]\n    - link \"ISP Proxies Static residential IPs Stable & reliable\" [ref=e207]\n    - link \"Datacenter Proxies High speed & low cost For large-scale tasks\" [ref=e208]\n- region \"The right proxy for the way you work\" [ref=e164]\n  - heading \"The right proxy for the way you work\" [level=2, ref=e209]\n  - tab \"Residential Proxies: Local insights\" [selected, ref=e210]\n  - tab \"Mobile Proxies: Mobile experiences\" [ref=e211]\n  - tab \"ISP Proxies: Consistent IPs\" [ref=e212]\n  - tab \"Datacenter Proxies: Everyday automation\" [ref=e213]\n  - heading \"See the web from a local perspective\" [level=3, ref=e225]\n  - link \"Explore residential proxies\" [ref=e226]\n- region \"Global coverage Local possibilities\" [ref=e165]\n  - heading \"Global coverage Local possibilities\" [level=2, ref=e173]\n  - link \"View all locations\" [ref=e174]\n  - button \"United States — New York\" [ref=e183]\n  - button \"Germany — Frankfurt\" [ref=e184]\n  - button \"Singapore — Singapore\" [ref=e185]\n  - button \"Japan — Tokyo\" [ref=e186]\n  - button \"Brazil — Sao Paulo\" [ref=e187]\n- region \"Power your work across industries\" [ref=e166]\n  - heading \"Power your work across industries\" [level=2, ref=e175]\n  - link \"eCommerce\" [ref=e176]\n  - link \"Travel & hospitality\" [ref=e177]\n  - link \"Digital marketing\" [ref=e178]\n  - link \"Social media\" [ref=e179]\n  - link \"Market research\" [ref=e180]\n  - link \"More use cases\" [ref=e181]\n  - link \"Explore use cases\" [ref=e188]\n- region \"Trusted by businesses worldwide\" [ref=e167]\n  - heading \"Trusted by businesses worldwide\" [level=2, ref=e214]\n  - button \"Previous testimonials\" [ref=e215]\n  - button \"Next testimonials\" [ref=e216]\n- region \"Access a borderless world today\" [ref=e168]\n  - heading \"Access a borderless world today\" [level=2, ref=e217]\n  - link \"Get proxies\" [ref=e218]\n  - link \"Talk to sales\" [ref=e219]\n- link \"FlashIP home\" [ref=e169]\n- link \"Residential Proxies\" [ref=e189]\n- link \"Mobile Proxies\" [ref=e190]\n- link \"ISP Proxies\" [ref=e191]\n- link \"Datacenter Proxies\" [ref=e192]\n- link \"Blog\" [ref=e193]\n- link \"Partners\" [ref=e194]\n- link \"Contact support\" [ref=e195]\n- link \"Privacy Policy\" [ref=e196]\n- link \"Terms & Conditions\" [ref=e170]\n- link \"Privacy Policy\" [ref=e171]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify({links:Array.from(document.querySelectorAll('a[href]')).map(a=>({text:a.textContent.trim().slice(0,100),href:a.getAttribute('href')})),actions:Array.from(document.querySelectorAll('button')).map(b=>({text:b.innerText,html:b.outerHTML.slice(0,600)})),modules:Array.from(document.scripts).map(s=>({src:s.src,type:s.type,text:s.src?'':s.textContent.slice(0,1400)}))})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://www.flaship.net/",
+      "result": "{\"links\":[{\"text\":\"Skip to content\",\"href\":\"#main\"},{\"text\":\"\",\"href\":\"/\"},{\"text\":\"Products\",\"href\":\"/residential-proxies/\"},{\"text\":\"Residential ProxiesResearch markets through residential IPs in your selected locations. Collect publ\",\"href\":\"/residential-proxies/\"},{\"text\":\"Mobile ProxiesTest mobile web experiences and review campaigns through 4G/5G mobile carrier IPs with\",\"href\":\"/mobile-proxies/\"},{\"text\":\"ISP ProxiesKeep a consistent ISP-associated IP for recurring business tasks. Support store administr\",\"href\":\"/isp-proxies/\"},{\"text\":\"Datacenter ProxiesPut static datacenter IPs to work in your scripts and testing tools. Run scheduled\",\"href\":\"/datacenter-proxies/\"},{\"text\":\"Pricing\",\"href\":\"/pricing/\"},{\"text\":\"Residential ProxiesPay-as-you-go & volume traffic packages with 1 to 12 months validity.from $1.00/G\",\"href\":\"/pricing/residential-proxies/\"},{\"text\":\"Mobile Proxies4G/5G mobile carrier traffic packages with 1 to 12 months validity.from $2.80/GB\",\"href\":\"/pricing/mobile-proxies/\"},{\"text\":\"ISP ProxiesStatic ISP allocations priced by IP and duration.from $7.99/IP/mo\",\"href\":\"/pricing/isp-proxies/\"},{\"text\":\"Datacenter ProxiesHigh-speed server-hosted IPs with volume duration discounts.from $4.99/IP/mo\",\"href\":\"/pricing/datacenter-proxies/\"},{\"text\":\"Use cases\",\"href\":\"/use-cases/\"},{\"text\":\"Web Scraping\",\"href\":\"/use-cases/web-scraping/\"},{\"text\":\"AI Training Data\",\"href\":\"/use-cases/ai-data-collection/\"},{\"text\":\"Market Research\",\"href\":\"/use-cases/market-research/\"},{\"text\":\"Financial Data\",\"href\":\"/use-cases/financial-data/\"},{\"text\":\"Academic Research\",\"href\":\"/use-cases/academic-research/\"},{\"text\":\"E-commerce\",\"href\":\"/use-cases/e-commerce/\"},{\"text\":\"Price Monitoring\",\"href\":\"/use-cases/price-monitoring/\"},{\"text\":\"Travel Fare Aggregation\",\"href\":\"/use-cases/travel-fare-aggregation/\"},{\"text\":\"Ad Verification\",\"href\":\"/use-cases/ad-verification/\"},{\"text\":\"SEO & SERP Tracking\",\"href\":\"/use-cases/seo-monitoring/\"},{\"text\":\"Social Media Management\",\"href\":\"/use-cases/social-media/\"},{\"text\":\"Brand Protection\",\"href\":\"/use-cases/brand-protection/\"},{\"text\":\"Affiliate Marketing\",\"href\":\"/use-cases/affiliate-marketing/\"},{\"text\":\"Lead Generation\",\"href\":\"/use-cases/lead-generation/\"},{\"text\":\"QA & App Testing\",\"href\":\"/use-cases/app-testing/\"},{\"text\":\"Cybersecurity\",\"href\":\"/use-cases/cybersecurity/\"},{\"text\":\"View all use cases\",\"href\":\"/use-cases/\"},{\"text\":\"Locations\",\"href\":\"/proxies-by-location/\"},{\"text\":\"United States4,520,000 IPs\",\"href\":\"/proxies-by-location/north-america/united-states/\"},{\"text\":\"United Kingdom2,240,000 IPs\",\"href\":\"/proxies-by-location/europe/united-kingdom/\"},{\"text\":\"Germany2,120,000 IPs\",\"href\":\"/proxies-by-location/europe/germany/\"},{\"text\":\"France1,980,000 IPs\",\"href\":\"/proxies-by-location/europe/france/\"},{\"text\":\"Japan1,850,000 IPs\",\"href\":\"/proxies-by-location/asia-pacific/japan/\"},{\"text\":\"Brazil1,620,000 IPs\",\"href\":\"/proxies-by-location/latin-america/brazil/\"},{\"text\":\"Global Coverage195+ Countries & RegionsExplore our global pool of 90M+ residential, ISP, and datacen\",\"href\":\"/proxies-by-location/\"},{\"text\":\"Blog\",\"href\":\"/blog/\"},{\"text\":\"English\",\"href\":\"/\"},{\"text\":\"简体中文\",\"href\":\"/zh/\"},{\"text\":\"Get Started\",\"href\":\"https://app.flaship.net/auth/register\"},{\"text\":\"Residential Proxies\",\"href\":\"/residential-proxies/\"},{\"text\":\"Mobile Proxies\",\"href\":\"/mobile-proxies/\"},{\"text\":\"ISP Proxies\",\"href\":\"/isp-proxies/\"},{\"text\":\"Datacenter Proxies\",\"href\":\"/datacenter-proxies/\"},{\"text\":\"Residential ProxiesPay-as-you-go & volume traffic packages with 1 to 12 months validity.from $1.00/G\",\"href\":\"/pricing/residential-proxies/\"},{\"text\":\"Mobile Proxies4G/5G mobile carrier traffic packages with 1 to 12 months validity.from $2.80/GB\",\"href\":\"/pricing/mobile-proxies/\"},{\"text\":\"ISP ProxiesStatic ISP allocations priced by IP and duration.from $7.99/IP/mo\",\"href\":\"/pricing/isp-proxies/\"},{\"text\":\"Datacenter ProxiesHigh-speed server-hosted IPs with volume duration discounts.from $4.99/IP/mo\",\"href\":\"/pricing/datacenter-proxies/\"},{\"text\":\"Web Scraping\",\"href\":\"/use-cases/web-scraping/\"},{\"text\":\"AI Training Data\",\"href\":\"/use-cases/ai-data-collection/\"},{\"text\":\"Market Research\",\"href\":\"/use-cases/market-research/\"},{\"text\":\"Financial Data\",\"href\":\"/use-cases/financial-data/\"},{\"text\":\"Academic Research\",\"href\":\"/use-cases/academic-research/\"},{\"text\":\"E-commerce\",\"href\":\"/use-cases/e-commerce/\"},{\"text\":\"Price Monitoring\",\"href\":\"/use-cases/price-monitoring/\"},{\"text\":\"Travel Fare Aggregation\",\"href\":\"/use-cases/travel-fare-aggregation/\"},{\"text\":\"Ad Verification\",\"href\":\"/use-cases/ad-verification/\"},{\"text\":\"SEO & SERP Tracking\",\"href\":\"/use-cases/seo-monitoring/\"},{\"text\":\"Social Media Management\",\"href\":\"/use-cases/social-media/\"},{\"text\":\"Brand Protection\",\"href\":\"/use-cases/brand-protection/\"},{\"text\":\"Affiliate Marketing\",\"href\":\"/use-cases/affiliate-marketing/\"},{\"text\":\"Lead Generation\",\"href\":\"/use-cases/lead-generation/\"},{\"text\":\"QA & App Testing\",\"href\":\"/use-cases/app-testing/\"},{\"text\":\"Cybersecurity\",\"href\":\"/use-cases/cybersecurity/\"},{\"text\":\"View all use cases\",\"href\":\"/use-cases/\"},{\"text\":\"United States4,520,000 IPs\",\"href\":\"/proxies-by-location/north-america/united-states/\"},{\"text\":\"United Kingdom2,240,000 IPs\",\"href\":\"/proxies-by-location/europe/united-kingdom/\"},{\"text\":\"Germany2,120,000 IPs\",\"href\":\"/proxies-by-location/europe/germany/\"},{\"text\":\"France1,980,000 IPs\",\"href\":\"/proxies-by-location/europe/france/\"},{\"text\":\"Japan1,850,000 IPs\",\"href\":\"/proxies-by-location/asia-pacific/japan/\"},{\"text\":\"Brazil1,620,000 IPs\",\"href\":\"/proxies-by-location/latin-america/brazil/\"},{\"text\":\"Explore All Locations\",\"href\":\"/proxies-by-location/\"},{\"text\":\"Blog\",\"href\":\"/blog/\"},{\"text\":\"Get Started\",\"href\":\"https://app.flaship.net/auth/register\"},{\"text\":\"Get proxies\",\"href\":\"https://app.flaship.net\"},{\"text\":\"View pricing\",\"href\":\"/pricing/residential-proxies/\"},{\"text\":\"Residential ProxiesReal household IPsHigh anonymity\",\"href\":\"/residential-proxies/\"},{\"text\":\"Mobile Proxies4G/5G carrier IPsLower ban risk\",\"href\":\"/mobile-proxies/\"},{\"text\":\"ISP ProxiesStatic residential IPsStable & reliable\",\"href\":\"/isp-proxies/\"},{\"text\":\"Datacenter ProxiesHigh speed & low costFor large-scale tasks\",\"href\":\"/datacenter-proxies/\"},{\"text\":\"Explore residential proxies\",\"href\":\"/residential-proxies/\"},{\"text\":\"Explore mobile proxies\",\"href\":\"/mobile-proxies/\"},{\"text\":\"Explore ISP proxies\",\"href\":\"/isp-proxies/\"},{\"text\":\"Explore datacenter proxies\",\"href\":\"/datacenter-proxies/\"},{\"text\":\"View all locations\",\"href\":\"/proxies-by-location/\"},{\"text\":\"eCommerce\",\"href\":\"/use-cases/price-monitoring/\"},{\"text\":\"Travel & hospitality\",\"href\":\"/use-cases/\"},{\"text\":\"Digital marketing\",\"href\":\"/use-cases/ad-verification/\"},{\"text\":\"Social media\",\"href\":\"/use-cases/social-media/\"},{\"text\":\"Market research\",\"href\":\"/use-cases/market-research/\"},{\"text\":\"More use cases\",\"href\":\"/use-cases/\"},{\"text\":\"Explore use cases\",\"href\":\"/use-cases/\"},{\"text\":\"Get proxies\",\"href\":\"https://app.flaship.net\"},{\"text\":\"Talk to sales\",\"href\":\"https://telegram.me/FlashID_global\"},{\"text\":\"\",\"href\":\"/\"},{\"text\":\"Residential Proxies\",\"href\":\"/residential-proxies/\"},{\"text\":\"Mobile Proxies\",\"href\":\"/mobile-proxies/\"},{\"text\":\"ISP Proxies\",\"href\":\"/isp-proxies/\"},{\"text\":\"Datacenter Proxies\",\"href\":\"/datacenter-proxies/\"},{\"text\":\"Blog\",\"href\":\"/blog/\"},{\"text\":\"Partners\",\"href\":\"/partners/\"},{\"text\":\"Contact support\",\"href\":\"https://telegram.me/FlashID_global\"},{\"text\":\"Privacy Policy\",\"href\":\"/privacy-policy/\"},{\"text\":\"Terms & Conditions\",\"href\":\"/terms-conditions/\"},{\"text\":\"Privacy Policy\",\"href\":\"/privacy-policy/\"}],\"actions\":[{\"text\":\"United Kingdom\\n1.9M+ IPs\",\"html\":\"<button type=\\\"button\\\" class=\\\"country-badge [position:absolute] [left:var(--badge-x)] [top:var(--badge-y)] [transform:translate(-50%,_-50%)] [display:flex] [align-items:center] [gap:10px] [min-width:138px] [padding:11px_13px] [border:1px_solid_#ffffffd6] [border-radius:13px] [background:#fbfaffdf] [box-shadow:0_5px_18px_#51488a08] [&amp;_svg]:[width:30px] [&amp;_svg]:[height:30px] [&amp;_svg]:[border-radius:50%] text-left cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 data-[active=true]:border-[#b99be7] data-[active=true]:bg-[#fff] data-[active=true]:shadow-[0\"},{\"text\":\"Germany\\n800K+ IPs\",\"html\":\"<button type=\\\"button\\\" class=\\\"country-badge [position:absolute] [left:var(--badge-x)] [top:var(--badge-y)] [transform:translate(-50%,_-50%)] [display:flex] [align-items:center] [gap:10px] [min-width:138px] [padding:11px_13px] [border:1px_solid_#ffffffd6] [border-radius:13px] [background:#fbfaffdf] [box-shadow:0_5px_18px_#51488a08] [&amp;_svg]:[width:30px] [&amp;_svg]:[height:30px] [&amp;_svg]:[border-radius:50%] text-left cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 data-[active=true]:border-[#b99be7] data-[active=true]:bg-[#fff] data-[active=true]:shadow-[0\"},{\"text\":\"United States\\n2.4M+ IPs\",\"html\":\"<button type=\\\"button\\\" class=\\\"country-badge [position:absolute] [left:var(--badge-x)] [top:var(--badge-y)] [transform:translate(-50%,_-50%)] [display:flex] [align-items:center] [gap:10px] [min-width:138px] [padding:11px_13px] [border:1px_solid_#ffffffd6] [border-radius:13px] [background:#fbfaffdf] [box-shadow:0_5px_18px_#51488a08] [&amp;_svg]:[width:30px] [&amp;_svg]:[height:30px] [&amp;_svg]:[border-radius:50%] text-left cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 data-[active=true]:border-[#b99be7] data-[active=true]:bg-[#fff] data-[active=true]:shadow-[0\"},{\"text\":\"Japan900K+ IPs\",\"html\":\"<button type=\\\"button\\\" class=\\\"country-badge [position:absolute] [left:var(--badge-x)] [top:var(--badge-y)] [transform:translate(-50%,_-50%)] [display:flex] [align-items:center] [gap:10px] [min-width:138px] [padding:11px_13px] [border:1px_solid_#ffffffd6] [border-radius:13px] [background:#fbfaffdf] [box-shadow:0_5px_18px_#51488a08] [&amp;_svg]:[width:30px] [&amp;_svg]:[height:30px] [&amp;_svg]:[border-radius:50%] text-left cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 data-[active=true]:border-[#b99be7] data-[active=true]:bg-[#fff] data-[active=true]:shadow-[0\"},{\"text\":\"Singapore\\n700K+ IPs\",\"html\":\"<button type=\\\"button\\\" class=\\\"country-badge [position:absolute] [left:var(--badge-x)] [top:var(--badge-y)] [transform:translate(-50%,_-50%)] [display:flex] [align-items:center] [gap:10px] [min-width:138px] [padding:11px_13px] [border:1px_solid_#ffffffd6] [border-radius:13px] [background:#fbfaffdf] [box-shadow:0_5px_18px_#51488a08] [&amp;_svg]:[width:30px] [&amp;_svg]:[height:30px] [&amp;_svg]:[border-radius:50%] text-left cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 data-[active=true]:border-[#b99be7] data-[active=true]:bg-[#fff] data-[active=true]:shadow-[0\"},{\"text\":\"Brazil\\n620K+ IPs\",\"html\":\"<button type=\\\"button\\\" class=\\\"country-badge [position:absolute] [left:var(--badge-x)] [top:var(--badge-y)] [transform:translate(-50%,_-50%)] [display:flex] [align-items:center] [gap:10px] [min-width:138px] [padding:11px_13px] [border:1px_solid_#ffffffd6] [border-radius:13px] [background:#fbfaffdf] [box-shadow:0_5px_18px_#51488a08] [&amp;_svg]:[width:30px] [&amp;_svg]:[height:30px] [&amp;_svg]:[border-radius:50%] text-left cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 data-[active=true]:border-[#b99be7] data-[active=true]:bg-[#fff] data-[active=true]:shadow-[0\"},{\"text\":\"Australia600K+ IPs\",\"html\":\"<button type=\\\"button\\\" class=\\\"country-badge [position:absolute] [left:var(--badge-x)] [top:var(--badge-y)] [transform:translate(-50%,_-50%)] [display:flex] [align-items:center] [gap:10px] [min-width:138px] [padding:11px_13px] [border:1px_solid_#ffffffd6] [border-radius:13px] [background:#fbfaffdf] [box-shadow:0_5px_18px_#51488a08] [&amp;_svg]:[width:30px] [&amp;_svg]:[height:30px] [&amp;_svg]:[border-radius:50%] text-left cursor-pointer transition-[border-color,background-color,box-shadow] duration-200 data-[active=true]:border-[#b99be7] data-[active=true]:bg-[#fff] data-[active=true]:shadow-[0\"},{\"text\":\"Residential Proxies\\nLocal insights\",\"html\":\"<button id=\\\"proxy-product-tab-residential\\\" class=\\\"group relative flex min-h-[96px] min-w-0 items-center gap-3 px-3 py-3 text-left transition-[background,color] duration-200 hover:bg-white/82 focus-visible:z-10 focus-visible:outline-offset-[-4px] aria-[selected=true]:bg-[#f4edff]/90 min-[768px]:gap-4 min-[768px]:px-5 min-[1100px]:gap-5 min-[1100px]:px-7\\\" type=\\\"button\\\" role=\\\"tab\\\" aria-selected=\\\"true\\\" aria-controls=\\\"proxy-product-panel-residential\\\" aria-label=\\\"Residential Proxies: Local insights\\\" tabindex=\\\"0\\\" data-product-tab=\\\"residential\\\" data-tab-index=\\\"0\\\"><span class=\\\"grid size-11 shrink-0 pla\"},{\"text\":\"Mobile Proxies\\nMobile experiences\",\"html\":\"<button id=\\\"proxy-product-tab-mobile\\\" class=\\\"group relative flex min-h-[96px] min-w-0 items-center gap-3 px-3 py-3 text-left transition-[background,color] duration-200 hover:bg-white/82 focus-visible:z-10 focus-visible:outline-offset-[-4px] aria-[selected=true]:bg-[#f4edff]/90 min-[768px]:gap-4 min-[768px]:px-5 min-[1100px]:gap-5 min-[1100px]:px-7\\\" type=\\\"button\\\" role=\\\"tab\\\" aria-selected=\\\"false\\\" aria-controls=\\\"proxy-product-panel-mobile\\\" aria-label=\\\"Mobile Proxies: Mobile experiences\\\" tabindex=\\\"-1\\\" data-product-tab=\\\"mobile\\\" data-tab-index=\\\"1\\\"><span class=\\\"pointer-events-none absolute inset-y-[2\"},{\"text\":\"ISP Proxies\\nConsistent IPs\",\"html\":\"<button id=\\\"proxy-product-tab-isp\\\" class=\\\"group relative flex min-h-[96px] min-w-0 items-center gap-3 px-3 py-3 text-left transition-[background,color] duration-200 hover:bg-white/82 focus-visible:z-10 focus-visible:outline-offset-[-4px] aria-[selected=true]:bg-[#f4edff]/90 min-[768px]:gap-4 min-[768px]:px-5 min-[1100px]:gap-5 min-[1100px]:px-7\\\" type=\\\"button\\\" role=\\\"tab\\\" aria-selected=\\\"false\\\" aria-controls=\\\"proxy-product-panel-isp\\\" aria-label=\\\"ISP Proxies: Consistent IPs\\\" tabindex=\\\"-1\\\" data-product-tab=\\\"isp\\\" data-tab-index=\\\"2\\\"><span class=\\\"pointer-events-none absolute inset-y-[24%] left-0 w-px \"},{\"text\":\"Datacenter Proxies\\nEveryday automation\",\"html\":\"<button id=\\\"proxy-product-tab-datacenter\\\" class=\\\"group relative flex min-h-[96px] min-w-0 items-center gap-3 px-3 py-3 text-left transition-[background,color] duration-200 hover:bg-white/82 focus-visible:z-10 focus-visible:outline-offset-[-4px] aria-[selected=true]:bg-[#f4edff]/90 min-[768px]:gap-4 min-[768px]:px-5 min-[1100px]:gap-5 min-[1100px]:px-7\\\" type=\\\"button\\\" role=\\\"tab\\\" aria-selected=\\\"false\\\" aria-controls=\\\"proxy-product-panel-datacenter\\\" aria-label=\\\"Datacenter Proxies: Everyday automation\\\" tabindex=\\\"-1\\\" data-product-tab=\\\"datacenter\\\" data-tab-index=\\\"3\\\"><span class=\\\"pointer-events-none ab\"},{\"text\":\"United States\",\"html\":\"<button type=\\\"button\\\" class=\\\"absolute z-10 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent text-transparent transition-transform duration-[180ms] before:absolute before:top-1/2 before:left-1/2 before:size-3 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:border-2 before:border-white before:bg-[#8a3dff] before:shadow-[0_3px_10px_#6421cc55] before:transition-[width,height,background,box-shadow] before:duration-[180ms] after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bor\"},{\"text\":\"Germany\",\"html\":\"<button type=\\\"button\\\" class=\\\"absolute z-10 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent text-transparent transition-transform duration-[180ms] before:absolute before:top-1/2 before:left-1/2 before:size-3 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:border-2 before:border-white before:bg-[#8a3dff] before:shadow-[0_3px_10px_#6421cc55] before:transition-[width,height,background,box-shadow] before:duration-[180ms] after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bor\"},{\"text\":\"Singapore\",\"html\":\"<button type=\\\"button\\\" class=\\\"absolute z-10 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent text-transparent transition-transform duration-[180ms] before:absolute before:top-1/2 before:left-1/2 before:size-3 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:border-2 before:border-white before:bg-[#8a3dff] before:shadow-[0_3px_10px_#6421cc55] before:transition-[width,height,background,box-shadow] before:duration-[180ms] after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bor\"},{\"text\":\"Japan\",\"html\":\"<button type=\\\"button\\\" class=\\\"absolute z-10 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent text-transparent transition-transform duration-[180ms] before:absolute before:top-1/2 before:left-1/2 before:size-3 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:border-2 before:border-white before:bg-[#8a3dff] before:shadow-[0_3px_10px_#6421cc55] before:transition-[width,height,background,box-shadow] before:duration-[180ms] after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bor\"},{\"text\":\"Brazil\",\"html\":\"<button type=\\\"button\\\" class=\\\"absolute z-10 size-11 -translate-x-1/2 -translate-y-1/2 rounded-full bg-transparent text-transparent transition-transform duration-[180ms] before:absolute before:top-1/2 before:left-1/2 before:size-3 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:border-2 before:border-white before:bg-[#8a3dff] before:shadow-[0_3px_10px_#6421cc55] before:transition-[width,height,background,box-shadow] before:duration-[180ms] after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:bor\"},{\"text\":\"\",\"html\":\"<button type=\\\"button\\\" class=\\\"grid size-11 place-items-center rounded-full text-[#8b62d8] transition-[color,background-color,transform] hover:bg-white/75 hover:text-brand active:scale-95 focus-visible:outline-2 focus-visible:outline-brand\\\" aria-label=\\\"Previous testimonials\\\" data-testimonial-previous=\\\"\\\"><svg width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"1.5\\\" stroke-linecap=\\\"round\\\" stroke-linejoin=\\\"round\\\" aria-hidden=\\\"true\\\"><path d=\\\"M20 12H4m6-6-6 6 6 6\\\"></path></svg></button>\"},{\"text\":\"\",\"html\":\"<button type=\\\"button\\\" class=\\\"grid size-11 place-items-center rounded-full text-[#8b62d8] transition-[color,background-color,transform] hover:bg-white/75 hover:text-brand active:scale-95 focus-visible:outline-2 focus-visible:outline-brand\\\" aria-label=\\\"Next testimonials\\\" data-testimonial-next=\\\"\\\"><span class=\\\"rotate-180 inline-grid place-items-center\\\"><svg width=\\\"24\\\" height=\\\"24\\\" viewBox=\\\"0 0 24 24\\\" fill=\\\"none\\\" stroke=\\\"currentColor\\\" stroke-width=\\\"1.5\\\" stroke-linecap=\\\"round\\\" stroke-linejoin=\\\"round\\\" aria-hidden=\\\"true\\\"><path d=\\\"M20 12H4m6-6-6 6 6 6\\\"></path></svg></span></button>\"}],\"modules\":[{\"src\":\"https://plugin-code.salesmartly.com/chat/widget-v2/code/modern/install.js\",\"type\":\"module\",\"text\":\"\"},{\"src\":\"https://plugin-code.salesmartly.com/chat/widget-v2/code/install.js\",\"type\":\"\",\"text\":\"\"},{\"src\":\"\",\"type\":\"application/ld+json\",\"text\":\"{\\\"@context\\\":\\\"https://schema.org\\\",\\\"@graph\\\":[{\\\"@type\\\":\\\"WebPage\\\",\\\"@id\\\":\\\"https://www.flaship.net/#webpage\\\",\\\"url\\\":\\\"https://www.flaship.net/\\\",\\\"name\\\":\\\"FlashIP | Global Proxy Solutions for Data & Business\\\",\\\"description\\\":\\\"Explore FlashIP residential, mobile, ISP and datacenter proxies for web scraping, local market research and account management. Compare locations, IP options and pricing.\\\",\\\"inLanguage\\\":\\\"en\\\",\\\"isPartOf\\\":{\\\"@id\\\":\\\"https://www.flaship.net/#website\\\"}},{\\\"@type\\\":\\\"Organization\\\",\\\"@id\\\":\\\"https://www.flaship.net/#organization\\\",\\\"name\\\":\\\"FlashIP\\\",\\\"url\\\":\\\"https://www.flaship.net/\\\",\\\"logo\\\":\\\"https://www.flaship.net/flaship-main-logo.svg\\\"},{\\\"@type\\\":\\\"WebSite\\\",\\\"@id\\\":\\\"https://www.flaship.net/#website\\\",\\\"name\\\":\\\"FlashIP\\\",\\\"url\\\":\\\"https://www.flaship.net/\\\",\\\"publisher\\\":{\\\"@id\\\":\\\"https://www.flaship.net/#organization\\\"}}]}\"},{\"src\":\"https://console.data4.net/static/js/tracker.js\",\"type\":\"\",\"text\":\"\"},{\"src\":\"https://www.googletagmanager.com/gtag/js?id=G-PC7DR5W7MR\",\"type\":\"\",\"text\":\"\"},{\"src\":\"\",\"type\":\"\",\"text\":\"\\n          window.dataLayer = window.dataLayer || [];\\n          function gtag() {\\n            dataLayer.push(arguments);\\n          }\\n          gtag('js', new Date());\\n          gtag('config', 'G-PC7DR5W7MR');\\n        \"},{\"src\":\"https://plugin-code.salesmartly.com/js/project_420706_861133_1789542311.js\",\"type\":\"\",\"text\":\"\"},{\"src\":\"https://plugin-code.salesmartly.com/chat/widget-v2/code/55a9f80e9b3f418f/modern-runtime-probe.js\",\"type\":\"\",\"text\":\"\"},{\"src\":\"\",\"type\":\"module\",\"text\":\"var e=()=>{let e=window.location.hash===`#main`?`#main`:``;document.querySelectorAll(`[data-language-path]`).forEach(t=>{t.href=`${t.dataset.languagePath}${e}`})};e(),window.addEventListener(`hashchange`,e);\"},{\"src\":\"\",\"type\":\"module\",\"text\":\"var e=document.querySelectorAll(`[data-nav-menu]`);e.forEach(e=>{e.addEventListener(`click`,t=>{t.target instanceof Element&&t.target.closest(`a`)&&(e.open=!1)}),e.addEventListener(`keydown`,t=>{t.key===`Escape`&&e.open&&(e.open=!1,e.querySelector(`summary`)?.focus())})}),document.addEventListener(`click`,t=>{t.target instanceof Node&&e.forEach(e=>{e.contains(t.target)||(e.open=!1)})});var t=document.querySelectorAll(`details[name=\\\"desktop-navigation\\\"]`),n=null,r=()=>{n&&=(clearTimeout(n),null)};t.forEach(e=>{e.addEventListener(`mouseenter`,()=>{window.matchMedia(`(hover: hover)`).matches&&(r(),t.forEach(t=>{t!==e&&t.open&&(t.open=!1)}),e.open=!0)}),e.addEventListener(`mouseleave`,()=>{window.matchMedia(`(hover: hover)`).matches&&(r(),n=setTimeout(()=>{e.open=!1},150))})}),document.querySelectorAll(`.desktop-nav > a, .brand, .header-actions`).forEach(e=>{e.addEventListener(`mouseenter`,()=>{window.matchMedia(`(hover: hover)`).matches&&(r(),t.forEach(e=>{e.open&&=!1}))})});\"},{\"src\":\"\",\"type\":\"module\",\"text\":\"var e=document.querySelector(`[data-globe-scene]`),t=e?.querySelector(`[data-globe-layer]`),n=matchMedia(`(prefers-reduced-motion: reduce)`),r=matchMedia(`(hover: hover) and (pointer: fine)`);if(e&&t){let i=[...e.querySelectorAll(`.country-badge`)],a=[...e.querySelectorAll(`[data-route]`)],o=null,s=null,c=null,l=0,u=()=>{cancelAnimationFrame(l),t.style.transform=``},d=(e,t)=>{let n=t.x-e.center.x,r=t.y-e.center.y,i=1/Math.max(Math.abs(n)/e.halfWidth,Math.abs(r)/e.halfHeight,1);return{x:e.center.x+n*i,y:e.center.y+r*i}},f=()=>{let n=t.getBoundingClientRect();if(!n.width||!n.height)return;let r=new Map(i.map(e=>{let t=e.getBoundingClientRect(),r=e.dataset.country;return[r,{code:r,element:e,visible:getComputedStyle(e).display!==`none`,center:{x:(t.x+t.width/2-n.x)/n.width*1e3,y:(t.y+t.height/2-n.y)/n.height*1e3},halfWidth:t.width/n.width*500,halfHeight:t.height/n.height*500,anchor:e.dataset.anchorX===void 0?null:{x:Number(e.dataset.anchorX)*10,y:Number(e.dataset.anchorY)*10}}]}));r.forEach(t=>{t.visible&&(t.anchor||={x:t.center.x-t.halfWidth-18,y:t.center.y},e.querySelector(`.country-node-group[data-country=\\\"${t.code}\\\"]`)?.querySelectorAll(`circle`).forEach(e=>{e.setAttribute(`cx`,String(t.anchor.x)),e.setAttribute(`cy`,String(t.anchor.y))}))}),e.querySelectorAll(`[data-leader]`).forEach(e=>{let t=r.get(e.dataset.leader);if(!t?.visible||!t.anchor)return;let n=d(t,t.anchor);e.setAt\"},{\"src\":\"\",\"type\":\"module\",\"text\":\"document.querySelectorAll(`[data-proxy-products]`).forEach(e=>{let t=Array.from(e.querySelectorAll(`[data-product-tab]`)),n=Array.from(e.querySelectorAll(`[data-product-panel]`)),r=e.querySelector(`[data-product-tab-scroll]`),i=matchMedia(`(prefers-reduced-motion: reduce)`).matches,a=Number(e.dataset.autoplayMs)||3e3,o=e.dataset.defaultProduct||`residential`,s=Math.max(0,t.findIndex(e=>e.dataset.productTab===o)),c=null,l=!0,u=!1,d=!1,f=()=>!i&&l&&!u&&!d&&!document.hidden,p=()=>{c?.cancel(),c=null,t.forEach(e=>{let t=e.querySelector(`[data-tab-progress]`);t&&(t.style.width=`0%`)});let e=t.find(e=>e.dataset.productTab===o)?.querySelector(`[data-tab-progress]`);if(e){if(i){e.style.width=`100%`;return}c=e.animate([{width:`0%`},{width:`100%`}],{duration:a,easing:`linear`,fill:`forwards`}),c.onfinish=()=>{let e=(t.findIndex(e=>e.dataset.productTab===o)+1)%t.length;g(e,!1),_(t[e].dataset.productTab||`residential`)},f()||c.pause()}},m=()=>{c&&!i&&(f()&&c.playState===`paused`&&c.play(),!f()&&c.playState===`running`&&c.pause())},h=e=>{if(!r)return;let t=e.offsetLeft,n=t+e.offsetWidth,a=r.scrollLeft,o=a+r.clientWidth,s=t<a?t-8:n>o?n-r.clientWidth+8:a;s!==a&&r.scrollTo({left:s,behavior:i?`auto`:`smooth`})},g=(e,n=!0)=>{s=(e+t.length)%t.length,t.forEach((e,t)=>e.tabIndex=t===s?0:-1);let r=t[s];n&&r.focus({preventScroll:!0}),h(r)},_=r=>{if(r===o){p();return}o=r,e.dataset.currentProduct=r,t.f\"},{\"src\":\"\",\"type\":\"module\",\"text\":\"document.querySelectorAll(`[data-global-coverage]`).forEach(e=>{if(!(e instanceof HTMLElement)||e.dataset.coverageBound===`true`)return;e.dataset.coverageBound=`true`;let t=Array.from(e.querySelectorAll(`[data-location-control]`)),n=Array.from(e.querySelectorAll(`[data-desktop-location-card]`)),r=Array.from(e.querySelectorAll(`[data-mobile-location-card]`)),i=e.querySelector(`[data-map-frame]`),a=e.querySelector(`[data-location-status]`),o=matchMedia(`(prefers-reduced-motion: reduce)`),s=()=>{if(!(i instanceof HTMLElement))return;let r=e.dataset.activeLocation,a=t.find(e=>e instanceof HTMLElement&&e.matches(`[data-location-node]`)&&e.dataset.locationId===r),o=n.find(e=>e instanceof HTMLElement&&e.dataset.locationId===r);if(!(a instanceof HTMLElement)||!(o instanceof HTMLElement)||o.hidden)return;let s=a.offsetLeft,c=a.offsetTop,l=s>i.clientWidth*.64?s-o.offsetWidth-14:s+14,u=c-o.offsetHeight-14,d=Math.max(8,Math.min(l,i.clientWidth-o.offsetWidth-8)),f=Math.max(8,Math.min(u,i.clientHeight-o.offsetHeight-8));o.style.left=`${d}px`,o.style.top=`${f}px`},c=()=>{o.matches||[...n,...r].forEach(e=>{e instanceof HTMLElement&&!e.hidden&&getComputedStyle(e).display!==`none`&&e.animate([{opacity:.35,transform:`translateY(5px)`},{opacity:1,transform:`translateY(0)`}],{duration:180,easing:`ease-out`})})},l=i=>{let o=t.find(e=>e instanceof HTMLElement&&e.dataset.locationId===i);if(o instanceo\"},{\"src\":\"https://www.flaship.net/_astro/HomeTestimonialsSection.astro_astro_type_script_index_0_lang.xr5CajvV.js\",\"type\":\"module\",\"text\":\"\"},{\"src\":\"\",\"type\":\"module\",\"text\":\"var e=`salesmartly-chat`,t=!1;function n(){if(typeof window>`u`||t)return;t=!0;let n=()=>{if(document.getElementById(e))return;let t=document.createElement(`script`);t.id=e,t.src=`https://plugin-code.salesmartly.com/js/project_420706_861133_1789542311.js`,t.async=!0,document.head.appendChild(t)},r=()=>{window.setTimeout(()=>{typeof window.requestIdleCallback==`function`?window.requestIdleCallback(n,{timeout:2e3}):n()},2e3)};document.readyState===`complete`?r():window.addEventListener(`load`,r,{once:!0})}function r(e){if(typeof window>`u`)return!1;let t=window;if(t.ssmEvent?.isReady!==!0)return!1;let n=t.ssq;if(!n||Array.isArray(n)||typeof n.push!=`function`)return!1;try{n.push(`chatOpen`)}catch{return!1}if(e)try{n.push(`sendTextMessage`,e)}catch{}return!0}n(),document.addEventListener(`click`,e=>{if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||!(e.target instanceof Element))return;let t=e.target.closest(`[data-talk-to-sales], [data-open-chat]`);t&&r(t.getAttribute(`data-chat-message`)||void 0)&&e.preventDefault()});\"}]}"
+    },
+    "success": true
+  }
+]

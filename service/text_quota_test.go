@@ -64,12 +64,14 @@ func TestSubscriptionGroupFundingPreferences(t *testing.T) {
 			oldDB, oldLog := model.DB, model.LOG_DB
 			oldMain, oldLogKind := common.MainDatabaseType(), common.LogDatabaseType()
 			model.DB, model.LOG_DB = db, db
+			model.ResetPartnerTenantMembershipCache()
 			common.SetDatabaseTypes(dialect.kind, dialect.kind)
 			defer func() {
 				model.DB, model.LOG_DB = oldDB, oldLog
+				model.ResetPartnerTenantMembershipCache()
 				common.SetDatabaseTypes(oldMain, oldLogKind)
 			}()
-			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.PartnerTenantAccount{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
 			now := model.GetDBTimestamp()
 			for i, tc := range []struct {
 				name, pref, group, applicable string
@@ -128,7 +130,48 @@ func TestSubscriptionGroupFundingPreferences(t *testing.T) {
 					assert.Equal(t, wantToken, token.RemainQuota, "failed subscription pre-consume must roll back the token before fallback")
 				})
 			}
-			require.NoError(t, db.Migrator().DropTable(&model.SubscriptionPreConsumeRecord{}, &model.UserSubscription{}, &model.SubscriptionPlan{}, &model.Token{}, &model.User{}))
+			// Tenant membership always wins over every mutable wallet preference,
+			// including disabled memberships and funded wallets.
+			for pi, pref := range []string{"wallet_only", "wallet_first", "subscription_first", "subscription_only"} {
+				for si, state := range []string{"active", "exhausted", "expired", "inapplicable"} {
+					t.Run("tenant-"+pref+"-"+state, func(t *testing.T) {
+						uid := 710000 + pi*10 + si
+						user := &model.User{Id: uid, Username: fmt.Sprintf("tenant-%d", uid), AffCode: fmt.Sprintf("tenant-%d", uid), Quota: 100, Group: "tenant"}
+						require.NoError(t, db.Create(user).Error)
+						token := &model.Token{UserId: uid, Key: fmt.Sprintf("tenant-token-%d", uid), RemainQuota: 100}
+						require.NoError(t, db.Create(token).Error)
+						require.NoError(t, db.Create(&model.PartnerTenantAccount{TenantId: 1, ExternalUserId: fmt.Sprint(uid), UserId: uid, TokenId: token.Id, Status: model.PartnerTenantStatusDisabled}).Error)
+						applicable, used, end := "tenant", int64(0), now+3600
+						if state == "exhausted" {
+							used = 99
+						}
+						if state == "expired" {
+							end = now - 1
+						}
+						if state == "inapplicable" {
+							applicable = "other"
+						}
+						plan := &model.SubscriptionPlan{Title: "Tenant", PartnerTenantId: 1, ApplicableGroup: applicable, Enabled: true}
+						require.NoError(t, db.Create(plan).Error)
+						sub := &model.UserSubscription{UserId: uid, PlanId: plan.Id, Status: "active", StartTime: now - 10, EndTime: end, AmountTotal: 100, AmountUsed: used, AllowWalletOverflow: true}
+						require.NoError(t, db.Create(sub).Error)
+						ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+						info := &relaycommon.RelayInfo{UserId: uid, RequestId: fmt.Sprintf("tenant-%d", uid), TokenId: token.Id, TokenKey: token.Key, OriginModelName: "shared-model", UsingGroup: "tenant", ForcePreConsume: true}
+						info.UserSetting.BillingPreference = pref
+						session, apiErr := NewBillingSession(ctx, info, 20)
+						if state == "active" {
+							require.Nil(t, apiErr)
+							require.Equal(t, BillingSourceSubscription, session.funding.Source())
+						} else {
+							require.NotNil(t, apiErr)
+							require.Nil(t, session)
+						}
+						require.NoError(t, db.First(user, uid).Error)
+						require.Equal(t, 100, user.Quota, "never debit a Tenant wallet")
+					})
+				}
+			}
+			require.NoError(t, db.Migrator().DropTable(&model.SubscriptionPreConsumeRecord{}, &model.UserSubscription{}, &model.SubscriptionPlan{}, &model.PartnerTenantAccount{}, &model.Token{}, &model.User{}))
 		})
 	}
 }
@@ -182,9 +225,14 @@ func TestFixedPriceBillingDatabaseMatrix(t *testing.T) {
 			oldDB, oldLogDB := model.DB, model.LOG_DB
 			oldMainType, oldLogType := common.MainDatabaseType(), common.LogDatabaseType()
 			model.DB, model.LOG_DB = db, logDB
+			model.ResetPartnerTenantMembershipCache()
 			common.SetDatabaseTypes(dialect.name, dialect.name)
-			t.Cleanup(func() { model.DB, model.LOG_DB = oldDB, oldLogDB; common.SetDatabaseTypes(oldMainType, oldLogType) })
-			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}))
+			t.Cleanup(func() {
+				model.DB, model.LOG_DB = oldDB, oldLogDB
+				model.ResetPartnerTenantMembershipCache()
+				common.SetDatabaseTypes(oldMainType, oldLogType)
+			})
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.PartnerTenantAccount{}, &model.Channel{}))
 			require.NoError(t, logDB.AutoMigrate(&model.Log{}))
 			versionQuery := "select version()"
 			if dialect.name == common.DatabaseTypeSQLite {

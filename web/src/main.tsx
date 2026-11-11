@@ -21,6 +21,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 
+import { isPartnerCheckoutPath, prepareCashierEntry } from '@/features/partner-checkout/lib/access'
 import { installBuildMetadata } from '@/lib/build-metadata'
 import { resolveLogoUrl } from '@/lib/constants'
 import { applyFaviconToDom } from '@/lib/dom-utils'
@@ -42,7 +43,8 @@ import './styles/index.css'
 
 // Ensure VChart theme is initialized before any chart mounts (prevents white default theme flash)
 // VChart theme is driven by our ThemeProvider (html.light/html.dark) via per-chart `theme` prop.
-initializeFrontendCache()
+prepareCashierEntry()
+if (!isPartnerCheckoutPath(window.location.pathname)) initializeFrontendCache()
 installBuildMetadata()
 
 const queryClient = createAppQueryClient(() => {
@@ -73,6 +75,7 @@ if (!rootElement) {
 ;(function initSystemBranding() {
   try {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
+    if (isPartnerCheckoutPath(window.location.pathname)) return
     const apply = (name?: string | null) => {
       const resolvedName = resolveProductName(name)
       document.title = resolvedName

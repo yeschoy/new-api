@@ -116,8 +116,8 @@ For commercial licensing, please contact support@quantumnous.com
   transform: scale(0.97);
   transition-duration: 90ms;
 }
-/* Outranks the landing's link reset, which inherits the hero ink colour. */
-.ci-handoffRoot .ci-heroCopy a.ci-forgeBadge {
+/* Outranks the landing's link reset both inside and below the hero. */
+.ci-handoffRoot a.ci-forgeBadge {
   color: var(--forge-ink);
 }
 .ci-forgeBadge:hover {

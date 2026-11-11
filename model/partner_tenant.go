@@ -2,10 +2,7 @@ package model
 
 import (
 	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -46,14 +43,15 @@ type PartnerTenant struct {
 func (PartnerTenant) TableName() string { return "partner_tenants" }
 
 type PartnerTenantAccount struct {
-	Id             int64  `json:"id" gorm:"primaryKey"`
-	TenantId       int64  `json:"tenant_id" gorm:"not null;uniqueIndex:idx_partner_tenant_external_user,priority:1"`
-	ExternalUserId string `json:"external_user_id" gorm:"type:varchar(128);not null;uniqueIndex:idx_partner_tenant_external_user,priority:2"`
-	UserId         int    `json:"user_id" gorm:"not null;uniqueIndex"`
-	TokenId        int    `json:"token_id" gorm:"not null;uniqueIndex"`
-	Status         int    `json:"status" gorm:"not null;default:1"`
-	CreatedAt      int64  `json:"created_at" gorm:"type:bigint"`
-	UpdatedAt      int64  `json:"updated_at" gorm:"type:bigint"`
+	Id                 int64  `json:"id" gorm:"primaryKey"`
+	TenantId           int64  `json:"tenant_id" gorm:"not null;uniqueIndex:idx_pt_account_external_hash,priority:1"`
+	ExternalUserId     string `json:"external_user_id" gorm:"type:varchar(128);not null"`
+	ExternalUserIdHash string `json:"-" gorm:"type:char(64);default:null;uniqueIndex:idx_pt_account_external_hash,priority:2"`
+	UserId             int    `json:"user_id" gorm:"not null;uniqueIndex"`
+	TokenId            int    `json:"token_id" gorm:"not null;uniqueIndex"`
+	Status             int    `json:"status" gorm:"not null;default:1"`
+	CreatedAt          int64  `json:"created_at" gorm:"type:bigint"`
+	UpdatedAt          int64  `json:"updated_at" gorm:"type:bigint"`
 }
 
 func (PartnerTenantAccount) TableName() string { return "partner_tenant_accounts" }
@@ -71,7 +69,17 @@ type PartnerTenantSubscriptionGrant struct {
 
 func (PartnerTenantSubscriptionGrant) TableName() string { return "partner_tenant_subscription_grants" }
 
-func isPartnerTenantUser(userID int) (bool, error) {
+// ResetPartnerTenantMembershipCache isolates membership when the database
+// lifecycle changes, including test fixtures that reuse numeric user IDs.
+// It never changes stored account membership or any model credential.
+func ResetPartnerTenantMembershipCache() { partnerTenantMembershipCache.Purge() }
+
+// IsPartnerTenantUser is an immutable-membership predicate, independent of plan
+// validity and account status. In particular disabled members cannot use wallets.
+func IsPartnerTenantUser(userID int) (bool, error) {
+	if DB == nil {
+		return false, errors.New("database is not initialized")
+	}
 	if member, found, err := partnerTenantMembershipCache.Get(userID); err == nil && found {
 		return member, nil
 	}
@@ -90,7 +98,7 @@ func GetPartnerUserPlanRateLimit(userID int, group string) (int, error) {
 	if DB == nil {
 		return 0, errors.New("database is not initialized")
 	}
-	member, err := isPartnerTenantUser(userID)
+	member, err := IsPartnerTenantUser(userID)
 	if err != nil || !member {
 		return 0, err
 	}
@@ -193,7 +201,7 @@ func UpdatePartnerTenantStatus(id int64, status int) error {
 
 func GetPartnerTenantAccount(tenantId int64, externalUserId string) (*PartnerTenantAccount, error) {
 	var account PartnerTenantAccount
-	result := DB.Where("tenant_id = ? AND external_user_id = ? AND status = ?", tenantId, externalUserId, PartnerTenantStatusEnabled).Limit(1).Find(&account)
+	result := partnerTenantAccountQuery(DB, tenantId, externalUserId).Where("status = ?", PartnerTenantStatusEnabled).Limit(1).Find(&account)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -220,7 +228,7 @@ func ProvisionPartnerTenantAccount(tenantId int64, externalUserId, displayName s
 	if tenantId <= 0 || !IsValidPartnerTenantExternalUserID(externalUserId) {
 		return nil, errors.New("invalid partner tenant account")
 	}
-	result := &PartnerTenantProvisionedAccount{ExternalUserId: externalUserId}
+	var result *PartnerTenantProvisionedAccount
 	var accountUserID int
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var tenant PartnerTenant
@@ -230,18 +238,33 @@ func ProvisionPartnerTenantAccount(tenantId int64, externalUserId, displayName s
 			}
 			return err
 		}
+		var err error
+		result, accountUserID, err = provisionPartnerTenantAccountTx(tx, &tenant, externalUserId, displayName)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Publish membership only after the user and account transaction commits.
+	partnerTenantMembershipCache.Set(accountUserID, true)
+	return result, nil
+}
+
+// Caller holds the enabled tenant lock. This helper never opens a nested
+// transaction or publishes cache entries before the caller's commit.
+func provisionPartnerTenantAccountTx(tx *gorm.DB, tenant *PartnerTenant, externalUserId, displayName string) (*PartnerTenantProvisionedAccount, int, error) {
+	result := &PartnerTenantProvisionedAccount{ExternalUserId: externalUserId}
+	var accountUserID int
+	err := func() error {
 		var account PartnerTenantAccount
-		accountQuery := tx.Where("tenant_id = ? AND external_user_id = ?", tenantId, externalUserId).Limit(1).Find(&account)
+		accountQuery := partnerTenantAccountQuery(lockForUpdate(tx), tenant.Id, externalUserId).Limit(1).Find(&account)
 		if accountQuery.Error != nil {
 			return accountQuery.Error
 		}
 		if accountQuery.RowsAffected > 0 {
-			if account.Status != PartnerTenantStatusEnabled {
-				return ErrPartnerTenantAccountDisabled
-			}
-			var token Token
-			if err := tx.Where("id = ? AND user_id = ?", account.TokenId, account.UserId).First(&token).Error; err != nil || token.Status != common.TokenStatusEnabled {
-				return ErrPartnerTenantCredentialUnavailable
+			token, err := validatePartnerTenantAccountTx(tx, tenant, &account)
+			if err != nil {
+				return err
 			}
 			result.APIKey = "sk-" + token.Key
 			accountUserID = account.UserId
@@ -318,14 +341,40 @@ func ProvisionPartnerTenantAccount(tenantId int64, externalUserId, displayName s
 		result.Created = true
 		accountUserID = user.Id
 		return nil
-	})
-	if err != nil {
+	}()
+	return result, accountUserID, err
+}
+
+// A broken mapping is never repaired by issuing a new credential.
+func validatePartnerTenantAccountTx(tx *gorm.DB, tenant *PartnerTenant, account *PartnerTenantAccount) (*Token, error) {
+	if account.Status != PartnerTenantStatusEnabled {
+		return nil, ErrPartnerTenantAccountDisabled
+	}
+	var user User
+	if err := lockForUpdate(tx).Where("id = ?", account.UserId).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPartnerTenantAccountDisabled
+		}
 		return nil, err
 	}
-	// Publish membership only after the user and account transaction commits.
-	partnerTenantMembershipCache.Set(accountUserID, true)
-	return result, nil
+	if user.Status != common.UserStatusEnabled || user.Group != tenant.Group {
+		return nil, ErrPartnerTenantAccountDisabled
+	}
+	var token Token
+	if err := lockForUpdate(tx).Where("id = ? AND user_id = ?", account.TokenId, account.UserId).First(&token).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPartnerTenantCredentialUnavailable
+		}
+		return nil, err
+	}
+	if token.Status != common.TokenStatusEnabled || token.Key == "" || token.Group != tenant.Group || (token.ExpiredTime != -1 && token.ExpiredTime <= getDBTimestampOn(tx)) {
+		return nil, ErrPartnerTenantCredentialUnavailable
+	}
+	return &token, nil
 }
+
+// Retained for internal callers and existing tests.
+func isPartnerTenantUser(userID int) (bool, error) { return IsPartnerTenantUser(userID) }
 
 func CreatePartnerTenantAccountWithTx(tx *gorm.DB, account *PartnerTenantAccount) error {
 	if tx == nil || account == nil || account.TenantId <= 0 || account.UserId <= 0 || account.TokenId <= 0 || account.ExternalUserId == "" {
@@ -334,85 +383,53 @@ func CreatePartnerTenantAccountWithTx(tx *gorm.DB, account *PartnerTenantAccount
 	now := common.GetTimestamp()
 	account.CreatedAt = now
 	account.UpdatedAt = now
+	account.ExternalUserIdHash = partnerTenantHash(account.ExternalUserId)
 	return tx.Create(account).Error
 }
 
-func PartnerTenantSubscriptionRequestHash(externalUserId string, planId int) string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s\x00%d", externalUserId, planId)))
-	return hex.EncodeToString(sum[:])
-}
-
-func GrantPartnerTenantSubscription(tenantId int64, externalUserId string, planId int, idempotencyHash, requestHash string) (*UserSubscription, bool, error) {
+// Tenant and account locks serialize delivery of different orders for the same
+// account. Extending the term does not add quota to its current reset period.
+func grantPartnerTenantSubscriptionTx(tx *gorm.DB, userID int, plan *SubscriptionPlan, renewalID int) (*UserSubscription, bool, error) {
 	var subscription *UserSubscription
 	var created bool
-	err := DB.Transaction(func(tx *gorm.DB) error {
-		var tenant PartnerTenant
-		tenantQuery := lockForUpdate(tx).Where("id = ? AND status = ?", tenantId, PartnerTenantStatusEnabled).Limit(1).Find(&tenant)
-		if tenantQuery.Error != nil {
-			return tenantQuery.Error
-		}
-		if tenantQuery.RowsAffected == 0 {
-			return ErrPartnerTenantNotFound
-		}
-
-		var prior PartnerTenantSubscriptionGrant
-		priorQuery := tx.Where("tenant_id = ? AND idempotency_hash = ?", tenantId, idempotencyHash).Limit(1).Find(&prior)
-		if priorQuery.Error != nil {
-			return priorQuery.Error
-		}
-		if priorQuery.RowsAffected > 0 {
-			if prior.RequestHash != requestHash {
-				return ErrPartnerTenantIdempotencyConflict
-			}
-			var existing UserSubscription
-			if err := tx.Where("id = ?", prior.UserSubscriptionId).First(&existing).Error; err != nil {
-				return err
-			}
-			subscription = &existing
-			return nil
-		}
-
-		var account PartnerTenantAccount
-		accountQuery := lockForUpdate(tx).Where("tenant_id = ? AND external_user_id = ? AND status = ?", tenantId, externalUserId, PartnerTenantStatusEnabled).Limit(1).Find(&account)
-		if accountQuery.Error != nil {
-			return accountQuery.Error
-		}
-		if accountQuery.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
-		}
-		var user User
-		if err := tx.Select("id", "group").Where("id = ?", account.UserId).First(&user).Error; err != nil {
-			return err
-		}
-		if user.Group != tenant.Group {
-			return ErrPartnerTenantNotFound
-		}
-
-		var plan SubscriptionPlan
-		planQuery := tx.Where("id = ? AND partner_tenant_id = ? AND enabled = ?", planId, tenantId, true).Limit(1).Find(&plan)
-		if planQuery.Error != nil {
-			return planQuery.Error
-		}
-		if planQuery.RowsAffected == 0 || plan.DurationUnit != SubscriptionDurationMonth || plan.DurationValue != 1 ||
-			plan.QuotaResetPeriod != SubscriptionResetMonthly || plan.TotalAmount < 0 || plan.ApplicableGroup != tenant.Group ||
-			plan.AllowWalletOverflow == nil || *plan.AllowWalletOverflow {
-			return ErrPartnerTenantPlanNotFound
-		}
-
+	err := func() error {
 		now := getDBTimestampOn(tx)
 		var activeSubscription UserSubscription
-		activeQuery := lockForUpdate(tx).
-			Where("user_id = ? AND plan_id = ? AND status = ? AND end_time > ?", account.UserId, plan.Id, "active", now).
-			Order("end_time desc, id desc").Limit(1).Find(&activeSubscription)
+		query := lockForUpdate(tx).Where("user_id = ? AND plan_id = ?", userID, plan.Id)
+		if renewalID > 0 {
+			// Order creation accepted this specific renewal. Natural expiry is
+			// not a new purchase; cancellation/deletion still fail closed.
+			query = query.Where("id = ? AND start_time <= ? AND (status = ? OR (status = ? AND end_time <= ?))", renewalID, now, "active", "expired", now)
+		} else {
+			query = query.Where("status = ? AND start_time <= ? AND end_time > ?", "active", now, now)
+		}
+		activeQuery := query.Order("end_time desc, id desc").Limit(1).Find(&activeSubscription)
 		if activeQuery.Error != nil {
 			return activeQuery.Error
 		}
+		if renewalID > 0 && activeQuery.RowsAffected == 0 {
+			return ErrPartnerTenantPlanNotFound
+		}
 		createdSubscription := &activeSubscription
 		if activeQuery.RowsAffected > 0 {
-			if err := maybeResetUserSubscriptionWithPlanTx(tx, createdSubscription, &plan, now); err != nil {
+			if createdSubscription.Source != SubscriptionSourcePartner {
+				return ErrPartnerTenantPlanNotFound
+			}
+			base := createdSubscription.EndTime
+			if base <= now {
+				// A lapsed accepted renewal starts a fresh calendar month at
+				// delivery, on the same entitlement row (no purchase-limit bypass
+				// for unrelated orders and no quota carried from the old period).
+				base = now
+				createdSubscription.Status = "active"
+				createdSubscription.StartTime = now
+				createdSubscription.AmountUsed = 0
+				createdSubscription.LastResetTime = now
+				createdSubscription.NextResetTime = 0
+			} else if err := maybeResetUserSubscriptionWithPlanTx(tx, createdSubscription, plan, now); err != nil {
 				return err
 			}
-			newEndTime, err := calcPlanEndTime(time.Unix(createdSubscription.EndTime, 0), &plan)
+			newEndTime, err := calcPlanEndTime(time.Unix(base, 0), plan)
 			if err != nil {
 				return err
 			}
@@ -420,35 +437,23 @@ func GrantPartnerTenantSubscription(tenantId int64, externalUserId string, planI
 			if createdSubscription.NextResetTime == 0 {
 				base := time.Unix(now, 0)
 				createdSubscription.LastResetTime = now
-				createdSubscription.NextResetTime = calcNextResetTime(base, &plan, newEndTime)
+				createdSubscription.NextResetTime = calcNextResetTime(base, plan, newEndTime)
 			}
 			createdSubscription.UpdatedAt = common.GetTimestamp()
 			if err := tx.Save(createdSubscription).Error; err != nil {
 				return err
 			}
 		} else {
-			newSubscription, createErr := CreateUserSubscriptionFromPlanTx(tx, account.UserId, &plan, SubscriptionSourcePartner)
+			newSubscription, createErr := CreateUserSubscriptionFromPlanTx(tx, userID, plan, SubscriptionSourcePartner)
 			if createErr != nil {
 				return createErr
 			}
 			createdSubscription = newSubscription
 		}
-		grant := &PartnerTenantSubscriptionGrant{
-			TenantId:           tenantId,
-			IdempotencyHash:    idempotencyHash,
-			RequestHash:        requestHash,
-			ExternalUserId:     externalUserId,
-			PlanId:             planId,
-			UserSubscriptionId: createdSubscription.Id,
-			CreatedAt:          common.GetTimestamp(),
-		}
-		if err := tx.Create(grant).Error; err != nil {
-			return err
-		}
 		subscription = createdSubscription
 		created = activeQuery.RowsAffected == 0
 		return nil
-	})
+	}()
 	if err != nil {
 		return nil, false, err
 	}

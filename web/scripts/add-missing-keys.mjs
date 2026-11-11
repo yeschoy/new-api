@@ -21,6 +21,48 @@ const newKeys = {
     'Save group order': 'Save group order',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
       'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.',
+    'Checkout access has expired': 'Checkout access has expired',
+    'Subscription checkout': 'Subscription checkout',
+    'Checkout access expires': 'Checkout access expires',
+    'Payment received': 'Payment received',
+    'Subscription delivered. You can return to the merchant.':
+      'Subscription delivered. You can return to the merchant.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Delivery is pending. Do not pay again; delivery continues even if you close this page.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'This payment is no longer available. Return to the merchant to check your order.',
+    'Awaiting payment confirmation': 'Awaiting payment confirmation',
+    'Payment QR code': 'Payment QR code',
+    'Open secure payment page': 'Open secure payment page',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Payment details are not ready. Return to the merchant if this persists.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.',
+    'Checkout access is missing, invalid or expired':
+      'Checkout access is missing, invalid or expired',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Return to the merchant to check this order. Do not pay again if you have already paid.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Only verified payment activates your subscription. This page cannot confirm payment.',
+    'Great models.': 'Great models.',
+    'Within reach.': 'Within reach.',
+    'For each full top-up of': 'For each full top-up of',
+    'Bonus usage credit': 'Bonus usage credit',
+    'Per order · Bonus credit is not withdrawable':
+      'Per order · Bonus credit is not withdrawable',
+    'Offer rules': 'Offer rules',
+    'Double 11 special': 'Double 11 special',
+    'Double 11 top-up special': 'Double 11 top-up special',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Every CNY 100 topped up earns {{reward}} in bonus credit',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Complete hundreds per order only; remainders do not carry over.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.',
+    'Check your wallet for current rewards.':
+      'Check your wallet for current rewards.',
+    'Offer details will appear when the campaign starts.':
+      'Offer details will appear when the campaign starts.',
     'New plan': 'New plan',
     'Show run history': 'Show run history',
     'Hide run history': 'Hide run history',
@@ -74,6 +116,47 @@ const newKeys = {
     'Save group order': '保存分组顺序',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
       '拖拽或点击箭头调整已保存分组的顺序，保存后对所有用户生效。运行历史仍按时间倒序排列。',
+    'Checkout access has expired': '收银台访问已过期',
+    'Subscription checkout': '订阅收银台',
+    'Checkout access expires': '收银台访问到期时间',
+    'Payment received': '已确认收款',
+    'Subscription delivered. You can return to the merchant.':
+      '订阅已开通，您可以返回商户。',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      '正在开通订阅，请勿重复付款。关闭页面后仍会继续处理。',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      '当前支付已不可用，请返回商户查看订单。',
+    'Awaiting payment confirmation': '等待支付确认',
+    'Payment QR code': '付款二维码',
+    'Open secure payment page': '打开安全支付页面',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      '支付信息尚未就绪。如持续出现，请返回商户处理。',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      '暂时无法刷新订单状态，这不代表支付失败。请重试查询或联系商户确认后再付款。',
+    'Checkout access is missing, invalid or expired':
+      '收银台访问凭证缺失、无效或已过期',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      '请返回商户查看此订单。如已付款，请勿重复支付。',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      '仅经核实的付款会开通订阅，本页面无法确认收款。',
+    'Great models.': '好模型，',
+    'Within reach.': '触手可及。',
+    'For each full top-up of': '单笔每满',
+    'Bonus usage credit': '额外赠送额度',
+    'Per order · Bonus credit is not withdrawable':
+      '单笔计算 · 赠送额度不可提现',
+    'Offer rules': '活动规则',
+    'Double 11 special': '双11特惠',
+    'Double 11 top-up special': '双11充值特惠',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '充值每满 100 元，赠 {{reward}} 使用额度',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '单笔订单按完整的 100 元计算，零头不累计。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '赠送额度不可提现，参与条件与次数限制以钱包页面为准。',
+    'Check your wallet for current rewards.': '前往钱包查看当前充值赠送规则。',
+    'Offer details will appear when the campaign starts.':
+      '活动开始后展示具体赠送规则。',
     'New plan': '新建计划',
     'Show run history': '查看运行历史',
     'Hide run history': '收起运行历史',
@@ -127,6 +210,48 @@ const newKeys = {
     'Save group order': '儲存分組順序',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
       '拖曳或點擊箭頭調整已儲存分組的順序，儲存後對所有使用者生效。執行歷史仍依時間由新到舊排列。',
+    'Checkout access has expired': '收銀台存取已過期',
+    'Subscription checkout': '訂閱收銀台',
+    'Checkout access expires': '收銀台存取到期時間',
+    'Payment received': '已確認收款',
+    'Subscription delivered. You can return to the merchant.':
+      '訂閱已開通，您可以返回商戶。',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      '正在開通訂閱，請勿重複付款。關閉頁面後仍會繼續處理。',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      '目前已無法支付，請返回商戶查看訂單。',
+    'Awaiting payment confirmation': '等待付款確認',
+    'Payment QR code': '付款 QR Code',
+    'Open secure payment page': '開啟安全付款頁面',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      '付款資訊尚未就緒。如持續出現，請返回商戶處理。',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      '暫時無法更新訂單狀態，這不代表付款失敗。請重試查詢或聯絡商戶確認後再付款。',
+    'Checkout access is missing, invalid or expired':
+      '收銀台存取憑證遺失、無效或已過期',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      '請返回商戶查看此訂單。如已付款，請勿重複支付。',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      '僅經核實的付款會開通訂閱，本頁面無法確認收款。',
+    'Great models.': '好模型，',
+    'Within reach.': '觸手可及。',
+    'For each full top-up of': '單筆每滿',
+    'Bonus usage credit': '額外贈送額度',
+    'Per order · Bonus credit is not withdrawable':
+      '單筆計算 · 贈送額度不可提領',
+    'Offer rules': '活動規則',
+    'Double 11 special': '雙11優惠',
+    'Double 11 top-up special': '雙11儲值優惠',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '儲值每滿人民幣 100 元，贈 {{reward}} 使用額度',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '每筆訂單以完整的人民幣 100 元計算，餘額不累計。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '贈送額度不可提領，參加條件與次數限制以錢包頁面為準。',
+    'Check your wallet for current rewards.':
+      '前往錢包查看目前的儲值贈送規則。',
+    'Offer details will appear when the campaign starts.':
+      '活動開始後將顯示詳細贈送規則。',
     'New plan': '新增計畫',
     'Show run history': '查看執行歷史',
     'Hide run history': '收起執行歷史',
@@ -180,6 +305,48 @@ const newKeys = {
     'Save group order': 'Enregistrer l’ordre',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
       'Glissez les groupes enregistrés ou utilisez les flèches. Enregistrez pour appliquer l’ordre à tous. L’historique reste du plus récent au plus ancien.',
+    'Checkout access has expired': 'L’accès au paiement a expiré',
+    'Subscription checkout': 'Paiement de l’abonnement',
+    'Checkout access expires': 'Expiration de l’accès au paiement',
+    'Payment received': 'Paiement reçu',
+    'Subscription delivered. You can return to the merchant.':
+      'Abonnement activé. Vous pouvez retourner chez le marchand.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Activation en cours. Ne payez pas à nouveau ; le traitement continue après la fermeture de cette page.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'Ce paiement n’est plus disponible. Consultez votre commande chez le marchand.',
+    'Awaiting payment confirmation': 'En attente de confirmation du paiement',
+    'Payment QR code': 'Code QR de paiement',
+    'Open secure payment page': 'Ouvrir le paiement sécurisé',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Les informations de paiement ne sont pas prêtes. Si cela persiste, contactez le marchand.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Impossible d’actualiser la commande. Cela ne signifie pas un échec du paiement. Réessayez ou vérifiez auprès du marchand avant de payer.',
+    'Checkout access is missing, invalid or expired':
+      'Accès au paiement absent, invalide ou expiré',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Consultez cette commande chez le marchand. Ne payez pas à nouveau si vous avez déjà payé.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Seul un paiement vérifié active l’abonnement. Cette page ne peut pas confirmer un paiement.',
+    'Great models.': 'Les meilleurs modèles.',
+    'Within reach.': 'À votre portée.',
+    'For each full top-up of': 'Par tranche rechargée de',
+    'Bonus usage credit': 'Crédit bonus',
+    'Per order · Bonus credit is not withdrawable':
+      'Par commande · Bonus non retirable',
+    'Offer rules': 'Conditions',
+    'Double 11 special': 'Offre du 11.11',
+    'Double 11 top-up special': 'Offre de recharge du 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Pour 100 CNY rechargés, recevez {{reward}} de crédit bonus',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Par tranches entières de 100 CNY par commande ; le reste ne se cumule pas.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Crédit bonus non retirable. Conditions et limites dans votre portefeuille.',
+    'Check your wallet for current rewards.':
+      'Consultez votre portefeuille pour les bonus en cours.',
+    'Offer details will appear when the campaign starts.':
+      'Les détails seront affichés au début de la campagne.',
     'New plan': 'Nouveau programme',
     'Show run history': 'Voir l’historique',
     'Hide run history': 'Masquer l’historique',
@@ -234,6 +401,48 @@ const newKeys = {
     'Save group order': '表示順を保存',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
       'ドラッグまたは矢印で保存済みグループを並べ替えます。保存すると全ユーザーに反映されます。実行履歴は新しい順のままです。',
+    'Checkout access has expired': '支払いページのアクセス期限が切れました',
+    'Subscription checkout': 'サブスクリプションのお支払い',
+    'Checkout access expires': '支払いページのアクセス期限',
+    'Payment received': '入金確認済み',
+    'Subscription delivered. You can return to the merchant.':
+      'サブスクリプションが有効になりました。販売元にお戻りください。',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      '有効化を処理中です。再度お支払いしないでください。このページを閉じても処理は続きます。',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'このお支払いは利用できません。販売元で注文をご確認ください。',
+    'Awaiting payment confirmation': '支払い確認待ち',
+    'Payment QR code': '支払い用QRコード',
+    'Open secure payment page': '安全な支払いページを開く',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      '支払い情報は準備中です。解消しない場合は販売元にお問い合わせください。',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      '注文状態を更新できません。支払い失敗を意味するものではありません。再照会するか、販売元に確認してからお支払いください。',
+    'Checkout access is missing, invalid or expired':
+      '支払いページのアクセス情報がないか、無効または期限切れです',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      '販売元でこの注文をご確認ください。お支払い済みの場合は再度お支払いしないでください。',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      '検証済みの入金のみがサブスクリプションを有効にします。このページでは入金を確定できません。',
+    'Great models.': '優れたモデルを、',
+    'Within reach.': 'もっと身近に。',
+    'For each full top-up of': '1注文のチャージ額ごとに',
+    'Bonus usage credit': '追加利用クレジット',
+    'Per order · Bonus credit is not withdrawable':
+      '注文単位で計算 · 特典は出金不可',
+    'Offer rules': '特典条件',
+    'Double 11 special': '11.11特典',
+    'Double 11 top-up special': '11.11チャージ特典',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '100人民元のチャージごとに{{reward}}の利用クレジットを進呈',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '1注文につき100人民元単位で計算し、端数は繰り越しません。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '特典クレジットは出金できません。対象条件と回数制限はウォレットをご確認ください。',
+    'Check your wallet for current rewards.':
+      '現在の特典はウォレットでご確認ください。',
+    'Offer details will appear when the campaign starts.':
+      'キャンペーン開始後に特典の詳細を表示します。',
     'New plan': 'プランを新規作成',
     'Show run history': '実行履歴を表示',
     'Hide run history': '実行履歴を閉じる',
@@ -287,6 +496,48 @@ const newKeys = {
     'Save group order': 'Сохранить порядок',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
       'Перетащите сохранённые группы или используйте стрелки. Сохраните порядок для всех пользователей. История остаётся от новых запусков к старым.',
+    'Checkout access has expired': 'Срок доступа к оплате истёк',
+    'Subscription checkout': 'Оплата подписки',
+    'Checkout access expires': 'Срок доступа к оплате',
+    'Payment received': 'Оплата получена',
+    'Subscription delivered. You can return to the merchant.':
+      'Подписка активирована. Вы можете вернуться к продавцу.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Активация ожидается. Не платите повторно: обработка продолжится и после закрытия страницы.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'Эта оплата больше недоступна. Проверьте заказ у продавца.',
+    'Awaiting payment confirmation': 'Ожидание подтверждения оплаты',
+    'Payment QR code': 'QR-код для оплаты',
+    'Open secure payment page': 'Открыть защищённую страницу оплаты',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Данные для оплаты ещё не готовы. Если проблема сохраняется, обратитесь к продавцу.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Не удалось обновить статус заказа. Это не означает сбой оплаты. Повторите проверку или уточните у продавца перед оплатой.',
+    'Checkout access is missing, invalid or expired':
+      'Доступ к оплате отсутствует, недействителен или истёк',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Проверьте этот заказ у продавца. Если вы уже заплатили, не платите повторно.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Подписку активирует только проверенная оплата. Эта страница не может подтвердить платёж.',
+    'Great models.': 'Лучшие модели.',
+    'Within reach.': 'Ближе, чем кажется.',
+    'For each full top-up of': 'За каждые полные',
+    'Bonus usage credit': 'Бонусный кредит',
+    'Per order · Bonus credit is not withdrawable':
+      'На заказ · Бонус нельзя вывести',
+    'Offer rules': 'Условия',
+    'Double 11 special': 'Акция 11.11',
+    'Double 11 top-up special': 'Бонус за пополнение к 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'За каждые 100 CNY пополнения — {{reward}} бонусного кредита',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Учитываются полные 100 CNY в одном заказе; остаток не переносится.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Бонусный кредит нельзя вывести. Условия и лимиты указаны в кошельке.',
+    'Check your wallet for current rewards.':
+      'Текущие бонусы за пополнение смотрите в кошельке.',
+    'Offer details will appear when the campaign starts.':
+      'Подробные условия появятся после начала акции.',
     'New plan': 'Новый план',
     'Show run history': 'История запусков',
     'Hide run history': 'Скрыть историю',
@@ -340,6 +591,48 @@ const newKeys = {
     'Save group order': 'Lưu thứ tự nhóm',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
       'Kéo hoặc dùng mũi tên để sắp xếp các nhóm đã lưu. Lưu để áp dụng cho mọi người. Lịch sử vẫn hiển thị lần chạy mới nhất trước.',
+    'Checkout access has expired': 'Quyền truy cập thanh toán đã hết hạn',
+    'Subscription checkout': 'Thanh toán đăng ký',
+    'Checkout access expires': 'Hạn truy cập trang thanh toán',
+    'Payment received': 'Đã nhận thanh toán',
+    'Subscription delivered. You can return to the merchant.':
+      'Đã kích hoạt đăng ký. Bạn có thể quay lại nhà bán hàng.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Đang chờ kích hoạt. Đừng thanh toán lại; quá trình xử lý vẫn tiếp tục khi bạn đóng trang.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'Thanh toán này không còn khả dụng. Hãy quay lại nhà bán hàng để kiểm tra đơn.',
+    'Awaiting payment confirmation': 'Đang chờ xác nhận thanh toán',
+    'Payment QR code': 'Mã QR thanh toán',
+    'Open secure payment page': 'Mở trang thanh toán an toàn',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Thông tin thanh toán chưa sẵn sàng. Nếu vẫn tiếp diễn, hãy liên hệ nhà bán hàng.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Không thể cập nhật trạng thái đơn. Điều này không có nghĩa thanh toán thất bại. Hãy thử tra cứu lại hoặc hỏi nhà bán hàng trước khi trả tiền.',
+    'Checkout access is missing, invalid or expired':
+      'Quyền truy cập thanh toán bị thiếu, không hợp lệ hoặc đã hết hạn',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Quay lại nhà bán hàng để kiểm tra đơn này. Đừng thanh toán lại nếu đã trả tiền.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Chỉ thanh toán đã xác minh mới kích hoạt đăng ký. Trang này không thể xác nhận thanh toán.',
+    'Great models.': 'Mô hình hàng đầu.',
+    'Within reach.': 'Trong tầm tay.',
+    'For each full top-up of': 'Mỗi lần nạp đủ',
+    'Bonus usage credit': 'Tín dụng thưởng thêm',
+    'Per order · Bonus credit is not withdrawable':
+      'Tính theo đơn · Không thể rút tiền thưởng',
+    'Offer rules': 'Thể lệ',
+    'Double 11 special': 'Ưu đãi 11.11',
+    'Double 11 top-up special': 'Ưu đãi nạp tiền 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Nạp mỗi 100 CNY, nhận {{reward}} tín dụng thưởng',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Tính theo từng 100 CNY trọn vẹn trong mỗi đơn; phần lẻ không cộng dồn.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Tín dụng thưởng không thể rút. Xem điều kiện và giới hạn trong ví.',
+    'Check your wallet for current rewards.':
+      'Xem ưu đãi nạp tiền hiện tại trong ví.',
+    'Offer details will appear when the campaign starts.':
+      'Chi tiết ưu đãi sẽ hiển thị khi chương trình bắt đầu.',
     'New plan': 'Tạo kế hoạch',
     'Show run history': 'Xem lịch sử chạy',
     'Hide run history': 'Ẩn lịch sử chạy',

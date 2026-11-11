@@ -166,6 +166,10 @@ func PartnerTenantSubscriptionQuota(c *gin.Context) {
 		return
 	}
 	externalUserID := strings.TrimSpace(c.Param("external_user_id"))
+	if !model.IsValidPartnerTenantExternalUserID(externalUserID) {
+		writePartnerTenantAPIError(c, http.StatusBadRequest, "invalid_request", "external_user_id is invalid")
+		return
+	}
 	account, err := model.GetPartnerTenantAccount(tenant.Id, externalUserID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		writePartnerTenantAPIError(c, http.StatusNotFound, "account_not_found", "account not found")
@@ -232,76 +236,6 @@ func PartnerTenantListPlans(c *gin.Context) {
 		plans[i].NormalizeDefaults()
 	}
 	c.JSON(http.StatusOK, gin.H{"plans": plans})
-}
-
-type partnerTenantGrantSubscriptionRequest struct {
-	PlanId int `json:"plan_id"`
-}
-
-func PartnerTenantGrantSubscription(c *gin.Context) {
-	tenant := middleware.PartnerTenantFromContext(c)
-	if tenant == nil {
-		writePartnerTenantAPIError(c, http.StatusUnauthorized, "invalid_partner_secret", "partner authentication failed")
-		return
-	}
-	externalUserID := strings.TrimSpace(c.Param("external_user_id"))
-	if !model.IsValidPartnerTenantExternalUserID(externalUserID) {
-		writePartnerTenantAPIError(c, http.StatusBadRequest, "invalid_request", "external_user_id is invalid")
-		return
-	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<10)
-	decoder := json.NewDecoder(c.Request.Body)
-	decoder.DisallowUnknownFields()
-	var req partnerTenantGrantSubscriptionRequest
-	if err := decoder.Decode(&req); err != nil {
-		writePartnerTenantAPIError(c, http.StatusBadRequest, "invalid_request", "request body is invalid")
-		return
-	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF || req.PlanId <= 0 {
-		writePartnerTenantAPIError(c, http.StatusBadRequest, "invalid_request", "request body must contain a positive plan_id")
-		return
-	}
-	idempotencyHash, err := service.ValidatePartnerOAuthIdempotencyKey(c.GetHeader("Idempotency-Key"))
-	if err != nil {
-		writePartnerTenantAPIError(c, http.StatusBadRequest, "invalid_request", "Idempotency-Key header is required and must be 16-64 URL-safe characters")
-		return
-	}
-	requestHash := model.PartnerTenantSubscriptionRequestHash(externalUserID, req.PlanId)
-	subscription, created, err := model.GrantPartnerTenantSubscription(tenant.Id, externalUserID, req.PlanId, idempotencyHash, requestHash)
-	switch {
-	case errors.Is(err, gorm.ErrRecordNotFound):
-		writePartnerTenantAPIError(c, http.StatusNotFound, "account_not_found", "account not found")
-		return
-	case errors.Is(err, model.ErrPartnerTenantPlanNotFound):
-		writePartnerTenantAPIError(c, http.StatusNotFound, "plan_not_found", "plan not found")
-		return
-	case errors.Is(err, model.ErrPartnerTenantIdempotencyConflict):
-		writePartnerTenantAPIError(c, http.StatusConflict, "idempotency_conflict", "Idempotency-Key was used with a different request")
-		return
-	case errors.Is(err, model.ErrPartnerTenantNotFound):
-		writePartnerTenantAPIError(c, http.StatusUnauthorized, "invalid_partner_secret", "partner authentication failed")
-		return
-	case err != nil:
-		writePartnerTenantAPIError(c, http.StatusInternalServerError, "server_error", "please try again later")
-		return
-	}
-	status := http.StatusOK
-	if created {
-		status = http.StatusCreated
-	}
-	c.JSON(status, gin.H{
-		"external_user_id": externalUserID,
-		"subscription_id":  subscription.Id,
-		"plan_id":          subscription.PlanId,
-		"status":           subscription.Status,
-		"start_time":       subscription.StartTime,
-		"end_time":         subscription.EndTime,
-		"quota_total":      subscription.AmountTotal,
-		"quota_used":       subscription.AmountUsed,
-		"quota_unlimited":  subscription.AmountTotal == 0,
-		"next_reset_time":  subscription.NextResetTime,
-		"created":          created,
-	})
 }
 
 type provisionPartnerTenantAccountRequest struct {

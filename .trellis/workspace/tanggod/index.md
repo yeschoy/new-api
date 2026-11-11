@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~330 | Active |
+| `journal-1.md` | ~359 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -30,6 +30,7 @@
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
 | 11 | 2026-11-11 | Fix explicit IQ plan visibility and deletion | `a186b3e4f` | `iq-test` |
+| 10 | 2026-11-11 | Tenant paid checkout implementation; DB verification blocked | `a117c925f` | `feat/partner-accounts` |
 | 9 | 2026-11-11 | IQ group tasks, prompt pools and retained run gallery | `187fc781d` | `iq-test` |
 | 8 | 2026-11-09 | Fix PostgreSQL IQ migration startup failure | `2089840ad` | `iq-test` |
 | 7 | 2026-11-09 | Scheduled group IQ tests and isolated gallery | `11d7d3d0b` | `iq-test` |

@@ -1,0 +1,7 @@
+$ rsbuild preview --host "127.0.0.1" --port "3011"
+
+Rsbuild v2.1.6
+
+  ➜  Local:    http://127.0.0.1:3011/
+
+error: script "preview" exited with code 143

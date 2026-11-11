@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/11-11-adspower-flaship-embedded-purchase/prd.md","reason":"Converged research and future product contract; no Tenant direct-grant compatibility and no business implementation before final approval"}
+{"file":".trellis/tasks/11-11-adspower-flaship-embedded-purchase/design.md","reason":"Selected merchant UI plus platform-hosted checkout, paid-order-only fulfillment and no dual-mode grant; unrelated recharge/OAuth products remain separate"}
+{"file":".trellis/tasks/11-11-adspower-flaship-embedded-purchase/research/REPORT.zh-CN.md","reason":"Primary public-code evidence, competitor fact/inference boundaries, proposed interfaces and verification material"}
+{"file":".trellis/spec/backend/partner-server-accounts.md","reason":"Existing server-payment flow is wallet recharge, not paid Tenant subscription purchase"}

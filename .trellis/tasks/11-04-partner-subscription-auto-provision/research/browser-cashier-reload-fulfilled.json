@@ -1,0 +1,189 @@
+[
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "url": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "network",
+      "unroute",
+      "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "unrouted": "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "network",
+      "route",
+      "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "--body",
+      "[REDACTED]"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "routed": "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "open",
+      "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "BA9DC5C39949C935180F634D10DA321E",
+      "title": "野菜",
+      "url": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--text",
+      "订阅已开通",
+      "--timeout",
+      "15000"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "text": "订阅已开通",
+      "waited": "text"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "refs": {
+        "e5": {
+          "name": "",
+          "role": "generic"
+        },
+        "e6": {
+          "name": "订阅收银台",
+          "role": "heading"
+        },
+        "e7": {
+          "name": "商户专属模型月套餐",
+          "role": "heading"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- generic \"订阅收银台商户专属模型月套餐99.00 CNY订单号PTO0123456789ABCDEFGHIJKLMNOPQRSTUV付款方式alipay收银台访问到期时间2029/11/22 08:00:00已\" [ref=e5] clickable [onclick]\n  - heading \"订阅收银台\" [level=1, ref=e6]\n  - heading \"商户专属模型月套餐\" [level=2, ref=e7]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/Users/lyh_god/GolandProjects/new-api/.trellis/tasks/11-04-partner-subscription-auto-provision/research/cashier-fulfilled.png"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/Users/lyh_god/GolandProjects/new-api/.trellis/tasks/11-04-partner-subscription-auto-provision/research/cashier-fulfilled.png"
+    },
+    "success": true
+  }
+]

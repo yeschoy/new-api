@@ -16,11 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import i18next from 'i18next'
 import { describe, expect, it } from 'vitest'
 
 import type { SubscriptionPlan } from '../../types'
 import {
   formValuesToPlanPayload,
+  getPlanFormSchema,
   PLAN_FORM_DEFAULTS,
   planToFormValues,
 } from '../plan-form'
@@ -90,6 +92,87 @@ describe('plan applicability form', () => {
       downgrade_group: '',
       applicable_group: 'partner-a',
     })
+  })
+
+  it.each([
+    { partnerTenantId: 42, currency: 'CNY' },
+    { partnerTenantId: 0, currency: 'USD' },
+  ])(
+    'submits $currency purchase prices without converting price or quota',
+    ({ partnerTenantId, currency }) => {
+      const values = planToFormValues({
+        ...plan,
+        partner_tenant_id: partnerTenantId,
+        currency,
+        price_amount: 9.99,
+      })
+      expect(values.price_amount).toBe(9.99)
+      expect(formValuesToPlanPayload(values).plan).toMatchObject({
+        partner_tenant_id: partnerTenantId,
+        currency,
+        price_amount: 9.99,
+        total_amount: plan.total_amount,
+      })
+    }
+  )
+
+  it('requires a new CNY price instead of relabelling a non-CNY partner price', () => {
+    const values = planToFormValues({ ...plan, partner_tenant_id: 42 })
+    const schema = getPlanFormSchema(i18next.t)
+
+    expect(values.price_amount).toBe(0)
+    expect(schema.safeParse({ ...values, title: 'Renamed plan' }).success).toBe(
+      false
+    )
+
+    const repriced = schema.parse({ ...values, price_amount: 69.99 })
+    expect(formValuesToPlanPayload(repriced).plan).toMatchObject({
+      currency: 'CNY',
+      price_amount: 69.99,
+      total_amount: plan.total_amount,
+    })
+  })
+
+  it.each([0, -1, 1.001])(
+    'rejects the invalid CNY partner price %s before submission',
+    (priceAmount) => {
+      const result = getPlanFormSchema(i18next.t).safeParse({
+        ...PLAN_FORM_DEFAULTS,
+        partner_tenant_id: 42,
+        title: 'Tenant CNY plan',
+        price_amount: priceAmount,
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(
+          result.error.issues.some((issue) => issue.path[0] === 'price_amount')
+        ).toBe(true)
+      }
+    }
+  )
+
+  it.each([0.01, 0.29, 9.99])(
+    'accepts the exact-cent CNY price %s',
+    (priceAmount) => {
+      expect(
+        getPlanFormSchema(i18next.t).safeParse({
+          ...PLAN_FORM_DEFAULTS,
+          partner_tenant_id: 42,
+          title: 'Tenant CNY plan',
+          price_amount: priceAmount,
+        }).success
+      ).toBe(true)
+    }
+  )
+
+  it('keeps ordinary zero-price plans valid', () => {
+    expect(
+      getPlanFormSchema(i18next.t).safeParse({
+        ...PLAN_FORM_DEFAULTS,
+        title: 'Ordinary plan',
+        price_amount: 0,
+      }).success
+    ).toBe(true)
   })
 
   it('preserves partner plan request limits in the form and payload', () => {

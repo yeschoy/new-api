@@ -1,0 +1,77 @@
+[
+  {
+    "command": [
+      "open",
+      "https://app.adspower.com/login?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "B42E013D98CF0EE02227DF172357DDB0",
+      "title": "AdsPower Browser",
+      "url": "https://app.adspower.com/login?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://app.adspower.com/login?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F",
+      "refs": {},
+      "removedRefs": [],
+      "snapshot": "(no interactive elements)"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify({url:location.href,title:document.title,scripts:Array.from(document.scripts).map(s=>s.src).filter(Boolean),preloads:Array.from(document.querySelectorAll('link[rel=preload]')).map(x=>({as:x.as,href:x.href})),frames:Array.from(document.querySelectorAll('iframe')).map(x=>x.src),text:document.body.innerText.slice(0,3500)})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://app.adspower.com/login?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F",
+      "result": "{\"url\":\"https://app.adspower.com/login?rel=official_website&lang=en&from=https%3A%2F%2Fwww.adspower.com%2F\",\"title\":\"AdsPower Browser\",\"scripts\":[\"https://app.adspower.com/static/js/index.BNd-KH2l.js\"],\"preloads\":[],\"frames\":[],\"text\":\"\"}"
+    },
+    "success": true
+  }
+]

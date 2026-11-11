@@ -1,0 +1,8 @@
+{"file":".trellis/tasks/11-04-partner-subscription-auto-provision/prd.md","reason":"Verify R1-R11 and approved no-compatibility scope without unrelated product or data deletion"}
+{"file":".trellis/tasks/11-04-partner-subscription-auto-provision/design.md","reason":"Check payment evidence, amount/currency, cashier capability, API alignment and recovery invariants"}
+{"file":".trellis/tasks/11-04-partner-subscription-auto-provision/implement.md","reason":"Confirm verification actually run, Docker-only DB runner, skipped tests honestly reported"}
+{"file":".agents/rules/billing.md","reason":"Mandatory billing rules and no negative/overflow charge or wallet fallback"}
+{"file":".trellis/spec/backend/subscription-group-billing.md","reason":"Preserve funding/group/retry and MySQL current-read invariants"}
+{"file":".trellis/spec/backend/partner-server-accounts.md","reason":"Prevent unintended changes to independent recharge/OAuth identity and payment products"}
+{"file":".agents/skills/i18n-translate/SKILL.md","reason":"Check new UI keys in all seven locales and script-only locale writes"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace backend DTO through dedicated cashier client, UI and merchant docs"}

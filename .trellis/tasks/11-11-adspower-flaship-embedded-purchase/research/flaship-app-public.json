@@ -1,0 +1,146 @@
+[
+  {
+    "command": [
+      "open",
+      "https://app.flaship.net"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "B42E013D98CF0EE02227DF172357DDB0",
+      "title": "FlashIP",
+      "url": "https://app.flaship.net/auth/login?returnTo=%2Fdashboard"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://app.flaship.net/auth/login?returnTo=%2Fdashboard",
+      "refs": {
+        "e227": {
+          "name": "",
+          "role": "generic"
+        },
+        "e228": {
+          "name": "",
+          "role": "link"
+        },
+        "e229": {
+          "name": "FlashIP",
+          "role": "link"
+        },
+        "e230": {
+          "name": "Language selector",
+          "role": "button"
+        },
+        "e231": {
+          "name": "登录 FlashIP",
+          "role": "heading"
+        },
+        "e232": {
+          "name": "注册",
+          "role": "button"
+        },
+        "e233": {
+          "name": "数据采集与业务增长",
+          "role": "heading"
+        },
+        "e234": {
+          "name": "",
+          "role": "LabelText"
+        },
+        "e235": {
+          "name": "忘记密码？",
+          "role": "button"
+        },
+        "e236": {
+          "name": "登录",
+          "role": "button"
+        },
+        "e237": {
+          "name": "使用 Google 继续",
+          "role": "button"
+        },
+        "e238": {
+          "name": "",
+          "role": "generic"
+        },
+        "e239": {
+          "name": "记住账密",
+          "role": "checkbox"
+        },
+        "e240": {
+          "name": "",
+          "role": "generic"
+        },
+        "e241": {
+          "name": "密码",
+          "role": "textbox"
+        },
+        "e242": {
+          "name": "",
+          "role": "button"
+        },
+        "e243": {
+          "name": "账号",
+          "role": "textbox"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- generic \"中文（简体）全球代理，助力数据采集与业务增长使用住宅、ISP 和数据中心代理，采集网络数据、探索本地市场，推动业务增长。登录 FlashIP欢迎回来！请登录以继续。账号账号密码密码记住账密忘记密码？登\" [ref=e227] clickable [onclick]\n  - link [ref=e228]\n  - link \"FlashIP\" [ref=e229]\n  - button \"Language selector\" [ref=e230]\n  - heading \"数据采集与业务增长\" [level=1, ref=e233]\n  - heading \"登录 FlashIP\" [level=5, ref=e231]\n  - generic \"账号\" [ref=e240] clickable [onclick]\n    - textbox \"账号\" [ref=e243]\n  - generic \"密码\" [ref=e238] clickable [onclick]\n    - textbox \"密码\" [ref=e241]\n    - button [ref=e242]\n  - LabelText \"记住账密\" [ref=e234] clickable [cursor:pointer]\n    - checkbox \"记住账密\" [checked=false, ref=e239]\n  - button \"忘记密码？\" [ref=e235]\n  - button \"登录\" [ref=e236]\n  - button \"使用 Google 继续\" [ref=e237]\n  - button \"注册\" [ref=e232]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify({url:location.href,title:document.title,text:document.body.innerText.slice(0,7000),scripts:Array.from(document.scripts).map(s=>s.src).filter(Boolean),preloads:Array.from(document.querySelectorAll('link[rel=modulepreload]')).map(x=>x.href),frames:Array.from(document.querySelectorAll('iframe')).map(x=>x.src)})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://app.flaship.net/auth/login?returnTo=%2Fdashboard",
+      "result": "{\"url\":\"https://app.flaship.net/auth/login?returnTo=%2Fdashboard\",\"title\":\"FlashIP\",\"text\":\"中文（简体）\\n\\n全球代理，助力\\n\\n数据采集与业务增长\\n\\n使用住宅、ISP 和数据中心代理，采集网络数据、探索本地市场，推动业务增长。\\n\\n登录 FlashIP\\n\\n欢迎回来！请登录以继续。\\n\\n账号\\n账号\\n密码\\n密码\\n记住账密\\n忘记密码？\\n登录\\n或\\n使用 Google 继续\\n\\n没有账号？\\n\\n注册\",\"scripts\":[\"https://plugin-code.salesmartly.com/chat/widget-v2/code/modern/install.js\",\"https://plugin-code.salesmartly.com/chat/widget-v2/code/install.js\",\"https://app.flaship.net/assets/index-ni4ttVJP.js\",\"https://plugin-code.salesmartly.com/js/project_420706_861133_1789542311.js\",\"https://console.data4.net/static/js/tracker.js\",\"https://www.googletagmanager.com/gtag/js?id=G-PC7DR5W7MR\",\"https://plugin-code.salesmartly.com/chat/widget-v2/code/55a9f80e9b3f418f/modern-runtime-probe.js\"],\"preloads\":[\"https://app.flaship.net/assets/react-vendor-CtVG_8mp.js\",\"https://app.flaship.net/assets/mui-vendor-d-7yZaJw.js\",\"https://app.flaship.net/assets/animation-vendor-BORT1h0y.js\",\"https://app.flaship.net/assets/editor-vendor-BkhC2fZQ.js\",\"https://app.flaship.net/assets/sentry-C0pUR2tt.js\",\"https://app.flaship.net/assets/sentry-vendor-D6f_YVMC.js\",\"https://app.flaship.net/assets/motion-lazy-BgQL69Lj.js\",\"https://app.flaship.net/assets/confirm-dialog-Bw8Wak4o.js\",\"https://app.flaship.net/assets/settings-drawer-Bfl9uO9P.js\",\"https://app.flaship.net/assets/label-Ciu12ZGj.js\",\"https://app.flaship.net/assets/layout-ByPYND5P.js\",\"https://app.flaship.net/assets/useIsMobile-CZsVE0zh.js\",\"https://app.flaship.net/assets/clickable-logo-B9KllJF_.js\",\"https://app.flaship.net/assets/merge-FTdccPbJ.js\",\"https://app.flaship.net/assets/client-H2OM2vKU.js\",\"https://app.flaship.net/assets/login-D1Pd87wH.js\",\"https://app.flaship.net/assets/index.esm-DVyumTej.js\",\"https://app.flaship.net/assets/RootAuthTurnstileContainer-Bd5JJbtl.js\",\"https://app.flaship.net/assets/rootauth-session-orchestrator-CmwH1t4D.js\",\"https://app.flaship.net/assets/auth-session-CsfRJDZf.js\",\"https://app.flaship.net/assets/password-login-orchestrator-BQG3_MGX.js\",\"https://app.flaship.net/assets/AuthHeader-DatbvVMn.js\",\"https://app.flaship.net/assets/google-auth-orchestrator-Ch9bfnxi.js\",\"https://app.flaship.net/assets/custom-alert-CIvyGm8D.js\",\"https://app.flaship.net/assets/fingerprint2-CEtrsy7m.js\"],\"frames\":[]}"
+    },
+    "success": true
+  }
+]

@@ -1,0 +1,714 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+/* A single composed hero: product story on the left, a luminous event visual
+ * on the right. Semantic offer tokens keep its light and dark palettes distinct. */
+.ci-liquidHome .ci-hero:has(.ci-doubleEleven) {
+  --hero-glow-lime: rgb(120 225 219 / 10%);
+  --hero-glow-mint: rgb(124 233 214 / 13%);
+  --hero-glow-cyan: rgb(100 194 255 / 17%);
+  --hero-glow-violet: rgb(158 128 255 / 12%);
+  --hero-accent: linear-gradient(110deg, #07867b 0%, #167fba 55%, #7861c5 100%);
+  padding: 148px 48px 76px;
+}
+.ci-liquidHome[data-theme='dark'] .ci-hero:has(.ci-doubleEleven) {
+  --hero-accent: linear-gradient(110deg, #83efd5 0%, #8cd8ff 55%, #b7a2ff 100%);
+}
+.ci-liquidHome .ci-heroGrid:has(.ci-doubleEleven) {
+  width: min(100%, 1140px);
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  grid-template-rows: auto 1fr;
+  align-items: start;
+  gap: 26px 72px;
+  text-align: left;
+}
+.ci-heroCopy:has(.ci-doubleEleven) .ci-heroIntro {
+  grid-column: 1;
+  align-self: start;
+}
+.ci-heroCopy:has(.ci-doubleEleven) .ci-heroUtilities {
+  grid-column: 1;
+  align-self: start;
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroBrand {
+  justify-content: flex-start;
+  gap: 10px;
+  margin-bottom: 30px;
+  font-size: 27px;
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroBrand img {
+  width: 38px;
+  height: 38px;
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) h1 {
+  font-size: clamp(2.8rem, 4.4vw, 4rem);
+  line-height: 1.18;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroIntro > p {
+  max-width: 440px;
+  margin: 24px 0 0;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroActions--primary {
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 0;
+}
+.ci-liquidHome
+  .ci-heroCopy:has(.ci-doubleEleven)
+  .ci-heroActions--primary
+  .ci-button {
+  min-height: 42px;
+  padding-inline: 15px;
+  border-color: var(--glass-edge-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--hero-ink);
+  box-shadow: none;
+  font-size: 12px;
+}
+.ci-liquidHome
+  .ci-heroCopy:has(.ci-doubleEleven)
+  .ci-heroActions--primary
+  .ci-button:hover {
+  border-color: var(--hero-body);
+  background: var(--glass-surface);
+  color: var(--hero-ink);
+  box-shadow: none;
+  transform: none;
+}
+.ci-liquidHome
+  .ci-heroCopy:has(.ci-doubleEleven)
+  .ci-heroActions--primary
+  .ci-button::before {
+  display: none;
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroOpenDesktopHint {
+  max-width: 400px;
+  margin: 14px 0 0;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-trustRow {
+  justify-content: flex-start;
+  gap: 14px;
+  margin-top: 28px;
+  font-size: 11px;
+}
+.ci-liquidHome .ci-doubleEleven {
+  --offer-ink: #f1f6ff;
+  --offer-muted: #a5b6ce;
+  --offer-accent: #85efda;
+  --offer-surface: #0c1526;
+  --offer-edge: rgb(133 206 246 / 28%);
+  --offer-grid: rgb(176 217 255 / 4%);
+  --offer-pointer: rgb(141 214 255 / 14%);
+  --offer-panel: rgb(170 201 255 / 4%);
+  --offer-divider: rgb(175 207 255 / 14%);
+  --offer-orbit: rgb(134 210 255 / 35%);
+  --offer-orbit-secondary: rgb(154 173 255 / 21%);
+  --offer-orbit-cross: rgb(172 141 255 / 22%);
+  --offer-orbit-point: #c3faff;
+  --offer-operator: #8297b2;
+  --offer-rules-ink: #d3e1f5;
+  --offer-button: linear-gradient(105deg, #91eed8, #a6e4ff);
+  --offer-button-ink: #102336;
+  --offer-sheen: rgb(255 255 255 / 50%);
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  overflow: hidden;
+  width: 100%;
+  min-width: 0;
+  isolation: isolate;
+  border: 1px solid var(--offer-edge);
+  border-radius: 28px;
+  background: var(--offer-surface);
+  box-shadow:
+    inset 0 1px 0 rgb(218 240 255 / 14%),
+    0 30px 65px -35px rgb(13 28 68 / 48%),
+    0 0 80px -42px rgb(113 174 253 / 40%);
+  color: var(--offer-ink);
+  text-align: left;
+}
+.ci-liquidHome[data-theme='light'] .ci-doubleEleven {
+  --offer-ink: #172f45;
+  --offer-muted: #51677e;
+  --offer-accent: #087b74;
+  --offer-surface: #f7fbff;
+  --offer-edge: rgb(72 133 175 / 25%);
+  --offer-grid: rgb(37 109 159 / 6%);
+  --offer-pointer: rgb(255 255 255 / 70%);
+  --offer-panel: rgb(255 255 255 / 65%);
+  --offer-divider: rgb(76 131 172 / 18%);
+  --offer-orbit: rgb(28 132 175 / 32%);
+  --offer-orbit-secondary: rgb(99 121 200 / 25%);
+  --offer-orbit-cross: rgb(137 108 205 / 24%);
+  --offer-orbit-point: #168aa1;
+  --offer-operator: #73879e;
+  --offer-rules-ink: #314d67;
+  --offer-button: linear-gradient(105deg, #076c71, #285ab2);
+  --offer-button-ink: #fff;
+  --offer-sheen: rgb(255 255 255 / 10%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 95%),
+    0 30px 65px -35px rgb(53 89 132 / 22%),
+    0 0 80px -42px rgb(113 174 253 / 28%);
+}
+.ci-doubleEleven::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--offer-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--offer-grid) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(#000, transparent 80%);
+  pointer-events: none;
+}
+.ci-doubleEleven::after {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  inset: -18%;
+  background:
+    radial-gradient(
+      ellipse 60% 46% at 12% 24%,
+      rgb(43 194 174 / 28%),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 91% 13%,
+      rgb(144 104 239 / 29%),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 65% 44% at 65% 75%,
+      rgb(36 107 211 / 17%),
+      transparent 80%
+    );
+  pointer-events: none;
+  animation: ci-offer-aurora 14s ease-in-out infinite alternate;
+}
+.ci-doubleElevenSpotlight {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(
+    280px circle at var(--offer-pointer-x, 50%) var(--offer-pointer-y, 25%),
+    var(--offer-pointer),
+    transparent 78%
+  );
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.ci-doubleEleven[data-spotlight='true'] .ci-doubleElevenSpotlight {
+  opacity: 1;
+}
+.ci-doubleElevenHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 28px 0;
+}
+.ci-doubleElevenEyebrow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--offer-ink);
+}
+.ci-doubleElevenIcon {
+  display: grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 7px;
+  background: rgb(133 239 218 / 10%);
+  color: var(--offer-accent);
+}
+.ci-liquidHome .ci-doubleElevenEyebrow h2 {
+  margin: 0;
+  color: inherit;
+  font-family: var(--ci-font-ui);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.ci-doubleElevenDates {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--offer-muted);
+  font-family: var(--font-brand-mono);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.ci-doubleElevenTimezone {
+  font-family: var(--ci-font-ui);
+  font-size: 9px;
+}
+.ci-doubleElevenArtwork {
+  position: relative;
+  display: grid;
+  height: 192px;
+  place-items: center;
+  margin-block: 8px 2px;
+  isolation: isolate;
+  pointer-events: none;
+}
+.ci-doubleElevenArtwork::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -35% 0;
+  background: radial-gradient(ellipse, rgb(115 189 255 / 15%), transparent 65%);
+}
+.ci-doubleElevenEdition {
+  position: relative;
+  background: linear-gradient(
+    125deg,
+    #e1fff9 5%,
+    #8aeddc 38%,
+    #a3d5ff 65%,
+    #c1acff 95%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  font-family: var(--ci-font-ui);
+  font-size: clamp(90px, 8.5vw, 122px);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.09em;
+  filter: drop-shadow(0 0 26px rgb(109 224 245 / 15%));
+  transform: skewY(-7deg);
+}
+.ci-liquidHome[data-theme='light'] .ci-doubleElevenEdition {
+  background-image: linear-gradient(
+    125deg,
+    #07877e 5%,
+    #148ca6 42%,
+    #4e7dcc 70%,
+    #8d66c3 95%
+  );
+  filter: drop-shadow(0 6px 18px rgb(58 146 182 / 14%));
+}
+.ci-doubleElevenOrbit {
+  position: absolute;
+  z-index: -1;
+  width: 82%;
+  height: 120px;
+  border: 1px solid var(--offer-orbit);
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgb(110 222 251 / 8%);
+}
+.ci-doubleElevenOrbit--one {
+  transform: rotate(-25deg);
+  animation: ci-offer-orbit 12s ease-in-out infinite alternate;
+}
+.ci-doubleElevenOrbit--one::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  left: 14%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--offer-orbit-point);
+  box-shadow: 0 0 12px #8cdfff;
+}
+.ci-doubleElevenOrbit--two {
+  height: 146px;
+  border-color: var(--offer-orbit-secondary);
+  transform: rotate(-25deg);
+}
+.ci-doubleElevenOrbit--three {
+  width: 60%;
+  height: 160px;
+  border-color: var(--offer-orbit-cross);
+  transform: rotate(38deg);
+  animation: ci-offer-cross-orbit 16s ease-in-out infinite alternate;
+}
+.ci-doubleElevenStar {
+  position: absolute;
+  color: var(--offer-accent);
+  font-size: 24px;
+  text-shadow: 0 0 20px rgb(133 239 218 / 40%);
+}
+.ci-doubleElevenStar--one {
+  top: 21%;
+  right: 12%;
+}
+.ci-doubleElevenStar--two {
+  bottom: 20%;
+  left: 12%;
+  font-size: 14px;
+  opacity: 0.6;
+}
+.ci-doubleElevenMain {
+  display: grid;
+  gap: 24px;
+  padding: 0 28px 22px;
+}
+.ci-doubleElevenCopy {
+  min-width: 0;
+}
+.ci-doubleElevenAmounts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--offer-divider);
+  border-radius: 14px;
+  background: var(--offer-panel);
+}
+.ci-doubleElevenAmount {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+.ci-doubleElevenAmount > span {
+  color: var(--offer-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.ci-doubleElevenAmount > strong {
+  color: var(--offer-ink);
+  font-family: var(--ci-font-ui);
+  font-size: 34px;
+  font-weight: 550;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ci-doubleElevenGift {
+  text-align: right;
+}
+.ci-doubleElevenGift > strong {
+  color: var(--offer-accent);
+}
+.ci-doubleElevenPlus {
+  display: grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  margin-top: 18px;
+  color: var(--offer-operator);
+}
+.ci-doubleElevenScope {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 8px;
+  border: 1px solid rgb(133 239 218 / 24%);
+  border-radius: 5px;
+  color: var(--offer-accent);
+  font-size: 11px;
+}
+.ci-liquidHome .ci-doubleElevenStatus {
+  min-height: 94px;
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--offer-divider);
+  border-radius: 14px;
+  color: var(--offer-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.ci-handoffRoot a.ci-doubleElevenAction {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+  isolation: isolate;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--offer-button);
+  color: var(--offer-button-ink);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 35%);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: box-shadow 180ms ease;
+}
+.ci-handoffRoot a.ci-doubleElevenAction::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -40% -20%;
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    var(--offer-sheen) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform 700ms ease;
+  pointer-events: none;
+}
+.ci-handoffRoot a.ci-doubleElevenAction:is(:hover, :focus-visible) {
+  box-shadow: 0 0 24px -6px rgb(128 222 249 / 40%);
+}
+.ci-handoffRoot a.ci-doubleElevenAction:is(:hover, :focus-visible)::before {
+  transform: translateX(120%);
+}
+.ci-doubleElevenRules {
+  border-top: 1px solid var(--offer-divider);
+}
+.ci-doubleElevenRules > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 13px 28px;
+  color: var(--offer-muted);
+  font-size: 10px;
+  line-height: 1.6;
+  list-style: none;
+  cursor: pointer;
+}
+.ci-doubleElevenRules > summary::-webkit-details-marker {
+  display: none;
+}
+.ci-doubleElevenRulesToggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  color: var(--offer-rules-ink);
+}
+.ci-doubleElevenRules[open] .ci-doubleElevenRulesToggle svg {
+  transform: rotate(180deg);
+}
+.ci-liquidHome .ci-doubleElevenRuleContent {
+  display: grid;
+  gap: 6px;
+  padding: 0 28px 16px;
+  color: var(--offer-muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.ci-liquidHome .ci-doubleElevenRuleContent p {
+  margin: 0;
+}
+.ci-doubleElevenRules > summary:focus-visible {
+  outline: 2px solid var(--offer-accent);
+  outline-offset: -4px;
+}
+.ci-handoffRoot a.ci-doubleElevenAction:focus-visible {
+  outline: 2px solid var(--offer-accent);
+  outline-offset: 3px;
+}
+.ci-liquidHome .ci-partnershipAnnouncement {
+  display: flex;
+  justify-content: center;
+  padding: 36px 24px 0;
+}
+.ci-liquidHome .ci-partnershipAnnouncement .ci-forgeBadge {
+  margin-bottom: 0;
+}
+@media (max-width: 1000px) {
+  .ci-liquidHome .ci-hero:has(.ci-doubleEleven) {
+    padding-inline: 32px;
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) {
+    gap: 24px 36px;
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) h1 {
+    font-size: 44px;
+  }
+  .ci-doubleElevenHeader {
+    padding-inline: 22px;
+  }
+  .ci-doubleElevenMain {
+    padding-inline: 22px;
+  }
+  .ci-doubleElevenAmounts {
+    padding-inline: 14px;
+    gap: 10px;
+  }
+  .ci-doubleElevenAmount > strong {
+    font-size: 30px;
+  }
+}
+@media (max-width: 760px) {
+  .ci-liquidHome .ci-hero:has(.ci-doubleEleven) {
+    padding: 114px 24px 48px;
+  }
+  .ci-liquidHome .ci-heroGrid:has(.ci-doubleEleven) {
+    width: min(100%, 520px);
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    text-align: center;
+  }
+  .ci-heroCopy:has(.ci-doubleEleven) .ci-heroIntro,
+  .ci-heroCopy:has(.ci-doubleEleven) .ci-heroUtilities,
+  .ci-liquidHome .ci-doubleEleven {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroBrand {
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroIntro > p {
+    margin: 18px auto 0;
+    font-size: 13px;
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroActions--primary,
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-trustRow {
+    justify-content: center;
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroOpenDesktopHint {
+    margin-inline: auto;
+    text-align: center;
+  }
+}
+@media (max-width: 640px) {
+  .ci-liquidHome .ci-doubleEleven {
+    border-radius: 24px;
+  }
+  .ci-doubleElevenHeader {
+    padding-top: 20px;
+  }
+  .ci-doubleElevenArtwork {
+    height: 140px;
+    margin-block: 2px;
+  }
+  .ci-doubleElevenEdition {
+    font-size: 90px;
+  }
+  .ci-doubleElevenOrbit {
+    height: 90px;
+  }
+  .ci-doubleElevenOrbit--two {
+    height: 110px;
+  }
+  .ci-doubleElevenOrbit--three {
+    height: 130px;
+  }
+  .ci-doubleElevenMain {
+    gap: 16px;
+    padding-bottom: 18px;
+  }
+  .ci-doubleElevenTimezone {
+    display: none;
+  }
+  .ci-doubleElevenRules > summary {
+    padding-inline: 22px;
+  }
+  .ci-liquidHome .ci-doubleElevenRuleContent {
+    padding-inline: 22px;
+  }
+  .ci-liquidHome .ci-heroCopy:has(.ci-doubleEleven) .ci-heroActions--primary {
+    display: grid;
+    width: min(100%, 300px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 10px;
+    margin-inline: auto;
+  }
+  .ci-liquidHome
+    .ci-heroCopy:has(.ci-doubleEleven)
+    .ci-heroActions--primary
+    .ci-heroOpenDesktop {
+    grid-column: 1 / -1;
+  }
+  .ci-liquidHome
+    .ci-heroCopy:has(.ci-doubleEleven)
+    .ci-heroActions--primary
+    .ci-button--outline {
+    min-height: 32px;
+    border-color: transparent;
+  }
+}
+@keyframes ci-offer-aurora {
+  from {
+    transform: translate3d(-2%, -2%, 0) rotate(-4deg);
+  }
+  to {
+    transform: translate3d(3%, 3%, 0) rotate(5deg);
+  }
+}
+@keyframes ci-offer-orbit {
+  from {
+    transform: rotate(-25deg) translate3d(0, 0, 0);
+  }
+  to {
+    transform: rotate(-13deg) translate3d(0, -4px, 0);
+  }
+}
+@keyframes ci-offer-cross-orbit {
+  from {
+    transform: rotate(38deg);
+  }
+  to {
+    transform: rotate(51deg);
+  }
+}
+@media (max-width: 760px), (hover: none), (pointer: coarse) {
+  .ci-doubleEleven::after,
+  .ci-doubleElevenOrbit {
+    animation: none;
+  }
+  .ci-doubleElevenSpotlight {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ci-doubleEleven::after,
+  .ci-doubleElevenOrbit {
+    animation: none;
+  }
+  .ci-doubleElevenSpotlight {
+    display: none;
+  }
+  .ci-handoffRoot a.ci-doubleElevenAction,
+  .ci-handoffRoot a.ci-doubleElevenAction::before {
+    transition: none;
+  }
+  .ci-handoffRoot a.ci-doubleElevenAction::before {
+    display: none;
+  }
+}
