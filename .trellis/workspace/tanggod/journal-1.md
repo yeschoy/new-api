@@ -291,3 +291,47 @@ Implemented independent per-group IQ configuration/schedule/run with atomic lega
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: Fix explicit IQ plan visibility and deletion
+<!-- trellis-session: v=2 fp=7da0db802d2962fa -->
+
+**Date**: 2026-11-11
+**Task**: Fix explicit IQ plan visibility and deletion
+**Branch**: `iq-test`
+
+### Summary
+
+Fixed the gallery regression: saved plans show one latest group row by default, history is opt-in, creation requires explicit group selection and save, and versioned deletion stops schedules/pending requests while retaining artwork.
+
+### Main Changes
+
+- Added versioned plan tombstones, deleted-group artifact authorization, and latest-row backfill for quiet groups beyond the global history page.
+- Updated seven locales and frontend/backend IQ contracts; no new task or production data changes.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a186b3e4f` | fix(iq-tests): show saved plans once and support plan deletion |
+
+### Testing
+
+- [OK] Passed: go test ./model ./controller ./router -count=1; 18 frontend IQ tests; typecheck; build; scoped lint; changed-file format check; i18n sync.
+- [OK] Mock-backed native browser verified one default row, history toggle, explicit create/save/delete and 390px layout without horizontal overflow.
+- Not verified: live PostgreSQL test, because the owned local Docker PostgreSQL container failed to start; existing CI PostgreSQL gate remains mandatory. Full frontend lint has unrelated existing violations.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Deploy only after PostgreSQL CI passes.
+
+### Approved Cleanup
+
+- The user approved cleanup and requested commit/push of the current `iq-test` branch.
+- Removed 36 recorded temporary files: local browser observations/screenshots, dev-server log, generated i18n reports, the external truncated build log, and `.iq-plan-visibility-temp-artifacts.md`; removed the two now-empty artifact/report directories.
+- Removed only the owned, unstarted `postgres:15` container `iq-plan-visibility-test` (`6dee1b00b4f5`); verified no matching container remains.
+- Preserved all Trellis logs, tracked translation tools, `web/dist/`, and the three pre-existing IQ artifact manifests. No production data or application code changed during cleanup.

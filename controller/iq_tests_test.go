@@ -77,6 +77,75 @@ func iqContext(user *model.User, path, id string) (*gin.Context, *httptest.Respo
 	c.Params = gin.Params{{Key: "id", Value: id}}
 	return c, w
 }
+func TestIQGalleryIncludesQuietPlansBeyondHistoryPage(t *testing.T) {
+	root, _ := setupIQController(t)
+	for _, group := range []string{"public", "private"} {
+		cfg, err := model.GetIQGroupConfig(group)
+		require.NoError(t, err)
+		cfg.Targets = model.IQTargets{{Group: group, Models: []string{"gpt-4o"}}}
+		_, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+		require.NoError(t, err)
+	}
+	for seq := int64(1); seq <= 26; seq++ {
+		group := "public"
+		if seq == 1 {
+			group = "private"
+		}
+		r := model.IQResult{ID: fmt.Sprintf("result-%d", seq), TaskID: fmt.Sprintf("run-%d", seq), Group: group, Model: "gpt-4o", RunSeq: seq, Status: "success", Artifact: "<svg>private body</svg>"}
+		require.NoError(t, model.DB.Create(&r).Error)
+	}
+	c, w := iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, 200, w.Code)
+	require.Equal(t, int64(21), gjson.Get(w.Body.String(), "data.groups.#").Int())
+	require.Equal(t, "run-26", gjson.Get(w.Body.String(), "data.groups.0.task_id").String())
+	require.Equal(t, "private", gjson.Get(w.Body.String(), "data.groups.20.group").String())
+	require.Equal(t, "result-1", gjson.Get(w.Body.String(), "data.groups.20.models.0.latest.id").String())
+	require.Greater(t, gjson.Get(w.Body.String(), "data.next_cursor").Int(), int64(0))
+	require.NotContains(t, w.Body.String(), "private body")
+}
+
+func TestIQGalleryOnlyShowsSavedPlansAndHidesDeletedArtifacts(t *testing.T) {
+	root, _ := setupIQController(t)
+	c, w := iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, 200, w.Code)
+	require.Empty(t, gjson.Get(w.Body.String(), "data.groups").Array())
+	cfg, err := model.GetIQGroupConfig("public")
+	require.NoError(t, err)
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Empty(t, gjson.Get(w.Body.String(), "data.groups").Array(), "merely opening a group must not show a plan")
+	cfg.Targets = model.IQTargets{{Group: "public", Models: []string{"gpt-4o"}}}
+	cfg, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+	require.NoError(t, err)
+	artifact := model.IQResult{ID: "saved-artifact", Group: "public", Model: "gpt-4o", TaskID: "saved-run", Status: "success", ArtifactKind: "svg", Artifact: "<svg>keep me</svg>"}
+	require.NoError(t, model.DB.Create(&artifact).Error)
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, int64(1), gjson.Get(w.Body.String(), "data.groups.#").Int())
+	require.Equal(t, cfg.Version, gjson.Get(w.Body.String(), "data.groups.0.config_version").Int())
+	deletePlan := func(version int64) int {
+		c, w := iqContext(root, "/api/iq-tests/config", "")
+		c.Request = httptest.NewRequest(http.MethodDelete, "/api/iq-tests/config", strings.NewReader(fmt.Sprintf(`{"group":"public","version":%d}`, version)))
+		c.Request.Header.Set("Content-Type", "application/json")
+		DeleteIQConfig(c)
+		return w.Code
+	}
+	require.Equal(t, 409, deletePlan(cfg.Version+1))
+	require.Equal(t, 200, deletePlan(cfg.Version))
+	require.Equal(t, 409, deletePlan(cfg.Version))
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Empty(t, gjson.Get(w.Body.String(), "data.groups").Array())
+	c, w = iqContext(root, "/api/iq-tests/results/saved-artifact", artifact.ID)
+	GetIQArtifact(c)
+	require.Equal(t, 404, w.Code)
+	kept, err := model.GetIQResult(artifact.ID)
+	require.NoError(t, err)
+	require.Equal(t, artifact.Artifact, kept.Artifact)
+}
+
 func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 	root, viewer := setupIQController(t)
 	var calls atomic.Int32

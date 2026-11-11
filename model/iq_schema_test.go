@@ -81,10 +81,12 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "ReasoningEffort"))
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Prompts"))
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Group"))
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Deleted"))
 	require.NoError(t, db.AutoMigrate(models...))
 	cfg, err = GetIQConfig()
 	require.NoError(t, err)
 	require.Empty(t, cfg.ReasoningEffort)
+	require.False(t, cfg.Deleted, "upgraded plans remain visible by default")
 	cfg.Prompt = " exact saved PostgreSQL prompt\n"
 	cfg.ReasoningEffort = "xhigh"
 	cfg.Targets = []IQTarget{{Group: "fixture", Models: []string{"model-a", "model-b"}}}
@@ -112,7 +114,30 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.Equal(t, groupSaved.Prompts, groupReloaded.Prompts)
 	require.Equal(t, groupSaved.ID, groupReloaded.ID)
 	require.Equal(t, groupSaved.Group, groupReloaded.Group)
-	t.Log("PostgreSQL migration, repeat migration, targets TEXT and config round trip passed")
+	result := IQResult{ID: "pg-plan-result", Group: "fixture", Model: "model-a", TaskID: "pg-plan-run", RunSeq: 1, Status: "success", Artifact: "<svg>retained</svg>"}
+	require.NoError(t, db.Create(&result).Error)
+	latest, err := ListIQLatestResults([]string{"fixture"})
+	require.NoError(t, err)
+	require.Len(t, latest, 1)
+	require.Equal(t, result.ID, latest[0].ID)
+	require.Empty(t, latest[0].Artifact)
+	require.NoError(t, DeleteIQGroupConfig("fixture", groupReloaded.Version, time.Now()))
+	require.NoError(t, db.AutoMigrate(models...))
+	groups, err = ListIQConfigs()
+	require.NoError(t, err)
+	require.Empty(t, groups, "startup migration must not resurrect deleted plans")
+	recreated, err := GetIQGroupConfig("fixture")
+	require.NoError(t, err)
+	require.Zero(t, recreated.Version)
+	recreated.Targets = groupSaved.Targets
+	recreated, err = SaveIQConfig(*recreated, 42, time.Now())
+	require.NoError(t, err)
+	require.Greater(t, recreated.Version, groupReloaded.Version)
+	require.ErrorIs(t, DeleteIQGroupConfig("fixture", groupReloaded.Version, time.Now()), ErrIQConflict)
+	kept, err := GetIQResult(result.ID)
+	require.NoError(t, err)
+	require.Equal(t, result.Artifact, kept.Artifact)
+	t.Log("PostgreSQL migration, repeat migration, targets TEXT, plan deletion/recreation and config round trip passed")
 }
 
 func TestIQSchemaPortableTextColumns(t *testing.T) {

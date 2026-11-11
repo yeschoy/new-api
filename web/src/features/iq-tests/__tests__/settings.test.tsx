@@ -20,14 +20,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AxiosError, type AxiosAdapter } from 'axios'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { iqConfigSchema } from '../config-schema'
 import { useIQViewerScope } from '../queries'
-import { IQConfigForm } from '../settings'
+import { IQConfigForm, IQSettings } from '../settings'
 import type { IQConfig, IQConfigInput } from '../types'
 
 const config: IQConfig = {
@@ -72,6 +72,27 @@ beforeEach(() => {
     },
   })
   const adapter: AxiosAdapter = async (request) => {
+    if (
+      request.url === '/api/iq-tests/targets' ||
+      request.url === '/api/iq-tests/config?list=true'
+    ) {
+      return {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: request,
+        data: {
+          success: true,
+          message: '',
+          data: request.url.endsWith('targets')
+            ? [
+                { group: 'public', models: ['model-0'] },
+                { group: 'private', models: ['model-private'] },
+              ]
+            : { tasks: [config], default_prompt: config.prompt },
+        },
+      }
+    }
     if (!request.url?.startsWith('/api/iq-tests/config')) {
       throw new Error('Unexpected API request')
     }
@@ -131,6 +152,57 @@ function mount() {
 }
 
 describe('IQ configuration editing', () => {
+  it('only offers saved plans in settings and creates a new group only after an explicit save', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    function PlanFixture(props: { creating: boolean }) {
+      const scope = useIQViewerScope()
+      return (
+        scope && (
+          <IQSettings
+            scope={scope}
+            canWrite
+            creating={props.creating}
+            onClose={onClose}
+          />
+        )
+      )
+    }
+    const view = render(
+      <QueryClientProvider client={client}>
+        <PlanFixture creating={false} />
+      </QueryClientProvider>
+    )
+    const selector = await screen.findByLabelText('Task group')
+    expect(selector).toHaveValue('public')
+    expect(
+      screen.queryByRole('option', { name: 'private' })
+    ).not.toBeInTheDocument()
+    view.unmount()
+    render(
+      <QueryClientProvider client={client}>
+        <PlanFixture creating />
+      </QueryClientProvider>
+    )
+    const createSelector = await screen.findByLabelText('Task group')
+    expect(createSelector).toHaveValue('')
+    expect(
+      screen.queryByRole('option', { name: 'public' })
+    ).not.toBeInTheDocument()
+    expect(saved).toEqual([])
+    await user.selectOptions(createSelector, 'private')
+    expect(saved).toEqual([])
+    await user.click(screen.getByRole('checkbox', { name: 'model-private' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+    expect(saved).toHaveLength(1)
+    expect(saved[0].group).toBe('private')
+    expect(saved[0].version).toBe(0)
+    expect(saved[0].targets).toEqual([
+      { group: 'private', models: ['model-private'] },
+    ])
+  })
+
   it('round-trips exact prompts, one group and daily Beijing schedule without server fields', async () => {
     const user = userEvent.setup()
     mount()

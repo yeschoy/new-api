@@ -98,6 +98,7 @@ export interface IQResults {
     active_run: IQResults['active_run']
     next_run_at: number
     schedule_enabled: boolean
+    config_version: number
   }[]
   active_run: {
     task_id: string

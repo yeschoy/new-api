@@ -12,6 +12,7 @@ import (
 var iqAdminPermissionRoutes = []permissionRoute{
 	{method: http.MethodGet, path: "/config", permission: authz.ChannelRead, handler: controller.GetIQConfig},
 	{method: http.MethodPut, path: "/config", permission: authz.ChannelWrite, handler: controller.PutIQConfig},
+	{method: http.MethodDelete, path: "/config", permission: authz.ChannelWrite, handler: controller.DeleteIQConfig},
 	{method: http.MethodGet, path: "/targets", permission: authz.ChannelRead, handler: controller.GetIQTargets},
 	{method: http.MethodPost, path: "/run", permission: authz.ChannelOperate, handler: controller.RunIQTests},
 }
@@ -24,7 +25,7 @@ func registerIQRoutes(api *gin.RouterGroup) {
 	admin := iq.Group("")
 	admin.Use(middleware.AdminAuth())
 	for _, r := range iqAdminPermissionRoutes {
-		if r.method == http.MethodPost || r.method == http.MethodPut {
+		if r.method == http.MethodPost || r.method == http.MethodPut || r.method == http.MethodDelete {
 			handlePermissionRoute(admin, r.method, r.path, r.permission, middleware.CriticalRateLimit(), r.handler)
 		} else {
 			handlePermissionRoute(admin, r.method, r.path, r.permission, r.handler)

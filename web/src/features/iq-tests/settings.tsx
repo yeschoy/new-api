@@ -52,6 +52,7 @@ export function IQSettings(props: {
   canWrite: boolean
   onClose: () => void
   group?: string
+  creating?: boolean
 }) {
   const { t } = useTranslation()
   const [selection, setSelection] = useState(props.group ?? '')
@@ -65,17 +66,17 @@ export function IQSettings(props: {
     queryKey: iqKeys.targets(props.scope),
     queryFn: ({ signal }) => getIQTargets(signal),
   })
-  const groups = [
-    ...new Set([
-      ...(config.data?.tasks.map((task) => task.group) ?? []),
-      ...(targets.data?.map((target) => target.group) ?? []),
-    ]),
-  ]
-  const group = selection || groups[0] || ''
+  const savedGroups = config.data?.tasks.map((task) => task.group) ?? []
+  const groups = props.creating
+    ? (targets.data?.map((target) => target.group) ?? []).filter(
+        (group) => !savedGroups.includes(group)
+      )
+    : savedGroups
+  const group = selection || (props.creating ? '' : groups[0]) || ''
   const selected = config.data?.tasks.find((task) => task.group === group)
   const task: IQConfig | undefined =
     selected ??
-    (config.data && group
+    (props.creating && config.data && group && groups.includes(group)
       ? {
           group,
           version: 0,
@@ -99,7 +100,7 @@ export function IQSettings(props: {
       onOpenChange={(open) => {
         if (!open) props.onClose()
       }}
-      title={t('IQ test settings')}
+      title={props.creating ? t('New plan') : t('IQ test settings')}
       description={t(
         'Save before running. Tests use site resources, not your balance.'
       )}
@@ -130,6 +131,11 @@ export function IQSettings(props: {
               value={group}
               onChange={(event) => setSelection(event.target.value)}
             >
+              {props.creating && (
+                <NativeSelectOption value=''>
+                  {t('Select a group')}
+                </NativeSelectOption>
+              )}
               {groups.map((name) => (
                 <NativeSelectOption key={name} value={name}>
                   {name}
@@ -138,7 +144,7 @@ export function IQSettings(props: {
             </NativeSelect>
             <FieldDescription>
               {t(
-                'Each group has its own task, models, prompts and schedule. Save changes before switching groups.'
+                'Only saved plans appear in the gallery. Selecting a group does not create a plan.'
               )}
             </FieldDescription>
           </Field>
@@ -149,6 +155,7 @@ export function IQSettings(props: {
               config={task}
               catalog={targets.data.filter((target) => target.group === group)}
               canWrite={props.canWrite}
+              onSaved={props.creating ? props.onClose : undefined}
             />
           ) : (
             <p>{t('No compatible targets available')}</p>
@@ -164,6 +171,7 @@ export function IQConfigForm(props: {
   config: IQConfig
   catalog: IQTarget[]
   canWrite: boolean
+  onSaved?: () => void
 }) {
   const { t } = useTranslation()
   const client = useQueryClient()
@@ -194,6 +202,7 @@ export function IQConfigForm(props: {
       setConflict(false)
       void client.invalidateQueries({ queryKey: iqKeys.results(props.scope) })
       toast.success(t('Saved successfully'))
+      props.onSaved?.()
     },
     onError: (error) => {
       if (getServerErrorStatus(error) === 409) setConflict(true)

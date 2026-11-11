@@ -162,6 +162,28 @@ func PutIQConfig(c *gin.Context) {
 	}
 	iqOK(c, saved)
 }
+func DeleteIQConfig(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
+	var input struct {
+		Group   string `json:"group"`
+		Version int64  `json:"version"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil || input.Group == "" || input.Version <= 0 {
+		iqError(c, 400, "Select a saved IQ plan to delete")
+		return
+	}
+	err := model.DeleteIQGroupConfig(input.Group, input.Version, time.Now())
+	if errors.Is(err, model.ErrIQConflict) {
+		iqError(c, 409, err.Error())
+		return
+	}
+	if err != nil {
+		iqError(c, 500, "Unable to delete IQ plan")
+		return
+	}
+	iqOK(c, nil)
+}
+
 func GetIQTargets(c *gin.Context) {
 	targets, err := iqTargetCatalog()
 	if err != nil {
@@ -227,6 +249,7 @@ type iqGroupCards struct {
 	ActiveRun       *iqActiveRun  `json:"active_run"`
 	NextRunAt       int64         `json:"next_run_at"`
 	ScheduleEnabled bool          `json:"schedule_enabled"`
+	ConfigVersion   int64         `json:"config_version"`
 }
 type iqActiveRun struct {
 	TaskID        string                 `json:"task_id"`
@@ -259,6 +282,24 @@ func GetIQResults(c *gin.Context) {
 	if err != nil {
 		iqError(c, 500, "Unable to load IQ results")
 		return
+	}
+	if before == 0 {
+		present := map[string]bool{}
+		for _, row := range rows {
+			present[row.Group] = true
+		}
+		missing := []string{}
+		for _, group := range allowedGroups {
+			if !present[group] {
+				missing = append(missing, group)
+			}
+		}
+		latest, err := model.ListIQLatestResults(missing)
+		if err != nil {
+			iqError(c, 500, "Unable to load IQ results")
+			return
+		}
+		rows = append(rows, latest...)
 	}
 	activeTasks, err := model.ListActiveIQTasks()
 	if err != nil {
@@ -368,12 +409,14 @@ func GetIQResults(c *gin.Context) {
 			if groups[i].Group == cfg.Group {
 				groups[i].ScheduleEnabled = cfg.Enabled
 				groups[i].NextRunAt = cfg.NextRunAt
+				groups[i].ConfigVersion = cfg.Version
 				hasRow = true
 			}
 		}
 		if !hasRow && before == 0 {
 			g := ensureRow(cfg.Group, "", 0)
 			g.ScheduleEnabled, g.NextRunAt = cfg.Enabled, cfg.NextRunAt
+			g.ConfigVersion = cfg.Version
 			for _, target := range cfg.Targets {
 				for _, name := range target.Models {
 					g.Models = append(g.Models, iqModelCard{Model: name})

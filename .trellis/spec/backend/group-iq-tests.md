@@ -16,12 +16,14 @@ The controller owns orchestration to avoid a service/controller import cycle.
   duplicate requests for groups present in their snapshots. The runner retains
   its existing per-type lease and bounded worker budget.
 - `ListIQHistory(groups, before)` pages 20 runs at a time, descending by RunSeq.
-  Results are immutable and keyed by SHA-256(taskID + NUL + group + NUL + model).
+  `ListIQLatestResults(groups)` backfills quiet groups omitted by the first global
+  history page, without selecting artifact bodies. Results are immutable and
+  keyed by SHA-256(taskID + NUL + group + NUL + model).
 - `StartIQAttempt(taskID, pairID, runner, now)` durably claims before sending;
   `CompleteIQAttempt` verifies the lease and replaces the latest row.
 - `NextIQRun(config, now, anchor)` calculates a strictly future UTC Unix second.
 - Viewer: `GET /api/iq-tests/results`, `GET /api/iq-tests/results/:id`.
-- Admin: `GET|PUT /api/iq-tests/config`, `GET /api/iq-tests/targets`,
+- Admin: `GET|PUT|DELETE /api/iq-tests/config`, `GET /api/iq-tests/targets`,
   `POST /api/iq-tests/run`; use channel read/write/operate RBAC and PAT scopes.
 - `testChannelWithIQ(..., options)` extends existing health-test conversion;
   `ExtractIQArtifact(text)` and `IQVisibleText(body, stream)` own extraction.
@@ -38,7 +40,21 @@ The controller owns orchestration to avoid a service/controller import cycle.
 - `GET /config?list=true` returns tasks plus default_prompt; `GET /config?group=...`
   returns an existing task or an unsaved version=0 default. PUT creates version=0
   tasks or optimistically updates only that group's version. `POST /run?group=...`
-  requires a saved group task. Independently queued groups never share run IDs.
+  requires a saved group task. Catalog/group reads must not create plans.
+  Independently queued groups never share run IDs.
+- DELETE `/config` accepts `{group: string, version: positive integer}` using
+  channel write RBAC, PAT scope and critical rate limiting. It atomically retains
+  a `deleted` boolean tombstone (NOT NULL DEFAULT false), increments the version,
+  disables scheduling, clears next_run_at and interrupts pending group attempts.
+  Already claimed requests may complete; never delete artwork. Listings and
+  authorization exclude tombstones; stale schedulers cannot enqueue them. Only
+  an explicit version=0 save recreates a deleted plan, with a version above the
+  tombstone so old editors/deletion requests cannot affect its successor. Legacy
+  splitting counts tombstones too and must not resurrect a deleted plan.
+- Gallery rows expose the plan's current `config_version` for versioned deletion,
+  not the historical run version. The first page must contain each saved plan's
+  latest run even if another group occupies all 20 paginated history slots. Older
+  pages may repeat those backfills; clients deduplicate by taskID/group.
 - Complete config PUT includes the last `version`, prompt, targets, enabled,
   schedule_mode, interval_hours, daily_time and timezone. Calendar is explicitly
   Asia/Shanghai, never server-local time. Optional `reasoning_effort` is shared
@@ -94,7 +110,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
 
 | Condition | Required result |
 | --- | --- |
-| Stale config version | 409, no write |
+| Stale config version / stale delete / repeated delete | 409, no write |
+| Invalid delete JSON, empty group or nonpositive version | 400 |
+| Deleted group list / directly known artwork | Absent / 404; bodies remain stored |
 | Invalid prompt/targets/schedule/unknown reasoning effort | 400 |
 | Anonymous / ordinary member admin action | 401 / 403 |
 | Hidden, removed or unsuccessful artifact ID | Indistinguishable 404 |
@@ -118,7 +136,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   The test creates and verifies a unique search_path schema, reproduces the
   old SQLSTATE 22023, applies/repeats migrations, checks targets is TEXT, and
   verifies exact prompt/JSON/effort persistence and upgrades an existing row
-  after the optional effort column is removed. It never uses public
+  after optional effort/plan/deletion columns are removed. Also assert latest-run
+  tuple subqueries, retained artwork and monotonic delete/recreate behavior across
+  repeated migrations. It never uses public
   schema for fixture writes. A missing DSN skips local tests, NOT CI acceptance.
 - `.github/workflows/yeschoy-deploy.yml` requires the PostgreSQL 15 service/test
   job before building images; deployment still requires that build. Never
@@ -130,7 +150,10 @@ The controller owns orchestration to avoid a service/controller import cycle.
   random prompt snapshots, descending retained history, optimistic edits,
   duplicate enqueue/checkpoints, lease recovery and cadence;
   default/invalid effort validation, adding the effort column to an existing row,
-  clearing a saved effort and immutable batch snapshot persistence.
+  clearing a saved effort and immutable batch snapshot persistence. Verify fresh
+  and read-only group selection stay empty, delete stops scheduled/unsent work,
+  running work can finish, artwork remains, recreation is explicit/versioned and
+  stale editors/deletes cannot modify the recreated plan.
 - `controller/iq_tests_test.go`: mocked call counts, exact prompt, group routing,
   viewer/artifact denial, quota and health non-mutation, native request bounds.
   `TestIQReasoningEffortWireRequests` exercises mapped OpenAI/Responses/Codex,
@@ -139,10 +162,13 @@ The controller owns orchestration to avoid a service/controller import cycle.
   effort retains defaults, usage metadata agrees, and one request is sent.
   Assert the executor receives a 25-minute deadline without waiting for it,
   preserves earlier parent deadlines, cancels completed pair contexts, and
-  reports the same configured limit on timeout without retrying.
+  reports the same configured limit on timeout without retrying. Test saved-plan
+  visibility, versioned deletion, deleted-artifact denial and latest-run backfills
+  for quiet groups beyond a 20-run global page.
 - `service/iq_artifact_test.go`: full/fenced markup and final native text,
   incomplete/oversized output, preservation of active self-contained content.
-- `router/iq_router_test.go`: all six anonymous denials and admin/member scopes.
+- `router/iq_router_test.go`: all seven anonymous denials and admin/member scopes,
+  including DELETE channel-write enforcement.
 - `relay/channel/iq_request_test.go`: deadline propagation and no redirect replay.
 - SQLite test users need distinct nonempty `AffCode` values; initialize dialect
   column names and explicit model prices before invoking real model helpers.

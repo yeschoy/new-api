@@ -82,6 +82,7 @@ type IQConfig struct {
 	UpdatedAt       int64     `json:"updated_at"`
 	UpdatedBy       int       `json:"updated_by"`
 	DispatchSeq     int64     `json:"-"`
+	Deleted         bool      `json:"-" gorm:"not null;default:false"`
 }
 
 // No artwork or prompt snapshot belongs in SystemTask's publicly listed bodies.
@@ -264,6 +265,7 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 	if c.Group == "" {
 		c.ID = 1 // Legacy/template configuration; group tasks use separate rows.
 	}
+	c.Deleted = false // Only an explicit version=0 save can recreate a deleted plan.
 	c.UpdatedAt = now.Unix()
 	c.UpdatedBy = userID
 	c.NextRunAt = NextIQRun(c, now, 0)
@@ -288,14 +290,22 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
 			}
-			if err != nil || existing.Version != c.Version {
+			if err != nil {
+				return ErrIQConflict
+			}
+			if existing.Deleted {
+				if c.Version != 0 {
+					return ErrIQConflict
+				}
+				c.Version = existing.Version
+			} else if existing.Version != c.Version {
 				return ErrIQConflict
 			}
 			c.ID = existing.ID
 		}
 		targets, _ := json.Marshal(c.Targets)
 		prompts, _ := json.Marshal(c.Prompts)
-		res := tx.Model(&IQConfig{}).Where("id = ? AND version = ?", c.ID, c.Version).Updates(map[string]any{"version": c.Version + 1, "prompt": c.Prompt, "prompts": string(prompts), "reasoning_effort": c.ReasoningEffort, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
+		res := tx.Model(&IQConfig{}).Where("id = ? AND version = ?", c.ID, c.Version).Updates(map[string]any{"version": c.Version + 1, "deleted": false, "prompt": c.Prompt, "prompts": string(prompts), "reasoning_effort": c.ReasoningEffort, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
 		if res.Error != nil {
 			return res.Error
 		}
@@ -343,7 +353,7 @@ func enqueueIQConfig(configID int, scheduled bool, now time.Time) (*SystemTask, 
 	created := false
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var c IQConfig
-		if err := tx.First(&c, configID).Error; err != nil {
+		if err := tx.Where("deleted = ?", false).First(&c, configID).Error; err != nil {
 			return err
 		}
 		if err := NormalizeIQConfig(&c); err != nil {
@@ -352,7 +362,7 @@ func enqueueIQConfig(configID int, scheduled bool, now time.Time) (*SystemTask, 
 		if scheduled && (!c.Enabled || c.NextRunAt == 0 || c.NextRunAt > now.Unix()) {
 			return nil
 		}
-		q := tx.Model(&IQConfig{}).Where("id = ? AND version = ?", c.ID, c.Version)
+		q := tx.Model(&IQConfig{}).Where("id = ? AND version = ? AND deleted = ?", c.ID, c.Version, false)
 		if scheduled {
 			q = q.Where("enabled = ? AND next_run_at = ?", true, c.NextRunAt)
 		}
@@ -415,7 +425,7 @@ func enqueueIQConfig(configID int, scheduled bool, now time.Time) (*SystemTask, 
 	})
 	if err != nil {
 		var cfg IQConfig
-		if e := DB.First(&cfg, configID).Error; e == nil {
+		if e := DB.Where("deleted = ?", false).First(&cfg, configID).Error; e == nil {
 			if active, e := GetActiveIQGroupTask(cfg.Group); e == nil && active != nil {
 				return active, false, nil
 			}
