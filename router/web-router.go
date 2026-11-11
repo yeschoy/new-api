@@ -24,12 +24,24 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 	router.GET("/partner-authorize", middleware.RouteTag("web"), controller.ServePartnerAuthorizePage(assets.IndexPage))
 	// The cashier capability lives in the fragment, but the HTML must also
 	// avoid caches/referrers and must never be embedded by another origin.
-	router.GET("/partner/checkout", middleware.RouteTag("web"), middleware.DisableCache(), func(c *gin.Context) {
+	cashierHTML := func(c *gin.Context) {
 		c.Header("Referrer-Policy", "no-referrer")
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("Content-Security-Policy", "frame-ancestors 'none'")
+		// Gin routes on decoded URL.Path. Never serve cashier HTML under an
+		// encoded alias whose browser pathname differs from the canonical route.
+		if c.Request.URL.EscapedPath() != "/partner/checkout" {
+			destination := "/partner/checkout"
+			if c.Request.URL.RawQuery != "" {
+				destination += "?" + c.Request.URL.RawQuery
+			}
+			c.Redirect(http.StatusMovedPermanently, destination)
+			return
+		}
 		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
-	})
+	}
+	router.GET("/partner/checkout", middleware.RouteTag("web"), middleware.DisableCache(), cashierHTML)
+	router.GET("/partner/checkout/", middleware.RouteTag("web"), middleware.DisableCache(), cashierHTML)
 	compress := gzip.Gzip(gzip.DefaultCompression)
 	router.GET("/desktop/connect", middleware.RouteTag("web"), middleware.DisableCache(), func(c *gin.Context) {
 		controller.ServeDesktopConnectSPA(c, assets.IndexPage)

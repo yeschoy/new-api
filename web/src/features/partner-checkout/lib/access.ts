@@ -32,7 +32,13 @@ export interface CashierAccess {
 let memoryAccess: CashierAccess | null = null
 
 export function isPartnerCheckoutPath(pathname: string): boolean {
-  return pathname === '/partner/checkout' || pathname === '/partner/checkout/'
+  // Match Go's single path decode; keep the pre-bundle policy in index.html aligned.
+  try {
+    const decoded = decodeURIComponent(pathname)
+    return decoded === '/partner/checkout' || decoded === '/partner/checkout/'
+  } catch {
+    return false
+  }
 }
 
 export function forgetCashierAccess(orderNo: string): void {
@@ -97,12 +103,16 @@ export function prepareCashierEntry(): void {
   const orderNo = params.get('order_no') || ''
   const fragment = window.location.hash
   const tokens = new URLSearchParams(fragment.slice(1)).getAll('token')
-  if (fragment) {
+  // Static frontend hosts may serve encoded aliases without a server redirect.
+  // Canonicalize before Router as well as removing the secret from history.
+  if (fragment || window.location.pathname !== '/partner/checkout') {
     window.history.replaceState(
       window.history.state,
       '',
-      window.location.pathname + window.location.search
+      `/partner/checkout${window.location.search}`
     )
+  }
+  if (fragment) {
     if (ORDER_PATTERN.test(orderNo)) {
       forgetCashierAccess(orderNo)
       if (

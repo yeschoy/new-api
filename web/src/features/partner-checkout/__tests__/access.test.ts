@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   forgetCashierAccess,
+  isPartnerCheckoutPath,
   prepareCashierEntry,
   readCashierAccess,
   saveCashierAccess,
@@ -42,6 +43,72 @@ afterEach(() => {
 })
 
 describe('order-only cashier access', () => {
+  it.each([
+    '/partner/checkout',
+    '/partner/checkout/',
+    '/partner/%63heckout',
+    '/%70artner/checkout',
+    '/partner%2Fcheckout',
+    '/partner/%63heckout%2f',
+  ])(
+    'canonicalizes and scrubs cashier entry %s before router creation',
+    (pathname) => {
+      window.history.replaceState(
+        null,
+        '',
+        `${pathname}?order_no=${ORDER_NO}&extra=a%2Fb#token=${TOKEN}`
+      )
+      expect(isPartnerCheckoutPath(window.location.pathname)).toBe(true)
+      prepareCashierEntry()
+      expect(window.location.pathname).toBe('/partner/checkout')
+      expect(window.location.search).toBe(`?order_no=${ORDER_NO}&extra=a%2Fb`)
+      expect(window.location.hash).toBe('')
+      expect(readCashierAccess(ORDER_NO)?.token).toBe(TOKEN)
+      expect(
+        JSON.parse(
+          sessionStorage.getItem(`partner-checkout:v1:${ORDER_NO}`) || '{}'
+        ).token
+      ).toBe(TOKEN)
+    }
+  )
+
+  it('canonicalizes a static-host alias on reload without discarding stored access', () => {
+    saveCashierAccess({
+      orderNo: ORDER_NO,
+      token: TOKEN,
+      expiresAt: NOW + 10000,
+    })
+    window.history.replaceState(
+      null,
+      '',
+      `/partner/%63heckout?order_no=${ORDER_NO}`
+    )
+    prepareCashierEntry()
+    expect(window.location.pathname).toBe('/partner/checkout')
+    expect(window.location.hash).toBe('')
+    expect(readCashierAccess(ORDER_NO)?.token).toBe(TOKEN)
+  })
+
+  it.each([
+    '/partner/checkout-other',
+    '/partner/checkout/child',
+    '/partner/%2563heckout',
+    '/partner/%',
+    '/partner/%FFcheckout',
+    '/other',
+  ])('does not reinterpret unrelated or malformed entry %s', (pathname) => {
+    window.history.replaceState(
+      null,
+      '',
+      `${pathname}?order_no=${ORDER_NO}#token=${TOKEN}`
+    )
+    expect(isPartnerCheckoutPath(window.location.pathname)).toBe(false)
+    expect(() => prepareCashierEntry()).not.toThrow()
+    expect(window.location.pathname).toBe(pathname)
+    expect(window.location.hash).toBe(`#token=${TOKEN}`)
+    expect(readCashierAccess(ORDER_NO)).toBeNull()
+  })
+
   it('scrubs the fragment before generic code and recovers access on same-tab reload', async () => {
     const localWrite = vi.spyOn(Storage.prototype, 'setItem')
     window.history.replaceState(

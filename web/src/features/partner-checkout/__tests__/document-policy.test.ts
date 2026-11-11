@@ -21,6 +21,8 @@ import vm from 'node:vm'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { isPartnerCheckoutPath } from '../lib/access'
+
 const html = fs.readFileSync('index.html', 'utf8')
 const inlineScripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
   (match) => match[1]
@@ -59,22 +61,38 @@ describe('cashier document policy before injected analytics', () => {
     )
   })
 
-  it.each(['/partner/checkout', '/partner/checkout/'])(
-    'never mounts backend-injected analytics on %s',
-    (pathname) => {
-      const template = document.createElement('template')
-      template.id = 'site-analytics'
-      template.innerHTML =
-        '<script data-policy-test src="https://analytics.example/script.js"></script><script data-policy-test>window.analyticsStarted = true</script>'
-      document.head.append(template)
-      vm.runInNewContext(analyticsLoader, {
-        document,
-        window: { location: { pathname } },
-      })
-      expect(document.querySelector('script[data-policy-test]')).toBeNull()
-      expect(document.querySelector('#site-analytics')).toBeNull()
-    }
-  )
+  it.each([
+    '/partner/checkout',
+    '/partner/checkout/',
+    '/partner/%63heckout',
+    '/%70artner/checkout',
+    '/partner%2Fcheckout',
+    '/partner/%63heckout%2f',
+  ])('never mounts backend-injected analytics on %s', (pathname) => {
+    const template = document.createElement('template')
+    template.id = 'site-analytics'
+    template.innerHTML =
+      '<script data-policy-test src="https://analytics.example/script.js"></script><script data-policy-test>window.analyticsStarted = true</script>'
+    document.head.append(template)
+    const context = vm.createContext({
+      document,
+      window: { location: { pathname } },
+    })
+    vm.runInContext(entryPolicy, context)
+    vm.runInContext(analyticsLoader, context)
+    expect(isPartnerCheckoutPath(pathname)).toBe(true)
+    const policy = document
+      .querySelector('meta[http-equiv="Content-Security-Policy"]')
+      ?.getAttribute('content')
+    expect(policy).toContain("script-src 'self' 'unsafe-inline'")
+    expect(policy).toContain("connect-src 'self'")
+    expect(document.querySelector('meta[name="referrer"]')).toHaveAttribute(
+      'content',
+      'no-referrer'
+    )
+    expect(document.querySelector('script[data-policy-test]')).toBeNull()
+    expect(document.querySelector('#site-analytics')).toBeNull()
+  })
 
   it('preserves injected analytics script attributes and inline code outside checkout', () => {
     const template = document.createElement('template')
@@ -82,10 +100,12 @@ describe('cashier document policy before injected analytics', () => {
     template.innerHTML =
       '<script data-policy-test src="https://analytics.example/script.js" data-website-id="public-site-id" defer></script><script data-policy-test>window.analyticsStarted = true</script>'
     document.head.append(template)
-    vm.runInNewContext(analyticsLoader, {
+    const context = vm.createContext({
       document,
       window: { location: { pathname: '/' } },
     })
+    vm.runInContext(entryPolicy, context)
+    vm.runInContext(analyticsLoader, context)
     const scripts = document.querySelectorAll('script[data-policy-test]')
     expect(scripts).toHaveLength(2)
     expect(scripts[0]).toHaveAttribute('data-website-id', 'public-site-id')
@@ -93,11 +113,19 @@ describe('cashier document policy before injected analytics', () => {
     expect(scripts[1]).toHaveTextContent('window.analyticsStarted = true')
   })
 
-  it('does not restrict normal application routes', () => {
+  it.each([
+    '/',
+    '/partner/checkout-other',
+    '/partner/checkout/child',
+    '/partner/%2563heckout',
+    '/partner/%',
+    '/partner/%FFcheckout',
+  ])('does not restrict non-cashier or malformed path %s', (pathname) => {
     vm.runInNewContext(entryPolicy, {
       document,
-      window: { location: { pathname: '/' } },
+      window: { location: { pathname } },
     })
+    expect(isPartnerCheckoutPath(pathname)).toBe(false)
     expect(
       document.querySelector('meta[http-equiv="Content-Security-Policy"]')
     ).toBeNull()

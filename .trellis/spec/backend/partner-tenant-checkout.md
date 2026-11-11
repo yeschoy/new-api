@@ -26,6 +26,7 @@ Read before changing pt_ Tenant account/key provisioning, subscription plan owne
 - Known purchase limits are checked before payment. Accepted renewal freezes its subscription ID and can survive natural expiry, not explicit cancellation. Nonzero purchase limits conservatively reserve pending first-purchase slots beyond browser expiry because of late payment; no automatic gateway close/release exists. Do not delete/release such orders without payment reconciliation.
 - Cashier HMAC is purpose-separated, order-bound and expires at initial 30-minute deadline. Stable SESSION_SECRET/CRYPTO_SECRET across nodes/restarts are required. DTO has no buyer ID/tenant secret/Key; only pending DTO includes QR/payment URL.
 - Merchant status needs pt_ and BFF user ownership; public capability is not a login. Scrub fragment before Router, use per-order sessionStorage only, separate fetch from auth interceptors, no third-party analytics, strict DTO decoder, HTTPS no-userinfo pay links, nonoverlap cancellable polling. HTML/API no-store/no-referrer and frame denial; redirects never settle.
+- Cashier path classification must match Go's single URL-path decode, not raw browser pathname literals. Before analytics, `web/index.html` classifies once (catch malformed encodings) for both CSP/referrer and analytics exclusion; `isPartnerCheckoutPath(pathname)` uses the same rule. Exact decoded `/partner/checkout` or `/partner/checkout/` is cashier; malformed, double-encoded and lookalike paths are not. `prepareCashierEntry()` canonicalizes recognized static-host aliases to `/partner/checkout`, preserving the raw query and scrubbing the fragment before Router or generic cache/branding/status effects. Both Go HTML routes redirect encoded/trailing-slash aliases with 301 to the local canonical path plus unchanged query and retain no-store/no-referrer/DENY/frame-ancestors headers. Never put a capability in Location or rely solely on a server redirect to protect static deployments.
 - Tenant membership forces subscription_only at NewBillingSession even with wallet preference/balance. Membership DB error fails closed. Legacy MJ/SwapFace unsupported subscription paths must check membership before upstream and reject, not debit wallet. Ordinary users/pst_ recharge behavior stays unchanged.
 
 ## 4. Validation & Error Matrix
@@ -44,6 +45,8 @@ Read before changing pt_ Tenant account/key provisioning, subscription plan owne
 | Tenant wallet has funds but no usable plan | Reject model use, wallet untouched |
 | Legacy MJ Tenant or membership-query failure | Reject before upstream |
 | Browser success/return/paid assertion | Informational only, no settlement |
+| `/partner/%63heckout`, `/%70artner/checkout`, encoded separator, trailing slash | Same early CSP/no analytics; canonical path, preserved query, fragment removed before Router; Go aliases redirect with privacy headers |
+| Malformed encoding, `/partner/%2563heckout`, `/partner/checkout-other` | No decode exception or recursive decoding; ordinary-page behavior remains unchanged |
 
 ## 5. Good / Base / Bad Cases
 
@@ -55,9 +58,10 @@ Read before changing pt_ Tenant account/key provisioning, subscription plan owne
 
 - `model/partner_tenant_order_test.go`: real SQLite/MySQL/PostgreSQL and MySQL clientFoundRows, fresh/legacy/repeated migrations, identity case sensitivity, same-key concurrency, paid evidence uniqueness, atomic rollback, disabled resources, recovery, renewal and known/accepted purchase limits.
 - `controller/partner_tenant_order_test.go`, `partner_tenant_review_test.go`: mocked TLS gateway, strict notifications, late/duplicate payment, failed preparation, public DTO/capability, real admin plan create/update -> checkout, purchase limit before gateway. Keep shared transport PartnerServer regression.
-- `router/partner_tenant_router_test.go`, web-route regression: removed grant, authenticated tenant scoping, cashier HTML/cache headers.
+- `router/partner_tenant_router_test.go`, web-route regression: removed grant, authenticated tenant scoping, cashier HTML/cache headers. `router/plugin_router_test.go:TestPartnerCashierHTMLCanonicalizesEncodedPaths` asserts encoded aliases/trailing slash redirect locally, preserve raw query and privacy headers, then serve canonical HTML; double-encoded/lookalike negative cases do not redirect.
 - Service funding and `relay/mjproxy_tenant_funding_test.go`: funded wallet refusal, DB failure, ordinary-user unchanged and no legacy upstream calls. Test fixtures using BillingSession must migrate PartnerTenantAccount.
 - `web/src/features/partner-checkout/__tests__`: access scrub/reload/scope, raw fetch contract/no login effects, schema/status/links/QR/poll cleanup, public root isolation, all seven locales. Subscription admin price/payload CNY vs ordinary USD regression, explicit foreign-currency admin rejection, and historical non-CNY edits requiring a new exact-cent CNY price rather than carrying the old amount.
+- Cashier access/document-policy/route/bootstrap regressions must execute real early HTML scripts, access helper, root route and `main.tsx` control flow with encoded/canonical/negative samples: CSP/referrer before analytics, no mounted analytics, fragment gone at Router construction, no generic login/status/branding/cache initialization, per-order reload preserved, ordinary pages unchanged. Do not mock the path predicate itself to prove this security boundary.
 - All Go tests/DB engines, including SQLite, run in task-owned Docker. A successful `go build`/`go vet` is NOT DB runtime verification. Report blocked container startup or skipped engines and do not archive as fully verified.
 
 ## 7. Wrong vs Correct
@@ -74,6 +78,15 @@ if err := RecordPartnerTenantPayment(order, provider, pid, method, txn, cents); 
     return err
 }
 return FulfillPartnerTenantSubscriptionOrder(order)
+```
+
+```ts
+// Wrong: raw browser pathname can differ from Gin's decoded routing path.
+const cashier = window.location.pathname === '/partner/checkout'
+
+// Correct: bounded single decode before policy/analytics; catch malformed paths.
+const cashier = isPartnerCheckoutPath(window.location.pathname)
+prepareCashierEntry() // canonicalize/scrub before createRouter and shared effects
 ```
 
 ```ts
