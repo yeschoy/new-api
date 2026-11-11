@@ -904,6 +904,44 @@ func TestWebFallbackDoesNotCacheMissingAPIOrAssets(t *testing.T) {
 	assert.Equal(t, "no-cache", page.Header().Get("Cache-Control"))
 }
 
+func TestPartnerCashierHTMLIsPrivateAndUnframed(t *testing.T) {
+	outer := gin.New()
+	SetWebRouter(outer, WebAssets{IndexPage: []byte("cashier")}, func(c *gin.Context) { c.Next() })
+	response := performPluginRequest(outer, http.MethodGet, "/partner/checkout?order_no=PTOtest")
+	assert.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, "cashier", response.Body.String())
+	assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+	assert.Equal(t, "no-referrer", response.Header().Get("Referrer-Policy"))
+	assert.Equal(t, "DENY", response.Header().Get("X-Frame-Options"))
+	assert.Equal(t, "frame-ancestors 'none'", response.Header().Get("Content-Security-Policy"))
+}
+
+func TestPartnerCashierHTMLCanonicalizesEncodedPaths(t *testing.T) {
+	outer := gin.New()
+	SetWebRouter(outer, WebAssets{IndexPage: []byte("cashier")}, func(c *gin.Context) { c.Next() })
+	for _, path := range []string{"/partner/%63heckout", "/%70artner/checkout", "/partner%2Fcheckout", "/partner/%63heckout%2f", "/partner/checkout/"} {
+		t.Run(path, func(t *testing.T) {
+			const query = "order_no=PTOtest&extra=a%2Fb"
+			response := performPluginRequest(outer, http.MethodGet, path+"?"+query)
+			assert.Equal(t, http.StatusMovedPermanently, response.Code)
+			assert.Equal(t, "/partner/checkout?"+query, response.Header().Get("Location"))
+			assert.NotContains(t, response.Body.String(), "cashier")
+			assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+			assert.Equal(t, "no-referrer", response.Header().Get("Referrer-Policy"))
+			assert.Equal(t, "DENY", response.Header().Get("X-Frame-Options"))
+			assert.Equal(t, "frame-ancestors 'none'", response.Header().Get("Content-Security-Policy"))
+			canonical := performPluginRequest(outer, http.MethodGet, response.Header().Get("Location"))
+			assert.Equal(t, http.StatusOK, canonical.Code)
+			assert.Equal(t, "cashier", canonical.Body.String())
+		})
+	}
+	for _, path := range []string{"/partner/%2563heckout", "/partner/checkout-other", "/partner/checkout/child"} {
+		response := performPluginRequest(outer, http.MethodGet, path)
+		assert.Empty(t, response.Header().Get("Location"), path)
+		assert.Empty(t, response.Header().Get("X-Frame-Options"), path)
+	}
+}
+
 func TestSecurityRoutesDisableCachingBeforeAuthentication(t *testing.T) {
 	outer := gin.New()
 	SetApiRouter(outer)

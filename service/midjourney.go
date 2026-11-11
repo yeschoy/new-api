@@ -30,6 +30,25 @@ func CovertMjpActionToModelName(mjAction string) string {
 	return modelName
 }
 
+// ValidateLegacyMidjourneyFunding runs before either legacy submission calls
+// upstream. These paths have no subscription reservation/settlement support;
+// Tenant membership (not the user's mutable preference or wallet balance)
+// therefore makes them unavailable. Read/status/notification paths are unaffected.
+func ValidateLegacyMidjourneyFunding(relayInfo *relaycommon.RelayInfo) error {
+	if relayInfo == nil {
+		return errors.New("legacy_midjourney_billing_unavailable")
+	}
+	member, err := model.IsPartnerTenantUser(relayInfo.UserId)
+	if err != nil {
+		// Do not expose database details or treat query failure as non-membership.
+		return errors.New("legacy_midjourney_billing_unavailable")
+	}
+	if member || relayInfo.BillingSource == BillingSourceSubscription {
+		return errors.New("legacy_midjourney_subscription_unsupported")
+	}
+	return nil
+}
+
 // PrepareMidjourneyTaskBilling sets the durable refund marker before the task is inserted.
 func PrepareMidjourneyTaskBilling(relayInfo *relaycommon.RelayInfo, task *model.Midjourney, quota int, shouldBill bool) (bool, error) {
 	if task == nil {

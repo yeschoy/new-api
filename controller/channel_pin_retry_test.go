@@ -117,7 +117,7 @@ func newPinRetryContext() *gin.Context {
 func TestAutoGroupSubscriptionFundingAndRetryRouting(t *testing.T) {
 	require.NoError(t, i18n.Init())
 	db := modelManagementDB(t, "sqlite", "")
-	require.NoError(t, db.AutoMigrate(&model.Token{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+	require.NoError(t, db.AutoMigrate(&model.Token{}, &model.PartnerTenantAccount{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
 	previousGroups := setting.UserUsableGroups2JSONString()
 	previousRatio := ratio_setting.GroupRatio2JSONString()
 	previousMax := setting.GetMaxTokenAutoGroups()

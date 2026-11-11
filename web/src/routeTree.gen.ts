@@ -35,6 +35,7 @@ import { Route as AuthenticatedSystemSettingsRouteRouteImport } from './routes/_
 import { Route as AboutIndexRouteImport } from './routes/about/index'
 import { Route as DesktopConnectRouteImport } from './routes/desktop/connect'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
+import { Route as PartnerCheckoutRouteImport } from './routes/partner/checkout'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
@@ -213,6 +214,11 @@ const DesktopConnectRoute = DesktopConnectRouteImport.update({
 const OauthProviderRoute = OauthProviderRouteImport.update({
   id: '/oauth/$provider',
   path: '/oauth/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerCheckoutRoute = PartnerCheckoutRouteImport.update({
+  id: '/partner/checkout',
+  path: '/partner/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingIndexRoute = PricingIndexRouteImport.update({
@@ -524,6 +530,7 @@ export interface FileRoutesByFullPath {
   '/iq-tests': typeof AuthenticatedIqTestsRoute
   '/desktop/connect': typeof DesktopConnectRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/partner/checkout': typeof PartnerCheckoutRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -598,6 +605,7 @@ export interface FileRoutesByTo {
   '/iq-tests': typeof AuthenticatedIqTestsRoute
   '/desktop/connect': typeof DesktopConnectRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/partner/checkout': typeof PartnerCheckoutRoute
   '/about': typeof AboutIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
@@ -676,6 +684,7 @@ export interface FileRoutesById {
   '/_authenticated/iq-tests': typeof AuthenticatedIqTestsRoute
   '/desktop/connect': typeof DesktopConnectRoute
   '/oauth/$provider': typeof OauthProviderRoute
+  '/partner/checkout': typeof PartnerCheckoutRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -753,6 +762,7 @@ export interface FileRouteTypes {
     | '/iq-tests'
     | '/desktop/connect'
     | '/oauth/$provider'
+    | '/partner/checkout'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -827,6 +837,7 @@ export interface FileRouteTypes {
     | '/iq-tests'
     | '/desktop/connect'
     | '/oauth/$provider'
+    | '/partner/checkout'
     | '/about'
     | '/pricing'
     | '/rankings'
@@ -904,6 +915,7 @@ export interface FileRouteTypes {
     | '/_authenticated/iq-tests'
     | '/desktop/connect'
     | '/oauth/$provider'
+    | '/partner/checkout'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -971,6 +983,7 @@ export interface RootRouteChildren {
   errors503Route: typeof errors503Route
   DesktopConnectRoute: typeof DesktopConnectRoute
   OauthProviderRoute: typeof OauthProviderRoute
+  PartnerCheckoutRoute: typeof PartnerCheckoutRoute
   AboutIndexRoute: typeof AboutIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
@@ -1160,6 +1173,13 @@ declare module '@tanstack/react-router' {
       path: '/oauth/$provider'
       fullPath: '/oauth/$provider'
       preLoaderRoute: typeof OauthProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner/checkout': {
+      id: '/partner/checkout'
+      path: '/partner/checkout'
+      fullPath: '/partner/checkout'
+      preLoaderRoute: typeof PartnerCheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing/': {
@@ -1689,6 +1709,7 @@ const rootRouteChildren: RootRouteChildren = {
   errors503Route: errors503Route,
   DesktopConnectRoute: DesktopConnectRoute,
   OauthProviderRoute: OauthProviderRoute,
+  PartnerCheckoutRoute: PartnerCheckoutRoute,
   AboutIndexRoute: AboutIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,

@@ -24,36 +24,47 @@ import { parseQuotaFromDollars, quotaUnitsToDollars } from '@/lib/format'
 import type { SubscriptionPlan, PlanPayload } from '../types'
 
 export function getPlanFormSchema(t: TFunction) {
-  return z.object({
-    partner_tenant_id: z.coerce.number().min(0),
-    title: z.string().min(1, t('Please enter plan title')),
-    subtitle: z.string().optional(),
-    price_amount: z.coerce.number().min(0, t('Please enter amount')),
-    duration_unit: z.enum(['year', 'month', 'day', 'hour', 'custom']),
-    duration_value: z.coerce.number().min(1),
-    custom_seconds: z.coerce.number().min(0).optional(),
-    quota_reset_period: z.enum([
-      'never',
-      'daily',
-      'weekly',
-      'monthly',
-      'custom',
-    ]),
-    quota_reset_custom_seconds: z.coerce.number().min(0).optional(),
-    enabled: z.boolean(),
-    sort_order: z.coerce.number(),
-    allow_balance_pay: z.boolean(),
-    allow_wallet_overflow: z.boolean(),
-    max_purchase_per_user: z.coerce.number().min(0),
-    total_amount: z.coerce.number().min(0),
-    requests_per_minute: z.coerce.number().int().min(0).max(1000000),
-    upgrade_group: z.string().optional(),
-    applicable_group: z.string().optional(),
-    downgrade_group: z.string().optional(),
-    stripe_price_id: z.string().optional(),
-    creem_product_id: z.string().optional(),
-    waffo_pancake_product_id: z.string().optional(),
-  })
+  return z
+    .object({
+      partner_tenant_id: z.coerce.number().min(0),
+      title: z.string().min(1, t('Please enter plan title')),
+      subtitle: z.string().optional(),
+      price_amount: z.coerce.number().min(0, t('Please enter amount')),
+      duration_unit: z.enum(['year', 'month', 'day', 'hour', 'custom']),
+      duration_value: z.coerce.number().min(1),
+      custom_seconds: z.coerce.number().min(0).optional(),
+      quota_reset_period: z.enum([
+        'never',
+        'daily',
+        'weekly',
+        'monthly',
+        'custom',
+      ]),
+      quota_reset_custom_seconds: z.coerce.number().min(0).optional(),
+      enabled: z.boolean(),
+      sort_order: z.coerce.number(),
+      allow_balance_pay: z.boolean(),
+      allow_wallet_overflow: z.boolean(),
+      max_purchase_per_user: z.coerce.number().min(0),
+      total_amount: z.coerce.number().min(0),
+      requests_per_minute: z.coerce.number().int().min(0).max(1000000),
+      upgrade_group: z.string().optional(),
+      applicable_group: z.string().optional(),
+      downgrade_group: z.string().optional(),
+      stripe_price_id: z.string().optional(),
+      creem_product_id: z.string().optional(),
+      waffo_pancake_product_id: z.string().optional(),
+    })
+    .refine(
+      (values) =>
+        values.partner_tenant_id <= 0 ||
+        (values.price_amount > 0 &&
+          Number(values.price_amount.toFixed(2)) === values.price_amount),
+      {
+        path: ['price_amount'],
+        message: t('Enter a positive CNY amount with up to 2 decimal places'),
+      }
+    )
 }
 
 export type PlanFormValues = z.infer<ReturnType<typeof getPlanFormSchema>>
@@ -84,11 +95,15 @@ export const PLAN_FORM_DEFAULTS: PlanFormValues = {
 }
 
 export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {
+  // Tenant prices are CNY-only. Never carry a historical USD amount into the
+  // CNY editor: require the operator to enter a new positive price explicitly.
+  const requiresRepricing =
+    Number(plan.partner_tenant_id || 0) > 0 && plan.currency !== 'CNY'
   return {
     partner_tenant_id: Number(plan.partner_tenant_id || 0),
     title: plan.title || '',
     subtitle: plan.subtitle || '',
-    price_amount: Number(plan.price_amount || 0),
+    price_amount: requiresRepricing ? 0 : Number(plan.price_amount || 0),
     duration_unit: plan.duration_unit || 'month',
     duration_value: Number(plan.duration_value || 1),
     custom_seconds: Number(plan.custom_seconds || 0),
@@ -117,7 +132,7 @@ export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
       ...values,
       partner_tenant_id: Number(values.partner_tenant_id || 0),
       price_amount: Number(values.price_amount || 0),
-      currency: 'USD',
+      currency: isPartnerPlan ? 'CNY' : 'USD',
       duration_unit: isPartnerPlan ? 'month' : values.duration_unit,
       duration_value: isPartnerPlan ? 1 : Number(values.duration_value || 0),
       custom_seconds: isPartnerPlan ? 0 : Number(values.custom_seconds || 0),

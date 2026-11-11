@@ -1,0 +1,350 @@
+[
+  {
+    "command": [
+      "open",
+      "https://www.flaship.net/"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "targetId": "B42E013D98CF0EE02227DF172357DDB0",
+      "title": "FlashIP | Global Proxy Solutions for Data & Business",
+      "url": "https://www.flaship.net/"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://www.flaship.net/",
+      "refs": {
+        "e159": {
+          "name": "Skip to content",
+          "role": "link"
+        },
+        "e160": {
+          "name": "FlashIP home",
+          "role": "link"
+        },
+        "e161": {
+          "name": "Main navigation",
+          "role": "navigation"
+        },
+        "e162": {
+          "name": "Get Started",
+          "role": "link"
+        },
+        "e163": {
+          "name": "FlashIP",
+          "role": "region"
+        },
+        "e164": {
+          "name": "The right proxy for the way you work",
+          "role": "region"
+        },
+        "e165": {
+          "name": "Global coverage Local possibilities",
+          "role": "region"
+        },
+        "e166": {
+          "name": "Power your work across industries",
+          "role": "region"
+        },
+        "e167": {
+          "name": "Trusted by businesses worldwide",
+          "role": "region"
+        },
+        "e168": {
+          "name": "Access a borderless world today",
+          "role": "region"
+        },
+        "e169": {
+          "name": "FlashIP home",
+          "role": "link"
+        },
+        "e170": {
+          "name": "Terms & Conditions",
+          "role": "link"
+        },
+        "e171": {
+          "name": "Privacy Policy",
+          "role": "link"
+        },
+        "e172": {
+          "name": "Blog",
+          "role": "link"
+        },
+        "e173": {
+          "name": "Global coverage Local possibilities",
+          "role": "heading"
+        },
+        "e174": {
+          "name": "View all locations",
+          "role": "link"
+        },
+        "e175": {
+          "name": "Power your work across industries",
+          "role": "heading"
+        },
+        "e176": {
+          "name": "eCommerce",
+          "role": "link"
+        },
+        "e177": {
+          "name": "Travel & hospitality",
+          "role": "link"
+        },
+        "e178": {
+          "name": "Digital marketing",
+          "role": "link"
+        },
+        "e179": {
+          "name": "Social media",
+          "role": "link"
+        },
+        "e180": {
+          "name": "Market research",
+          "role": "link"
+        },
+        "e181": {
+          "name": "More use cases",
+          "role": "link"
+        },
+        "e182": {
+          "name": "Multiple Proxy Types for Any Scenario",
+          "role": "navigation"
+        },
+        "e183": {
+          "name": "United States — New York",
+          "role": "button"
+        },
+        "e184": {
+          "name": "Germany — Frankfurt",
+          "role": "button"
+        },
+        "e185": {
+          "name": "Singapore — Singapore",
+          "role": "button"
+        },
+        "e186": {
+          "name": "Japan — Tokyo",
+          "role": "button"
+        },
+        "e187": {
+          "name": "Brazil — Sao Paulo",
+          "role": "button"
+        },
+        "e188": {
+          "name": "Explore use cases",
+          "role": "link"
+        },
+        "e189": {
+          "name": "Residential Proxies",
+          "role": "link"
+        },
+        "e190": {
+          "name": "Mobile Proxies",
+          "role": "link"
+        },
+        "e191": {
+          "name": "ISP Proxies",
+          "role": "link"
+        },
+        "e192": {
+          "name": "Datacenter Proxies",
+          "role": "link"
+        },
+        "e193": {
+          "name": "Blog",
+          "role": "link"
+        },
+        "e194": {
+          "name": "Partners",
+          "role": "link"
+        },
+        "e195": {
+          "name": "Contact support",
+          "role": "link"
+        },
+        "e196": {
+          "name": "Privacy Policy",
+          "role": "link"
+        },
+        "e197": {
+          "name": "Products",
+          "role": "link"
+        },
+        "e198": {
+          "name": "Pricing",
+          "role": "link"
+        },
+        "e199": {
+          "name": "Use cases",
+          "role": "link"
+        },
+        "e200": {
+          "name": "Locations",
+          "role": "link"
+        },
+        "e201": {
+          "name": "Reliable Proxies for a Borderless World",
+          "role": "heading"
+        },
+        "e202": {
+          "name": "Get proxies",
+          "role": "link"
+        },
+        "e203": {
+          "name": "View pricing",
+          "role": "link"
+        },
+        "e204": {
+          "name": "Multiple Proxy Types for Any Scenario",
+          "role": "heading"
+        },
+        "e205": {
+          "name": "Residential Proxies Real household IPs High anonymity",
+          "role": "link"
+        },
+        "e206": {
+          "name": "Mobile Proxies 4G/5G carrier IPs Lower ban risk",
+          "role": "link"
+        },
+        "e207": {
+          "name": "ISP Proxies Static residential IPs Stable & reliable",
+          "role": "link"
+        },
+        "e208": {
+          "name": "Datacenter Proxies High speed & low cost For large-scale tasks",
+          "role": "link"
+        },
+        "e209": {
+          "name": "The right proxy for the way you work",
+          "role": "heading"
+        },
+        "e210": {
+          "name": "Residential Proxies: Local insights",
+          "role": "tab"
+        },
+        "e211": {
+          "name": "Mobile Proxies: Mobile experiences",
+          "role": "tab"
+        },
+        "e212": {
+          "name": "ISP Proxies: Consistent IPs",
+          "role": "tab"
+        },
+        "e213": {
+          "name": "Datacenter Proxies: Everyday automation",
+          "role": "tab"
+        },
+        "e214": {
+          "name": "Trusted by businesses worldwide",
+          "role": "heading"
+        },
+        "e215": {
+          "name": "Previous testimonials",
+          "role": "button"
+        },
+        "e216": {
+          "name": "Next testimonials",
+          "role": "button"
+        },
+        "e217": {
+          "name": "Access a borderless world today",
+          "role": "heading"
+        },
+        "e218": {
+          "name": "Get proxies",
+          "role": "link"
+        },
+        "e219": {
+          "name": "Talk to sales",
+          "role": "link"
+        },
+        "e220": {
+          "name": "Highlight connections for United Kingdom, 1.9M+ IPs",
+          "role": "button"
+        },
+        "e221": {
+          "name": "Highlight connections for Germany, 800K+ IPs",
+          "role": "button"
+        },
+        "e222": {
+          "name": "Highlight connections for United States, 2.4M+ IPs",
+          "role": "button"
+        },
+        "e223": {
+          "name": "Highlight connections for Singapore, 700K+ IPs",
+          "role": "button"
+        },
+        "e224": {
+          "name": "Highlight connections for Brazil, 620K+ IPs",
+          "role": "button"
+        },
+        "e225": {
+          "name": "See the web from a local perspective",
+          "role": "heading"
+        },
+        "e226": {
+          "name": "Explore residential proxies",
+          "role": "link"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- link \"Skip to content\" [ref=e159]\n- link \"FlashIP home\" [ref=e160]\n- navigation \"Main navigation\" [ref=e161]\n  - link \"Products\" [ref=e197]\n  - link \"Pricing\" [ref=e198]\n  - link \"Use cases\" [ref=e199]\n  - link \"Locations\" [ref=e200]\n  - link \"Blog\" [ref=e172]\n- link \"Get Started\" [ref=e162]\n- region \"FlashIP\" [ref=e163]\n  - heading \"Reliable Proxies for a Borderless World\" [level=1, ref=e201]\n  - link \"Get proxies\" [ref=e202]\n  - link \"View pricing\" [ref=e203]\n  - button \"Highlight connections for United Kingdom, 1.9M+ IPs\" [ref=e220]\n  - button \"Highlight connections for Germany, 800K+ IPs\" [ref=e221]\n  - button \"Highlight connections for United States, 2.4M+ IPs\" [ref=e222]\n  - button \"Highlight connections for Singapore, 700K+ IPs\" [ref=e223]\n  - button \"Highlight connections for Brazil, 620K+ IPs\" [ref=e224]\n  - navigation \"Multiple Proxy Types for Any Scenario\" [ref=e182]\n    - heading \"Multiple Proxy Types for Any Scenario\" [level=2, ref=e204]\n    - link \"Residential Proxies Real household IPs High anonymity\" [ref=e205]\n    - link \"Mobile Proxies 4G/5G carrier IPs Lower ban risk\" [ref=e206]\n    - link \"ISP Proxies Static residential IPs Stable & reliable\" [ref=e207]\n    - link \"Datacenter Proxies High speed & low cost For large-scale tasks\" [ref=e208]\n- region \"The right proxy for the way you work\" [ref=e164]\n  - heading \"The right proxy for the way you work\" [level=2, ref=e209]\n  - tab \"Residential Proxies: Local insights\" [selected, ref=e210]\n  - tab \"Mobile Proxies: Mobile experiences\" [ref=e211]\n  - tab \"ISP Proxies: Consistent IPs\" [ref=e212]\n  - tab \"Datacenter Proxies: Everyday automation\" [ref=e213]\n  - heading \"See the web from a local perspective\" [level=3, ref=e225]\n  - link \"Explore residential proxies\" [ref=e226]\n- region \"Global coverage Local possibilities\" [ref=e165]\n  - heading \"Global coverage Local possibilities\" [level=2, ref=e173]\n  - link \"View all locations\" [ref=e174]\n  - button \"United States — New York\" [ref=e183]\n  - button \"Germany — Frankfurt\" [ref=e184]\n  - button \"Singapore — Singapore\" [ref=e185]\n  - button \"Japan — Tokyo\" [ref=e186]\n  - button \"Brazil — Sao Paulo\" [ref=e187]\n- region \"Power your work across industries\" [ref=e166]\n  - heading \"Power your work across industries\" [level=2, ref=e175]\n  - link \"eCommerce\" [ref=e176]\n  - link \"Travel & hospitality\" [ref=e177]\n  - link \"Digital marketing\" [ref=e178]\n  - link \"Social media\" [ref=e179]\n  - link \"Market research\" [ref=e180]\n  - link \"More use cases\" [ref=e181]\n  - link \"Explore use cases\" [ref=e188]\n- region \"Trusted by businesses worldwide\" [ref=e167]\n  - heading \"Trusted by businesses worldwide\" [level=2, ref=e214]\n  - button \"Previous testimonials\" [ref=e215]\n  - button \"Next testimonials\" [ref=e216]\n- region \"Access a borderless world today\" [ref=e168]\n  - heading \"Access a borderless world today\" [level=2, ref=e217]\n  - link \"Get proxies\" [ref=e218]\n  - link \"Talk to sales\" [ref=e219]\n- link \"FlashIP home\" [ref=e169]\n- link \"Residential Proxies\" [ref=e189]\n- link \"Mobile Proxies\" [ref=e190]\n- link \"ISP Proxies\" [ref=e191]\n- link \"Datacenter Proxies\" [ref=e192]\n- link \"Blog\" [ref=e193]\n- link \"Partners\" [ref=e194]\n- link \"Contact support\" [ref=e195]\n- link \"Privacy Policy\" [ref=e196]\n- link \"Terms & Conditions\" [ref=e170]\n- link \"Privacy Policy\" [ref=e171]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify({url:location.href,title:document.title,links:Array.from(document.querySelectorAll('a[href]')).map(a=>({text:a.innerText.trim(),href:a.href})).filter(a=>/log|sign|dash|api|doc|partner|price|terms|privacy/i.test(a.text+' '+a.href)),scripts:Array.from(document.scripts).map(s=>s.src).filter(Boolean),frames:Array.from(document.querySelectorAll('iframe')).map(x=>x.src)})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "https://www.flaship.net/",
+      "result": "{\"url\":\"https://www.flaship.net/\",\"title\":\"FlashIP | Global Proxy Solutions for Data & Business\",\"links\":[{\"text\":\"\",\"href\":\"https://www.flaship.net/use-cases/web-scraping/\"},{\"text\":\"\",\"href\":\"https://www.flaship.net/use-cases/price-monitoring/\"},{\"text\":\"Blog\",\"href\":\"https://www.flaship.net/blog/\"},{\"text\":\"ISP ProxiesStatic ISP allocations priced by IP and duration.from $7.99/IP/mo\",\"href\":\"https://www.flaship.net/pricing/isp-proxies/\"},{\"text\":\"Web Scraping\",\"href\":\"https://www.flaship.net/use-cases/web-scraping/\"},{\"text\":\"Price Monitoring\",\"href\":\"https://www.flaship.net/use-cases/price-monitoring/\"},{\"text\":\"Blog\",\"href\":\"https://www.flaship.net/blog/\"},{\"text\":\"eCommerce\",\"href\":\"https://www.flaship.net/use-cases/price-monitoring/\"},{\"text\":\"Blog\",\"href\":\"https://www.flaship.net/blog/\"},{\"text\":\"Partners\",\"href\":\"https://www.flaship.net/partners/\"},{\"text\":\"Privacy Policy\",\"href\":\"https://www.flaship.net/privacy-policy/\"},{\"text\":\"Terms & Conditions\",\"href\":\"https://www.flaship.net/terms-conditions/\"},{\"text\":\"Privacy Policy\",\"href\":\"https://www.flaship.net/privacy-policy/\"}],\"scripts\":[\"https://console.data4.net/static/js/tracker.js\",\"https://www.googletagmanager.com/gtag/js?id=G-PC7DR5W7MR\",\"https://www.flaship.net/_astro/HomeTestimonialsSection.astro_astro_type_script_index_0_lang.xr5CajvV.js\"],\"frames\":[]}"
+    },
+    "success": true
+  }
+]

@@ -1,0 +1,142 @@
+[
+  {
+    "command": [
+      "wait",
+      "--text",
+      "99.00",
+      "--timeout",
+      "15000"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "text": "99.00",
+      "waited": "text"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "refs": {
+        "e1": {
+          "name": "",
+          "role": "generic"
+        },
+        "e2": {
+          "name": "订阅收银台",
+          "role": "heading"
+        },
+        "e3": {
+          "name": "商户专属模型月套餐",
+          "role": "heading"
+        },
+        "e4": {
+          "name": "打开安全支付页面",
+          "role": "link"
+        }
+      },
+      "removedRefs": [],
+      "snapshot": "- generic \"订阅收银台商户专属模型月套餐99.00 CNY订单号PTO0123456789ABCDEFGHIJKLMNOPQRSTUV付款方式alipay收银台访问到期时间2029/11/22 08:00:00等\" [ref=e1] clickable [onclick]\n  - heading \"订阅收银台\" [level=1, ref=e2]\n  - heading \"商户专属模型月套餐\" [level=2, ref=e3]\n  - link \"打开安全支付页面\" [ref=e4]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "screenshot",
+      "/Users/lyh_god/GolandProjects/new-api/.trellis/tasks/11-04-partner-subscription-auto-provision/research/cashier-desktop.png"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "path": "/Users/lyh_god/GolandProjects/new-api/.trellis/tasks/11-04-partner-subscription-auto-provision/research/cashier-desktop.png"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "url": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify({hashCleared:location.hash==='',title:document.title,text:document.body.innerText,externalScripts:Array.from(document.scripts).filter(x=>x.src&&new URL(x.src).origin!==location.origin).map(x=>x.src),referrer:document.querySelector('meta[name=referrer]')?.content})"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "result": "{\"hashCleared\":true,\"title\":\"野菜\",\"text\":\"订阅收银台\\n商户专属模型月套餐\\n\\n99.00 CNY\\n\\n订单号\\nPTO0123456789ABCDEFGHIJKLMNOPQRSTUV\\n付款方式\\nalipay\\n收银台访问到期时间\\n2029/11/22 08:00:00\\n\\n等待支付确认\\n\\n打开安全支付页面\\n\\n仅经核实的付款会开通订阅，本页面无法确认收款。\",\"externalScripts\":[],\"referrer\":\"no-referrer\"}"
+    },
+    "success": true
+  }
+]

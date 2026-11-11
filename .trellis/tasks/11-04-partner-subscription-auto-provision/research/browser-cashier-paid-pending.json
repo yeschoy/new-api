@@ -1,0 +1,167 @@
+[
+  {
+    "command": [
+      "get",
+      "url"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "url": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "network",
+      "unroute",
+      "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "unrouted": "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "network",
+      "route",
+      "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "--body",
+      "[REDACTED]"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "routed": "**/api/partner/checkout/PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "wait",
+      "--text",
+      "请勿重复付款",
+      "--timeout",
+      "12000"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "text": "请勿重复付款",
+      "waited": "text"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "snapshot",
+      "-i"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "refs": {
+        "e1": {
+          "name": "",
+          "role": "generic"
+        },
+        "e2": {
+          "name": "订阅收银台",
+          "role": "heading"
+        },
+        "e3": {
+          "name": "商户专属模型月套餐",
+          "role": "heading"
+        }
+      },
+      "removedRefs": [
+        "@e4"
+      ],
+      "snapshot": "- generic \"订阅收银台商户专属模型月套餐99.00 CNY订单号PTO0123456789ABCDEFGHIJKLMNOPQRSTUV付款方式alipay收银台访问到期时间2029/11/22 08:00:00已\" [ref=e1] clickable [onclick]\n  - heading \"订阅收银台\" [level=1, ref=e2]\n  - heading \"商户专属模型月套餐\" [level=2, ref=e3]"
+    },
+    "success": true
+  },
+  {
+    "command": [
+      "eval",
+      "JSON.stringify({text:document.body.innerText,paymentLinks:document.querySelectorAll('a[href=\"https://example.com/not-a-payment\"]').length,hashCleared:location.hash===''} )"
+    ],
+    "result": {
+      "lifecycle": {
+        "effectiveLaunch": {
+          "browserLaunched": true,
+          "engine": "chrome",
+          "launchHash": 597689549236224900
+        },
+        "launched": false,
+        "relaunchedBrowser": false,
+        "restartedBackground": false,
+        "restoreStatus": "not_configured",
+        "reused": true,
+        "saveStatus": "not_attempted"
+      },
+      "origin": "http://127.0.0.1:3011/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+      "result": "{\"text\":\"订阅收银台\\n商户专属模型月套餐\\n\\n99.00 CNY\\n\\n订单号\\nPTO0123456789ABCDEFGHIJKLMNOPQRSTUV\\n付款方式\\nalipay\\n收银台访问到期时间\\n2029/11/22 08:00:00\\n\\n已确认收款\\n\\n正在开通订阅，请勿重复付款。关闭页面后仍会继续处理。\\n\\n仅经核实的付款会开通订阅，本页面无法确认收款。\",\"paymentLinks\":0,\"hashCleared\":true}"
+    },
+    "success": true
+  }
+]
