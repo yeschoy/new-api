@@ -36,7 +36,8 @@ type AutoGroupOrderItemProps = {
   leading?: ReactNode
   children?: ReactNode
   onMove: (index: number, direction: 'up' | 'down') => void
-  onRemove: (group: string) => void
+  onRemove?: (group: string) => void
+  disabled?: boolean
 }
 
 export function AutoGroupOrderItem(props: AutoGroupOrderItemProps) {
@@ -61,6 +62,7 @@ export function AutoGroupOrderItem(props: AutoGroupOrderItemProps) {
   return (
     <Reorder.Item
       value={props.group}
+      drag={props.disabled ? false : 'y'}
       dragListener={false}
       dragMomentum={false}
       dragControls={dragControls}
@@ -73,6 +75,7 @@ export function AutoGroupOrderItem(props: AutoGroupOrderItemProps) {
         className='text-muted-foreground cursor-grab touch-none font-mono active:cursor-grabbing'
         aria-label={t('Drag {{group}} to reorder', { group: props.group })}
         title={t('Drag {{group}} to reorder', { group: props.group })}
+        disabled={props.disabled}
         onPointerDown={handleDragStart}
         onKeyDown={handleDragKeyDown}
       >
@@ -93,7 +96,7 @@ export function AutoGroupOrderItem(props: AutoGroupOrderItemProps) {
           type='button'
           variant='ghost'
           size='icon-sm'
-          disabled={props.index === 0}
+          disabled={props.disabled || props.index === 0}
           aria-label={t('Move {{group}} up', { group: props.group })}
           onClick={() => props.onMove(props.index, 'up')}
         >
@@ -107,7 +110,7 @@ export function AutoGroupOrderItem(props: AutoGroupOrderItemProps) {
           type='button'
           variant='ghost'
           size='icon-sm'
-          disabled={props.index === props.count - 1}
+          disabled={props.disabled || props.index === props.count - 1}
           aria-label={t('Move {{group}} down', { group: props.group })}
           onClick={() => props.onMove(props.index, 'down')}
         >
@@ -117,19 +120,22 @@ export function AutoGroupOrderItem(props: AutoGroupOrderItemProps) {
             aria-hidden='true'
           />
         </Button>
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon-sm'
-          aria-label={t('Remove {{group}}', { group: props.group })}
-          onClick={() => props.onRemove(props.group)}
-        >
-          <HugeiconsIcon
-            icon={Cancel01Icon}
-            strokeWidth={2}
-            aria-hidden='true'
-          />
-        </Button>
+        {props.onRemove && (
+          <Button
+            type='button'
+            variant='ghost'
+            size='icon-sm'
+            disabled={props.disabled}
+            aria-label={t('Remove {{group}}', { group: props.group })}
+            onClick={() => props.onRemove?.(props.group)}
+          >
+            <HugeiconsIcon
+              icon={Cancel01Icon}
+              strokeWidth={2}
+              aria-hidden='true'
+            />
+          </Button>
+        )}
       </div>
     </Reorder.Item>
   )

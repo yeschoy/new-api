@@ -80,7 +80,6 @@ function IQGallery(props: { scope: string }) {
     group: string
     creating: boolean
   } | null>(null)
-  const [showHistory, setShowHistory] = useState(false)
   const [confirmRun, setConfirmRun] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{
     group: string
@@ -103,10 +102,26 @@ function IQGallery(props: { scope: string }) {
   for (const row of data?.groups ?? []) {
     if (!firstRows.has(row.group)) firstRows.set(row.group, row)
   }
-  const visibleRows = showHistory
-    ? (data?.groups ?? [])
-    : [...firstRows.values()]
-  const results = visibleRows.flatMap((group) =>
+  const groupRank = new Map(
+    (data?.group_order ?? []).map((group, index) => [group, index])
+  )
+  const visibleGroups = [...firstRows.values()].sort(
+    (a, b) =>
+      (groupRank.get(a.group) ?? groupRank.size) -
+      (groupRank.get(b.group) ?? groupRank.size)
+  )
+  const cardsByGroup = new Map<
+    string,
+    { key: string; card: IQResults['groups'][number]['models'][number] }[]
+  >()
+  for (const row of data?.groups ?? []) {
+    const cards = cardsByGroup.get(row.group) ?? []
+    for (const card of row.models) {
+      cards.push({ key: `${row.task_id}\0${card.model}`, card })
+    }
+    cardsByGroup.set(row.group, cards)
+  }
+  const results = (data?.groups ?? []).flatMap((group) =>
     group.models.flatMap((card) => (card.latest ? [card.latest] : []))
   )
   const expanded = results.find(
@@ -175,7 +190,7 @@ function IQGallery(props: { scope: string }) {
             <h1 className='text-2xl font-semibold'>{t('IQ tests')}</h1>
             <p className='text-muted-foreground text-sm'>
               {t(
-                'Compare the latest HTML/SVG artwork from selected text models, grouped by routing group. Not a standardized IQ score.'
+                'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.'
               )}
             </p>
           </div>
@@ -186,12 +201,6 @@ function IQGallery(props: { scope: string }) {
               onClick={() => void query.refetch()}
             >
               {t('Refresh')}
-            </Button>
-            <Button
-              variant='outline'
-              onClick={() => setShowHistory((value) => !value)}
-            >
-              {showHistory ? t('Hide run history') : t('Show run history')}
             </Button>
             {canRead && (
               <Button
@@ -230,7 +239,7 @@ function IQGallery(props: { scope: string }) {
             </section>
             <p className='text-muted-foreground text-sm'>
               {t(
-                'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.'
+                'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.'
               )}
             </p>
             {data.groups.length === 0 && (
@@ -242,9 +251,9 @@ function IQGallery(props: { scope: string }) {
               />
             )}
             <div ref={previews.root} className='space-y-8'>
-              {visibleRows.map((group) => (
+              {visibleGroups.map((group) => (
                 <section
-                  key={`${group.task_id}:${group.group}`}
+                  key={group.group}
                   className='min-w-0 space-y-4'
                   aria-label={group.group}
                 >
@@ -337,27 +346,29 @@ function IQGallery(props: { scope: string }) {
                     className='focus-visible:ring-ring overflow-x-auto rounded-lg pb-3 focus-visible:ring-2 focus-visible:outline-none'
                   >
                     <ul className='grid auto-cols-[min(100%,22rem)] grid-flow-col gap-5'>
-                      {group.models.map((card) => (
-                        <li key={card.model} className='min-w-0'>
-                          <IQResultCard
-                            scope={props.scope}
-                            card={card}
-                            live={Boolean(
-                              card.latest &&
-                              previews.live.includes(
-                                artifactRevision(card.latest)
-                              )
-                            )}
-                            onOpen={setSelected}
-                          />
-                        </li>
-                      ))}
+                      {(cardsByGroup.get(group.group) ?? []).map(
+                        ({ key, card }) => (
+                          <li key={key} className='min-w-0'>
+                            <IQResultCard
+                              scope={props.scope}
+                              card={card}
+                              live={Boolean(
+                                card.latest &&
+                                previews.live.includes(
+                                  artifactRevision(card.latest)
+                                )
+                              )}
+                              onOpen={setSelected}
+                            />
+                          </li>
+                        )
+                      )}
                     </ul>
                   </div>
                 </section>
               ))}
             </div>
-            {showHistory && query.hasNextPage && (
+            {query.hasNextPage && (
               <Button
                 variant='outline'
                 disabled={query.isFetchingNextPage}

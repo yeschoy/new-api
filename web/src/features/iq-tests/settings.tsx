@@ -43,6 +43,7 @@ import { getServerErrorStatus } from '@/lib/server-error-message'
 
 import { getIQConfig, getIQConfigs, getIQTargets, saveIQConfig } from './api'
 import { editableIQConfig, iqConfigSchema } from './config-schema'
+import { IQGroupOrder } from './group-order'
 import { iqKeys, iqQueryOptions, isCurrentIQScope } from './queries'
 import { IQTargetSelector } from './target-selector'
 import type { IQConfig, IQConfigInput, IQTarget } from './types'
@@ -72,6 +73,9 @@ export function IQSettings(props: {
         (group) => !savedGroups.includes(group)
       )
     : savedGroups
+  // Pin the initial editor group: saving a different display order must not
+  // switch forms and silently discard an in-progress prompt/schedule edit.
+  if (!props.creating && !selection && groups[0]) setSelection(groups[0])
   const group = selection || (props.creating ? '' : groups[0]) || ''
   const selected = config.data?.tasks.find((task) => task.group === group)
   const task: IQConfig | undefined =
@@ -83,6 +87,7 @@ export function IQSettings(props: {
           prompt: config.data.default_prompt,
           prompts: [],
           reasoning_effort: '',
+          history_limit: 30,
           targets: [],
           enabled: false,
           schedule_mode: 'interval',
@@ -124,6 +129,13 @@ export function IQSettings(props: {
         (config.isPending || targets.isPending) && <LoadingState />}
       {!config.isError && !targets.isError && config.data && targets.data && (
         <FieldGroup>
+          {!props.creating && savedGroups.length > 1 && (
+            <IQGroupOrder
+              scope={props.scope}
+              groups={savedGroups}
+              canWrite={props.canWrite}
+            />
+          )}
           <Field>
             <FieldLabel htmlFor='iq-task-group'>{t('Task group')}</FieldLabel>
             <NativeSelect
@@ -381,6 +393,26 @@ export function IQConfigForm(props: {
             })}
           </p>
         </div>
+        <Field data-invalid={Boolean(form.formState.errors.history_limit)}>
+          <FieldLabel htmlFor='iq-history-limit'>
+            {t('Retained runs per group')}
+          </FieldLabel>
+          <Input
+            id='iq-history-limit'
+            type='number'
+            min={1}
+            max={1000}
+            step={1}
+            aria-describedby='iq-history-limit-help'
+            aria-invalid={Boolean(form.formState.errors.history_limit)}
+            {...form.register('history_limit', { valueAsNumber: true })}
+          />
+          <FieldDescription id='iq-history-limit-help'>
+            {t(
+              'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.'
+            )}
+          </FieldDescription>
+        </Field>
         <div className='flex items-center gap-3'>
           <Controller
             name='enabled'

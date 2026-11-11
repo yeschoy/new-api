@@ -13,6 +13,7 @@ var iqAdminPermissionRoutes = []permissionRoute{
 	{method: http.MethodGet, path: "/config", permission: authz.ChannelRead, handler: controller.GetIQConfig},
 	{method: http.MethodPut, path: "/config", permission: authz.ChannelWrite, handler: controller.PutIQConfig},
 	{method: http.MethodDelete, path: "/config", permission: authz.ChannelWrite, handler: controller.DeleteIQConfig},
+	{method: http.MethodPut, path: "/group-order", permission: authz.ChannelWrite, handler: controller.PutIQGroupOrder},
 	{method: http.MethodGet, path: "/targets", permission: authz.ChannelRead, handler: controller.GetIQTargets},
 	{method: http.MethodPost, path: "/run", permission: authz.ChannelOperate, handler: controller.RunIQTests},
 }

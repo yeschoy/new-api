@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -82,11 +83,15 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Prompts"))
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Group"))
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Deleted"))
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "SortOrder"))
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "HistoryLimit"))
 	require.NoError(t, db.AutoMigrate(models...))
 	cfg, err = GetIQConfig()
 	require.NoError(t, err)
 	require.Empty(t, cfg.ReasoningEffort)
 	require.False(t, cfg.Deleted, "upgraded plans remain visible by default")
+	require.Zero(t, cfg.SortOrder, "existing plans use deterministic name order")
+	require.Equal(t, 30, cfg.HistoryLimit, "upgraded plans default to 30 retained rounds")
 	cfg.Prompt = " exact saved PostgreSQL prompt\n"
 	cfg.ReasoningEffort = "xhigh"
 	cfg.Targets = []IQTarget{{Group: "fixture", Models: []string{"model-a", "model-b"}}}
@@ -105,6 +110,7 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	group := groups[0]
+	group.HistoryLimit = 12
 	group.Prompts = IQPrompts{" exact first PostgreSQL prompt\n", "second prompt"}
 	groupSaved, err := SaveIQConfig(group, 42, time.Now())
 	require.NoError(t, err)
@@ -112,8 +118,48 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	groupReloaded, err := GetIQGroupConfig("fixture")
 	require.NoError(t, err)
 	require.Equal(t, groupSaved.Prompts, groupReloaded.Prompts)
+	require.Equal(t, 12, groupReloaded.HistoryLimit)
 	require.Equal(t, groupSaved.ID, groupReloaded.ID)
 	require.Equal(t, groupSaved.Group, groupReloaded.Group)
+	other, err := GetIQGroupConfig("order-fixture")
+	require.NoError(t, err)
+	other, err = SaveIQConfig(*other, 42, time.Now())
+	require.NoError(t, err)
+	// Upgrade real saved group rows, not only the legacy template row.
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "SortOrder"))
+	require.NoError(t, db.AutoMigrate(models...))
+	legacyOrder, err := ListIQConfigs()
+	require.NoError(t, err)
+	for _, cfg := range legacyOrder {
+		require.Zero(t, cfg.SortOrder)
+	}
+	require.NoError(t, SaveIQGroupOrder([]string{"order-fixture", "fixture"}, []string{"fixture", "order-fixture"}))
+	require.NoError(t, db.AutoMigrate(models...))
+	ordered, err := ListIQConfigs()
+	require.NoError(t, err)
+	require.Equal(t, "order-fixture", ordered[0].Group)
+	require.Equal(t, 2, ordered[1].SortOrder)
+	// Real row locking serializes two editors that observed the same order.
+	saves := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			saves <- SaveIQGroupOrder([]string{"fixture", "order-fixture"}, []string{"order-fixture", "fixture"})
+		}()
+	}
+	succeeded, conflicted := 0, 0
+	for i := 0; i < 2; i++ {
+		err := <-saves
+		if err == nil {
+			succeeded++
+		} else if errors.Is(err, ErrIQConflict) {
+			conflicted++
+		} else {
+			require.NoError(t, err)
+		}
+	}
+	require.Equal(t, 1, succeeded)
+	require.Equal(t, 1, conflicted)
+	require.NoError(t, DeleteIQGroupConfig(other.Group, other.Version, time.Now()))
 	result := IQResult{ID: "pg-plan-result", Group: "fixture", Model: "model-a", TaskID: "pg-plan-run", RunSeq: 1, Status: "success", Artifact: "<svg>retained</svg>"}
 	require.NoError(t, db.Create(&result).Error)
 	latest, err := ListIQLatestResults([]string{"fixture"})
@@ -137,7 +183,9 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	kept, err := GetIQResult(result.ID)
 	require.NoError(t, err)
 	require.Equal(t, result.Artifact, kept.Artifact)
-	t.Log("PostgreSQL migration, repeat migration, targets TEXT, plan deletion/recreation and config round trip passed")
+	assertIQHistoryRetention(t)
+	assertIQRetentionCleanupRace(t)
+	t.Log("PostgreSQL migrations, concurrent ordering, physical run/artifact retention and config round trip passed")
 }
 
 func TestIQSchemaPortableTextColumns(t *testing.T) {

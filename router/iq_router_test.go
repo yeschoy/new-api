@@ -78,14 +78,19 @@ func TestIQRoutesAuthenticationAndPermissions(t *testing.T) {
 			}
 			require.Equal(t, want, w.Code, w.Body.String())
 		}
-		req := httptest.NewRequest(http.MethodDelete, "/api/iq-tests/config", nil)
-		req.Header.Set("Authorization", "Bearer "+bundle.AccessToken)
-		w := httptest.NewRecorder()
-		engine.ServeHTTP(w, req)
-		want := 400 // Authorized root reaches JSON validation, not a permission denial.
-		if role == common.RoleCommonUser {
-			want = 403
+		for _, action := range []struct{ method, path string }{
+			{http.MethodDelete, "/api/iq-tests/config"},
+			{http.MethodPut, "/api/iq-tests/group-order"},
+		} {
+			req := httptest.NewRequest(action.method, action.path, nil)
+			req.Header.Set("Authorization", "Bearer "+bundle.AccessToken)
+			w := httptest.NewRecorder()
+			engine.ServeHTTP(w, req)
+			want := 400 // Authorized root reaches JSON validation, not a permission denial.
+			if role == common.RoleCommonUser {
+				want = 403
+			}
+			require.Equal(t, want, w.Code, w.Body.String())
 		}
-		require.Equal(t, want, w.Code, w.Body.String())
 	}
 }

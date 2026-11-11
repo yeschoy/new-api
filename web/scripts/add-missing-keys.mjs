@@ -10,21 +10,40 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
+    'Retained runs per group': 'Retained runs per group',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.',
+    'Group display order': 'Group display order',
+    'Save group order': 'Save group order',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.',
     'Checkout access has expired': 'Checkout access has expired',
     'Subscription checkout': 'Subscription checkout',
     'Checkout access expires': 'Checkout access expires',
     'Payment received': 'Payment received',
-    'Subscription delivered. You can return to the merchant.': 'Subscription delivered. You can return to the merchant.',
-    'Delivery is pending. Do not pay again; delivery continues even if you close this page.': 'Delivery is pending. Do not pay again; delivery continues even if you close this page.',
-    'This payment is no longer available. Return to the merchant to check your order.': 'This payment is no longer available. Return to the merchant to check your order.',
+    'Subscription delivered. You can return to the merchant.':
+      'Subscription delivered. You can return to the merchant.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Delivery is pending. Do not pay again; delivery continues even if you close this page.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'This payment is no longer available. Return to the merchant to check your order.',
     'Awaiting payment confirmation': 'Awaiting payment confirmation',
     'Payment QR code': 'Payment QR code',
     'Open secure payment page': 'Open secure payment page',
-    'Payment details are not ready. Return to the merchant if this persists.': 'Payment details are not ready. Return to the merchant if this persists.',
-    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.': 'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.',
-    'Checkout access is missing, invalid or expired': 'Checkout access is missing, invalid or expired',
-    'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Return to the merchant to check this order. Do not pay again if you have already paid.',
-    'Only verified payment activates your subscription. This page cannot confirm payment.': 'Only verified payment activates your subscription. This page cannot confirm payment.',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Payment details are not ready. Return to the merchant if this persists.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.',
+    'Checkout access is missing, invalid or expired':
+      'Checkout access is missing, invalid or expired',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Return to the merchant to check this order. Do not pay again if you have already paid.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Only verified payment activates your subscription. This page cannot confirm payment.',
     'Great models.': 'Great models.',
     'Within reach.': 'Within reach.',
     'For each full top-up of': 'For each full top-up of',
@@ -86,21 +105,40 @@ const newKeys = {
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
   },
   zh: {
+    'Retained runs per group': '每组保留轮数',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      '保留该分组最近完成的执行轮次（1–1000，默认 30）。更早的记录、作品和不再使用的快照将永久删除，正在执行的任务不受影响。',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      '按分组对比生成的 HTML/SVG 作品，最新轮次排在前面。这不是标准化智商评分。',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      '每个分组集中展示保留的历次结果，最新在前。新结果不会替换旧卡片，时间均为北京时间。',
+    'Group display order': '分组展示顺序',
+    'Save group order': '保存分组顺序',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      '拖拽或点击箭头调整已保存分组的顺序，保存后对所有用户生效。运行历史仍按时间倒序排列。',
     'Checkout access has expired': '收银台访问已过期',
     'Subscription checkout': '订阅收银台',
     'Checkout access expires': '收银台访问到期时间',
     'Payment received': '已确认收款',
-    'Subscription delivered. You can return to the merchant.': '订阅已开通，您可以返回商户。',
-    'Delivery is pending. Do not pay again; delivery continues even if you close this page.': '正在开通订阅，请勿重复付款。关闭页面后仍会继续处理。',
-    'This payment is no longer available. Return to the merchant to check your order.': '当前支付已不可用，请返回商户查看订单。',
+    'Subscription delivered. You can return to the merchant.':
+      '订阅已开通，您可以返回商户。',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      '正在开通订阅，请勿重复付款。关闭页面后仍会继续处理。',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      '当前支付已不可用，请返回商户查看订单。',
     'Awaiting payment confirmation': '等待支付确认',
     'Payment QR code': '付款二维码',
     'Open secure payment page': '打开安全支付页面',
-    'Payment details are not ready. Return to the merchant if this persists.': '支付信息尚未就绪。如持续出现，请返回商户处理。',
-    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.': '暂时无法刷新订单状态，这不代表支付失败。请重试查询或联系商户确认后再付款。',
-    'Checkout access is missing, invalid or expired': '收银台访问凭证缺失、无效或已过期',
-    'Return to the merchant to check this order. Do not pay again if you have already paid.': '请返回商户查看此订单。如已付款，请勿重复支付。',
-    'Only verified payment activates your subscription. This page cannot confirm payment.': '仅经核实的付款会开通订阅，本页面无法确认收款。',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      '支付信息尚未就绪。如持续出现，请返回商户处理。',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      '暂时无法刷新订单状态，这不代表支付失败。请重试查询或联系商户确认后再付款。',
+    'Checkout access is missing, invalid or expired':
+      '收银台访问凭证缺失、无效或已过期',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      '请返回商户查看此订单。如已付款，请勿重复支付。',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      '仅经核实的付款会开通订阅，本页面无法确认收款。',
     'Great models.': '好模型，',
     'Within reach.': '触手可及。',
     'For each full top-up of': '单笔每满',
@@ -161,21 +199,40 @@ const newKeys = {
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
   },
   'zh-TW': {
+    'Retained runs per group': '每組保留輪數',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      '保留此分組最近完成的執行輪次（1–1000，預設 30）。更早的紀錄、作品及不再使用的快照將永久刪除，執行中的任務不受影響。',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      '依分組比較產生的 HTML/SVG 作品，最新輪次排在前面。這不是標準化智商評分。',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      '每個分組集中顯示保留的歷次結果，最新在前。新結果不會取代舊卡片，時間均為北京時間。',
+    'Group display order': '分組顯示順序',
+    'Save group order': '儲存分組順序',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      '拖曳或點擊箭頭調整已儲存分組的順序，儲存後對所有使用者生效。執行歷史仍依時間由新到舊排列。',
     'Checkout access has expired': '收銀台存取已過期',
     'Subscription checkout': '訂閱收銀台',
     'Checkout access expires': '收銀台存取到期時間',
     'Payment received': '已確認收款',
-    'Subscription delivered. You can return to the merchant.': '訂閱已開通，您可以返回商戶。',
-    'Delivery is pending. Do not pay again; delivery continues even if you close this page.': '正在開通訂閱，請勿重複付款。關閉頁面後仍會繼續處理。',
-    'This payment is no longer available. Return to the merchant to check your order.': '目前已無法支付，請返回商戶查看訂單。',
+    'Subscription delivered. You can return to the merchant.':
+      '訂閱已開通，您可以返回商戶。',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      '正在開通訂閱，請勿重複付款。關閉頁面後仍會繼續處理。',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      '目前已無法支付，請返回商戶查看訂單。',
     'Awaiting payment confirmation': '等待付款確認',
     'Payment QR code': '付款 QR Code',
     'Open secure payment page': '開啟安全付款頁面',
-    'Payment details are not ready. Return to the merchant if this persists.': '付款資訊尚未就緒。如持續出現，請返回商戶處理。',
-    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.': '暫時無法更新訂單狀態，這不代表付款失敗。請重試查詢或聯絡商戶確認後再付款。',
-    'Checkout access is missing, invalid or expired': '收銀台存取憑證遺失、無效或已過期',
-    'Return to the merchant to check this order. Do not pay again if you have already paid.': '請返回商戶查看此訂單。如已付款，請勿重複支付。',
-    'Only verified payment activates your subscription. This page cannot confirm payment.': '僅經核實的付款會開通訂閱，本頁面無法確認收款。',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      '付款資訊尚未就緒。如持續出現，請返回商戶處理。',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      '暫時無法更新訂單狀態，這不代表付款失敗。請重試查詢或聯絡商戶確認後再付款。',
+    'Checkout access is missing, invalid or expired':
+      '收銀台存取憑證遺失、無效或已過期',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      '請返回商戶查看此訂單。如已付款，請勿重複支付。',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      '僅經核實的付款會開通訂閱，本頁面無法確認收款。',
     'Great models.': '好模型，',
     'Within reach.': '觸手可及。',
     'For each full top-up of': '單筆每滿',
@@ -237,21 +294,40 @@ const newKeys = {
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
   },
   fr: {
+    'Retained runs per group': 'Exécutions conservées par groupe',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Conserve les dernières exécutions terminées du groupe (1–1000, 30 par défaut). Les anciens résultats, œuvres et instantanés inutilisés sont supprimés définitivement. Les exécutions en cours sont protégées.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'Comparez les œuvres HTML/SVG par groupe, des plus récentes aux plus anciennes. Ce n’est pas un score de QI standardisé.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Chaque groupe réunit ses résultats conservés, les plus récents en premier. Les nouveaux ne remplacent pas les anciennes cartes. Horaires de Pékin.',
+    'Group display order': 'Ordre d’affichage des groupes',
+    'Save group order': 'Enregistrer l’ordre',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Glissez les groupes enregistrés ou utilisez les flèches. Enregistrez pour appliquer l’ordre à tous. L’historique reste du plus récent au plus ancien.',
     'Checkout access has expired': 'L’accès au paiement a expiré',
     'Subscription checkout': 'Paiement de l’abonnement',
     'Checkout access expires': 'Expiration de l’accès au paiement',
     'Payment received': 'Paiement reçu',
-    'Subscription delivered. You can return to the merchant.': 'Abonnement activé. Vous pouvez retourner chez le marchand.',
-    'Delivery is pending. Do not pay again; delivery continues even if you close this page.': 'Activation en cours. Ne payez pas à nouveau ; le traitement continue après la fermeture de cette page.',
-    'This payment is no longer available. Return to the merchant to check your order.': 'Ce paiement n’est plus disponible. Consultez votre commande chez le marchand.',
+    'Subscription delivered. You can return to the merchant.':
+      'Abonnement activé. Vous pouvez retourner chez le marchand.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Activation en cours. Ne payez pas à nouveau ; le traitement continue après la fermeture de cette page.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'Ce paiement n’est plus disponible. Consultez votre commande chez le marchand.',
     'Awaiting payment confirmation': 'En attente de confirmation du paiement',
     'Payment QR code': 'Code QR de paiement',
     'Open secure payment page': 'Ouvrir le paiement sécurisé',
-    'Payment details are not ready. Return to the merchant if this persists.': 'Les informations de paiement ne sont pas prêtes. Si cela persiste, contactez le marchand.',
-    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.': 'Impossible d’actualiser la commande. Cela ne signifie pas un échec du paiement. Réessayez ou vérifiez auprès du marchand avant de payer.',
-    'Checkout access is missing, invalid or expired': 'Accès au paiement absent, invalide ou expiré',
-    'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Consultez cette commande chez le marchand. Ne payez pas à nouveau si vous avez déjà payé.',
-    'Only verified payment activates your subscription. This page cannot confirm payment.': 'Seul un paiement vérifié active l’abonnement. Cette page ne peut pas confirmer un paiement.',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Les informations de paiement ne sont pas prêtes. Si cela persiste, contactez le marchand.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Impossible d’actualiser la commande. Cela ne signifie pas un échec du paiement. Réessayez ou vérifiez auprès du marchand avant de payer.',
+    'Checkout access is missing, invalid or expired':
+      'Accès au paiement absent, invalide ou expiré',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Consultez cette commande chez le marchand. Ne payez pas à nouveau si vous avez déjà payé.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Seul un paiement vérifié active l’abonnement. Cette page ne peut pas confirmer un paiement.',
     'Great models.': 'Les meilleurs modèles.',
     'Within reach.': 'À votre portée.',
     'For each full top-up of': 'Par tranche rechargée de',
@@ -314,21 +390,40 @@ const newKeys = {
       "Abonnement {{plan}} activé avec un code d'échange (ID du code : {{id}})",
   },
   ja: {
+    'Retained runs per group': 'グループごとの保持実行数',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'このグループの完了済み実行を新しい順に保持します（1～1000、既定は30）。古い記録・作品・未使用のスナップショットは完全に削除されます。実行中のタスクは保護されます。',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      '生成された HTML/SVG 作品をグループ別に新しい順で比較します。標準化されたIQスコアではありません。',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      '各グループの保持済み結果を新しい順でまとめて表示します。新しい結果が古いカードを置き換えることはありません。時刻は北京時間です。',
+    'Group display order': 'グループの表示順',
+    'Save group order': '表示順を保存',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'ドラッグまたは矢印で保存済みグループを並べ替えます。保存すると全ユーザーに反映されます。実行履歴は新しい順のままです。',
     'Checkout access has expired': '支払いページのアクセス期限が切れました',
     'Subscription checkout': 'サブスクリプションのお支払い',
     'Checkout access expires': '支払いページのアクセス期限',
     'Payment received': '入金確認済み',
-    'Subscription delivered. You can return to the merchant.': 'サブスクリプションが有効になりました。販売元にお戻りください。',
-    'Delivery is pending. Do not pay again; delivery continues even if you close this page.': '有効化を処理中です。再度お支払いしないでください。このページを閉じても処理は続きます。',
-    'This payment is no longer available. Return to the merchant to check your order.': 'このお支払いは利用できません。販売元で注文をご確認ください。',
+    'Subscription delivered. You can return to the merchant.':
+      'サブスクリプションが有効になりました。販売元にお戻りください。',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      '有効化を処理中です。再度お支払いしないでください。このページを閉じても処理は続きます。',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'このお支払いは利用できません。販売元で注文をご確認ください。',
     'Awaiting payment confirmation': '支払い確認待ち',
     'Payment QR code': '支払い用QRコード',
     'Open secure payment page': '安全な支払いページを開く',
-    'Payment details are not ready. Return to the merchant if this persists.': '支払い情報は準備中です。解消しない場合は販売元にお問い合わせください。',
-    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.': '注文状態を更新できません。支払い失敗を意味するものではありません。再照会するか、販売元に確認してからお支払いください。',
-    'Checkout access is missing, invalid or expired': '支払いページのアクセス情報がないか、無効または期限切れです',
-    'Return to the merchant to check this order. Do not pay again if you have already paid.': '販売元でこの注文をご確認ください。お支払い済みの場合は再度お支払いしないでください。',
-    'Only verified payment activates your subscription. This page cannot confirm payment.': '検証済みの入金のみがサブスクリプションを有効にします。このページでは入金を確定できません。',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      '支払い情報は準備中です。解消しない場合は販売元にお問い合わせください。',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      '注文状態を更新できません。支払い失敗を意味するものではありません。再照会するか、販売元に確認してからお支払いください。',
+    'Checkout access is missing, invalid or expired':
+      '支払いページのアクセス情報がないか、無効または期限切れです',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      '販売元でこの注文をご確認ください。お支払い済みの場合は再度お支払いしないでください。',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      '検証済みの入金のみがサブスクリプションを有効にします。このページでは入金を確定できません。',
     'Great models.': '優れたモデルを、',
     'Within reach.': 'もっと身近に。',
     'For each full top-up of': '1注文のチャージ額ごとに',
@@ -390,21 +485,40 @@ const newKeys = {
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
   },
   ru: {
+    'Retained runs per group': 'Хранимых запусков на группу',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Хранить последние завершённые запуски группы (1–1000, по умолчанию 30). Старые записи, работы и неиспользуемые снимки удаляются навсегда. Активные запуски защищены.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'Сравнивайте работы HTML/SVG по группам, начиная с новых запусков. Это не стандартизированный показатель IQ.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Сохранённые результаты каждой группы показаны вместе, новые первыми. Новые результаты не заменяют старые карточки. Время пекинское.',
+    'Group display order': 'Порядок отображения групп',
+    'Save group order': 'Сохранить порядок',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Перетащите сохранённые группы или используйте стрелки. Сохраните порядок для всех пользователей. История остаётся от новых запусков к старым.',
     'Checkout access has expired': 'Срок доступа к оплате истёк',
     'Subscription checkout': 'Оплата подписки',
     'Checkout access expires': 'Срок доступа к оплате',
     'Payment received': 'Оплата получена',
-    'Subscription delivered. You can return to the merchant.': 'Подписка активирована. Вы можете вернуться к продавцу.',
-    'Delivery is pending. Do not pay again; delivery continues even if you close this page.': 'Активация ожидается. Не платите повторно: обработка продолжится и после закрытия страницы.',
-    'This payment is no longer available. Return to the merchant to check your order.': 'Эта оплата больше недоступна. Проверьте заказ у продавца.',
+    'Subscription delivered. You can return to the merchant.':
+      'Подписка активирована. Вы можете вернуться к продавцу.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Активация ожидается. Не платите повторно: обработка продолжится и после закрытия страницы.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'Эта оплата больше недоступна. Проверьте заказ у продавца.',
     'Awaiting payment confirmation': 'Ожидание подтверждения оплаты',
     'Payment QR code': 'QR-код для оплаты',
     'Open secure payment page': 'Открыть защищённую страницу оплаты',
-    'Payment details are not ready. Return to the merchant if this persists.': 'Данные для оплаты ещё не готовы. Если проблема сохраняется, обратитесь к продавцу.',
-    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.': 'Не удалось обновить статус заказа. Это не означает сбой оплаты. Повторите проверку или уточните у продавца перед оплатой.',
-    'Checkout access is missing, invalid or expired': 'Доступ к оплате отсутствует, недействителен или истёк',
-    'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Проверьте этот заказ у продавца. Если вы уже заплатили, не платите повторно.',
-    'Only verified payment activates your subscription. This page cannot confirm payment.': 'Подписку активирует только проверенная оплата. Эта страница не может подтвердить платёж.',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Данные для оплаты ещё не готовы. Если проблема сохраняется, обратитесь к продавцу.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Не удалось обновить статус заказа. Это не означает сбой оплаты. Повторите проверку или уточните у продавца перед оплатой.',
+    'Checkout access is missing, invalid or expired':
+      'Доступ к оплате отсутствует, недействителен или истёк',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Проверьте этот заказ у продавца. Если вы уже заплатили, не платите повторно.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Подписку активирует только проверенная оплата. Эта страница не может подтвердить платёж.',
     'Great models.': 'Лучшие модели.',
     'Within reach.': 'Ближе, чем кажется.',
     'For each full top-up of': 'За каждые полные',
@@ -466,21 +580,40 @@ const newKeys = {
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
   },
   vi: {
+    'Retained runs per group': 'Số lần chạy giữ lại mỗi nhóm',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Giữ các lần chạy đã hoàn tất gần nhất của nhóm (1–1000, mặc định 30). Bản ghi, tác phẩm cũ và ảnh chụp trạng thái không còn dùng sẽ bị xóa vĩnh viễn. Lần chạy đang hoạt động được bảo vệ.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'So sánh tác phẩm HTML/SVG theo nhóm, lần chạy mới nhất trước. Đây không phải điểm IQ chuẩn hóa.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Mỗi nhóm hiển thị chung các kết quả được giữ lại, mới nhất trước. Kết quả mới không thay thế thẻ cũ. Thời gian theo giờ Bắc Kinh.',
+    'Group display order': 'Thứ tự hiển thị nhóm',
+    'Save group order': 'Lưu thứ tự nhóm',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Kéo hoặc dùng mũi tên để sắp xếp các nhóm đã lưu. Lưu để áp dụng cho mọi người. Lịch sử vẫn hiển thị lần chạy mới nhất trước.',
     'Checkout access has expired': 'Quyền truy cập thanh toán đã hết hạn',
     'Subscription checkout': 'Thanh toán đăng ký',
     'Checkout access expires': 'Hạn truy cập trang thanh toán',
     'Payment received': 'Đã nhận thanh toán',
-    'Subscription delivered. You can return to the merchant.': 'Đã kích hoạt đăng ký. Bạn có thể quay lại nhà bán hàng.',
-    'Delivery is pending. Do not pay again; delivery continues even if you close this page.': 'Đang chờ kích hoạt. Đừng thanh toán lại; quá trình xử lý vẫn tiếp tục khi bạn đóng trang.',
-    'This payment is no longer available. Return to the merchant to check your order.': 'Thanh toán này không còn khả dụng. Hãy quay lại nhà bán hàng để kiểm tra đơn.',
+    'Subscription delivered. You can return to the merchant.':
+      'Đã kích hoạt đăng ký. Bạn có thể quay lại nhà bán hàng.',
+    'Delivery is pending. Do not pay again; delivery continues even if you close this page.':
+      'Đang chờ kích hoạt. Đừng thanh toán lại; quá trình xử lý vẫn tiếp tục khi bạn đóng trang.',
+    'This payment is no longer available. Return to the merchant to check your order.':
+      'Thanh toán này không còn khả dụng. Hãy quay lại nhà bán hàng để kiểm tra đơn.',
     'Awaiting payment confirmation': 'Đang chờ xác nhận thanh toán',
     'Payment QR code': 'Mã QR thanh toán',
     'Open secure payment page': 'Mở trang thanh toán an toàn',
-    'Payment details are not ready. Return to the merchant if this persists.': 'Thông tin thanh toán chưa sẵn sàng. Nếu vẫn tiếp diễn, hãy liên hệ nhà bán hàng.',
-    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.': 'Không thể cập nhật trạng thái đơn. Điều này không có nghĩa thanh toán thất bại. Hãy thử tra cứu lại hoặc hỏi nhà bán hàng trước khi trả tiền.',
-    'Checkout access is missing, invalid or expired': 'Quyền truy cập thanh toán bị thiếu, không hợp lệ hoặc đã hết hạn',
-    'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Quay lại nhà bán hàng để kiểm tra đơn này. Đừng thanh toán lại nếu đã trả tiền.',
-    'Only verified payment activates your subscription. This page cannot confirm payment.': 'Chỉ thanh toán đã xác minh mới kích hoạt đăng ký. Trang này không thể xác nhận thanh toán.',
+    'Payment details are not ready. Return to the merchant if this persists.':
+      'Thông tin thanh toán chưa sẵn sàng. Nếu vẫn tiếp diễn, hãy liên hệ nhà bán hàng.',
+    'Unable to refresh order status. Payment is not marked as failed. Retry status or check with the merchant before paying.':
+      'Không thể cập nhật trạng thái đơn. Điều này không có nghĩa thanh toán thất bại. Hãy thử tra cứu lại hoặc hỏi nhà bán hàng trước khi trả tiền.',
+    'Checkout access is missing, invalid or expired':
+      'Quyền truy cập thanh toán bị thiếu, không hợp lệ hoặc đã hết hạn',
+    'Return to the merchant to check this order. Do not pay again if you have already paid.':
+      'Quay lại nhà bán hàng để kiểm tra đơn này. Đừng thanh toán lại nếu đã trả tiền.',
+    'Only verified payment activates your subscription. This page cannot confirm payment.':
+      'Chỉ thanh toán đã xác minh mới kích hoạt đăng ký. Trang này không thể xác nhận thanh toán.',
     'Great models.': 'Mô hình hàng đầu.',
     'Within reach.': 'Trong tầm tay.',
     'For each full top-up of': 'Mỗi lần nạp đủ',
