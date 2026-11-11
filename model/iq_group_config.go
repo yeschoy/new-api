@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -63,7 +64,7 @@ func ListIQConfigs() ([]IQConfig, error) {
 		}
 	}
 	configs := []IQConfig{}
-	err = DB.Where("group_name <> ?", "").Order("group_name").Find(&configs).Error
+	err = DB.Where("group_name <> ? AND deleted = ?", "", false).Order("group_name").Find(&configs).Error
 	return configs, err
 }
 
@@ -81,6 +82,33 @@ func GetIQGroupConfig(group string) (*IQConfig, error) {
 	cfg.ID, cfg.Version, cfg.Group = 0, 0, group
 	cfg.Targets = IQTargets{{Group: group, Models: []string{}}}
 	return &cfg, nil
+}
+
+// DeleteIQGroupConfig retains a versioned tombstone and artwork. Deleting and
+// recreating a plan must not let stale editors overwrite or delete its successor.
+func DeleteIQGroupConfig(group string, version int64, now time.Time) error {
+	if group == "" || version <= 0 {
+		return ErrIQConflict
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockIQConfigs(tx); err != nil {
+			return err
+		}
+		res := tx.Model(&IQConfig{}).
+			Where("group_name = ? AND version = ? AND deleted = ?", group, version, false).
+			Updates(map[string]any{"deleted": true, "enabled": false, "next_run_at": 0, "version": version + 1, "updated_at": now.Unix()})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return ErrIQConflict
+		}
+		// A pending->running claim races atomically with this update. Requests
+		// already claimed may finish, but unsent work must never start later.
+		return tx.Model(&IQAttempt{}).
+			Where("group_name = ? AND status = ?", group, "pending").
+			Updates(map[string]any{"status": "interrupted", "completed_at": now.Unix()}).Error
+	})
 }
 
 func iqActiveKey(group string) string {
@@ -123,6 +151,20 @@ func activeIQGroupTask(db *gorm.DB, group string) (*SystemTask, error) {
 		}
 	}
 	return nil, nil
+}
+
+// The gallery's first page needs the latest completed row of every saved plan,
+// even when one busy group has filled the global history page by itself.
+func ListIQLatestResults(groups []string) ([]IQResult, error) {
+	rows := []IQResult{}
+	if len(groups) == 0 {
+		return rows, nil
+	}
+	latest := DB.Model(&IQResult{}).Select("group_name, MAX(run_seq)").
+		Where("group_name IN ?", groups).Group("group_name")
+	err := DB.Omit("artifact").Where("(group_name, run_seq) IN (?)", latest).
+		Order("run_seq DESC, group_name, model").Find(&rows).Error
+	return rows, err
 }
 
 func ListActiveIQTasks() ([]SystemTask, error) {

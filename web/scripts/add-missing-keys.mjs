@@ -10,6 +10,19 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
+    'New plan': 'New plan',
+    'Show run history': 'Show run history',
+    'Hide run history': 'Hide run history',
+    'Delete plan': 'Delete plan',
+    'Delete plan {{group}}?': 'Delete plan {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Create and save a plan to show its group here. Available groups are not added automatically.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Only saved plans appear in the gallery. Selecting a group does not create a plan.',
     'Run result': 'Run result',
     'Load older runs': 'Load older runs',
     'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
@@ -39,6 +52,19 @@ const newKeys = {
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
   },
   zh: {
+    'New plan': '新建计划',
+    'Show run history': '查看运行历史',
+    'Hide run history': '收起运行历史',
+    'Delete plan': '删除计划',
+    'Delete plan {{group}}?': '删除 {{group}} 的计划？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      '从展示列表移除此计划，停止定时和尚未发送的请求。已生成的作品会保留，已经开始的请求可能继续完成。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '每个已保存计划的分组只展示一行，运行历史需主动打开查看。时间均为北京时间。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      '新建并保存计划后，对应分组才会展示在这里，不会自动添加其他可用分组。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '仅展示已保存的计划，选择分组不会自动创建计划。',
     'Run result': '本次结果',
     'Load older runs': '加载更早的记录',
     'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
@@ -68,6 +94,19 @@ const newKeys = {
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
   },
   'zh-TW': {
+    'New plan': '新增計畫',
+    'Show run history': '查看執行歷史',
+    'Hide run history': '收起執行歷史',
+    'Delete plan': '刪除計畫',
+    'Delete plan {{group}}?': '刪除 {{group}} 的計畫？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      '從展示清單移除此計畫，停止排程與尚未送出的請求。已產生的作品會保留，已開始的請求可能繼續完成。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '每個已儲存計畫的群組只顯示一行，執行歷史需主動開啟查看。時間均為北京時間。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      '新增並儲存計畫後，對應群組才會顯示在這裡，不會自動新增其他可用群組。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '僅顯示已儲存的計畫，選取群組不會自動建立計畫。',
     'Run result': '本次結果',
     'Load older runs': '載入更早的記錄',
     'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
@@ -97,6 +136,19 @@ const newKeys = {
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
   },
   fr: {
+    'New plan': 'Nouveau programme',
+    'Show run history': 'Voir l’historique',
+    'Hide run history': 'Masquer l’historique',
+    'Delete plan': 'Supprimer le programme',
+    'Delete plan {{group}}?': 'Supprimer le programme de {{group}} ?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Retirer ce programme de la galerie et arrêter sa planification et les requêtes non envoyées. Les œuvres sont conservées. Les requêtes déjà lancées peuvent se terminer.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Chaque programme enregistré occupe une ligne par groupe. L’historique reste masqué jusqu’à son ouverture. Horaires en heure de Pékin.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Créez et enregistrez un programme pour afficher son groupe ici. Les groupes disponibles ne sont pas ajoutés automatiquement.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Seuls les programmes enregistrés apparaissent dans la galerie. Sélectionner un groupe ne crée pas de programme.',
     'Run result': 'Résultat de l’exécution',
     'Load older runs': 'Charger les exécutions précédentes',
     'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
@@ -127,6 +179,19 @@ const newKeys = {
       "Abonnement {{plan}} activé avec un code d'échange (ID du code : {{id}})",
   },
   ja: {
+    'New plan': 'プランを新規作成',
+    'Show run history': '実行履歴を表示',
+    'Hide run history': '実行履歴を閉じる',
+    'Delete plan': 'プランを削除',
+    'Delete plan {{group}}?': '{{group}} のプランを削除しますか？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'このプランをギャラリーから除外し、スケジュールと未送信のリクエストを停止します。保存済みの作品は保持されます。開始済みのリクエストは完了する場合があります。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '保存済みプランはグループごとに1行で表示します。実行履歴は開くまで表示されません。時刻は北京時間です。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'プランを作成して保存すると、そのグループがここに表示されます。利用可能なグループは自動追加されません。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '保存済みのプランのみギャラリーに表示されます。グループの選択だけではプランは作成されません。',
     'Run result': '今回の結果',
     'Load older runs': '以前の実行を読み込む',
     'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
@@ -156,6 +221,19 @@ const newKeys = {
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
   },
   ru: {
+    'New plan': 'Новый план',
+    'Show run history': 'История запусков',
+    'Hide run history': 'Скрыть историю',
+    'Delete plan': 'Удалить план',
+    'Delete plan {{group}}?': 'Удалить план группы {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Убрать план из галереи, отключить расписание и неотправленные запросы. Сохранённые работы останутся. Уже начатые запросы могут завершиться.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Каждый сохранённый план отображается одной строкой группы. История запусков скрыта до открытия. Время пекинское.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Создайте и сохраните план, чтобы его группа появилась здесь. Доступные группы не добавляются автоматически.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'В галерее видны только сохранённые планы. Выбор группы не создаёт план.',
     'Run result': 'Результат запуска',
     'Load older runs': 'Загрузить более ранние запуски',
     'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
@@ -185,6 +263,19 @@ const newKeys = {
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
   },
   vi: {
+    'New plan': 'Tạo kế hoạch',
+    'Show run history': 'Xem lịch sử chạy',
+    'Hide run history': 'Ẩn lịch sử chạy',
+    'Delete plan': 'Xóa kế hoạch',
+    'Delete plan {{group}}?': 'Xóa kế hoạch của {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Ẩn kế hoạch khỏi thư viện, dừng lịch chạy và các yêu cầu chưa gửi. Tác phẩm đã lưu được giữ lại. Các yêu cầu đã bắt đầu có thể tiếp tục hoàn tất.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Mỗi kế hoạch đã lưu hiển thị một hàng cho nhóm. Lịch sử chạy được ẩn cho đến khi mở. Thời gian theo giờ Bắc Kinh.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Tạo và lưu kế hoạch để hiển thị nhóm tại đây. Các nhóm khả dụng không được tự động thêm.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Chỉ các kế hoạch đã lưu xuất hiện trong thư viện. Chọn nhóm không tự tạo kế hoạch.',
     'Run result': 'Kết quả lần chạy',
     'Load older runs': 'Tải các lần chạy cũ hơn',
     'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':

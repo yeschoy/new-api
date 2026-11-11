@@ -39,6 +39,7 @@ let client: QueryClient
 let requests: string[]
 let results: IQResults
 let staleArtifact = false
+let deletions: { group: string; version: number }[]
 const config: IQConfig = {
   group: 'public',
   prompts: [],
@@ -129,6 +130,7 @@ beforeEach(() => {
   })
   requests = []
   staleArtifact = false
+  deletions = []
   results = {
     groups: [
       {
@@ -138,6 +140,7 @@ beforeEach(() => {
         active_run: null,
         next_run_at: 0,
         schedule_enabled: false,
+        config_version: 2,
         models: Array.from({ length: 5 }, (_, index) => ({
           model: `model-${index}`,
           latest: latest(index),
@@ -171,12 +174,31 @@ beforeEach(() => {
     requests.push(request.url ?? '')
     let data: unknown
     if (request.url === '/api/iq-tests/results') data = results
-    else if (request.url === '/api/iq-tests/config?list=true') {
+    else if (request.url === '/api/iq-tests/results?before=10') {
+      data = { ...results, next_cursor: 0 }
+    } else if (
+      request.url === '/api/iq-tests/config' &&
+      request.method === 'delete'
+    ) {
+      const input = JSON.parse(request.data) as {
+        group: string
+        version: number
+      }
+      deletions.push(input)
+      results = {
+        ...results,
+        groups: results.groups.filter((row) => row.group !== input.group),
+      }
+      data = null
+    } else if (request.url === '/api/iq-tests/config?list=true') {
       data = { tasks: [config], default_prompt: config.prompt }
     } else if (request.url?.startsWith('/api/iq-tests/run?group=')) {
       data = { task_id: 'new-run', status: 'pending', created: true }
     } else if (request.url === '/api/iq-tests/targets') {
-      data = [{ group: 'public', models: ['model-0', 'model-1'] }]
+      data = [
+        { group: 'public', models: ['model-0', 'model-1'] },
+        { group: 'private', models: ['model-private'] },
+      ]
     } else if (request.url?.startsWith('/api/iq-tests/results/')) {
       const id = request.url.split('/').at(-1)
       const result = results.groups
@@ -236,6 +258,12 @@ describe('authenticated IQ gallery', () => {
     ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'IQ test settings' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'New plan' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Delete plan' })
     ).not.toBeInTheDocument()
     expect(requests).toEqual(['/api/iq-tests/results'])
     expect(document.querySelector('iframe')).toBeNull()
@@ -301,6 +329,7 @@ describe('authenticated IQ gallery', () => {
       active_run: null,
       next_run_at: 0,
       schedule_enabled: false,
+      config_version: 2,
       models: [0, 1].map((index) => ({
         model: `private-${index}`,
         latest: null,
@@ -322,7 +351,7 @@ describe('authenticated IQ gallery', () => {
     expect(requests).toEqual(['/api/iq-tests/results'])
   })
 
-  it('keeps multiple runs of the same group in separate rows with distinct artwork', async () => {
+  it('shows one row per saved group until run history is explicitly opened', async () => {
     const older = latest(0)
     results.groups.push({
       group: 'public',
@@ -331,6 +360,7 @@ describe('authenticated IQ gallery', () => {
       active_run: null,
       next_run_at: 0,
       schedule_enabled: false,
+      config_version: 2,
       models: [
         {
           model: older.model,
@@ -340,15 +370,48 @@ describe('authenticated IQ gallery', () => {
       ],
     })
     mount()
-    const rows = await screen.findAllByRole('region', {
+    const primaryRows = await screen.findAllByRole('region', {
       name: 'Models in public',
     })
+    expect(primaryRows).toHaveLength(1)
+    expect(screen.getAllByRole('heading', { name: 'public' })).toHaveLength(1)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show run history' })
+    )
+    const rows = screen.getAllByRole('region', { name: 'Models in public' })
     expect(rows).toHaveLength(2)
     expect(within(rows[0]).getAllByRole('listitem')).toHaveLength(5)
     expect(within(rows[1]).getAllByRole('listitem')).toHaveLength(1)
     expect(
       screen.getAllByRole('button', { name: 'Preview model-0' })
     ).toHaveLength(2)
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Hide run history' })
+    )
+    expect(
+      screen.getAllByRole('region', { name: 'Models in public' })
+    ).toHaveLength(1)
+  })
+
+  it('deduplicates the latest plan rows when older history pages include them again', async () => {
+    results.next_cursor = 10
+    const user = userEvent.setup()
+    mount()
+    await screen.findByRole('heading', { name: 'public' })
+    expect(
+      screen.queryByRole('button', { name: 'Load older runs' })
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show run history' }))
+    await user.click(screen.getByRole('button', { name: 'Load older runs' }))
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Load older runs' })
+      ).not.toBeInTheDocument()
+    )
+    expect(requests).toContain('/api/iq-tests/results?before=10')
+    expect(
+      screen.getAllByRole('region', { name: 'Models in public' })
+    ).toHaveLength(1)
   })
 
   it('runs one group independently while another group is active', async () => {
@@ -361,6 +424,7 @@ describe('authenticated IQ gallery', () => {
       active_run: null,
       next_run_at: 0,
       schedule_enabled: false,
+      config_version: 2,
     })
     mount()
     const publicGroup = await screen.findByRole('region', { name: 'public' })
@@ -378,6 +442,61 @@ describe('authenticated IQ gallery', () => {
       expect(requests).toContain('/api/iq-tests/run?group=private')
     )
     expect(requests).not.toContain('/api/iq-tests/run?group=public')
+  })
+
+  it('requires explicit creation and does not display catalog groups when opening a new plan', async () => {
+    login(1, 100)
+    results = { ...results, groups: [], active_run: null }
+    const user = userEvent.setup()
+    mount()
+    await screen.findByText('No IQ results available')
+    await user.click(screen.getByRole('button', { name: 'New plan' }))
+    const dialog = await screen.findByRole('dialog')
+    const selector = await within(dialog).findByLabelText('Task group')
+    expect(selector).toHaveValue('')
+    expect(
+      within(dialog).queryByLabelText('Test prompt')
+    ).not.toBeInTheDocument()
+    await user.selectOptions(selector, 'private')
+    expect(within(dialog).getByLabelText('Test prompt')).toHaveValue(
+      config.prompt
+    )
+    expect(
+      screen.queryByRole('heading', { name: 'private' })
+    ).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }))
+    expect(
+      screen.queryByRole('region', { name: 'private' })
+    ).not.toBeInTheDocument()
+    expect(deletions).toEqual([])
+  })
+
+  it('deletes only the confirmed plan with its current version and removes its row', async () => {
+    login(1, 100)
+    const user = userEvent.setup()
+    mount()
+    const row = await screen.findByRole('region', { name: 'public' })
+    await user.click(within(row).getByRole('button', { name: 'Delete plan' }))
+    let dialog = await screen.findByRole('alertdialog')
+    expect(deletions).toEqual([])
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByRole('region', { name: 'public' })).toBeInTheDocument()
+    await user.click(within(row).getByRole('button', { name: 'Delete plan' }))
+    dialog = await screen.findByRole('alertdialog')
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Delete plan' })
+    )
+    await screen.findByText('No IQ results available')
+    expect(deletions).toEqual([{ group: 'public', version: 2 }])
+    expect(
+      screen.queryByRole('region', { name: 'public' })
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('region', { name: 'public' })
+      ).not.toBeInTheDocument()
+    )
   })
 
   it('shows settings and manual execution only to authorized administrators', async () => {

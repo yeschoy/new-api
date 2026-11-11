@@ -12,8 +12,10 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   `iqKeys.artifact(scope, result)` includes stable pair ID and result revision.
 - `buildIQPreviewDocument(artifact)` builds the trusted opaque-frame document.
 - `IQ_PREVIEW_SANDBOX = 'allow-scripts'`; `MAX_LIVE_IQ_PREVIEWS = 4`.
-- Configuration uses a complete versioned PUT; result/artifact DTOs are owned
-  by `types.ts` and `api.ts`. API timestamps are Unix seconds.
+- Configuration uses a complete versioned PUT. DELETE `/api/iq-tests/config`
+  accepts `{ group, version }`; gallery rows carry the current `config_version`
+  separately from each historical result's version. DTOs are owned by `types.ts`
+  and `api.ts`. API timestamps are Unix seconds.
 - `IQ_REASONING_EFFORTS` in `types.ts` owns the frontend effort union and Zod
   enum: '', none, minimal, low, medium, high, xhigh, max. An absent backend
   effort is displayed/submitted as the empty default by `editableIQConfig`.
@@ -27,9 +29,12 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   while foreground). Load older runs explicitly; each backend page retains whole
   runs. Fetch artifacts lazily for visible cards or the open preview. Compare
   artifact revisions against metadata and fail closed on inconsistent responses.
-- Each group/run occupies one gallery row, newest run first; key by taskID/group,
-  never group alone. Older rows and failures retain their original artwork.
-  Task controls appear once per group; another group's run does not disable them.
+- The default gallery shows exactly one latest row per saved group plan. Never
+  expand every run into another apparent group by default. History is an explicit
+  show/hide action, newest first, retaining taskID/group row keys and original
+  artwork. Deduplicate rows across history pages: first-page backfills can appear
+  again on older pages. Task controls appear once per group; another group's run
+  does not disable them.
   Its model list uses column-flow grid
   with bounded responsive card widths, in a labeled keyboard-focusable horizontal
   scroll region; never wrap a group across multiple rows or overflow the page.
@@ -59,6 +64,13 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   consume resources or navigate their own frame. A local browser probe observed
   a dynamic download link falling back to self-navigation; no download sandbox
   capability was granted. Do not misreport this as universal egress prevention.
+- Settings lists saved plans only, not the union of plans and the target catalog.
+  An explicit New plan action starts with no selected group and offers unplanned
+  catalog groups. Selecting/closing never creates anything; version=0 PUT saves
+  the plan. Delete requires confirmation and channel write permission; on success
+  cancel stale reads, remove the group's rows and artifact caches, and invalidate
+  configuration/results. Do not purge saved artwork or promise to abort requests
+  already started. The backend's tombstone keeps deleted plans hidden on refresh.
 - Each task editor is bound to one routing group. Its thinking-level setting
   applies to that task's selected models; other tasks keep independent settings.
   Multiple prompt textareas form a pool; the backend chooses one per task run.
@@ -85,6 +97,9 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 | Artifact revision mismatch or fetch failure | Honest unavailable state; no cross-run document reuse |
 | Metadata error | Hide active frames; retryable error, no stale success |
 | Config 409 | Preserve edits; require explicit reload/reconciliation |
+| Unplanned catalog group | Absent from gallery/settings; only selectable in New plan |
+| Confirmed plan deletion | Hide all group runs, invalidate cache, stop schedule/unsent work; keep artwork |
+| Deletion 409 | Keep the row; require refresh before deleting a newer plan |
 | Expanded preview | One frame; card frames paused; accessible close lifecycle |
 | Mobile viewport | No document overflow; settings fit viewport |
 | Model self-navigation / CPU abuse | Document limitation; never claim full isolation |
@@ -102,11 +117,13 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   preservation and size bound; jsdom is construction evidence, not isolation.
 - `gallery.test.tsx`: admin/member controls, lazy bounded previews and expanded
   lifecycle, current status, account changes, artifact revision mismatches and
-  multiple independent horizontal group/run rows, retained same-group history,
-  per-group manual execution and fixed desktop thumbnail dimensions.
+  independent horizontal group rows, default one-row-per-group, explicitly opened
+  retained history, cross-page deduplication, confirmed deletion/cancel, explicit
+  creation, per-group manual execution and fixed desktop thumbnail dimensions.
 - `settings.test.tsx`: exact prompt/targets/schedule save, mode round-trip values,
   stale-save prompt/effort preservation, effort enum/default, single-group
-  selection, prompt-pool round trips and explicit discard/reload.
+  selection, saved-plan-only settings, explicit version=0 creation, prompt-pool
+  round trips and explicit discard/reload.
 - `localization.test.ts`: all static/dynamic feature keys in seven locales.
 - One local mock-backed browser smoke: real Canvas/SVG render, blocked parent
   DOM/storage/cookies, subresource/fetch/worker/popup/top/form attempts, mobile

@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -30,10 +34,11 @@ import { LoadingState } from '@/components/loading-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { hasPermission } from '@/lib/admin-permissions'
+import { handleServerError } from '@/lib/handle-server-error'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { runIQTests } from './api'
+import { deleteIQConfig, runIQTests } from './api'
 import { IQPreview } from './preview'
 import {
   iqKeys,
@@ -44,7 +49,7 @@ import {
 } from './queries'
 import { IQResultCard, IQStatusLabel, IQTime } from './result-card'
 import { IQSettings } from './settings'
-import { artifactRevision } from './types'
+import { artifactRevision, type IQResults } from './types'
 import { useLiveIQPreviews } from './use-live-previews'
 
 export function IQTestsPage() {
@@ -71,19 +76,39 @@ function IQGallery(props: { scope: string }) {
   const query = useIQResults(props.scope)
   useIQScopeCleanup(props.scope)
   const [selected, setSelected] = useState<string | null>(null)
-  const [settings, setSettings] = useState<string | null>(null)
+  const [settings, setSettings] = useState<{
+    group: string
+    creating: boolean
+  } | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
   const [confirmRun, setConfirmRun] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{
+    group: string
+    version: number
+  } | null>(null)
   const pages = query.isError ? undefined : query.data?.pages
   const data = pages?.[0]
     ? {
         ...pages[0],
-        groups: pages.flatMap((page) => page.groups),
+        groups: [
+          ...new Map(
+            pages
+              .flatMap((page) => page.groups)
+              .map((row) => [`${row.task_id}\0${row.group}`, row])
+          ).values(),
+        ],
       }
     : undefined
-  const results =
-    data?.groups.flatMap((group) =>
-      group.models.flatMap((card) => (card.latest ? [card.latest] : []))
-    ) ?? []
+  const firstRows = new Map<string, IQResults['groups'][number]>()
+  for (const row of data?.groups ?? []) {
+    if (!firstRows.has(row.group)) firstRows.set(row.group, row)
+  }
+  const visibleRows = showHistory
+    ? (data?.groups ?? [])
+    : [...firstRows.values()]
+  const results = visibleRows.flatMap((group) =>
+    group.models.flatMap((card) => (card.latest ? [card.latest] : []))
+  )
   const expanded = results.find(
     (result) =>
       result.status === 'success' && artifactRevision(result) === selected
@@ -92,7 +117,11 @@ function IQGallery(props: { scope: string }) {
     results
       .filter((result) => result.status === 'success')
       .map(artifactRevision),
-    Boolean(expanded) || settings !== null || confirmRun !== null || !data
+    Boolean(expanded) ||
+      settings !== null ||
+      confirmRun !== null ||
+      confirmDelete !== null ||
+      !data
   )
   const run = useMutation({
     mutationFn: runIQTests,
@@ -105,6 +134,38 @@ function IQGallery(props: { scope: string }) {
       )
       void client.invalidateQueries({ queryKey: iqKeys.results(props.scope) })
     },
+  })
+  const remove = useMutation({
+    mutationFn: deleteIQConfig,
+    retry: false,
+    onSuccess: async (_, input) => {
+      if (!isCurrentIQScope(props.scope)) return
+      await client.cancelQueries({ queryKey: iqKeys.scope(props.scope) })
+      if (!isCurrentIQScope(props.scope)) return
+      setConfirmDelete(null)
+      setSelected(null)
+      client.removeQueries({
+        queryKey: iqKeys.config(props.scope, input.group),
+      })
+      client.removeQueries({
+        queryKey: [...iqKeys.scope(props.scope), 'artifact'],
+      })
+      client.setQueryData<InfiniteData<IQResults>>(
+        iqKeys.results(props.scope),
+        (previous) =>
+          previous && {
+            ...previous,
+            pages: previous.pages.map((page) => ({
+              ...page,
+              groups: page.groups.filter((row) => row.group !== input.group),
+            })),
+          }
+      )
+      void client.invalidateQueries({ queryKey: iqKeys.configs(props.scope) })
+      void client.invalidateQueries({ queryKey: iqKeys.results(props.scope) })
+      toast.success(t('Deleted successfully'))
+    },
+    onError: (error) => handleServerError(error),
   })
   return (
     <Main className='min-w-0 overflow-y-auto'>
@@ -126,9 +187,25 @@ function IQGallery(props: { scope: string }) {
             >
               {t('Refresh')}
             </Button>
+            <Button
+              variant='outline'
+              onClick={() => setShowHistory((value) => !value)}
+            >
+              {showHistory ? t('Hide run history') : t('Show run history')}
+            </Button>
             {canRead && (
-              <Button variant='outline' onClick={() => setSettings('')}>
+              <Button
+                variant='outline'
+                onClick={() => setSettings({ group: '', creating: false })}
+              >
                 {t('IQ test settings')}
+              </Button>
+            )}
+            {canRead && canWrite && (
+              <Button
+                onClick={() => setSettings({ group: '', creating: true })}
+              >
+                {t('New plan')}
               </Button>
             )}
           </div>
@@ -153,19 +230,19 @@ function IQGallery(props: { scope: string }) {
             </section>
             <p className='text-muted-foreground text-sm'>
               {t(
-                'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.'
+                'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.'
               )}
             </p>
             {data.groups.length === 0 && (
               <EmptyState
                 title={t('No IQ results available')}
                 description={t(
-                  'An administrator can select models and run a test. Only your accessible groups appear here.'
+                  'Create and save a plan to show its group here. Available groups are not added automatically.'
                 )}
               />
             )}
             <div ref={previews.root} className='space-y-8'>
-              {data.groups.map((group, index) => (
+              {visibleRows.map((group) => (
                 <section
                   key={`${group.task_id}:${group.group}`}
                   className='min-w-0 space-y-4'
@@ -183,16 +260,33 @@ function IQGallery(props: { scope: string }) {
                         </p>
                       )}
                     </div>
-                    {data.groups.findIndex(
-                      (row) => row.group === group.group
-                    ) === index && (
+                    {firstRows.get(group.group) === group && (
                       <div className='flex flex-wrap gap-2'>
                         {canRead && (
                           <Button
                             variant='outline'
-                            onClick={() => setSettings(group.group)}
+                            onClick={() =>
+                              setSettings({
+                                group: group.group,
+                                creating: false,
+                              })
+                            }
                           >
                             {t('IQ test settings')}
+                          </Button>
+                        )}
+                        {canWrite && (
+                          <Button
+                            variant='destructive'
+                            disabled={remove.isPending}
+                            onClick={() =>
+                              setConfirmDelete({
+                                group: group.group,
+                                version: group.config_version,
+                              })
+                            }
+                          >
+                            {t('Delete plan')}
                           </Button>
                         )}
                         {canRun && (
@@ -263,7 +357,7 @@ function IQGallery(props: { scope: string }) {
                 </section>
               ))}
             </div>
-            {query.hasNextPage && (
+            {showHistory && query.hasNextPage && (
               <Button
                 variant='outline'
                 disabled={query.isFetchingNextPage}
@@ -312,8 +406,29 @@ function IQGallery(props: { scope: string }) {
           <IQSettings
             scope={props.scope}
             canWrite={canWrite}
-            group={settings}
+            group={settings.group}
+            creating={settings.creating}
             onClose={() => setSettings(null)}
+          />
+        )}
+        {canWrite && (
+          <ConfirmDialog
+            open={confirmDelete !== null}
+            onOpenChange={(open) => {
+              if (!open) setConfirmDelete(null)
+            }}
+            title={t('Delete plan {{group}}?', {
+              group: confirmDelete?.group ?? '',
+            })}
+            desc={t(
+              'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.'
+            )}
+            confirmText={t('Delete plan')}
+            destructive
+            isLoading={remove.isPending}
+            handleConfirm={() => {
+              if (confirmDelete) remove.mutate(confirmDelete)
+            }}
           />
         )}
         {canRun && (
