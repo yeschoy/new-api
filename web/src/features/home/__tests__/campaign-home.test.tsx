@@ -118,6 +118,29 @@ describe('default home campaign deadline', () => {
     expect(getPublicCashbackOffers).not.toHaveBeenCalled()
   })
 
+  it('keeps the product home during Double Eleven and embeds the live top-up offer', async () => {
+    vi.setSystemTime(new Date('2026-11-11T14:00:00.000Z'))
+    getPublicCashbackOffers.mockResolvedValue({
+      active: true,
+      currency: 'CNY',
+      invitee: { strategy: 'per_hundred', fixed_per_hundred: 10 },
+    })
+    await renderApp(<Home />, client)
+    expect(
+      await screen.findByText(
+        'Every CNY 100 topped up earns ¥10 in bonus credit'
+      )
+    ).toBeVisible()
+    expect(
+      screen.getByRole('heading', {
+        name: 'Change two values. Access every leading provider.',
+      })
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('heading', { name: 'Top-up and inviter cashback' })
+    ).not.toBeInTheDocument()
+  })
+
   it('restores product home on deadline without a reload and rechecks after focus', async () => {
     vi.useRealTimers()
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })

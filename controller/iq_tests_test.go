@@ -1,0 +1,432 @@
+package controller
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
+	"gorm.io/gorm"
+)
+
+func setupIQController(t *testing.T) (*model.User, *model.User) {
+	t.Helper()
+	previousDB, previousLog := model.DB, model.LOG_DB
+	oldRedis, oldMemory, oldConsume, oldExport := common.RedisEnabled, common.MemoryCacheEnabled, common.LogConsumeEnabled, common.DataExportEnabled
+	ratios, usable := ratio_setting.GroupRatio2JSONString(), setting.UserUsableGroups2JSONString()
+	prices := ratio_setting.ModelPrice2JSONString()
+	oldMainType, oldLogType := common.MainDatabaseType(), common.LogDatabaseType()
+	initModelListColumnNames(t)
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	model.DB = db
+	model.LOG_DB = db
+	require.NoError(t, db.AutoMigrate(&model.IQConfig{}, &model.IQBatch{}, &model.IQAttempt{}, &model.IQResult{}, &model.SystemTask{}, &model.SystemTaskLock{}, &model.User{}, &model.Channel{}, &model.Ability{}, &model.Log{}))
+	common.RedisEnabled = false
+	common.MemoryCacheEnabled = false
+	common.LogConsumeEnabled = true
+	common.DataExportEnabled = false
+	require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"default":1,"public":2,"private":3}`))
+	require.NoError(t, setting.UpdateUserUsableGroupsByJSONString(`{}`))
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{"gpt-4o":0.01,"gpt-4o-mini":0.01}`))
+	service.InitHttpClient()
+	t.Cleanup(func() {
+		model.DB = previousDB
+		common.SetDatabaseTypes(oldMainType, oldLogType)
+		model.LOG_DB = previousLog
+		common.RedisEnabled = oldRedis
+		common.MemoryCacheEnabled = oldMemory
+		common.LogConsumeEnabled = oldConsume
+		common.DataExportEnabled = oldExport
+		_ = ratio_setting.UpdateGroupRatioByJSONString(ratios)
+		_ = setting.UpdateUserUsableGroupsByJSONString(usable)
+		_ = ratio_setting.UpdateModelPriceByJSONString(prices)
+		_ = sqlDB.Close()
+	})
+	root := &model.User{Username: "iq-root", AffCode: "iq-root", Role: common.RoleRootUser, Status: common.UserStatusEnabled, Group: "default", Quota: 12345}
+	viewer := &model.User{Username: "iq-viewer", AffCode: "iq-viewer", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "public", Quota: 6789}
+	require.NoError(t, db.Create(root).Error)
+	require.NoError(t, db.Create(viewer).Error)
+	return root, viewer
+}
+func iqContext(user *model.User, path, id string) (*gin.Context, *httptest.ResponseRecorder) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, path, nil)
+	c.Set("id", user.Id)
+	c.Set("role", user.Role)
+	c.Params = gin.Params{{Key: "id", Value: id}}
+	return c, w
+}
+func TestIQGalleryIncludesQuietPlansBeyondHistoryPage(t *testing.T) {
+	root, _ := setupIQController(t)
+	for _, group := range []string{"public", "private"} {
+		cfg, err := model.GetIQGroupConfig(group)
+		require.NoError(t, err)
+		cfg.Targets = model.IQTargets{{Group: group, Models: []string{"gpt-4o"}}}
+		_, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+		require.NoError(t, err)
+	}
+	for seq := int64(1); seq <= 26; seq++ {
+		group := "public"
+		if seq == 1 {
+			group = "private"
+		}
+		r := model.IQResult{ID: fmt.Sprintf("result-%d", seq), TaskID: fmt.Sprintf("run-%d", seq), Group: group, Model: "gpt-4o", RunSeq: seq, Status: "success", Artifact: "<svg>private body</svg>"}
+		require.NoError(t, model.DB.Create(&r).Error)
+	}
+	c, w := iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, 200, w.Code)
+	require.Equal(t, int64(21), gjson.Get(w.Body.String(), "data.groups.#").Int())
+	require.Equal(t, "run-26", gjson.Get(w.Body.String(), "data.groups.0.task_id").String())
+	require.Equal(t, "private", gjson.Get(w.Body.String(), "data.groups.20.group").String())
+	require.Equal(t, "result-1", gjson.Get(w.Body.String(), "data.groups.20.models.0.latest.id").String())
+	require.Greater(t, gjson.Get(w.Body.String(), "data.next_cursor").Int(), int64(0))
+	require.NotContains(t, w.Body.String(), "private body")
+}
+
+func TestIQGalleryOnlyShowsSavedPlansAndHidesDeletedArtifacts(t *testing.T) {
+	root, _ := setupIQController(t)
+	c, w := iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, 200, w.Code)
+	require.Empty(t, gjson.Get(w.Body.String(), "data.groups").Array())
+	cfg, err := model.GetIQGroupConfig("public")
+	require.NoError(t, err)
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Empty(t, gjson.Get(w.Body.String(), "data.groups").Array(), "merely opening a group must not show a plan")
+	cfg.Targets = model.IQTargets{{Group: "public", Models: []string{"gpt-4o"}}}
+	cfg, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+	require.NoError(t, err)
+	artifact := model.IQResult{ID: "saved-artifact", Group: "public", Model: "gpt-4o", TaskID: "saved-run", Status: "success", ArtifactKind: "svg", Artifact: "<svg>keep me</svg>"}
+	require.NoError(t, model.DB.Create(&artifact).Error)
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, int64(1), gjson.Get(w.Body.String(), "data.groups.#").Int())
+	require.Equal(t, cfg.Version, gjson.Get(w.Body.String(), "data.groups.0.config_version").Int())
+	deletePlan := func(version int64) int {
+		c, w := iqContext(root, "/api/iq-tests/config", "")
+		c.Request = httptest.NewRequest(http.MethodDelete, "/api/iq-tests/config", strings.NewReader(fmt.Sprintf(`{"group":"public","version":%d}`, version)))
+		c.Request.Header.Set("Content-Type", "application/json")
+		DeleteIQConfig(c)
+		return w.Code
+	}
+	require.Equal(t, 409, deletePlan(cfg.Version+1))
+	require.Equal(t, 200, deletePlan(cfg.Version))
+	require.Equal(t, 409, deletePlan(cfg.Version))
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Empty(t, gjson.Get(w.Body.String(), "data.groups").Array())
+	c, w = iqContext(root, "/api/iq-tests/results/saved-artifact", artifact.ID)
+	GetIQArtifact(c)
+	require.Equal(t, 404, w.Code)
+	kept, err := model.GetIQResult(artifact.ID)
+	require.NoError(t, err)
+	require.Equal(t, artifact.Artifact, kept.Artifact)
+}
+
+func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
+	root, viewer := setupIQController(t)
+	var calls atomic.Int32
+	var wrong atomic.Bool
+	prompt := " exact IQ prompt\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		body, _ := io.ReadAll(r.Body)
+		if gjson.GetBytes(body, "messages.0.content").String() != prompt || gjson.GetBytes(body, "max_tokens").Int() != model.IQOutputTokens || gjson.GetBytes(body, "reasoning_effort").String() != "high" {
+			wrong.Store(true)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(string(body), "gpt-4o-mini") {
+			w.WriteHeader(500)
+			fmt.Fprint(w, `{"error":{"message":"secret-provider-key"}}`)
+			return
+		}
+		fmt.Fprint(w, `{"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"<html><body><canvas></canvas><script>const x = 1;</script><svg></svg></body></html>"}}],"usage":{"prompt_tokens":10,"completion_tokens":20}}`)
+	}))
+	defer server.Close()
+	for i := 0; i < 3; i++ {
+		ch := &model.Channel{Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled, Key: "mock-key", BaseURL: &server.URL, Name: fmt.Sprintf("iq-%d", i), Models: "gpt-4o,gpt-4o-mini,unselected", Group: "public,private,default"}
+		require.NoError(t, model.DB.Create(ch).Error)
+		require.NoError(t, ch.AddAbilities(nil))
+	}
+	defaultOnly := &model.Channel{Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled, Key: "mock", BaseURL: &server.URL, Models: "only-default", Group: "default"}
+	require.NoError(t, model.DB.Create(defaultOnly).Error)
+	require.NoError(t, defaultOnly.AddAbilities(nil))
+	catalog, err := iqTargetCatalog()
+	require.NoError(t, err)
+	var defaultFound bool
+	for _, g := range catalog {
+		if g.Group == "default" {
+			defaultFound = true
+			require.Contains(t, g.Models, "only-default")
+		}
+	}
+	require.True(t, defaultFound, "admin catalog must include default-only capabilities")
+	cfg, err := model.GetIQConfig()
+	require.NoError(t, err)
+	cfg.Prompt = model.IQText(prompt)
+	cfg.ReasoningEffort = "high"
+	cfg.Targets = []model.IQTarget{{Group: "public", Models: []string{"gpt-4o"}}, {Group: "private", Models: []string{"gpt-4o-mini"}}}
+	require.NoError(t, validateIQTargets(cfg))
+	cfg, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+	require.NoError(t, err)
+	task, _, err := model.EnqueueIQBatch(false, time.Now())
+	require.NoError(t, err)
+	task, claimed, err := model.ClaimSystemTask(task.ID, model.SystemTaskTypeIQTest, "iq-runner", common.GetTimestamp()+60)
+	require.NoError(t, err)
+	require.True(t, claimed)
+	require.NoError(t, runIQBatch(context.Background(), task, "iq-runner", *cfg, root.Id, executeIQPair))
+	require.EqualValues(t, 2, calls.Load())
+	require.False(t, wrong.Load())
+	// Running the same checkpoint again cannot send any pair a second time.
+	require.NoError(t, runIQBatch(context.Background(), task, "iq-runner", *cfg, root.Id, executeIQPair))
+	require.EqualValues(t, 2, calls.Load())
+	publicID, privateID := model.IQResultID(task.TaskID, "public", "gpt-4o"), model.IQResultID(task.TaskID, "private", "gpt-4o-mini")
+	result, err := model.GetIQResult(publicID)
+	require.NoError(t, err)
+	require.Equal(t, "success", result.Status)
+	require.Contains(t, string(result.Artifact), "<script>")
+	failed, err := model.GetIQResult(privateID)
+	require.NoError(t, err)
+	require.Equal(t, "error", failed.Status)
+	require.NotContains(t, failed.ErrorMessage, "secret")
+	var log model.Log
+	require.NoError(t, model.DB.Where("token_name = ?", "IQ test").First(&log).Error)
+	require.Equal(t, "public", log.Group, "selected group must precede relay-info generation")
+	c, w := iqContext(viewer, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, 200, w.Code)
+	require.NotContains(t, w.Body.String(), "private")
+	require.NotContains(t, w.Body.String(), "<canvas")
+	require.Contains(t, w.Body.String(), "public")
+	// Seed a successful private artifact so denial proves authorization, not
+	// merely the endpoint's non-success-result rule.
+	require.NoError(t, model.DB.Model(&model.IQResult{}).Where("id = ?", privateID).Updates(map[string]any{"status": "success", "artifact": "<svg></svg>", "artifact_kind": "svg", "error_code": "", "error_message": ""}).Error)
+	c, w = iqContext(viewer, "/api/iq-tests/results/"+privateID, privateID)
+	GetIQArtifact(c)
+	require.Equal(t, 404, w.Code)
+	c, w = iqContext(viewer, "/api/iq-tests/results/"+publicID, publicID)
+	GetIQArtifact(c)
+	require.Equal(t, 200, w.Code)
+	require.Contains(t, w.Header().Get("Content-Type"), "application/json")
+	c, w = iqContext(root, "/api/iq-tests/results/"+privateID, privateID)
+	GetIQArtifact(c)
+	require.Equal(t, 200, w.Code)
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Contains(t, w.Body.String(), "private")
+	require.NoError(t, ratio_setting.UpdateGroupRatioByJSONString(`{"default":1,"private":3}`))
+	c, w = iqContext(viewer, "/api/iq-tests/results/"+publicID, publicID)
+	GetIQArtifact(c)
+	require.Equal(t, 404, w.Code, "current group revocation must also protect a directly known artifact ID")
+	var unchanged model.User
+	require.NoError(t, model.DB.First(&unchanged, root.Id).Error)
+	require.Equal(t, root.Quota, unchanged.Quota)
+	unchanged = model.User{}
+	require.NoError(t, model.DB.First(&unchanged, viewer.Id).Error)
+	require.Equal(t, viewer.Quota, unchanged.Quota)
+	require.EqualValues(t, 2, calls.Load())
+	var channels []model.Channel
+	require.NoError(t, model.DB.Find(&channels).Error)
+	for _, ch := range channels {
+		require.Equal(t, common.ChannelStatusEnabled, ch.Status)
+		require.Zero(t, ch.TestTime)
+	}
+}
+func TestIQBatchPairDeadline(t *testing.T) {
+	for _, parentTimeout := range []time.Duration{0, 5 * time.Minute} {
+		t.Run(parentTimeout.String(), func(t *testing.T) {
+			root, _ := setupIQController(t)
+			cfg, err := model.GetIQConfig()
+			require.NoError(t, err)
+			cfg.Targets = []model.IQTarget{{Group: "public", Models: []string{"gpt-4o"}}}
+			cfg, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+			require.NoError(t, err)
+			task, _, err := model.EnqueueIQBatch(false, time.Now())
+			require.NoError(t, err)
+			task, claimed, err := model.ClaimSystemTask(task.ID, model.SystemTaskTypeIQTest, "iq-deadline-runner", common.GetTimestamp()+60)
+			require.NoError(t, err)
+			require.True(t, claimed)
+
+			ctx := context.Background()
+			if parentTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, parentTimeout)
+				defer cancel()
+			}
+			var calledCtx context.Context
+			var calledAt time.Time
+			calls := 0
+			require.NoError(t, runIQBatch(ctx, task, "iq-deadline-runner", *cfg, root.Id, func(pairCtx context.Context, _ int, _, _, _, _ string) model.IQResult {
+				calls++
+				calledCtx = pairCtx
+				calledAt = time.Now()
+				return model.IQResult{Status: "success", ArtifactKind: "svg", Artifact: "<svg></svg>"}
+			}))
+			require.Equal(t, 1, calls)
+			require.NotNil(t, calledCtx)
+			deadline, ok := calledCtx.Deadline()
+			require.True(t, ok)
+			if parentTimeout == 0 {
+				require.WithinDuration(t, calledAt.Add(25*time.Minute), deadline, time.Second)
+			} else {
+				parentDeadline, _ := ctx.Deadline()
+				require.Equal(t, parentDeadline, deadline, "the IQ limit must not extend an earlier parent deadline")
+			}
+			require.ErrorIs(t, calledCtx.Err(), context.Canceled, "completed pairs must release their deadline timer")
+		})
+	}
+}
+
+func TestIQPairTimeoutResult(t *testing.T) {
+	root, _ := setupIQController(t)
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = io.Copy(io.Discard, r.Body)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	ch := &model.Channel{Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled, Key: "mock", BaseURL: &server.URL, Models: "gpt-4o", Group: "public"}
+	require.NoError(t, model.DB.Create(ch).Error)
+	require.NoError(t, ch.AddAbilities(nil))
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	result := executeIQPair(ctx, root.Id, "public", "gpt-4o", "test", "")
+	require.Equal(t, "timeout", result.Status)
+	require.Equal(t, "timeout", result.ErrorCode)
+	require.Equal(t, "IQ request exceeded the 25-minute limit", result.ErrorMessage)
+	require.EqualValues(t, 1, calls.Load(), "timed-out requests must not be retried")
+}
+
+func TestIQNativeRequestsAndOutputBounds(t *testing.T) {
+	protected, err := restoreIQInput([]byte(`{"messages":[{"role":"user","content":"overridden"}],"tools":[{}],"n":4}`), []byte(`{"messages":[{"role":"user","content":"exact"}]}`))
+	require.NoError(t, err)
+	protected, err = boundIQRequest(protected, string(constant.EndpointTypeOpenAI))
+	require.NoError(t, err)
+	require.Equal(t, "exact", gjson.GetBytes(protected, "messages.0.content").String())
+	require.False(t, gjson.GetBytes(protected, "tools").Exists())
+	require.False(t, gjson.GetBytes(protected, "n").Exists())
+
+	for _, endpoint := range []constant.EndpointType{constant.EndpointTypeOpenAI, constant.EndpointTypeOpenAIResponse, constant.EndpointTypeAnthropic, constant.EndpointTypeGemini} {
+		request := buildIQRequest("model", string(endpoint), "exact", false)
+		body, err := common.Marshal(request)
+		require.NoError(t, err)
+		require.Contains(t, string(body), "exact")
+		bounded, err := boundIQRequest(body, string(endpoint))
+		require.NoError(t, err)
+		require.Contains(t, string(bounded), "16384")
+	}
+	require.Equal(t, string(constant.EndpointTypeOpenAIResponse), iqEndpoint(&model.Channel{Type: constant.ChannelTypeCodex}, "gpt-5-codex"))
+	mapping := `{"alias":"gpt-5-codex"}`
+	require.Equal(t, string(constant.EndpointTypeOpenAIResponse), iqEndpoint(&model.Channel{Type: constant.ChannelTypeOpenAI, ModelMapping: &mapping}, "alias"))
+	require.Empty(t, iqEndpoint(&model.Channel{Type: constant.ChannelTypeOpenAI}, "text-embedding-3-small"))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r := executeIQPair(ctx, 1, "public", "m", "p", "")
+	require.NotEqual(t, "success", r.Status)
+}
+
+func TestIQReasoningEffortWireRequests(t *testing.T) {
+	for _, tc := range []struct {
+		name, upstream, effort, path, want, tokenPath string
+		channelType                                   int
+	}{
+		{"chat", "gpt-5", "high", "reasoning_effort", "high", "max_completion_tokens", constant.ChannelTypeOpenAI},
+		{"responses", "gpt-5-codex", "xhigh", "reasoning.effort", "xhigh", "max_output_tokens", constant.ChannelTypeOpenAI},
+		{"codex", "gpt-5-codex", "xhigh", "reasoning.effort", "xhigh", "max_output_tokens", constant.ChannelTypeCodex},
+		{"claude-adaptive", "claude-sonnet-4-6", "high", "output_config.effort", "high", "max_tokens", constant.ChannelTypeAnthropic},
+		{"claude-manual", "claude-3-7-sonnet-latest", "high", "thinking.type", "enabled", "max_tokens", constant.ChannelTypeAnthropic},
+		{"gemini-level", "gemini-3-pro-preview", "high", "generationConfig.thinkingConfig.thinkingLevel", "high", "generationConfig.maxOutputTokens", constant.ChannelTypeGemini},
+		{"gemini-budget", "gemini-2.5-flash", "none", "generationConfig.thinkingConfig.thinkingBudget", "0", "generationConfig.maxOutputTokens", constant.ChannelTypeGemini},
+		{"model-modifier", "gpt-5@thinking:on@effort:low", "high", "reasoning_effort", "low", "max_completion_tokens", constant.ChannelTypeOpenAI},
+		{"channel-default", "gpt-4o", "", "reasoning_effort", "low", "max_tokens", constant.ChannelTypeOpenAI},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, _ := setupIQController(t)
+			bodies := make(chan []byte, 1)
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				body, _ := io.ReadAll(r.Body)
+				select {
+				case bodies <- body:
+				default:
+				}
+				if tc.channelType == constant.ChannelTypeCodex {
+					w.Header().Set("Content-Type", "text/event-stream")
+					fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"<svg></svg>\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<svg></svg>\"}]}]}}\n\n")
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, `{"choices":[{"message":{"content":"<svg></svg>"}}]}`)
+			}))
+			defer server.Close()
+			mapping, err := common.Marshal(map[string]string{"gpt-4o": tc.upstream})
+			require.NoError(t, err)
+			mappingJSON := string(mapping)
+			override := `{"reasoning_effort":"low"}`
+			switch tc.channelType {
+			case constant.ChannelTypeAnthropic:
+				override = `{"reasoning_effort":"low","thinking":{"type":"disabled"},"output_config":{"effort":"low"}}`
+			case constant.ChannelTypeGemini:
+				override = `{"reasoning_effort":"low","generationConfig":{"thinkingConfig":{"thinkingLevel":"low"}}}`
+			default:
+				if tc.path == "reasoning.effort" {
+					override = `{"reasoning_effort":"low","reasoning":{"effort":"low"}}`
+				}
+			}
+			ch := &model.Channel{Type: tc.channelType, Status: common.ChannelStatusEnabled, Key: "mock", BaseURL: &server.URL, Models: "gpt-4o", Group: "public", ModelMapping: &mappingJSON, ParamOverride: &override}
+			if tc.channelType == constant.ChannelTypeCodex {
+				ch.Key = `{"access_token":"mock","account_id":"mock-account"}`
+			}
+			require.NoError(t, model.DB.Create(ch).Error)
+			require.NoError(t, ch.AddAbilities(nil))
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			result := executeIQPair(ctx, root.Id, "public", "gpt-4o", "exact", tc.effort)
+			require.Equal(t, "success", result.Status, result.ErrorMessage)
+			body := <-bodies
+			require.Equal(t, tc.want, gjson.GetBytes(body, tc.path).String(), string(body))
+			require.EqualValues(t, model.IQOutputTokens, gjson.GetBytes(body, tc.tokenPath).Int())
+			if tc.channelType != constant.ChannelTypeOpenAI && tc.effort != "" {
+				require.False(t, gjson.GetBytes(body, "reasoning_effort").Exists(), "channel overrides must not add the wrong protocol's thinking controls")
+			}
+			if tc.name == "claude-manual" {
+				budget := gjson.GetBytes(body, "thinking.budget_tokens").Int()
+				require.GreaterOrEqual(t, budget, int64(1024))
+				require.Less(t, budget, int64(model.IQOutputTokens))
+			}
+			require.EqualValues(t, 1, calls.Load(), "every pair must issue exactly one request")
+			var log model.Log
+			require.NoError(t, model.DB.Where("token_name = ?", "IQ test").First(&log).Error)
+			wantEffort := tc.effort
+			if tc.name == "model-modifier" || tc.name == "channel-default" {
+				wantEffort = "low"
+			}
+			require.Equal(t, wantEffort, gjson.Get(log.Other, "reasoning_effort").String(), "usage metadata must match the final reasoning controls")
+		})
+	}
+}

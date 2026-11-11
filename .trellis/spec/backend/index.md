@@ -15,11 +15,12 @@ This directory contains guidelines for backend development. Fill in each file wi
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Database Guidelines](./database-guidelines.md) | ORM patterns, queries, migrations | To fill |
+| [Database Guidelines](./database-guidelines.md) | PostgreSQL-first migration/DDL verification; other conventions pending | Partial |
 | [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
 | [Partner Tenant Paid Checkout](./partner-tenant-checkout.md) | Paid-only Tenant order/cashier/fulfillment, identity isolation and subscription-only funding | Implemented; DB runtime gate pending |
+| [Group IQ Tests](./group-iq-tests.md) | Single-attempt routing, calendar/lease persistence, private latest artwork and API permissions | Implemented |
 
 ---
 

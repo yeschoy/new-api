@@ -1,11 +1,11 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
 
 const LOCALES_DIR = path.resolve('src/i18n/locales')
 
 function stableStringify(obj) {
-  return JSON.stringify(obj, null, 2) + '\n'
+  return `${JSON.stringify(obj, null, 2)}\n`
 }
 
 const newKeys = {
@@ -25,8 +25,62 @@ const newKeys = {
     'Checkout access is missing, invalid or expired': 'Checkout access is missing, invalid or expired',
     'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Return to the merchant to check this order. Do not pay again if you have already paid.',
     'Only verified payment activates your subscription. This page cannot confirm payment.': 'Only verified payment activates your subscription. This page cannot confirm payment.',
+    'Great models.': 'Great models.',
+    'Within reach.': 'Within reach.',
+    'For each full top-up of': 'For each full top-up of',
+    'Bonus usage credit': 'Bonus usage credit',
+    'Per order · Bonus credit is not withdrawable':
+      'Per order · Bonus credit is not withdrawable',
+    'Offer rules': 'Offer rules',
+    'Double 11 special': 'Double 11 special',
+    'Double 11 top-up special': 'Double 11 top-up special',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Every CNY 100 topped up earns {{reward}} in bonus credit',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Complete hundreds per order only; remainders do not carry over.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.',
+    'Check your wallet for current rewards.':
+      'Check your wallet for current rewards.',
+    'Offer details will appear when the campaign starts.':
+      'Offer details will appear when the campaign starts.',
+    'New plan': 'New plan',
+    'Show run history': 'Show run history',
+    'Hide run history': 'Hide run history',
+    'Delete plan': 'Delete plan',
+    'Delete plan {{group}}?': 'Delete plan {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Create and save a plan to show its group here. Available groups are not added automatically.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Only saved plans appear in the gallery. Selecting a group does not create a plan.',
+    'Run result': 'Run result',
+    'Load older runs': 'Load older runs',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.',
+    'Task group': 'Task group',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Each group has its own task, models, prompts and schedule. Save changes before switching groups.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.',
+    'Prompt {{number}}': 'Prompt {{number}}',
+    'Remove prompt': 'Remove prompt',
+    'Add prompt': 'Add prompt',
+    'Thinking level': 'Thinking level',
+    Minimal: 'Minimal',
+    Low: 'Low',
+    High: 'High',
+    'Extra high': 'Extra high',
+    Maximum: 'Maximum',
+    'Models in {{group}}': 'Models in {{group}}',
+    'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.':
+      'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.',
     'Click to join': 'Click to join',
-    'Per-user plan limit. 0 disables the plan limit; system limits still apply.': 'Per-user plan limit. 0 disables the plan limit; system limits still apply.',
+    'Per-user plan limit. 0 disables the plan limit; system limits still apply.':
+      'Per-user plan limit. 0 disables the plan limit; system limits still apply.',
     'Invalid redemption entitlement': 'Invalid redemption entitlement',
     'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}':
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
@@ -47,8 +101,61 @@ const newKeys = {
     'Checkout access is missing, invalid or expired': '收银台访问凭证缺失、无效或已过期',
     'Return to the merchant to check this order. Do not pay again if you have already paid.': '请返回商户查看此订单。如已付款，请勿重复支付。',
     'Only verified payment activates your subscription. This page cannot confirm payment.': '仅经核实的付款会开通订阅，本页面无法确认收款。',
+    'Great models.': '好模型，',
+    'Within reach.': '触手可及。',
+    'For each full top-up of': '单笔每满',
+    'Bonus usage credit': '额外赠送额度',
+    'Per order · Bonus credit is not withdrawable':
+      '单笔计算 · 赠送额度不可提现',
+    'Offer rules': '活动规则',
+    'Double 11 special': '双11特惠',
+    'Double 11 top-up special': '双11充值特惠',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '充值每满 100 元，赠 {{reward}} 使用额度',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '单笔订单按完整的 100 元计算，零头不累计。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '赠送额度不可提现，参与条件与次数限制以钱包页面为准。',
+    'Check your wallet for current rewards.': '前往钱包查看当前充值赠送规则。',
+    'Offer details will appear when the campaign starts.':
+      '活动开始后展示具体赠送规则。',
+    'New plan': '新建计划',
+    'Show run history': '查看运行历史',
+    'Hide run history': '收起运行历史',
+    'Delete plan': '删除计划',
+    'Delete plan {{group}}?': '删除 {{group}} 的计划？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      '从展示列表移除此计划，停止定时和尚未发送的请求。已生成的作品会保留，已经开始的请求可能继续完成。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '每个已保存计划的分组只展示一行，运行历史需主动打开查看。时间均为北京时间。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      '新建并保存计划后，对应分组才会展示在这里，不会自动添加其他可用分组。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '仅展示已保存的计划，选择分组不会自动创建计划。',
+    'Run result': '本次结果',
+    'Load older runs': '加载更早的记录',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '每次运行结果独立保存，最新的排在前面。每行展示一个分组的一次运行，时间均为北京时间。',
+    'Task group': '任务分组',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      '每个分组独立配置任务、模型、提示词和定时。切换分组前请先保存修改。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '每次运行随机抽取一条提示词，该任务内所有模型共用。默认使用项目现有提示词。',
+    'Prompt {{number}}': '提示词 {{number}}',
+    'Remove prompt': '移除提示词',
+    'Add prompt': '添加提示词',
+    'Thinking level': '思考等级',
+    Minimal: '极低',
+    Low: '低',
+    High: '高',
+    'Extra high': '极高',
+    Maximum: '最高',
+    'Models in {{group}}': '{{group}} 分组的模型',
+    'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.':
+      '应用于所有选中的模型。“默认”沿用模型或渠道设置，模型名称中的修饰参数优先。可用等级取决于模型。',
     'Click to join': '点击加入',
-    'Per-user plan limit. 0 disables the plan limit; system limits still apply.': '每位用户的套餐限速。0 表示不启用套餐限速，系统限速仍然生效。',
+    'Per-user plan limit. 0 disables the plan limit; system limits still apply.':
+      '每位用户的套餐限速。0 表示不启用套餐限速，系统限速仍然生效。',
     'Invalid redemption entitlement': '无效的兑换码权益',
     'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}':
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
@@ -69,8 +176,62 @@ const newKeys = {
     'Checkout access is missing, invalid or expired': '收銀台存取憑證遺失、無效或已過期',
     'Return to the merchant to check this order. Do not pay again if you have already paid.': '請返回商戶查看此訂單。如已付款，請勿重複支付。',
     'Only verified payment activates your subscription. This page cannot confirm payment.': '僅經核實的付款會開通訂閱，本頁面無法確認收款。',
+    'Great models.': '好模型，',
+    'Within reach.': '觸手可及。',
+    'For each full top-up of': '單筆每滿',
+    'Bonus usage credit': '額外贈送額度',
+    'Per order · Bonus credit is not withdrawable':
+      '單筆計算 · 贈送額度不可提領',
+    'Offer rules': '活動規則',
+    'Double 11 special': '雙11優惠',
+    'Double 11 top-up special': '雙11儲值優惠',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '儲值每滿人民幣 100 元，贈 {{reward}} 使用額度',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '每筆訂單以完整的人民幣 100 元計算，餘額不累計。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '贈送額度不可提領，參加條件與次數限制以錢包頁面為準。',
+    'Check your wallet for current rewards.':
+      '前往錢包查看目前的儲值贈送規則。',
+    'Offer details will appear when the campaign starts.':
+      '活動開始後將顯示詳細贈送規則。',
+    'New plan': '新增計畫',
+    'Show run history': '查看執行歷史',
+    'Hide run history': '收起執行歷史',
+    'Delete plan': '刪除計畫',
+    'Delete plan {{group}}?': '刪除 {{group}} 的計畫？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      '從展示清單移除此計畫，停止排程與尚未送出的請求。已產生的作品會保留，已開始的請求可能繼續完成。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '每個已儲存計畫的群組只顯示一行，執行歷史需主動開啟查看。時間均為北京時間。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      '新增並儲存計畫後，對應群組才會顯示在這裡，不會自動新增其他可用群組。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '僅顯示已儲存的計畫，選取群組不會自動建立計畫。',
+    'Run result': '本次結果',
+    'Load older runs': '載入更早的記錄',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '每次執行結果獨立儲存，最新的排在前面。每行顯示一個群組的一次執行，時間均為北京時間。',
+    'Task group': '任務群組',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      '每個群組獨立設定任務、模型、提示詞和排程。切換群組前請先儲存修改。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '每次執行隨機抽取一條提示詞，此任務內所有模型共用。預設使用專案現有提示詞。',
+    'Prompt {{number}}': '提示詞 {{number}}',
+    'Remove prompt': '移除提示詞',
+    'Add prompt': '新增提示詞',
+    'Thinking level': '思考等級',
+    Minimal: '極低',
+    Low: '低',
+    High: '高',
+    'Extra high': '極高',
+    Maximum: '最高',
+    'Models in {{group}}': '{{group}} 群組的模型',
+    'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.':
+      '套用至所有選取的模型。「預設」沿用模型或渠道設定，模型名稱中的修飾參數優先。可用等級取決於模型。',
     'Click to join': '點擊加入',
-    'Per-user plan limit. 0 disables the plan limit; system limits still apply.': '每位使用者的方案速率限制。0 表示不啟用方案限制，系統限制仍然生效。',
+    'Per-user plan limit. 0 disables the plan limit; system limits still apply.':
+      '每位使用者的方案速率限制。0 表示不啟用方案限制，系統限制仍然生效。',
     'Invalid redemption entitlement': '無效的兌換碼權益',
     'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}':
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
@@ -91,8 +252,62 @@ const newKeys = {
     'Checkout access is missing, invalid or expired': 'Accès au paiement absent, invalide ou expiré',
     'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Consultez cette commande chez le marchand. Ne payez pas à nouveau si vous avez déjà payé.',
     'Only verified payment activates your subscription. This page cannot confirm payment.': 'Seul un paiement vérifié active l’abonnement. Cette page ne peut pas confirmer un paiement.',
+    'Great models.': 'Les meilleurs modèles.',
+    'Within reach.': 'À votre portée.',
+    'For each full top-up of': 'Par tranche rechargée de',
+    'Bonus usage credit': 'Crédit bonus',
+    'Per order · Bonus credit is not withdrawable':
+      'Par commande · Bonus non retirable',
+    'Offer rules': 'Conditions',
+    'Double 11 special': 'Offre du 11.11',
+    'Double 11 top-up special': 'Offre de recharge du 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Pour 100 CNY rechargés, recevez {{reward}} de crédit bonus',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Par tranches entières de 100 CNY par commande ; le reste ne se cumule pas.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Crédit bonus non retirable. Conditions et limites dans votre portefeuille.',
+    'Check your wallet for current rewards.':
+      'Consultez votre portefeuille pour les bonus en cours.',
+    'Offer details will appear when the campaign starts.':
+      'Les détails seront affichés au début de la campagne.',
+    'New plan': 'Nouveau programme',
+    'Show run history': 'Voir l’historique',
+    'Hide run history': 'Masquer l’historique',
+    'Delete plan': 'Supprimer le programme',
+    'Delete plan {{group}}?': 'Supprimer le programme de {{group}} ?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Retirer ce programme de la galerie et arrêter sa planification et les requêtes non envoyées. Les œuvres sont conservées. Les requêtes déjà lancées peuvent se terminer.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Chaque programme enregistré occupe une ligne par groupe. L’historique reste masqué jusqu’à son ouverture. Horaires en heure de Pékin.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Créez et enregistrez un programme pour afficher son groupe ici. Les groupes disponibles ne sont pas ajoutés automatiquement.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Seuls les programmes enregistrés apparaissent dans la galerie. Sélectionner un groupe ne crée pas de programme.',
+    'Run result': 'Résultat de l’exécution',
+    'Load older runs': 'Charger les exécutions précédentes',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Chaque exécution est conservée, de la plus récente à la plus ancienne. Une ligne par exécution de groupe. Horaires de Pékin.',
+    'Task group': 'Groupe de la tâche',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Chaque groupe a sa tâche, ses modèles, ses prompts et sa planification. Enregistrez avant de changer de groupe.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Un prompt est tiré au sort à chaque exécution et partagé par tous les modèles de la tâche. Le prompt actuel du projet est utilisé par défaut.',
+    'Prompt {{number}}': 'Prompt {{number}}',
+    'Remove prompt': 'Retirer le prompt',
+    'Add prompt': 'Ajouter un prompt',
+    'Thinking level': 'Niveau de réflexion',
+    Minimal: 'Minimal',
+    Low: 'Faible',
+    High: 'Élevé',
+    'Extra high': 'Très élevé',
+    Maximum: 'Maximum',
+    'Models in {{group}}': 'Modèles du groupe {{group}}',
+    'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.':
+      'S’applique à tous les modèles sélectionnés. Par défaut, les réglages du modèle ou du canal sont conservés ; les modificateurs du nom du modèle sont prioritaires. Les niveaux disponibles dépendent du modèle.',
     'Click to join': 'Cliquez pour rejoindre',
-    'Per-user plan limit. 0 disables the plan limit; system limits still apply.': 'Limite du forfait par utilisateur. 0 désactive cette limite ; les limites système restent applicables.',
+    'Per-user plan limit. 0 disables the plan limit; system limits still apply.':
+      'Limite du forfait par utilisateur. 0 désactive cette limite ; les limites système restent applicables.',
     'Invalid redemption entitlement':
       "Droit associé au code d'échange invalide",
     'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}':
@@ -114,8 +329,62 @@ const newKeys = {
     'Checkout access is missing, invalid or expired': '支払いページのアクセス情報がないか、無効または期限切れです',
     'Return to the merchant to check this order. Do not pay again if you have already paid.': '販売元でこの注文をご確認ください。お支払い済みの場合は再度お支払いしないでください。',
     'Only verified payment activates your subscription. This page cannot confirm payment.': '検証済みの入金のみがサブスクリプションを有効にします。このページでは入金を確定できません。',
+    'Great models.': '優れたモデルを、',
+    'Within reach.': 'もっと身近に。',
+    'For each full top-up of': '1注文のチャージ額ごとに',
+    'Bonus usage credit': '追加利用クレジット',
+    'Per order · Bonus credit is not withdrawable':
+      '注文単位で計算 · 特典は出金不可',
+    'Offer rules': '特典条件',
+    'Double 11 special': '11.11特典',
+    'Double 11 top-up special': '11.11チャージ特典',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '100人民元のチャージごとに{{reward}}の利用クレジットを進呈',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '1注文につき100人民元単位で計算し、端数は繰り越しません。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '特典クレジットは出金できません。対象条件と回数制限はウォレットをご確認ください。',
+    'Check your wallet for current rewards.':
+      '現在の特典はウォレットでご確認ください。',
+    'Offer details will appear when the campaign starts.':
+      'キャンペーン開始後に特典の詳細を表示します。',
+    'New plan': 'プランを新規作成',
+    'Show run history': '実行履歴を表示',
+    'Hide run history': '実行履歴を閉じる',
+    'Delete plan': 'プランを削除',
+    'Delete plan {{group}}?': '{{group}} のプランを削除しますか？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'このプランをギャラリーから除外し、スケジュールと未送信のリクエストを停止します。保存済みの作品は保持されます。開始済みのリクエストは完了する場合があります。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '保存済みプランはグループごとに1行で表示します。実行履歴は開くまで表示されません。時刻は北京時間です。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'プランを作成して保存すると、そのグループがここに表示されます。利用可能なグループは自動追加されません。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '保存済みのプランのみギャラリーに表示されます。グループの選択だけではプランは作成されません。',
+    'Run result': '今回の結果',
+    'Load older runs': '以前の実行を読み込む',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '実行結果は毎回個別に保存され、新しい順に表示されます。1行が1グループの1回の実行です。時刻は北京時間です。',
+    'Task group': 'タスクのグループ',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'グループごとにタスク、モデル、プロンプト、スケジュールを個別に設定します。グループを切り替える前に変更を保存してください。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '実行ごとにプロンプトを1つランダムに選び、タスク内の全モデルで共有します。既定ではプロジェクトの既存プロンプトを使います。',
+    'Prompt {{number}}': 'プロンプト {{number}}',
+    'Remove prompt': 'プロンプトを削除',
+    'Add prompt': 'プロンプトを追加',
+    'Thinking level': '思考レベル',
+    Minimal: '最小',
+    Low: '低',
+    High: '高',
+    'Extra high': '非常に高い',
+    Maximum: '最大',
+    'Models in {{group}}': '{{group}} グループのモデル',
+    'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.':
+      '選択したすべてのモデルに適用されます。デフォルトではモデルまたはチャネルの設定を維持し、モデル名の修飾パラメーターが優先されます。利用可能なレベルはモデルによって異なります。',
     'Click to join': 'クリックして参加',
-    'Per-user plan limit. 0 disables the plan limit; system limits still apply.': 'ユーザーごとのプラン制限です。0 でプラン制限を無効にしても、システム制限は適用されます。',
+    'Per-user plan limit. 0 disables the plan limit; system limits still apply.':
+      'ユーザーごとのプラン制限です。0 でプラン制限を無効にしても、システム制限は適用されます。',
     'Invalid redemption entitlement': '引き換えコードの特典が無効です',
     'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}':
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
@@ -136,8 +405,62 @@ const newKeys = {
     'Checkout access is missing, invalid or expired': 'Доступ к оплате отсутствует, недействителен или истёк',
     'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Проверьте этот заказ у продавца. Если вы уже заплатили, не платите повторно.',
     'Only verified payment activates your subscription. This page cannot confirm payment.': 'Подписку активирует только проверенная оплата. Эта страница не может подтвердить платёж.',
+    'Great models.': 'Лучшие модели.',
+    'Within reach.': 'Ближе, чем кажется.',
+    'For each full top-up of': 'За каждые полные',
+    'Bonus usage credit': 'Бонусный кредит',
+    'Per order · Bonus credit is not withdrawable':
+      'На заказ · Бонус нельзя вывести',
+    'Offer rules': 'Условия',
+    'Double 11 special': 'Акция 11.11',
+    'Double 11 top-up special': 'Бонус за пополнение к 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'За каждые 100 CNY пополнения — {{reward}} бонусного кредита',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Учитываются полные 100 CNY в одном заказе; остаток не переносится.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Бонусный кредит нельзя вывести. Условия и лимиты указаны в кошельке.',
+    'Check your wallet for current rewards.':
+      'Текущие бонусы за пополнение смотрите в кошельке.',
+    'Offer details will appear when the campaign starts.':
+      'Подробные условия появятся после начала акции.',
+    'New plan': 'Новый план',
+    'Show run history': 'История запусков',
+    'Hide run history': 'Скрыть историю',
+    'Delete plan': 'Удалить план',
+    'Delete plan {{group}}?': 'Удалить план группы {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Убрать план из галереи, отключить расписание и неотправленные запросы. Сохранённые работы останутся. Уже начатые запросы могут завершиться.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Каждый сохранённый план отображается одной строкой группы. История запусков скрыта до открытия. Время пекинское.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Создайте и сохраните план, чтобы его группа появилась здесь. Доступные группы не добавляются автоматически.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'В галерее видны только сохранённые планы. Выбор группы не создаёт план.',
+    'Run result': 'Результат запуска',
+    'Load older runs': 'Загрузить более ранние запуски',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Все запуски сохраняются отдельно, новые сверху. Одна строка — один запуск группы. Время пекинское.',
+    'Task group': 'Группа задачи',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'У каждой группы свои задача, модели, запросы и расписание. Сохраните изменения перед сменой группы.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Для каждого запуска случайно выбирается один запрос, общий для всех моделей задачи. По умолчанию используется текущий запрос проекта.',
+    'Prompt {{number}}': 'Запрос {{number}}',
+    'Remove prompt': 'Удалить запрос',
+    'Add prompt': 'Добавить запрос',
+    'Thinking level': 'Уровень размышления',
+    Minimal: 'Минимальный',
+    Low: 'Низкий',
+    High: 'Высокий',
+    'Extra high': 'Очень высокий',
+    Maximum: 'Максимальный',
+    'Models in {{group}}': 'Модели группы {{group}}',
+    'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.':
+      'Применяется ко всем выбранным моделям. По умолчанию сохраняются настройки модели или канала; модификаторы в имени модели имеют приоритет. Доступные уровни зависят от модели.',
     'Click to join': 'Нажмите, чтобы вступить',
-    'Per-user plan limit. 0 disables the plan limit; system limits still apply.': 'Лимит плана на пользователя. 0 отключает лимит плана; системные ограничения сохраняются.',
+    'Per-user plan limit. 0 disables the plan limit; system limits still apply.':
+      'Лимит плана на пользователя. 0 отключает лимит плана; системные ограничения сохраняются.',
     'Invalid redemption entitlement': 'Недопустимый тип вознаграждения по коду',
     'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}':
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
@@ -158,8 +481,62 @@ const newKeys = {
     'Checkout access is missing, invalid or expired': 'Quyền truy cập thanh toán bị thiếu, không hợp lệ hoặc đã hết hạn',
     'Return to the merchant to check this order. Do not pay again if you have already paid.': 'Quay lại nhà bán hàng để kiểm tra đơn này. Đừng thanh toán lại nếu đã trả tiền.',
     'Only verified payment activates your subscription. This page cannot confirm payment.': 'Chỉ thanh toán đã xác minh mới kích hoạt đăng ký. Trang này không thể xác nhận thanh toán.',
+    'Great models.': 'Mô hình hàng đầu.',
+    'Within reach.': 'Trong tầm tay.',
+    'For each full top-up of': 'Mỗi lần nạp đủ',
+    'Bonus usage credit': 'Tín dụng thưởng thêm',
+    'Per order · Bonus credit is not withdrawable':
+      'Tính theo đơn · Không thể rút tiền thưởng',
+    'Offer rules': 'Thể lệ',
+    'Double 11 special': 'Ưu đãi 11.11',
+    'Double 11 top-up special': 'Ưu đãi nạp tiền 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Nạp mỗi 100 CNY, nhận {{reward}} tín dụng thưởng',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Tính theo từng 100 CNY trọn vẹn trong mỗi đơn; phần lẻ không cộng dồn.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Tín dụng thưởng không thể rút. Xem điều kiện và giới hạn trong ví.',
+    'Check your wallet for current rewards.':
+      'Xem ưu đãi nạp tiền hiện tại trong ví.',
+    'Offer details will appear when the campaign starts.':
+      'Chi tiết ưu đãi sẽ hiển thị khi chương trình bắt đầu.',
+    'New plan': 'Tạo kế hoạch',
+    'Show run history': 'Xem lịch sử chạy',
+    'Hide run history': 'Ẩn lịch sử chạy',
+    'Delete plan': 'Xóa kế hoạch',
+    'Delete plan {{group}}?': 'Xóa kế hoạch của {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Ẩn kế hoạch khỏi thư viện, dừng lịch chạy và các yêu cầu chưa gửi. Tác phẩm đã lưu được giữ lại. Các yêu cầu đã bắt đầu có thể tiếp tục hoàn tất.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Mỗi kế hoạch đã lưu hiển thị một hàng cho nhóm. Lịch sử chạy được ẩn cho đến khi mở. Thời gian theo giờ Bắc Kinh.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Tạo và lưu kế hoạch để hiển thị nhóm tại đây. Các nhóm khả dụng không được tự động thêm.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Chỉ các kế hoạch đã lưu xuất hiện trong thư viện. Chọn nhóm không tự tạo kế hoạch.',
+    'Run result': 'Kết quả lần chạy',
+    'Load older runs': 'Tải các lần chạy cũ hơn',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Mỗi lần chạy được lưu riêng, mới nhất ở trên. Mỗi hàng là một lần chạy của một nhóm. Thời gian theo giờ Bắc Kinh.',
+    'Task group': 'Nhóm tác vụ',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Mỗi nhóm có tác vụ, mô hình, câu lệnh và lịch chạy riêng. Hãy lưu thay đổi trước khi chuyển nhóm.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Mỗi lần chạy chọn ngẫu nhiên một câu lệnh dùng chung cho mọi mô hình trong tác vụ. Mặc định dùng câu lệnh hiện có của dự án.',
+    'Prompt {{number}}': 'Câu lệnh {{number}}',
+    'Remove prompt': 'Xóa câu lệnh',
+    'Add prompt': 'Thêm câu lệnh',
+    'Thinking level': 'Mức độ suy nghĩ',
+    Minimal: 'Tối thiểu',
+    Low: 'Thấp',
+    High: 'Cao',
+    'Extra high': 'Rất cao',
+    Maximum: 'Tối đa',
+    'Models in {{group}}': 'Mô hình trong nhóm {{group}}',
+    'Applies to all selected models. Default keeps model/channel settings; model modifiers take precedence. Supported levels depend on the model.':
+      'Áp dụng cho tất cả mô hình đã chọn. Mặc định giữ cài đặt của mô hình hoặc kênh; tham số bổ sung trong tên mô hình được ưu tiên. Các mức khả dụng tùy thuộc vào mô hình.',
     'Click to join': 'Nhấn để tham gia',
-    'Per-user plan limit. 0 disables the plan limit; system limits still apply.': 'Giới hạn gói cho mỗi người dùng. 0 tắt giới hạn gói; giới hạn hệ thống vẫn áp dụng.',
+    'Per-user plan limit. 0 disables the plan limit; system limits still apply.':
+      'Giới hạn gói cho mỗi người dùng. 0 tắt giới hạn gói; giới hạn hệ thống vẫn áp dụng.',
     'Invalid redemption entitlement': 'Quyền lợi của mã đổi không hợp lệ',
     'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}':
       'Đã kích hoạt gói đăng ký {{plan}} bằng mã đổi (ID mã: {{id}})',
@@ -171,10 +548,18 @@ async function main() {
     for (const locale of Object.keys(newKeys)) {
       const relativePath = `web/src/i18n/locales/${locale}.json`
       const [base, ours, theirs] = [1, 2, 3].map((stage) =>
-        JSON.parse(execFileSync('git', ['show', `:${stage}:${relativePath}`], { encoding: 'utf8' }))
+        JSON.parse(
+          execFileSync('git', ['show', `:${stage}:${relativePath}`], {
+            encoding: 'utf8',
+          })
+        )
       )
       const translation = {}
-      for (const key of new Set([...Object.keys(base.translation), ...Object.keys(ours.translation), ...Object.keys(theirs.translation)])) {
+      for (const key of new Set([
+        ...Object.keys(base.translation),
+        ...Object.keys(ours.translation),
+        ...Object.keys(theirs.translation),
+      ])) {
         const original = base.translation[key]
         const local = ours.translation[key]
         const remote = theirs.translation[key]
@@ -184,9 +569,17 @@ async function main() {
         else throw new Error(`Conflicting translation: ${locale}: ${key}`)
         if (value !== undefined) translation[key] = value
       }
-      ours.translation = Object.fromEntries(Object.entries(translation).sort(([a], [b]) => a.localeCompare(b)))
-      await fs.writeFile(path.join(LOCALES_DIR, `${locale}.json`), stableStringify(ours), 'utf8')
-      console.log(`${locale}: merged ${Object.keys(translation).length} translations`)
+      ours.translation = Object.fromEntries(
+        Object.entries(translation).sort(([a], [b]) => a.localeCompare(b))
+      )
+      await fs.writeFile(
+        path.join(LOCALES_DIR, `${locale}.json`),
+        stableStringify(ours),
+        'utf8'
+      )
+      console.log(
+        `${locale}: merged ${Object.keys(translation).length} translations`
+      )
     }
     return
   }
@@ -198,7 +591,7 @@ async function main() {
 
     let count = 0
     for (const [key, value] of Object.entries(trans)) {
-      if (!Object.prototype.hasOwnProperty.call(json.translation, key)) {
+      if (!Object.hasOwn(json.translation, key)) {
         json.translation[key] = value
         count++
       } else if (json.translation[key] !== value) {

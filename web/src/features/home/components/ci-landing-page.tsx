@@ -40,6 +40,7 @@ import { useSystemConfig } from '@/hooks/use-system-config'
 import { PRODUCT_NAME } from '@/lib/product-brand'
 import { cn } from '@/lib/utils'
 
+import { useDoubleElevenWindow } from '../hooks/use-double-eleven-window'
 import {
   filterCatalog,
   sortCatalog,
@@ -52,6 +53,7 @@ import { formatPerMillionTokens } from '../lib/pricing-savings'
 import { CatalogPrice } from './catalog-price'
 import { CatalogVendorIcon } from './catalog-vendor-icon'
 import { CiMark } from './ci-mark'
+import { DoubleElevenPromo } from './double-eleven-promo'
 import { ForgeHeroBadge, ForgeSpotlight } from './forge-partnership'
 import { GlassCursor } from './glass-cursor'
 
@@ -127,6 +129,7 @@ export function CiLandingPage(props: LandingPageProps) {
   const { status } = useStatus()
   const { footerHtml } = useSystemConfig()
   const { resolvedTheme } = useTheme()
+  const campaignWindow = useDoubleElevenWindow()
   const [revealed, setRevealed] = useState(false)
   const address = useGuideAddress()
   const clipboard = useCopyToClipboard({ notify: false })
@@ -162,101 +165,108 @@ export function CiLandingPage(props: LandingPageProps) {
           <section className='ci-hero' id='top'>
             <div className='ci-heroGrid'>
               <div className='ci-heroCopy'>
-                <ForgeHeroBadge />
-                <div className='ci-heroBrand'>
-                  <CiMark size={56} />
-                  <span className='ci-heroProductName'>{PRODUCT_NAME}</span>
-                  <span className='ci-heroBrandBadge'>yeschoy</span>
+                <div className='ci-heroIntro'>
+                  <div className='ci-heroBrand'>
+                    <CiMark size={56} />
+                    <span className='ci-heroProductName'>{PRODUCT_NAME}</span>
+                    <span className='ci-heroBrandBadge'>yeschoy</span>
+                  </div>
+                  <h1
+                    className={cn(
+                      'ci-revealHeading',
+                      revealed && 'ci-revealHeadingVisible'
+                    )}
+                  >
+                    {props.maxSavingsPercent > 0 && !campaignWindow.visible ? (
+                      <>
+                        <span>
+                          <i>
+                            {t('Save up to')}{' '}
+                            <AnimatedPercent value={props.maxSavingsPercent} />
+                          </i>
+                        </span>
+                        <span>
+                          <i>
+                            {t('on AI models')}
+                            {featured ? (
+                              <span
+                                className='ci-heroModelLogo ci-heroModelLogoVisible'
+                                aria-hidden='true'
+                              >
+                                <CatalogVendorIcon model={featured} />
+                              </span>
+                            ) : null}
+                          </i>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>
+                          <i>{t('Great models.')}</i>
+                        </span>
+                        <span>
+                          <i>{t('Within reach.')}</i>
+                        </span>
+                      </>
+                    )}
+                  </h1>
+                  <p>
+                    {t(
+                      'Access leading discounted AI models from multiple providers through one OpenAI-compatible API,'
+                    )}{' '}
+                    <strong className='ci-heroCopyEmphasis'>
+                      {t('without changing your request format.')}
+                    </strong>
+                  </p>
                 </div>
-                <h1
-                  className={cn(
-                    'ci-revealHeading',
-                    revealed && 'ci-revealHeadingVisible'
-                  )}
-                >
-                  {props.maxSavingsPercent > 0 ? (
-                    <>
-                      <span>
-                        <i>
-                          {t('Save up to')}{' '}
-                          <AnimatedPercent value={props.maxSavingsPercent} />
-                        </i>
-                      </span>
-                      <span>
-                        <i>
-                          {t('on AI models')}
-                          {featured ? (
-                            <span
-                              className='ci-heroModelLogo ci-heroModelLogoVisible'
-                              aria-hidden='true'
-                            >
-                              <CatalogVendorIcon model={featured} />
-                            </span>
-                          ) : null}
-                        </i>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        <i>{t('Pay in yuan across models')}</i>
-                      </span>
-                      <span>
-                        <i>{t('through one API')}</i>
-                      </span>
-                    </>
-                  )}
-                </h1>
-                <p>
-                  {t(
-                    'Access leading discounted AI models from multiple providers through one OpenAI-compatible API,'
-                  )}{' '}
-                  <strong className='ci-heroCopyEmphasis'>
-                    {t('without changing your request format.')}
-                  </strong>
-                </p>
-                <div className='ci-heroActions ci-heroActions--primary'>
-                  <a
-                    href='/desktop/connect'
-                    className='ci-button ci-button--default ci-button--size-sm ci-heroOpenDesktop'
-                    data-testid='homepage-open-desktop'
-                  >
-                    {t('Open YesChoy desktop in one click')}{' '}
-                    <MonitorDown size={17} aria-hidden='true' />
-                  </a>
-                  <Link
-                    to={primaryTo}
-                    className='ci-button ci-button--outline ci-button--size-sm'
-                  >
-                    {t('Start saving')} <ArrowIcon />
-                  </Link>
-                  <Link
-                    to='/client'
-                    className='ci-button ci-button--outline ci-button--size-sm ci-heroClientAction'
-                  >
-                    {t('Client')}
-                  </Link>
-                </div>
-                <p className='ci-heroOpenDesktopHint'>
-                  {t(
-                    'Already installed? One tap opens the app and signs you into this site—no long URL.'
-                  )}
-                </p>
-                <div className='ci-trustRow'>
-                  <span>
-                    <Wallet size={15} /> {t('Fund from $5')}
-                  </span>
-                  <span>
-                    <Gauge size={15} /> {t('Usage-based pricing')}
-                  </span>
-                  <span>
-                    <CalendarOff size={15} /> {t('No monthly commitment')}
-                  </span>
+                <DoubleElevenPromo isAuthenticated={props.isAuthenticated} />
+                <div className='ci-heroUtilities'>
+                  <div className='ci-heroActions ci-heroActions--primary'>
+                    <a
+                      href='/desktop/connect'
+                      className='ci-button ci-button--default ci-button--size-sm ci-heroOpenDesktop'
+                      data-testid='homepage-open-desktop'
+                    >
+                      {t('Open YesChoy desktop in one click')}{' '}
+                      <MonitorDown size={17} aria-hidden='true' />
+                    </a>
+                    <Link
+                      to={primaryTo}
+                      className='ci-button ci-button--outline ci-button--size-sm'
+                    >
+                      {t('Start saving')} <ArrowIcon />
+                    </Link>
+                    <Link
+                      to='/client'
+                      className='ci-button ci-button--outline ci-button--size-sm ci-heroClientAction'
+                    >
+                      {t('Client')}
+                    </Link>
+                  </div>
+                  <p className='ci-heroOpenDesktopHint'>
+                    {t(
+                      'Already installed? One tap opens the app and signs you into this site—no long URL.'
+                    )}
+                  </p>
+                  <div className='ci-trustRow'>
+                    <span>
+                      <Wallet size={15} /> {t('Fund from $5')}
+                    </span>
+                    <span>
+                      <Gauge size={15} /> {t('Usage-based pricing')}
+                    </span>
+                    <span>
+                      <CalendarOff size={15} /> {t('No monthly commitment')}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
+          <div className='ci-partnershipAnnouncement'>
+            <ForgeHeroBadge />
+          </div>
           <ForgeSpotlight primaryTo={primaryTo} baseUrl={address.baseUrl} />
 
           <Catalog models={props.models} />

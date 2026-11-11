@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
+- **Total Sessions**: 11
 - **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~221 | Active |
+| `journal-1.md` | ~359 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,7 +29,11 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-11-11 | Fix explicit IQ plan visibility and deletion | `a186b3e4f` | `iq-test` |
 | 10 | 2026-11-11 | Tenant paid checkout implementation; DB verification blocked | `a117c925f` | `feat/partner-accounts` |
+| 9 | 2026-11-11 | IQ group tasks, prompt pools and retained run gallery | `187fc781d` | `iq-test` |
+| 8 | 2026-11-09 | Fix PostgreSQL IQ migration startup failure | `2089840ad` | `iq-test` |
+| 7 | 2026-11-09 | Scheduled group IQ tests and isolated gallery | `11d7d3d0b` | `iq-test` |
 | 6 | 2026-11-02 | 合作商账号与不限量套餐提交及远端整合 | `d2e908664`, `2f465c900` | `feat/partner-accounts` |
 | 5 | 2026-10-19 | 合作方 OAuth 授权日志（专表） | `431cc580c` | `feat/partner-oauth-audit-rc44` |
 | 4 | 2026-09-18 | 优化首页品牌与社群入口 | `7f4da2c1b` | `qq-image` |

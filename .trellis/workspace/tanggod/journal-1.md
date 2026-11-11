@@ -199,6 +199,100 @@ Implemented partner tenant accounts, unlimited quota and per-user RPM; fixed rev
 - Review items 1 (video remix limiter coverage) and 2 (partner plan compliance UI gate) remain open; the user requested only fixes 3/4 and commit/push.
 
 
+## Session 7: Scheduled group IQ tests and isolated gallery
+<!-- trellis-session: v=2 fp=b805d7b9f8935264 -->
+
+**Date**: 2026-11-09
+**Task**: Scheduled group IQ tests and isolated gallery
+**Branch**: `iq-test`
+
+### Summary
+
+Implemented administrator-configured prompts, concrete group/model targets, interval/daily Beijing schedules, durable single-attempt execution and authenticated latest-only HTML/SVG gallery. Completed focused mock/SQLite/frontend/build/browser checks; documented iframe self-navigation/resource limits and unavailable independent child review. User authorized commit and push; temporary outputs retained for cleanup consent.
+
+### Main Changes
+
+- Add bounded IQ persistence/scheduling/execution and private group-filtered APIs without viewer quota debit or retries.
+- Add /iq-tests in both console modes, active opaque-origin previews, versioned admin forms and seven locales; fix schedule input identity.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `11d7d3d0b` | feat(iq-tests): add scheduled group artwork tests |
+
+### Testing
+
+- [OK] Nine focused IQ backend test functions and affected channel-test regression passed; frontend feature tests, affected lint, typecheck and build passed.
+- [OK] One local built-app smoke verified Canvas/SVG, parent/storage isolation, blocked subresources and anonymous/member/mobile UI; observed and documented own-frame navigation limitation.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Push iq-test branch to origin; request consent before deleting inventoried temporary outputs. Keep Trellis logs and default-disabled schedules.
+
+
+## Session 8: Fix PostgreSQL IQ migration startup failure
+<!-- trellis-session: v=2 fp=cf15d62472654cd7 -->
+
+**Date**: 2026-11-09
+**Task**: Fix PostgreSQL IQ migration startup failure
+**Branch**: `iq-test`
+
+### Summary
+
+Confirmed production deployment failed on introduced iq_configs.targets varchar(16777215), SQLSTATE 22023. Replaced size inference with portable text mapping and added a required PostgreSQL check before image build/deployment. User prioritizes PostgreSQL; real isolated PostgreSQL 15.19 migration, repeat migration, config round trip and full application startup/health passed. No production mutation or main merge.
+
+### Main Changes
+
+- Fix IQTargets JSON column mapping; record PostgreSQL-first acceptance and the actual production incident.
+- Add a PostgreSQL 15 service/regression gate to the deployment workflow before build and deploy.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2089840ad` | fix(iq-tests): prevent PostgreSQL migration startup failure |
+
+### Testing
+
+- [OK] Actual PostgreSQL 15.19 rejects the legacy varchar with 22023; fixed TEXT migration/repeat and exact JSON/prompt round trip pass in a verified isolated schema.
+- [OK] Native application build passes, full PostgreSQL-backed startup succeeds, and /api/status returns success=true. Workflow YAML/dependency checks pass.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Push only iq-test. Main merge/deployment needs owner authorization; temporary local PG resources remain inventoried for approved cleanup.
+
+
+## Session 9: IQ group tasks, prompt pools and retained run gallery
+<!-- trellis-session: v=2 fp=0e2a9bdec5715419 -->
+
+**Date**: 2026-11-11
+**Task**: IQ group tasks, prompt pools and retained run gallery
+**Branch**: `iq-test`
+
+### Summary
+
+Implemented independent per-group IQ configuration/schedule/run with atomic legacy split, random prompt pool snapshots and existing default prompt. Preserved immutable per-run artwork and descending whole-run cursor pagination. Fixed thumbnail layout with a scaled 1280x960 viewport and direct-body preview markup. IQ-only Go checks, frontend lint/typecheck and 14 targeted checks passed; one local browser visual probe passed. No paid provider calls or deployment. Live PostgreSQL migration check skipped because TEST_POSTGRES_DSN is unset. The user subsequently approved cleanup: removed this session's .iq-independent-tasks-temp-artifacts.md, /tmp/iq-independent-go-check.log, /tmp/iq-independent-web-check.log and /tmp/iq-independent-preview-smoke/. Feature commits and Trellis logs were retained; pre-existing unrelated temporary inventories were left untouched.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `187fc781d` | feat(iq-tests): isolate group tasks and preserve chronological run history |
+
+### Status
+
+[OK] **Completed**
+
+
 ## Session 10: Tenant paid checkout implementation; DB verification blocked
 <!-- trellis-session: v=2 fp=b73bd25ae5faec8e -->
 
@@ -219,3 +313,47 @@ Implemented paid Tenant subscription orders, order-scoped public cashier, strict
 ### Status
 
 [OK] **Completed**
+
+
+## Session 11: Fix explicit IQ plan visibility and deletion
+<!-- trellis-session: v=2 fp=7da0db802d2962fa -->
+
+**Date**: 2026-11-11
+**Task**: Fix explicit IQ plan visibility and deletion
+**Branch**: `iq-test`
+
+### Summary
+
+Fixed the gallery regression: saved plans show one latest group row by default, history is opt-in, creation requires explicit group selection and save, and versioned deletion stops schedules/pending requests while retaining artwork.
+
+### Main Changes
+
+- Added versioned plan tombstones, deleted-group artifact authorization, and latest-row backfill for quiet groups beyond the global history page.
+- Updated seven locales and frontend/backend IQ contracts; no new task or production data changes.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a186b3e4f` | fix(iq-tests): show saved plans once and support plan deletion |
+
+### Testing
+
+- [OK] Passed: go test ./model ./controller ./router -count=1; 18 frontend IQ tests; typecheck; build; scoped lint; changed-file format check; i18n sync.
+- [OK] Mock-backed native browser verified one default row, history toggle, explicit create/save/delete and 390px layout without horizontal overflow.
+- Not verified: live PostgreSQL test, because the owned local Docker PostgreSQL container failed to start; existing CI PostgreSQL gate remains mandatory. Full frontend lint has unrelated existing violations.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Deploy only after PostgreSQL CI passes.
+
+### Approved Cleanup
+
+- The user approved cleanup and requested commit/push of the current `iq-test` branch.
+- Removed 36 recorded temporary files: local browser observations/screenshots, dev-server log, generated i18n reports, the external truncated build log, and `.iq-plan-visibility-temp-artifacts.md`; removed the two now-empty artifact/report directories.
+- Removed only the owned, unstarted `postgres:15` container `iq-plan-visibility-test` (`6dee1b00b4f5`); verified no matching container remains.
+- Preserved all Trellis logs, tracked translation tools, `web/dist/`, and the three pre-existing IQ artifact manifests. No production data or application code changed during cleanup.
