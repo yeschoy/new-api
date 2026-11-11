@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { getPublicCashbackOffers } from '@/features/cashback/api'
+import { useDoubleElevenWindow } from '@/features/home/hooks/use-double-eleven-window'
 import {
   FORGE_MARK,
   FORGE_PARTNER_NAME,
@@ -82,8 +83,14 @@ export function RewardBanner() {
           state.location.pathname.startsWith(`${prefix}/`)
       ),
   })
+  // The home page has a dedicated partnership section below its main offer.
+  // Keep the site-wide strip focused on rewards there, not a second hackathon ad.
+  const showForge = useRouterState({
+    select: (state) => state.location.pathname !== '/',
+  })
   const isAuthenticated = useAuthStore((state) => !!state.auth.user)
   const { status } = useStatus()
+  const doubleEleven = useDoubleElevenWindow()
   const offers = useQuery({
     queryKey: ['cashback', 'public-offers'],
     queryFn: getPublicCashbackOffers,
@@ -109,12 +116,16 @@ export function RewardBanner() {
           },
           { t, locale, formatQuota: (quota) => formatQuotaWithCurrency(quota) }
         )
+  const showDoubleEleven =
+    doubleEleven.visible && !!rewards && !!offers.data?.invitee
   // One dismissal covers the whole strip until either announcement changes.
   const announcementKey = JSON.stringify({
-    forge: FORGE_ANNOUNCEMENT_ID,
+    forge: showForge ? FORGE_ANNOUNCEMENT_ID : null,
     rewards: rewards?.rulesKey ?? null,
+    ...(showDoubleEleven ? { promotion: 'double-eleven-2026' } : {}),
   })
-  const visible = !hiddenRoute && announcementKey !== dismissedKey
+  const visible =
+    !hiddenRoute && (showForge || !!rewards) && announcementKey !== dismissedKey
 
   // Full-height shells subtract this so the banner never adds a page scroll.
   useLayoutEffect(() => {
@@ -162,42 +173,46 @@ export function RewardBanner() {
         className='pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,color-mix(in_srgb,var(--brand-lime)_26%,transparent),color-mix(in_srgb,var(--brand-mint)_14%,transparent)_50%,color-mix(in_srgb,var(--brand-cyan)_22%,transparent))] dark:opacity-35'
       />
       <div className='relative mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-5 gap-y-1'>
-        <p className='flex flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5'>
-          <img
-            src={FORGE_MARK}
-            alt=''
-            width={22}
-            height={17}
-            aria-hidden='true'
-            className='hidden shrink-0 drop-shadow-[0_0_4px_rgb(34_211_238/0.35)] sm:block'
-          />
-          <span className='tracking-wide'>
-            <span className='text-foreground font-semibold'>
-              {t('Fastrun Cloud Hackathon')}
-            </span>{' '}
-            <span aria-hidden='true' className='text-muted-foreground'>
-              ×
-            </span>{' '}
-            {FORGE_PARTNER_NAME}
-            <span className='text-muted-foreground'>
-              {' · '}
-              {t('Model supply partner')}
+        {showForge ? (
+          <p className='flex flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5'>
+            <img
+              src={FORGE_MARK}
+              alt=''
+              width={22}
+              height={17}
+              aria-hidden='true'
+              className='hidden shrink-0 drop-shadow-[0_0_4px_rgb(34_211_238/0.35)] sm:block'
+            />
+            <span className='tracking-wide'>
+              <span className='text-foreground font-semibold'>
+                {t('Fastrun Cloud Hackathon')}
+              </span>{' '}
+              <span aria-hidden='true' className='text-muted-foreground'>
+                ×
+              </span>{' '}
+              {FORGE_PARTNER_NAME}
+              <span className='text-muted-foreground'>
+                {' · '}
+                {t('Model supply partner')}
+              </span>
             </span>
-          </span>
-          <Link
-            to='/'
-            hash={FORGE_SECTION_ID}
-            className='text-xs font-semibold whitespace-nowrap text-cyan-700 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current dark:text-(--brand-cyan)'
-          >
-            {t('Explore the hackathon')} →
-          </Link>
-        </p>
+            <Link
+              to='/'
+              hash={FORGE_SECTION_ID}
+              className='text-xs font-semibold whitespace-nowrap text-cyan-700 underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current dark:text-(--brand-cyan)'
+            >
+              {t('Explore the hackathon')} →
+            </Link>
+          </p>
+        ) : null}
         {rewards ? (
           <>
-            <span
-              aria-hidden='true'
-              className='bg-foreground/15 hidden h-3.5 w-px md:block'
-            />
+            {showForge ? (
+              <span
+                aria-hidden='true'
+                className='bg-foreground/15 hidden h-3.5 w-px md:block'
+              />
+            ) : null}
             <p className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1'>
               <span
                 aria-hidden='true'
@@ -205,6 +220,11 @@ export function RewardBanner() {
               >
                 <Gift className='size-3' strokeWidth={2.5} />
               </span>
+              {showDoubleEleven ? (
+                <span className='border-foreground/10 bg-background/70 text-foreground rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap'>
+                  {t('Double 11 special')}
+                </span>
+              ) : null}
               <span className='tracking-wide'>
                 {rewards.segments.join(' | ')}
               </span>

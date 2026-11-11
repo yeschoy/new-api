@@ -10,6 +10,25 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
+    'Great models.': 'Great models.',
+    'Within reach.': 'Within reach.',
+    'For each full top-up of': 'For each full top-up of',
+    'Bonus usage credit': 'Bonus usage credit',
+    'Per order · Bonus credit is not withdrawable':
+      'Per order · Bonus credit is not withdrawable',
+    'Offer rules': 'Offer rules',
+    'Double 11 special': 'Double 11 special',
+    'Double 11 top-up special': 'Double 11 top-up special',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Every CNY 100 topped up earns {{reward}} in bonus credit',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Complete hundreds per order only; remainders do not carry over.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.',
+    'Check your wallet for current rewards.':
+      'Check your wallet for current rewards.',
+    'Offer details will appear when the campaign starts.':
+      'Offer details will appear when the campaign starts.',
     'New plan': 'New plan',
     'Show run history': 'Show run history',
     'Hide run history': 'Hide run history',
@@ -52,6 +71,24 @@ const newKeys = {
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
   },
   zh: {
+    'Great models.': '好模型，',
+    'Within reach.': '触手可及。',
+    'For each full top-up of': '单笔每满',
+    'Bonus usage credit': '额外赠送额度',
+    'Per order · Bonus credit is not withdrawable':
+      '单笔计算 · 赠送额度不可提现',
+    'Offer rules': '活动规则',
+    'Double 11 special': '双11特惠',
+    'Double 11 top-up special': '双11充值特惠',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '充值每满 100 元，赠 {{reward}} 使用额度',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '单笔订单按完整的 100 元计算，零头不累计。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '赠送额度不可提现，参与条件与次数限制以钱包页面为准。',
+    'Check your wallet for current rewards.': '前往钱包查看当前充值赠送规则。',
+    'Offer details will appear when the campaign starts.':
+      '活动开始后展示具体赠送规则。',
     'New plan': '新建计划',
     'Show run history': '查看运行历史',
     'Hide run history': '收起运行历史',
@@ -94,6 +131,25 @@ const newKeys = {
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
   },
   'zh-TW': {
+    'Great models.': '好模型，',
+    'Within reach.': '觸手可及。',
+    'For each full top-up of': '單筆每滿',
+    'Bonus usage credit': '額外贈送額度',
+    'Per order · Bonus credit is not withdrawable':
+      '單筆計算 · 贈送額度不可提領',
+    'Offer rules': '活動規則',
+    'Double 11 special': '雙11優惠',
+    'Double 11 top-up special': '雙11儲值優惠',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '儲值每滿人民幣 100 元，贈 {{reward}} 使用額度',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '每筆訂單以完整的人民幣 100 元計算，餘額不累計。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '贈送額度不可提領，參加條件與次數限制以錢包頁面為準。',
+    'Check your wallet for current rewards.':
+      '前往錢包查看目前的儲值贈送規則。',
+    'Offer details will appear when the campaign starts.':
+      '活動開始後將顯示詳細贈送規則。',
     'New plan': '新增計畫',
     'Show run history': '查看執行歷史',
     'Hide run history': '收起執行歷史',
@@ -136,6 +192,25 @@ const newKeys = {
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
   },
   fr: {
+    'Great models.': 'Les meilleurs modèles.',
+    'Within reach.': 'À votre portée.',
+    'For each full top-up of': 'Par tranche rechargée de',
+    'Bonus usage credit': 'Crédit bonus',
+    'Per order · Bonus credit is not withdrawable':
+      'Par commande · Bonus non retirable',
+    'Offer rules': 'Conditions',
+    'Double 11 special': 'Offre du 11.11',
+    'Double 11 top-up special': 'Offre de recharge du 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Pour 100 CNY rechargés, recevez {{reward}} de crédit bonus',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Par tranches entières de 100 CNY par commande ; le reste ne se cumule pas.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Crédit bonus non retirable. Conditions et limites dans votre portefeuille.',
+    'Check your wallet for current rewards.':
+      'Consultez votre portefeuille pour les bonus en cours.',
+    'Offer details will appear when the campaign starts.':
+      'Les détails seront affichés au début de la campagne.',
     'New plan': 'Nouveau programme',
     'Show run history': 'Voir l’historique',
     'Hide run history': 'Masquer l’historique',
@@ -179,6 +254,25 @@ const newKeys = {
       "Abonnement {{plan}} activé avec un code d'échange (ID du code : {{id}})",
   },
   ja: {
+    'Great models.': '優れたモデルを、',
+    'Within reach.': 'もっと身近に。',
+    'For each full top-up of': '1注文のチャージ額ごとに',
+    'Bonus usage credit': '追加利用クレジット',
+    'Per order · Bonus credit is not withdrawable':
+      '注文単位で計算 · 特典は出金不可',
+    'Offer rules': '特典条件',
+    'Double 11 special': '11.11特典',
+    'Double 11 top-up special': '11.11チャージ特典',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      '100人民元のチャージごとに{{reward}}の利用クレジットを進呈',
+    'Complete hundreds per order only; remainders do not carry over.':
+      '1注文につき100人民元単位で計算し、端数は繰り越しません。',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      '特典クレジットは出金できません。対象条件と回数制限はウォレットをご確認ください。',
+    'Check your wallet for current rewards.':
+      '現在の特典はウォレットでご確認ください。',
+    'Offer details will appear when the campaign starts.':
+      'キャンペーン開始後に特典の詳細を表示します。',
     'New plan': 'プランを新規作成',
     'Show run history': '実行履歴を表示',
     'Hide run history': '実行履歴を閉じる',
@@ -221,6 +315,25 @@ const newKeys = {
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
   },
   ru: {
+    'Great models.': 'Лучшие модели.',
+    'Within reach.': 'Ближе, чем кажется.',
+    'For each full top-up of': 'За каждые полные',
+    'Bonus usage credit': 'Бонусный кредит',
+    'Per order · Bonus credit is not withdrawable':
+      'На заказ · Бонус нельзя вывести',
+    'Offer rules': 'Условия',
+    'Double 11 special': 'Акция 11.11',
+    'Double 11 top-up special': 'Бонус за пополнение к 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'За каждые 100 CNY пополнения — {{reward}} бонусного кредита',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Учитываются полные 100 CNY в одном заказе; остаток не переносится.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Бонусный кредит нельзя вывести. Условия и лимиты указаны в кошельке.',
+    'Check your wallet for current rewards.':
+      'Текущие бонусы за пополнение смотрите в кошельке.',
+    'Offer details will appear when the campaign starts.':
+      'Подробные условия появятся после начала акции.',
     'New plan': 'Новый план',
     'Show run history': 'История запусков',
     'Hide run history': 'Скрыть историю',
@@ -263,6 +376,25 @@ const newKeys = {
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
   },
   vi: {
+    'Great models.': 'Mô hình hàng đầu.',
+    'Within reach.': 'Trong tầm tay.',
+    'For each full top-up of': 'Mỗi lần nạp đủ',
+    'Bonus usage credit': 'Tín dụng thưởng thêm',
+    'Per order · Bonus credit is not withdrawable':
+      'Tính theo đơn · Không thể rút tiền thưởng',
+    'Offer rules': 'Thể lệ',
+    'Double 11 special': 'Ưu đãi 11.11',
+    'Double 11 top-up special': 'Ưu đãi nạp tiền 11.11',
+    'Every CNY 100 topped up earns {{reward}} in bonus credit':
+      'Nạp mỗi 100 CNY, nhận {{reward}} tín dụng thưởng',
+    'Complete hundreds per order only; remainders do not carry over.':
+      'Tính theo từng 100 CNY trọn vẹn trong mỗi đơn; phần lẻ không cộng dồn.',
+    'Gift credit cannot be withdrawn. Eligibility and limits are shown in your wallet.':
+      'Tín dụng thưởng không thể rút. Xem điều kiện và giới hạn trong ví.',
+    'Check your wallet for current rewards.':
+      'Xem ưu đãi nạp tiền hiện tại trong ví.',
+    'Offer details will appear when the campaign starts.':
+      'Chi tiết ưu đãi sẽ hiển thị khi chương trình bắt đầu.',
     'New plan': 'Tạo kế hoạch',
     'Show run history': 'Xem lịch sử chạy',
     'Hide run history': 'Ẩn lịch sử chạy',

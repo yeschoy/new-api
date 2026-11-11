@@ -28,7 +28,7 @@ import {
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { AxiosAdapter } from 'axios'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CashbackPublicOffers } from '@/features/cashback/types'
 import { api } from '@/lib/api'
@@ -97,6 +97,8 @@ async function renderAt(path: string, status: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-11-11T12:00:00+08:00'))
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   window.localStorage.removeItem(REWARD_BANNER_DISMISS_KEY)
 })
@@ -108,9 +110,94 @@ afterEach(() => {
   useAuthStore.getState().auth.reset()
   window.localStorage.removeItem(REWARD_BANNER_DISMISS_KEY)
   document.documentElement.style.removeProperty('--reward-banner-height')
+  vi.useRealTimers()
 })
 
 describe('RewardBanner', () => {
+  it.each(['/', '/wallet'])(
+    'labels a live payer reward as Double Eleven on %s without changing its amount or action',
+    async (path) => {
+      serveOffers(() =>
+        offersReply({
+          active: true,
+          currency: 'CNY',
+          invitee: { strategy: 'per_hundred', fixed_per_hundred: 10 },
+        })
+      )
+      await renderAt(path)
+      expect(await screen.findByText('Double 11 special')).toBeVisible()
+      expect(
+        screen.getByRole('region', { name: 'Announcements' })
+      ).toHaveTextContent('Top-up: ¥10 for every ¥100')
+      expect(screen.getByRole('link', { name: /Top up now/ })).toHaveAttribute(
+        'href',
+        '/sign-up'
+      )
+    }
+  )
+
+  it.each(['2026-11-09T23:59:59+08:00', '2026-11-19T00:00:00+08:00'])(
+    'keeps regular recharge copy outside the Double Eleven display window: %s',
+    async (date) => {
+      vi.setSystemTime(new Date(date))
+      serveOffers(() => offersReply(firstTopUpOffers))
+      await renderAt('/')
+      await screen.findByRole('link', { name: /Top up now/ })
+      expect(screen.queryByText('Double 11 special')).toBeNull()
+      expect(
+        screen.getByRole('region', { name: 'Announcements' })
+      ).toHaveTextContent('First top-up ¥100 get ¥5')
+    }
+  )
+
+  it('removes only the special label at the deadline without reloading', async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date('2026-11-18T23:59:59+08:00'))
+    client.setQueryData(['cashback', 'public-offers'], firstTopUpOffers)
+    serveOffers(() => offersReply(firstTopUpOffers))
+    await renderAt('/')
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByText('Double 11 special')).toBeVisible()
+    await act(async () => {
+      vi.advanceTimersByTime(1_000)
+    })
+    expect(screen.queryByText('Double 11 special')).toBeNull()
+    expect(
+      screen.getByRole('region', { name: 'Announcements' })
+    ).toHaveTextContent('First top-up ¥100 get ¥5')
+  })
+
+  it('does not label a sign-up-only grant as Double Eleven', async () => {
+    serveOffers(() => offersReply({ active: false, currency: 'CNY' }))
+    await renderAt('/', { quota_for_new_user: 500_000 })
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: 'Announcements' })
+      ).toHaveTextContent(/New users get/)
+    )
+    expect(screen.queryByText('Double 11 special')).toBeNull()
+  })
+
+  it('removes the special label if the payer campaign stops', async () => {
+    let offers = firstTopUpOffers
+    serveOffers(() => offersReply(offers))
+    await renderAt('/wallet')
+    expect(await screen.findByText('Double 11 special')).toBeVisible()
+    offers = { active: false, currency: 'CNY' }
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['cashback', 'public-offers'] })
+    })
+    await waitFor(() =>
+      expect(screen.queryByText('Double 11 special')).toBeNull()
+    )
+    expect(
+      screen.getByRole('region', { name: 'Announcements' })
+    ).toHaveTextContent('Fastrun Cloud Hackathon')
+  })
+
   it('sends anonymous visitors to sign-up from a live first-top-up offer', async () => {
     serveOffers(() => offersReply(firstTopUpOffers))
     await renderAt('/')
@@ -125,6 +212,10 @@ describe('RewardBanner', () => {
       'href',
       '/sign-up'
     )
+    expect(banner).not.toHaveTextContent('Fastrun Cloud Hackathon')
+    expect(
+      screen.queryByRole('link', { name: /Explore the hackathon/ })
+    ).toBeNull()
   })
 
   it('sends signed-in users to the wallet', async () => {
@@ -137,9 +228,9 @@ describe('RewardBanner', () => {
     ).toHaveAttribute('href', '/wallet')
   })
 
-  it('keeps only the hackathon when the offers request fails even with a sign-up grant', async () => {
+  it('keeps only the hackathon on other pages when the offers request fails even with a sign-up grant', async () => {
     serveOffers(() => ({ status: 500, data: { success: false } }))
-    await renderAt('/', { quota_for_new_user: 500_000 })
+    await renderAt('/wallet', { quota_for_new_user: 500_000 })
 
     await waitFor(() =>
       expect(client.getQueryState(['cashback', 'public-offers'])?.status).toBe(
@@ -150,6 +241,20 @@ describe('RewardBanner', () => {
     expect(banner).toHaveTextContent('Fastrun Cloud Hackathon')
     expect(banner).not.toHaveTextContent(/New users get/)
     expect(screen.queryByRole('link', { name: /Top up now/ })).toBeNull()
+  })
+
+  it('does not put the hackathon back above the home hero when rewards cannot load', async () => {
+    serveOffers(() => ({ status: 500, data: { success: false } }))
+    await renderAt('/', { quota_for_new_user: 500_000 })
+    await waitFor(() =>
+      expect(client.getQueryState(['cashback', 'public-offers'])?.status).toBe(
+        'error'
+      )
+    )
+    expect(screen.queryByRole('region', { name: 'Announcements' })).toBeNull()
+    expect(
+      document.documentElement.style.getPropertyValue('--reward-banner-height')
+    ).toBe('')
   })
 
   it('links the hackathon to the home spotlight beside the live offer', async () => {
