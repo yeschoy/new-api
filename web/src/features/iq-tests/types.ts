@@ -48,6 +48,7 @@ export interface IQConfig {
   version: number
   prompt: string
   reasoning_effort: (typeof IQ_REASONING_EFFORTS)[number]
+  history_limit?: number
   targets: IQTarget[]
   enabled: boolean
   schedule_mode: 'interval' | 'daily'
@@ -62,7 +63,7 @@ export interface IQConfig {
 export type IQConfigInput = Omit<
   IQConfig,
   'next_run_at' | 'updated_at' | 'updated_by' | 'prompts'
-> & { prompts: string[] }
+> & { prompts: string[]; history_limit: number }
 
 export interface IQResult {
   id: string

@@ -20,7 +20,11 @@ The controller owns orchestration to avoid a service/controller import cycle.
   history page, without selecting artifact bodies. Results are immutable and
   keyed by SHA-256(taskID + NUL + group + NUL + model).
 - `StartIQAttempt(taskID, pairID, runner, now)` durably claims before sending;
-  `CompleteIQAttempt` verifies the lease and replaces the latest row.
+  `CompleteIQAttempt` verifies the lease and inserts an immutable run result.
+- `PruneIQHistory()` and `pruneIQGroupHistory(tx, config)` physically enforce
+  per-group `IQConfig.HistoryLimit`; `FinishSystemTask` invokes maintenance for
+  IQ completion after releasing the lease. Calendar IQ scheduling invokes it
+  periodically, including when schedules are disabled.
 - `NextIQRun(config, now, anchor)` calculates a strictly future UTC Unix second.
 - Viewer: `GET /api/iq-tests/results`, `GET /api/iq-tests/results/:id`.
 - Admin: `GET|PUT|DELETE /api/iq-tests/config`, `PUT /api/iq-tests/group-order`,
@@ -60,7 +64,8 @@ The controller owns orchestration to avoid a service/controller import cycle.
   channel write RBAC, PAT scope and critical rate limiting. It atomically retains
   a `deleted` boolean tombstone (NOT NULL DEFAULT false), increments the version,
   disables scheduling, clears next_run_at and interrupts pending group attempts.
-  Already claimed requests may complete; never delete artwork. Listings and
+  Already claimed requests may complete; deletion itself retains in-budget
+  artwork (the retention policy still applies to tombstones). Listings and
   authorization exclude tombstones; stale schedulers cannot enqueue them. Only
   an explicit version=0 save recreates a deleted plan, with a version above the
   tombstone so old editors/deletion requests cannot affect its successor. Legacy
@@ -69,7 +74,28 @@ The controller owns orchestration to avoid a service/controller import cycle.
   not the historical run version. The first page must contain each saved plan's
   latest run even if another group occupies all 20 paginated history slots. Older
   pages may repeat those backfills; clients deduplicate by taskID/group.
-- Complete config PUT includes the last `version`, prompt, targets, enabled,
+- `history_limit` is an integer NOT NULL DEFAULT 30 on each group plan, valid
+  1–1000. Missing/zero historical model values and snapshots normalize to 30;
+  config PUT rejects explicit zero. When an older editor omits history_limit,
+  preserve the existing plan's current budget (new plans default to 30), so an
+  unrelated save cannot silently shrink the budget and erase data. Count entire
+  completed task rounds (success or failure), not individual model cards. Active
+  pending/running tasks and any task with a lease row are protected in addition
+  to that budget until terminal cleanup. A save atomically applies the new limit
+  and deletes expired data; a pruning failure rolls back both policy and deletion.
+  Never perform destructive pruning in viewer GETs. Completion and periodic
+  maintenance enforce existing/default budgets for disabled and deleted plans too.
+  Scan result/attempt metadata, newest run_seq first, deleting expired group rows
+  in batches of 200. Physically DELETE IQResult (including artifact) and IQAttempt;
+  delete IQBatch and terminal IQ SystemTask only when no group's result/attempt
+  references remain. Old shared batches must not lose another group's retained
+  artwork/snapshot. Generic task-history deletion must not orphan IQ-owned bodies.
+  Protect completion, interruption, config writes and pruning with the row-1 lock;
+  a delayed interrupt of an already-pruned batch is an idempotent no-op, never
+  recreates a result or replays a request. Retention indexes cover attempt group
+  and result task_id. SQL deletion makes storage reusable; do not claim immediate
+  filesystem shrink or run automatic VACUUM FULL/OPTIMIZE as part of this feature.
+- Complete config PUT includes the last `version`, prompt, targets, history_limit, enabled,
   schedule_mode, interval_hours, daily_time and timezone. Calendar is explicitly
   Asia/Shanghai, never server-local time. Optional `reasoning_effort` is shared
   across all pairs: empty string (default), none, minimal, low, medium, high,
@@ -101,8 +127,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   direct/fenced HTML or SVG; prefer the whole HTML scene over nested SVG.
   Preserve inline scripts, not thinking/tool-only/file-link outputs. Extraction
   never fetches URLs or executes tools and is not a host-DOM script sanitizer.
-- Every run retains its own result and artwork; failures, interruption, target
-  edits and late cleanup must never overwrite/delete another run. Keep legacy
+- Every in-budget run retains its own result and artwork; failures, interruption,
+  target edits and late cleanup must never overwrite another run. Only explicit
+  retention maintenance deletes out-of-budget rounds and their bodies. Keep legacy
   pair-keyed rows readable without rewriting their IDs. List responses group by
   taskID/group, newest run first, and omit artifact bodies. Historical models
   remain readable even if deselected later, subject to current group access.
@@ -128,7 +155,10 @@ The controller owns orchestration to avoid a service/controller import cycle.
 | Invalid delete JSON, empty group or nonpositive version | 400 |
 | Empty/duplicate/mismatched order arrays / stale order or plan membership | 400 / 409; no partial order write |
 | Deleted group list / directly known artwork | Absent / 404; bodies remain stored |
-| Invalid prompt/targets/schedule/unknown reasoning effort | 400 |
+| Invalid prompt/targets/schedule/unknown reasoning effort/history_limit outside 1–1000 | 400 |
+| Retention lowered / new completed round over budget | Physical removal of expired results, artifacts/checkpoints and unreferenced snapshots/tasks |
+| Pruning DB error during config save | Roll back configuration and all deletions |
+| Late interrupt for a pruned task / artifact ID after pruning | No-op / 404 |
 | Anonymous / ordinary member admin action | 401 / 403 |
 | Hidden, removed or unsuccessful artifact ID | Indistinguishable 404 |
 | Duplicate manual enqueue for the same group | Existing active task, created=false; other groups enqueue independently |
@@ -139,7 +169,8 @@ The controller owns orchestration to avoid a service/controller import cycle.
 ## 5. Good / Base / Bad Cases
 
 - Good: three backing channels for one selected pair produce one IQ request.
-- Base: old dated artwork remains in its original run row after new work terminates.
+- Base: old dated artwork remains in its original run row after new work terminates,
+  up to the saved retention budget. Do not merely hide unlimited stored bodies.
 - Bad: putting HTML in SystemTask.Result, exposing a public HTML URL, or using
   the public relay retry controller to implement a supposedly single attempt.
 
@@ -156,7 +187,10 @@ The controller owns orchestration to avoid a service/controller import cycle.
   repeated migrations. Upgrade saved group rows without sort_order, preserve the
   order on repeated startup, and race two saves with the same previous array:
   exactly one changes order and the other returns ErrIQConflict. It never uses public
-  schema for fixture writes. A missing DSN skips local tests, NOT CI acceptance.
+  schema for fixture writes. Upgrade history_limit to default 30, persist custom
+  limits through repeated migrations, and run assertIQHistoryRetention against
+  real PostgreSQL to verify physical body/snapshot deletion and active-run safety.
+  A missing DSN skips local tests, NOT CI acceptance.
 - `.github/workflows/yeschoy-deploy.yml` requires the PostgreSQL 15 service/test
   job before building images; deployment still requires that build. Never
   replace this with a manual production migration check.
@@ -173,6 +207,12 @@ The controller owns orchestration to avoid a service/controller import cycle.
   stale editors/deletes cannot modify the recreated plan. Group ordering tests
   cover append, legacy fallback, stale/invalid atomic saves, preserved config/
   snapshot fields, old-client config saves and re-created plans appending.
+- `model/iq_history_retention_test.go`: 35 completed multi-model rounds retain
+  exactly 30 plus protected active work; lowering immediately deletes excess
+  result/artifact/attempt/snapshot/task rows. Verify success/failure share a budget,
+  shared legacy references, deleted/disabled plans, lease protection, idempotence,
+  delayed interruption, completion-triggered pruning, rollback on SQL deletion
+  failure and >400-row backlog chunking after generic task history was removed.
 - `controller/iq_tests_test.go`: mocked call counts, exact prompt, group routing,
   viewer/artifact denial, quota and health non-mutation, native request bounds.
   `TestIQReasoningEffortWireRequests` exercises mapped OpenAI/Responses/Codex,
@@ -185,7 +225,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   visibility, versioned deletion, deleted-artifact denial and latest-run backfills
   for quiet groups beyond a 20-run global page. Verify ordered config listings,
   dedicated ordering PUT validation, unchanged newest-first history, and no hidden
-  group names in viewer group_order metadata.
+  group names in viewer group_order metadata. Saving retention returns the new
+  count, immediately purges old artifact IDs (404), preserves retained IDs (200),
+  validates bounds, and a results GET never prunes data.
 - `service/iq_artifact_test.go`: full/fenced markup and final native text,
   incomplete/oversized output, preservation of active self-contained content.
 - `router/iq_router_test.go`: all eight anonymous denials and admin/member scopes,

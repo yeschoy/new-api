@@ -402,6 +402,7 @@ describe('IQ configuration editing', () => {
       version: 2,
       prompt: '  Finished artwork.  ',
       reasoning_effort: 'xhigh',
+      history_limit: 30,
       targets: [{ group: 'public', models: ['model-0', 'model-1'] }],
       enabled: true,
       schedule_mode: 'daily',
@@ -447,6 +448,28 @@ describe('IQ configuration editing', () => {
     )
     expect(screen.getByLabelText('Thinking level')).toHaveValue('')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('defaults to 30 retained rounds, saves a custom limit and rejects invalid counts', async () => {
+    const user = userEvent.setup()
+    mount()
+    const limit = screen.getByLabelText('Retained runs per group')
+    expect(limit).toHaveValue(30)
+    await user.clear(limit)
+    await user.type(limit, '12')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(saved).toHaveLength(1))
+    expect(saved[0].history_limit).toBe(12)
+    for (const history_limit of [0, -1, 1.5, 1001, Number.NaN]) {
+      expect(
+        iqConfigSchema.safeParse({ ...saved[0], history_limit }).success
+      ).toBe(false)
+    }
+    for (const history_limit of [1, 30, 1000]) {
+      expect(
+        iqConfigSchema.safeParse({ ...saved[0], history_limit }).success
+      ).toBe(true)
+    }
   })
 
   it('keeps the default optional and validates all supported thinking levels', async () => {

@@ -20,6 +20,9 @@ func (iqTaskHandler) Schedule(now time.Time) error {
 	if err != nil {
 		return err
 	}
+	if err := model.PruneIQHistory(); err != nil {
+		return err
+	}
 	for _, cfg := range configs {
 		if !cfg.Enabled || cfg.NextRunAt == 0 || cfg.NextRunAt > now.Unix() {
 			continue

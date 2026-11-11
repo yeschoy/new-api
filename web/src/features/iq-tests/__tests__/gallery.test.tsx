@@ -351,7 +351,7 @@ describe('authenticated IQ gallery', () => {
     expect(requests).toEqual(['/api/iq-tests/results'])
   })
 
-  it('uses shared group order for the gallery but leaves history chronological for members', async () => {
+  it('keeps shared group ordering while showing retained cards without a history toggle', async () => {
     results.group_order = ['private', 'public']
     results.groups.push({
       ...results.groups[0],
@@ -368,18 +368,14 @@ describe('authenticated IQ gallery', () => {
         .getAllByRole('heading', { level: 2 })
         .map((heading) => heading.textContent)
     expect(headings()).toEqual(['private', 'public'])
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Show run history' })
-    )
-    expect(headings()).toEqual(['public', 'private'])
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Hide run history' })
-    )
+    expect(
+      screen.queryByRole('button', { name: 'Show run history' })
+    ).not.toBeInTheDocument()
     expect(headings()).toEqual(['private', 'public'])
     expect(requests).toEqual(['/api/iq-tests/results'])
   })
 
-  it('shows one row per saved group until run history is explicitly opened', async () => {
+  it('shows previous generations beside the latest under one group heading without replacing cards', async () => {
     const older = latest(0)
     results.groups.push({
       group: 'public',
@@ -398,27 +394,73 @@ describe('authenticated IQ gallery', () => {
       ],
     })
     mount()
-    const primaryRows = await screen.findAllByRole('region', {
+    const rows = await screen.findAllByRole('region', {
       name: 'Models in public',
     })
-    expect(primaryRows).toHaveLength(1)
+    expect(rows).toHaveLength(1)
     expect(screen.getAllByRole('heading', { name: 'public' })).toHaveLength(1)
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Show run history' })
-    )
-    const rows = screen.getAllByRole('region', { name: 'Models in public' })
-    expect(rows).toHaveLength(2)
-    expect(within(rows[0]).getAllByRole('listitem')).toHaveLength(5)
-    expect(within(rows[1]).getAllByRole('listitem')).toHaveLength(1)
+    const cards = within(rows[0]).getAllByRole('listitem')
+    expect(cards).toHaveLength(6)
+    expect(within(cards[0]).getByText('model-0')).toBeInTheDocument()
+    expect(within(cards[5]).getByText('model-0')).toBeInTheDocument()
     expect(
       screen.getAllByRole('button', { name: 'Preview model-0' })
     ).toHaveLength(2)
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Hide run history' })
+    await showCards([0, 1, 2, 3, 4, 5])
+    await waitFor(() =>
+      expect(document.querySelectorAll('iframe')).toHaveLength(4)
     )
-    expect(
-      screen.getAllByRole('region', { name: 'Models in public' })
-    ).toHaveLength(1)
+  })
+
+  it('prepends a new generation without replacing the existing card and removes only expired metadata', async () => {
+    const previous = {
+      ...results.groups[0],
+      task_id: 'run-1',
+      active_run: null,
+      models: [
+        {
+          model: 'model-0',
+          latest: { ...latest(0), id: 'result-1', task_id: 'run-1' },
+          progress: null,
+        },
+      ],
+    }
+    results = { ...results, groups: [previous], active_run: null }
+    const user = userEvent.setup()
+    mount()
+    const strip = await screen.findByRole('region', {
+      name: 'Models in public',
+    })
+    const originalCard = within(strip).getByRole('listitem')
+    results = {
+      ...results,
+      groups: [
+        {
+          ...previous,
+          task_id: 'run-2',
+          models: [
+            {
+              model: 'model-0',
+              latest: { ...latest(0), id: 'result-2', task_id: 'run-2' },
+              progress: null,
+            },
+          ],
+        },
+        previous,
+      ],
+    }
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() =>
+      expect(within(strip).getAllByRole('listitem')).toHaveLength(2)
+    )
+    expect(screen.getAllByRole('heading', { name: 'public' })).toHaveLength(1)
+    expect(within(strip).getAllByRole('listitem')[1]).toBe(originalCard)
+    results = { ...results, groups: [results.groups[0]] }
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() =>
+      expect(within(strip).getAllByRole('listitem')).toHaveLength(1)
+    )
+    expect(originalCard).not.toBeInTheDocument()
   })
 
   it('deduplicates the latest plan rows when older history pages include them again', async () => {
@@ -427,9 +469,8 @@ describe('authenticated IQ gallery', () => {
     mount()
     await screen.findByRole('heading', { name: 'public' })
     expect(
-      screen.queryByRole('button', { name: 'Load older runs' })
-    ).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show run history' }))
+      screen.getByRole('button', { name: 'Load older runs' })
+    ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Load older runs' }))
     await waitFor(() =>
       expect(

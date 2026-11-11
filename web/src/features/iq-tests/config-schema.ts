@@ -51,6 +51,7 @@ export const iqConfigSchema = z
         message
       ),
     reasoning_effort: z.enum(IQ_REASONING_EFFORTS),
+    history_limit: z.number().int().min(1).max(1000),
     targets: z.array(
       z.object({ group: z.string(), models: z.array(z.string()) })
     ),
@@ -101,6 +102,7 @@ export function editableIQConfig(config: IQConfig): IQConfigInput {
     prompt: config.prompts?.[0] ?? config.prompt,
     prompts: config.prompts?.slice(1) ?? [],
     reasoning_effort: config.reasoning_effort ?? '',
+    history_limit: config.history_limit ?? 30,
     targets: config.targets,
     enabled: config.enabled,
     schedule_mode: config.schedule_mode,

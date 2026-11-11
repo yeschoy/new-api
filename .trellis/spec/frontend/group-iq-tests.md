@@ -39,21 +39,26 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   On 409 retain the draft and require explicit reload. Successful ordering saves
   invalidate configs/results without resetting the selected task or unsaved prompt
   form. New-plan dialogs do not expose ordering.
-- The default gallery shows exactly one latest row per saved group plan. Sort this
-  derived view using results.group_order (already viewer-filtered by the server);
-  missing metadata on older servers preserves response order. Do not sort the
-  history arrays or change pagination/deduplication. Never
-  expand every run into another apparent group by default. History is an explicit
-  show/hide action, newest first, retaining taskID/group row keys and original
-  artwork. Deduplicate rows across history pages: first-page backfills can appear
-  again on older pages. Task controls appear once per group; another group's run
-  does not disable them.
-  Its model list uses column-flow grid
-  with bounded responsive card widths, in a labeled keyboard-focusable horizontal
-  scroll region; never wrap a group across multiple rows or overflow the page.
-  Retain lazy observation and the global live-preview cap across all rows.
-- Preserve old run rows during and after a new run. Do not merge new progress
-  into a previous run or label historical artwork as the latest result.
+- The gallery always shows retained generations, not a latest-only view hidden
+  behind a history toggle. Use exactly one stable group section/header/controls
+  per saved plan, in results.group_order (already viewer-filtered); older servers
+  without this metadata retain first-response order. Within that group's single
+  horizontal strip, flatten each newest-first run's model cards in response order.
+  Card keys include taskID/model; repeated model names across rounds are distinct
+  cards and artifact revisions. New active/results cards must not replace older
+  retained ones. Keep per-card result timestamps; the group summary uses its
+  latest row. Preserve cross-page taskID/group deduplication because quiet-group
+  first-page backfills can recur on older pages. Load older runs stays directly
+  available whenever the cursor exists, without a show/hide action. Task controls
+  appear once per group; another group's run does not disable them.
+  The model/run strip uses column-flow grid with bounded responsive card widths,
+  in a labeled keyboard-focusable horizontal scroll region; never wrap a group
+  across multiple rows or overflow the page. Retain lazy observation and the
+  global live-preview cap across all retained cards.
+- Preserve in-budget run cards during and after a new run. Do not merge new
+  progress into a previous run or label historical artwork as the latest result.
+  A pruned artifact is unavailable (404), never silently substituted with a newer
+  result under the same model name.
 - Thumbnail iframes render at a 1280x960 desktop viewport and scale as a whole
   using ResizeObserver into a 4:3 card. Never render a desktop artwork directly
   in a narrow 256px-tall viewport. Expanded previews stay interactive/responsive.
@@ -82,7 +87,8 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   catalog groups. Selecting/closing never creates anything; version=0 PUT saves
   the plan. Delete requires confirmation and channel write permission; on success
   cancel stale reads, remove the group's rows and artifact caches, and invalidate
-  configuration/results. Do not purge saved artwork or promise to abort requests
+  configuration/results. Plan deletion itself does not purge in-budget artwork;
+  normal retention still applies to deleted plans. Never promise to abort requests
   already started. The backend's tombstone keeps deleted plans hidden on refresh.
 - Each task editor is bound to one routing group. Its thinking-level setting
   applies to that task's selected models; other tasks keep independent settings.
@@ -94,6 +100,13 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   and supported levels depend on the model. Preserve effort, prompt pool and
   selected models through saves and conflict recovery; saving settings never runs
   a paid test automatically.
+- Settings include history_limit (Retained runs per group), integer 1–1000,
+  default 30 via editableIQConfig for old payloads and unsaved plans. Save it in
+  the complete versioned config PUT and preserve it across conflict reloads.
+  Explain that it counts completed rounds, not individual model cards, and that
+  older records/artwork/unused snapshots are permanently deleted; active work is
+  protected. A lower limit applies on save, not just to future runs. Invalidate
+  result metadata after save so pruned cards disappear without reusing artifacts.
 - Retain exact prompt whitespace and edits after recoverable/stale save errors.
   Daily uses Beijing time. Give interval/daily branches distinct React keys so
   native number/time inputs and react-hook-form refs are not incorrectly reused
@@ -111,7 +124,9 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 | Metadata error | Hide active frames; retryable error, no stale success |
 | Config 409 | Preserve edits; require explicit reload/reconciliation |
 | Unplanned catalog group | Absent from gallery/settings; only selectable in New plan |
-| Confirmed plan deletion | Hide all group runs, invalidate cache, stop schedule/unsent work; keep artwork |
+| Confirmed plan deletion | Hide all group runs, invalidate cache, stop schedule/unsent work; keep in-budget artwork |
+| New completed generation | Add cards to the existing group strip, retaining earlier in-budget generations |
+| Retention lowered / invalid retention | Remove expired cards after save / block invalid noninteger or out-of-range input |
 | Deletion 409 | Keep the row; require refresh before deleting a newer plan |
 | Ordering 409 | Preserve local order; block resubmission until explicit reload |
 | Ordering saved while editing a plan | Keep selected group and unsaved prompt/schedule edits |
@@ -132,16 +147,19 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   preservation and size bound; jsdom is construction evidence, not isolation.
 - `gallery.test.tsx`: admin/member controls, lazy bounded previews and expanded
   lifecycle, current status, account changes, artifact revision mismatches and
-  independent horizontal group rows, default one-row-per-group, explicitly opened
-  retained history, cross-page deduplication, confirmed deletion/cancel, explicit
+  independent horizontal group rows, one-header-per-group with repeated-model
+  retained generation cards, direct older-history loading, cross-page deduplication,
+  confirmed deletion/cancel, explicit
   creation, per-group manual execution and fixed desktop thumbnail dimensions.
-  Verify member gallery follows group_order while history remains chronological.
+  Verify member gallery follows group_order while generations within each strip
+  remain newest-first, and more history cards do not exceed the four-frame cap.
 - `settings.test.tsx`: exact prompt/targets/schedule save, mode round-trip values,
   stale-save prompt/effort preservation, effort enum/default, single-group
   selection, saved-plan-only settings, explicit version=0 creation, prompt-pool
   round trips and explicit discard/reload. Ordering tests cover arrow/keyboard
   movement, explicit independent saves, reopen persistence, read-only controls,
   conflict preservation/reload and unsaved plan-form preservation across reordering.
+  Retention tests assert default 30, custom saves and integer/range validation.
 - `localization.test.ts`: all static/dynamic feature keys in seven locales.
 - One local mock-backed browser smoke: real Canvas/SVG render, blocked parent
   DOM/storage/cookies, subresource/fetch/worker/popup/top/form attempts, mobile

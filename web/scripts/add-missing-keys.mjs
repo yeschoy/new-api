@@ -10,6 +10,13 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
+    'Retained runs per group': 'Retained runs per group',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.',
     'Group display order': 'Group display order',
     'Save group order': 'Save group order',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
@@ -56,6 +63,13 @@ const newKeys = {
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
   },
   zh: {
+    'Retained runs per group': '每组保留轮数',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      '保留该分组最近完成的执行轮次（1–1000，默认 30）。更早的记录、作品和不再使用的快照将永久删除，正在执行的任务不受影响。',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      '按分组对比生成的 HTML/SVG 作品，最新轮次排在前面。这不是标准化智商评分。',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      '每个分组集中展示保留的历次结果，最新在前。新结果不会替换旧卡片，时间均为北京时间。',
     'Group display order': '分组展示顺序',
     'Save group order': '保存分组顺序',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
@@ -102,6 +116,13 @@ const newKeys = {
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
   },
   'zh-TW': {
+    'Retained runs per group': '每組保留輪數',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      '保留此分組最近完成的執行輪次（1–1000，預設 30）。更早的紀錄、作品及不再使用的快照將永久刪除，執行中的任務不受影響。',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      '依分組比較產生的 HTML/SVG 作品，最新輪次排在前面。這不是標準化智商評分。',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      '每個分組集中顯示保留的歷次結果，最新在前。新結果不會取代舊卡片，時間均為北京時間。',
     'Group display order': '分組顯示順序',
     'Save group order': '儲存分組順序',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
@@ -148,6 +169,13 @@ const newKeys = {
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
   },
   fr: {
+    'Retained runs per group': 'Exécutions conservées par groupe',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Conserve les dernières exécutions terminées du groupe (1–1000, 30 par défaut). Les anciens résultats, œuvres et instantanés inutilisés sont supprimés définitivement. Les exécutions en cours sont protégées.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'Comparez les œuvres HTML/SVG par groupe, des plus récentes aux plus anciennes. Ce n’est pas un score de QI standardisé.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Chaque groupe réunit ses résultats conservés, les plus récents en premier. Les nouveaux ne remplacent pas les anciennes cartes. Horaires de Pékin.',
     'Group display order': 'Ordre d’affichage des groupes',
     'Save group order': 'Enregistrer l’ordre',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
@@ -195,6 +223,13 @@ const newKeys = {
       "Abonnement {{plan}} activé avec un code d'échange (ID du code : {{id}})",
   },
   ja: {
+    'Retained runs per group': 'グループごとの保持実行数',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'このグループの完了済み実行を新しい順に保持します（1～1000、既定は30）。古い記録・作品・未使用のスナップショットは完全に削除されます。実行中のタスクは保護されます。',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      '生成された HTML/SVG 作品をグループ別に新しい順で比較します。標準化されたIQスコアではありません。',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      '各グループの保持済み結果を新しい順でまとめて表示します。新しい結果が古いカードを置き換えることはありません。時刻は北京時間です。',
     'Group display order': 'グループの表示順',
     'Save group order': '表示順を保存',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
@@ -241,6 +276,13 @@ const newKeys = {
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
   },
   ru: {
+    'Retained runs per group': 'Хранимых запусков на группу',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Хранить последние завершённые запуски группы (1–1000, по умолчанию 30). Старые записи, работы и неиспользуемые снимки удаляются навсегда. Активные запуски защищены.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'Сравнивайте работы HTML/SVG по группам, начиная с новых запусков. Это не стандартизированный показатель IQ.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Сохранённые результаты каждой группы показаны вместе, новые первыми. Новые результаты не заменяют старые карточки. Время пекинское.',
     'Group display order': 'Порядок отображения групп',
     'Save group order': 'Сохранить порядок',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
@@ -287,6 +329,13 @@ const newKeys = {
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
   },
   vi: {
+    'Retained runs per group': 'Số lần chạy giữ lại mỗi nhóm',
+    'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
+      'Giữ các lần chạy đã hoàn tất gần nhất của nhóm (1–1000, mặc định 30). Bản ghi, tác phẩm cũ và ảnh chụp trạng thái không còn dùng sẽ bị xóa vĩnh viễn. Lần chạy đang hoạt động được bảo vệ.',
+    'Compare generated HTML/SVG artwork by group, newest runs first. Not a standardized IQ score.':
+      'So sánh tác phẩm HTML/SVG theo nhóm, lần chạy mới nhất trước. Đây không phải điểm IQ chuẩn hóa.',
+    'Each group shows its retained runs together, newest first. New results do not replace older cards. Times are shown in Beijing time.':
+      'Mỗi nhóm hiển thị chung các kết quả được giữ lại, mới nhất trước. Kết quả mới không thay thế thẻ cũ. Thời gian theo giờ Bắc Kinh.',
     'Group display order': 'Thứ tự hiển thị nhóm',
     'Save group order': 'Lưu thứ tự nhóm',
     'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':

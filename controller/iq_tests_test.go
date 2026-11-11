@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -77,6 +78,65 @@ func iqContext(user *model.User, path, id string) (*gin.Context, *httptest.Respo
 	c.Params = gin.Params{{Key: "id", Value: id}}
 	return c, w
 }
+func TestIQHistoryRetentionConfigDeletesOldArtifacts(t *testing.T) {
+	root, _ := setupIQController(t)
+	cfg, err := model.GetIQGroupConfig("public")
+	require.NoError(t, err)
+	cfg, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+	require.NoError(t, err)
+	for i := 1; i <= 3; i++ {
+		r := model.IQResult{ID: fmt.Sprintf("retained-%d", i), TaskID: fmt.Sprintf("history-%d", i), Group: "public", Model: "m", RunSeq: int64(i), Status: "success", ArtifactKind: "svg", Artifact: "<svg>body</svg>"}
+		require.NoError(t, model.DB.Create(&r).Error)
+	}
+	c, w := iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, 200, w.Code)
+	var count int64
+	require.NoError(t, model.DB.Model(&model.IQResult{}).Count(&count).Error)
+	require.EqualValues(t, 3, count, "viewer reads never trigger destructive cleanup")
+	cfg.HistoryLimit = 2
+	body, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	c, w = iqContext(root, "/api/iq-tests/config", "")
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/iq-tests/config", strings.NewReader(string(body)))
+	c.Request.Header.Set("Content-Type", "application/json")
+	PutIQConfig(c)
+	require.Equal(t, 200, w.Code, w.Body.String())
+	require.EqualValues(t, 2, gjson.Get(w.Body.String(), "data.history_limit").Int())
+	c, w = iqContext(root, "/api/iq-tests/results/retained-1", "retained-1")
+	GetIQArtifact(c)
+	require.Equal(t, 404, w.Code)
+	c, w = iqContext(root, "/api/iq-tests/results/retained-3", "retained-3")
+	GetIQArtifact(c)
+	require.Equal(t, 200, w.Code)
+	require.NoError(t, model.DB.Model(&model.IQResult{}).Count(&count).Error)
+	require.EqualValues(t, 2, count)
+	cfg.Version++
+	body, err = json.Marshal(cfg)
+	require.NoError(t, err)
+	var legacy map[string]any
+	require.NoError(t, json.Unmarshal(body, &legacy))
+	delete(legacy, "history_limit")
+	body, err = json.Marshal(legacy)
+	require.NoError(t, err)
+	c, w = iqContext(root, "/api/iq-tests/config", "")
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/iq-tests/config", strings.NewReader(string(body)))
+	c.Request.Header.Set("Content-Type", "application/json")
+	PutIQConfig(c)
+	require.Equal(t, 200, w.Code)
+	require.EqualValues(t, 2, gjson.Get(w.Body.String(), "data.history_limit").Int(), "an older editor cannot reset a custom budget")
+	for _, invalid := range []int{0, -1, 1001} {
+		cfg.HistoryLimit = invalid
+		body, err = json.Marshal(cfg)
+		require.NoError(t, err)
+		c, w = iqContext(root, "/api/iq-tests/config", "")
+		c.Request = httptest.NewRequest(http.MethodPut, "/api/iq-tests/config", strings.NewReader(string(body)))
+		c.Request.Header.Set("Content-Type", "application/json")
+		PutIQConfig(c)
+		require.Equal(t, 400, w.Code)
+	}
+}
+
 func TestIQGroupOrderAPIAndVisibleResults(t *testing.T) {
 	root, viewer := setupIQController(t)
 	for _, group := range []string{"public", "private"} {

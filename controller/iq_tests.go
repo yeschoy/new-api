@@ -134,18 +134,40 @@ func GetIQConfig(c *gin.Context) {
 }
 func PutIQConfig(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8<<20)
-	var cfg model.IQConfig
-	if err := c.ShouldBindJSON(&cfg); err != nil {
+	var input struct {
+		model.IQConfig
+		HistoryLimit *int `json:"history_limit"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		iqError(c, 400, "Invalid IQ configuration JSON")
 		return
 	}
+	cfg := input.IQConfig
 	if cfg.Group == "" {
 		iqError(c, 400, "Each IQ task requires one group")
 		return
 	}
-	if _, err := model.ListIQConfigs(); err != nil {
+	configs, err := model.ListIQConfigs()
+	if err != nil {
 		iqError(c, 500, "Unable to load IQ configuration")
 		return
+	}
+	cfg.HistoryLimit = model.IQDefaultHistoryLimit
+	if input.HistoryLimit != nil {
+		cfg.HistoryLimit = *input.HistoryLimit
+		if cfg.HistoryLimit == 0 {
+			iqError(c, 400, "history_limit must be 1–1000")
+			return
+		}
+	} else {
+		// Older editors must not silently lower a custom retention budget and
+		// permanently erase history when saving an unrelated prompt/schedule.
+		for _, existing := range configs {
+			if existing.Group == cfg.Group {
+				cfg.HistoryLimit = existing.HistoryLimit
+				break
+			}
+		}
 	}
 	if err := validateIQTargets(&cfg); err != nil {
 		iqError(c, 400, err.Error())

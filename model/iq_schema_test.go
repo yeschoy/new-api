@@ -84,12 +84,14 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Group"))
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "Deleted"))
 	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "SortOrder"))
+	require.NoError(t, db.Migrator().DropColumn(&IQConfig{}, "HistoryLimit"))
 	require.NoError(t, db.AutoMigrate(models...))
 	cfg, err = GetIQConfig()
 	require.NoError(t, err)
 	require.Empty(t, cfg.ReasoningEffort)
 	require.False(t, cfg.Deleted, "upgraded plans remain visible by default")
 	require.Zero(t, cfg.SortOrder, "existing plans use deterministic name order")
+	require.Equal(t, 30, cfg.HistoryLimit, "upgraded plans default to 30 retained rounds")
 	cfg.Prompt = " exact saved PostgreSQL prompt\n"
 	cfg.ReasoningEffort = "xhigh"
 	cfg.Targets = []IQTarget{{Group: "fixture", Models: []string{"model-a", "model-b"}}}
@@ -108,6 +110,7 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	group := groups[0]
+	group.HistoryLimit = 12
 	group.Prompts = IQPrompts{" exact first PostgreSQL prompt\n", "second prompt"}
 	groupSaved, err := SaveIQConfig(group, 42, time.Now())
 	require.NoError(t, err)
@@ -115,6 +118,7 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	groupReloaded, err := GetIQGroupConfig("fixture")
 	require.NoError(t, err)
 	require.Equal(t, groupSaved.Prompts, groupReloaded.Prompts)
+	require.Equal(t, 12, groupReloaded.HistoryLimit)
 	require.Equal(t, groupSaved.ID, groupReloaded.ID)
 	require.Equal(t, groupSaved.Group, groupReloaded.Group)
 	other, err := GetIQGroupConfig("order-fixture")
@@ -179,7 +183,9 @@ func TestIQPostgresMigrationAndConfigRoundTrip(t *testing.T) {
 	kept, err := GetIQResult(result.ID)
 	require.NoError(t, err)
 	require.Equal(t, result.Artifact, kept.Artifact)
-	t.Log("PostgreSQL migration, repeat migration, targets TEXT, concurrent group ordering, plan deletion/recreation and config round trip passed")
+	assertIQHistoryRetention(t)
+	assertIQRetentionCleanupRace(t)
+	t.Log("PostgreSQL migrations, concurrent ordering, physical run/artifact retention and config round trip passed")
 }
 
 func TestIQSchemaPortableTextColumns(t *testing.T) {

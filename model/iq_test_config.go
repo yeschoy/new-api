@@ -70,6 +70,7 @@ type IQConfig struct {
 	Group           string    `json:"group" gorm:"column:group_name;type:varchar(64);not null;default:'';uniqueIndex"`
 	Prompts         IQPrompts `json:"prompts" gorm:"serializer:json"`
 	SortOrder       int       `json:"sort_order" gorm:"not null;default:0"`
+	HistoryLimit    int       `json:"history_limit" gorm:"not null;default:30"`
 	Version         int64     `json:"version"`
 	Prompt          IQText    `json:"prompt"`
 	ReasoningEffort string    `json:"reasoning_effort" gorm:"type:varchar(16);not null;default:''"`
@@ -94,7 +95,7 @@ type IQBatch struct {
 type IQAttempt struct {
 	TaskID      string `json:"-" gorm:"type:varchar(64);primaryKey"`
 	PairID      string `json:"id" gorm:"type:varchar(64);primaryKey"`
-	Group       string `json:"group" gorm:"column:group_name;type:varchar(64)"`
+	Group       string `json:"group" gorm:"column:group_name;type:varchar(64);index:idx_iq_attempt_group"`
 	Model       string `json:"model" gorm:"type:varchar(255)"`
 	Status      string `json:"status" gorm:"type:varchar(32)"`
 	StartedAt   int64  `json:"started_at"`
@@ -104,7 +105,7 @@ type IQResult struct {
 	ID            string `json:"id" gorm:"type:varchar(64);primaryKey"`
 	Group         string `json:"group" gorm:"column:group_name;type:varchar(64);index:idx_iq_history_group_run,priority:1"`
 	Model         string `json:"model" gorm:"type:varchar(255)"`
-	TaskID        string `json:"task_id" gorm:"type:varchar(64)"`
+	TaskID        string `json:"task_id" gorm:"type:varchar(64);index:idx_iq_result_task"`
 	RunSeq        int64  `json:"-" gorm:"index:idx_iq_history_group_run,priority:2"`
 	ConfigVersion int64  `json:"config_version"`
 	Status        string `json:"status" gorm:"type:varchar(32)"`
@@ -122,7 +123,7 @@ func IQPairID(group, name string) string {
 	return hex.EncodeToString(sum[:])
 }
 func defaultIQConfig() IQConfig {
-	return IQConfig{ID: 1, Version: 1, Prompt: IQDefaultPrompt, Targets: []IQTarget{}, ScheduleMode: "interval", IntervalHours: 24, DailyTime: "09:00", Timezone: "Asia/Shanghai"}
+	return IQConfig{ID: 1, Version: 1, HistoryLimit: IQDefaultHistoryLimit, Prompt: IQDefaultPrompt, Targets: []IQTarget{}, ScheduleMode: "interval", IntervalHours: 24, DailyTime: "09:00", Timezone: "Asia/Shanghai"}
 }
 func GetIQConfig() (*IQConfig, error) {
 	initial := defaultIQConfig()
@@ -136,6 +137,12 @@ func GetIQConfig() (*IQConfig, error) {
 
 // NormalizeIQConfig preserves the exact administrator prompt, including whitespace.
 func NormalizeIQConfig(c *IQConfig) error {
+	if c.HistoryLimit == 0 {
+		c.HistoryLimit = IQDefaultHistoryLimit
+	}
+	if c.HistoryLimit < 1 || c.HistoryLimit > IQMaxHistoryLimit {
+		return fmt.Errorf("history_limit must be 1–%d", IQMaxHistoryLimit)
+	}
 	effort, err := reasoning.ParseEffort(c.ReasoningEffort)
 	if err != nil {
 		return err
@@ -290,7 +297,7 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 					return err
 				}
 				c.Version = 0 // Incremented after the transaction, like updates.
-				return nil
+				return pruneIQGroupHistory(tx, c)
 			}
 			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
@@ -316,14 +323,14 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 		}
 		targets, _ := json.Marshal(c.Targets)
 		prompts, _ := json.Marshal(c.Prompts)
-		res := tx.Model(&IQConfig{}).Where("id = ? AND version = ?", c.ID, c.Version).Updates(map[string]any{"version": c.Version + 1, "deleted": false, "sort_order": c.SortOrder, "prompt": c.Prompt, "prompts": string(prompts), "reasoning_effort": c.ReasoningEffort, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
+		res := tx.Model(&IQConfig{}).Where("id = ? AND version = ?", c.ID, c.Version).Updates(map[string]any{"version": c.Version + 1, "deleted": false, "sort_order": c.SortOrder, "history_limit": c.HistoryLimit, "prompt": c.Prompt, "prompts": string(prompts), "reasoning_effort": c.ReasoningEffort, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
 		if res.Error != nil {
 			return res.Error
 		}
 		if res.RowsAffected != 1 {
 			return ErrIQConflict
 		}
-		return nil // Configuration changes never delete previously generated artwork.
+		return pruneIQGroupHistory(tx, c) // Only out-of-retention runs are removed.
 	})
 	c.Version++
 	return &c, err
@@ -483,6 +490,9 @@ func StartIQAttempt(taskID, pairID, runner string, now int64) (bool, error) {
 }
 func CompleteIQAttempt(r IQResult, runner string) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockIQConfigs(tx); err != nil {
+			return err
+		}
 		if err := iqLease(tx, r.TaskID, runner); err != nil {
 			return err
 		}
@@ -505,8 +515,14 @@ func CompleteIQAttempt(r IQResult, runner string) error {
 // Expired work is terminal, including unsent pending pairs. Never replay a batch.
 func InterruptIQBatch(taskID string) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockIQConfigs(tx); err != nil {
+			return err
+		}
 		var b IQBatch
 		if err := tx.First(&b, "task_id = ?", taskID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil // Retention may already have removed this terminal run.
+			}
 			return err
 		}
 		var snapshot IQConfig

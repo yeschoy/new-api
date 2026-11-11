@@ -475,7 +475,17 @@ func FinishSystemTask(taskID string, lockedBy string, status SystemTaskStatus, r
 	if result.RowsAffected == 0 {
 		return ErrSystemTaskLockLost
 	}
-	return ReleaseSystemTaskLock(taskID, lockedBy)
+	if err := ReleaseSystemTaskLock(taskID, lockedBy); err != nil {
+		return err
+	}
+	var taskType string
+	if err := DB.Model(&SystemTask{}).Where("task_id = ?", taskID).Pluck("type", &taskType).Error; err != nil {
+		return err
+	}
+	if taskType == SystemTaskTypeIQTest {
+		return PruneIQHistory()
+	}
+	return nil
 }
 
 func (task *SystemTask) DecodePayload(v any) error {
