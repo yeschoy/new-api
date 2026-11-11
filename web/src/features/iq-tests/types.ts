@@ -90,6 +90,7 @@ export interface IQModelCard {
 }
 
 export interface IQResults {
+  group_order?: string[]
   groups: {
     group: string
     task_id: string

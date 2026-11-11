@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"slices"
 	"time"
 
 	"gorm.io/gorm"
@@ -64,8 +66,65 @@ func ListIQConfigs() ([]IQConfig, error) {
 		}
 	}
 	configs := []IQConfig{}
-	err = DB.Where("group_name <> ? AND deleted = ?", "", false).Order("group_name").Find(&configs).Error
+	err = iqOrderedConfigs(DB).Find(&configs).Error
 	return configs, err
+}
+
+func iqOrderedConfigs(db *gorm.DB) *gorm.DB {
+	return db.Where("group_name <> ? AND deleted = ?", "", false).Order("sort_order, group_name")
+}
+
+func appendIQGroupOrder(tx *gorm.DB, cfg *IQConfig) error {
+	var last int
+	if err := tx.Model(&IQConfig{}).Where("group_name <> ? AND deleted = ?", "", false).
+		Select("COALESCE(MAX(sort_order), 0)").Scan(&last).Error; err != nil {
+		return err
+	}
+	cfg.SortOrder = last + 1
+	return nil
+}
+
+var ErrIQInvalidOrder = errors.New("IQ group order must contain every saved group exactly once")
+
+// SaveIQGroupOrder only changes presentation order. Compare the complete ordered
+// group list under the same lock as plan creation/deletion; stale editors must
+// explicitly reload rather than overwrite another administrator's ordering.
+func SaveIQGroupOrder(groups, previous []string) error {
+	if len(groups) == 0 || len(groups) != len(previous) {
+		return ErrIQInvalidOrder
+	}
+	seen := make(map[string]bool, len(groups))
+	for _, group := range groups {
+		if group == "" || seen[group] {
+			return ErrIQInvalidOrder
+		}
+		seen[group] = true
+	}
+	for _, group := range previous {
+		if !seen[group] {
+			return ErrIQInvalidOrder
+		}
+		delete(seen, group)
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockIQConfigs(tx); err != nil {
+			return err
+		}
+		var current []string
+		if err := iqOrderedConfigs(tx.Model(&IQConfig{})).Pluck("group_name", &current).Error; err != nil {
+			return err
+		}
+		if !slices.Equal(current, previous) {
+			return ErrIQConflict
+		}
+		for i, group := range groups {
+			if err := tx.Model(&IQConfig{}).Where("group_name = ? AND deleted = ?", group, false).
+				UpdateColumn("sort_order", i+1).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func GetIQGroupConfig(group string) (*IQConfig, error) {

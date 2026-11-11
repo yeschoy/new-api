@@ -61,6 +61,17 @@ export async function saveIQConfig(input: IQConfigInput): Promise<IQConfig> {
   return requireServerSuccess(response.data).data
 }
 
+export async function saveIQGroupOrder(input: {
+  groups: string[]
+  previous: string[]
+}): Promise<void> {
+  const response = await api.put<Envelope<null>>(
+    '/api/iq-tests/group-order',
+    input
+  )
+  requireServerSuccess(response.data)
+}
+
 export async function deleteIQConfig(input: {
   group: string
   version: number

@@ -103,9 +103,16 @@ function IQGallery(props: { scope: string }) {
   for (const row of data?.groups ?? []) {
     if (!firstRows.has(row.group)) firstRows.set(row.group, row)
   }
+  const groupRank = new Map(
+    (data?.group_order ?? []).map((group, index) => [group, index])
+  )
   const visibleRows = showHistory
     ? (data?.groups ?? [])
-    : [...firstRows.values()]
+    : [...firstRows.values()].sort(
+        (a, b) =>
+          (groupRank.get(a.group) ?? groupRank.size) -
+          (groupRank.get(b.group) ?? groupRank.size)
+      )
   const results = visibleRows.flatMap((group) =>
     group.models.flatMap((card) => (card.latest ? [card.latest] : []))
   )

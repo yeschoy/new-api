@@ -23,8 +23,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   `CompleteIQAttempt` verifies the lease and replaces the latest row.
 - `NextIQRun(config, now, anchor)` calculates a strictly future UTC Unix second.
 - Viewer: `GET /api/iq-tests/results`, `GET /api/iq-tests/results/:id`.
-- Admin: `GET|PUT|DELETE /api/iq-tests/config`, `GET /api/iq-tests/targets`,
-  `POST /api/iq-tests/run`; use channel read/write/operate RBAC and PAT scopes.
+- Admin: `GET|PUT|DELETE /api/iq-tests/config`, `PUT /api/iq-tests/group-order`,
+  `GET /api/iq-tests/targets`, `POST /api/iq-tests/run`; use channel
+  read/write/operate RBAC and PAT scopes.
 - `testChannelWithIQ(..., options)` extends existing health-test conversion;
   `ExtractIQArtifact(text)` and `IQVisibleText(body, stream)` own extraction.
 
@@ -42,6 +43,19 @@ The controller owns orchestration to avoid a service/controller import cycle.
   tasks or optimistically updates only that group's version. `POST /run?group=...`
   requires a saved group task. Catalog/group reads must not create plans.
   Independently queued groups never share run IDs.
+- `IQConfig.SortOrder` is an integer NOT NULL DEFAULT 0. List saved plans by
+  sort_order then group_name: upgraded rows keep deterministic name order; new
+  and explicitly recreated plans append after the current maximum. Normal PUT
+  ignores caller-supplied sort_order and preserves the stored position.
+  `PUT /group-order` accepts `{groups: string[], previous: string[]}` under channel
+  write RBAC/PAT scope and critical rate limiting (1 MiB body bound). Both arrays
+  must contain the same nonempty unique group set. Under the shared row-1 lock,
+  compare previous to the entire current ordered saved-plan list; return 409 for
+  stale order/membership, otherwise atomically assign positions 1..N. Do not change
+  plan versions, prompts, schedules, next_run_at, queued snapshots or artwork and
+  never enqueue requests. Result lists expose `group_order: string[]` containing
+  only the viewer-authorized groups in saved order; actual run rows and cursors
+  stay newest-first so presentation sorting never breaks history pagination.
 - DELETE `/config` accepts `{group: string, version: positive integer}` using
   channel write RBAC, PAT scope and critical rate limiting. It atomically retains
   a `deleted` boolean tombstone (NOT NULL DEFAULT false), increments the version,
@@ -112,6 +126,7 @@ The controller owns orchestration to avoid a service/controller import cycle.
 | --- | --- |
 | Stale config version / stale delete / repeated delete | 409, no write |
 | Invalid delete JSON, empty group or nonpositive version | 400 |
+| Empty/duplicate/mismatched order arrays / stale order or plan membership | 400 / 409; no partial order write |
 | Deleted group list / directly known artwork | Absent / 404; bodies remain stored |
 | Invalid prompt/targets/schedule/unknown reasoning effort | 400 |
 | Anonymous / ordinary member admin action | 401 / 403 |
@@ -138,7 +153,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   verifies exact prompt/JSON/effort persistence and upgrades an existing row
   after optional effort/plan/deletion columns are removed. Also assert latest-run
   tuple subqueries, retained artwork and monotonic delete/recreate behavior across
-  repeated migrations. It never uses public
+  repeated migrations. Upgrade saved group rows without sort_order, preserve the
+  order on repeated startup, and race two saves with the same previous array:
+  exactly one changes order and the other returns ErrIQConflict. It never uses public
   schema for fixture writes. A missing DSN skips local tests, NOT CI acceptance.
 - `.github/workflows/yeschoy-deploy.yml` requires the PostgreSQL 15 service/test
   job before building images; deployment still requires that build. Never
@@ -153,7 +170,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   clearing a saved effort and immutable batch snapshot persistence. Verify fresh
   and read-only group selection stay empty, delete stops scheduled/unsent work,
   running work can finish, artwork remains, recreation is explicit/versioned and
-  stale editors/deletes cannot modify the recreated plan.
+  stale editors/deletes cannot modify the recreated plan. Group ordering tests
+  cover append, legacy fallback, stale/invalid atomic saves, preserved config/
+  snapshot fields, old-client config saves and re-created plans appending.
 - `controller/iq_tests_test.go`: mocked call counts, exact prompt, group routing,
   viewer/artifact denial, quota and health non-mutation, native request bounds.
   `TestIQReasoningEffortWireRequests` exercises mapped OpenAI/Responses/Codex,
@@ -164,11 +183,13 @@ The controller owns orchestration to avoid a service/controller import cycle.
   preserves earlier parent deadlines, cancels completed pair contexts, and
   reports the same configured limit on timeout without retrying. Test saved-plan
   visibility, versioned deletion, deleted-artifact denial and latest-run backfills
-  for quiet groups beyond a 20-run global page.
+  for quiet groups beyond a 20-run global page. Verify ordered config listings,
+  dedicated ordering PUT validation, unchanged newest-first history, and no hidden
+  group names in viewer group_order metadata.
 - `service/iq_artifact_test.go`: full/fenced markup and final native text,
   incomplete/oversized output, preservation of active self-contained content.
-- `router/iq_router_test.go`: all seven anonymous denials and admin/member scopes,
-  including DELETE channel-write enforcement.
+- `router/iq_router_test.go`: all eight anonymous denials and admin/member scopes,
+  including DELETE and group-order PUT channel-write/PAT-scope enforcement.
 - `relay/channel/iq_request_test.go`: deadline propagation and no redirect replay.
 - SQLite test users need distinct nonempty `AffCode` values; initialize dialect
   column names and explicit model prices before invoking real model helpers.

@@ -10,6 +10,10 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
+    'Group display order': 'Group display order',
+    'Save group order': 'Save group order',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.',
     'New plan': 'New plan',
     'Show run history': 'Show run history',
     'Hide run history': 'Hide run history',
@@ -52,6 +56,10 @@ const newKeys = {
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
   },
   zh: {
+    'Group display order': '分组展示顺序',
+    'Save group order': '保存分组顺序',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      '拖拽或点击箭头调整已保存分组的顺序，保存后对所有用户生效。运行历史仍按时间倒序排列。',
     'New plan': '新建计划',
     'Show run history': '查看运行历史',
     'Hide run history': '收起运行历史',
@@ -94,6 +102,10 @@ const newKeys = {
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
   },
   'zh-TW': {
+    'Group display order': '分組顯示順序',
+    'Save group order': '儲存分組順序',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      '拖曳或點擊箭頭調整已儲存分組的順序，儲存後對所有使用者生效。執行歷史仍依時間由新到舊排列。',
     'New plan': '新增計畫',
     'Show run history': '查看執行歷史',
     'Hide run history': '收起執行歷史',
@@ -136,6 +148,10 @@ const newKeys = {
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
   },
   fr: {
+    'Group display order': 'Ordre d’affichage des groupes',
+    'Save group order': 'Enregistrer l’ordre',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Glissez les groupes enregistrés ou utilisez les flèches. Enregistrez pour appliquer l’ordre à tous. L’historique reste du plus récent au plus ancien.',
     'New plan': 'Nouveau programme',
     'Show run history': 'Voir l’historique',
     'Hide run history': 'Masquer l’historique',
@@ -179,6 +195,10 @@ const newKeys = {
       "Abonnement {{plan}} activé avec un code d'échange (ID du code : {{id}})",
   },
   ja: {
+    'Group display order': 'グループの表示順',
+    'Save group order': '表示順を保存',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'ドラッグまたは矢印で保存済みグループを並べ替えます。保存すると全ユーザーに反映されます。実行履歴は新しい順のままです。',
     'New plan': 'プランを新規作成',
     'Show run history': '実行履歴を表示',
     'Hide run history': '実行履歴を閉じる',
@@ -221,6 +241,10 @@ const newKeys = {
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
   },
   ru: {
+    'Group display order': 'Порядок отображения групп',
+    'Save group order': 'Сохранить порядок',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Перетащите сохранённые группы или используйте стрелки. Сохраните порядок для всех пользователей. История остаётся от новых запусков к старым.',
     'New plan': 'Новый план',
     'Show run history': 'История запусков',
     'Hide run history': 'Скрыть историю',
@@ -263,6 +287,10 @@ const newKeys = {
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
   },
   vi: {
+    'Group display order': 'Thứ tự hiển thị nhóm',
+    'Save group order': 'Lưu thứ tự nhóm',
+    'Drag or use the arrows to reorder saved groups. Save to apply for all viewers. Run history stays newest first.':
+      'Kéo hoặc dùng mũi tên để sắp xếp các nhóm đã lưu. Lưu để áp dụng cho mọi người. Lịch sử vẫn hiển thị lần chạy mới nhất trước.',
     'New plan': 'Tạo kế hoạch',
     'Show run history': 'Xem lịch sử chạy',
     'Hide run history': 'Ẩn lịch sử chạy',

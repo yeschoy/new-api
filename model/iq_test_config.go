@@ -69,6 +69,7 @@ type IQConfig struct {
 	ID              int       `json:"id" gorm:"primaryKey;autoIncrement:false"`
 	Group           string    `json:"group" gorm:"column:group_name;type:varchar(64);not null;default:'';uniqueIndex"`
 	Prompts         IQPrompts `json:"prompts" gorm:"serializer:json"`
+	SortOrder       int       `json:"sort_order" gorm:"not null;default:0"`
 	Version         int64     `json:"version"`
 	Prompt          IQText    `json:"prompt"`
 	ReasoningEffort string    `json:"reasoning_effort" gorm:"type:varchar(16);not null;default:''"`
@@ -269,6 +270,7 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 	c.UpdatedAt = now.Unix()
 	c.UpdatedBy = userID
 	c.NextRunAt = NextIQRun(c, now, 0)
+	c.SortOrder = 0 // Ordering is changed only by the dedicated optimistic bulk save.
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		if c.Group != "" {
 			if err := lockIQConfigs(tx); err != nil {
@@ -277,6 +279,9 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 			var existing IQConfig
 			err := tx.Where("group_name = ?", c.Group).First(&existing).Error
 			if errors.Is(err, gorm.ErrRecordNotFound) && c.Version == 0 {
+				if err := appendIQGroupOrder(tx, &c); err != nil {
+					return err
+				}
 				if err := nextIQConfigID(tx, &c); err != nil {
 					return err
 				}
@@ -298,14 +303,20 @@ func SaveIQConfig(c IQConfig, userID int, now time.Time) (*IQConfig, error) {
 					return ErrIQConflict
 				}
 				c.Version = existing.Version
-			} else if existing.Version != c.Version {
-				return ErrIQConflict
+				if err := appendIQGroupOrder(tx, &c); err != nil {
+					return err
+				}
+			} else {
+				if existing.Version != c.Version {
+					return ErrIQConflict
+				}
+				c.SortOrder = existing.SortOrder
 			}
 			c.ID = existing.ID
 		}
 		targets, _ := json.Marshal(c.Targets)
 		prompts, _ := json.Marshal(c.Prompts)
-		res := tx.Model(&IQConfig{}).Where("id = ? AND version = ?", c.ID, c.Version).Updates(map[string]any{"version": c.Version + 1, "deleted": false, "prompt": c.Prompt, "prompts": string(prompts), "reasoning_effort": c.ReasoningEffort, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
+		res := tx.Model(&IQConfig{}).Where("id = ? AND version = ?", c.ID, c.Version).Updates(map[string]any{"version": c.Version + 1, "deleted": false, "sort_order": c.SortOrder, "prompt": c.Prompt, "prompts": string(prompts), "reasoning_effort": c.ReasoningEffort, "targets": string(targets), "enabled": c.Enabled, "schedule_mode": c.ScheduleMode, "interval_hours": c.IntervalHours, "daily_time": c.DailyTime, "timezone": c.Timezone, "next_run_at": c.NextRunAt, "updated_at": c.UpdatedAt, "updated_by": userID})
 		if res.Error != nil {
 			return res.Error
 		}

@@ -9,6 +9,93 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestIQGroupOrderPersistenceAndIsolation(t *testing.T) {
+	iqTestDB(t)
+	now := time.Now()
+	for _, group := range []string{"public", "private", "default"} {
+		cfg, err := GetIQGroupConfig(group)
+		require.NoError(t, err)
+		cfg.Enabled = true
+		cfg.Targets = IQTargets{{Group: group, Models: []string{"m"}}}
+		_, err = SaveIQConfig(*cfg, 1, now)
+		require.NoError(t, err)
+	}
+	before, err := ListIQConfigs()
+	require.NoError(t, err)
+	previous := []string{"public", "private", "default"}
+	require.Equal(t, previous, []string{before[0].Group, before[1].Group, before[2].Group}, "new plans append")
+	task, _, err := EnqueueIQGroup("public", false, now)
+	require.NoError(t, err)
+	snapshot, err := GetIQBatch(task.TaskID)
+	require.NoError(t, err)
+	before, err = ListIQConfigs()
+	require.NoError(t, err)
+	order := []string{"default", "public", "private"}
+	require.NoError(t, SaveIQGroupOrder(order, previous))
+	after, err := ListIQConfigs()
+	require.NoError(t, err)
+	require.Equal(t, order, []string{after[0].Group, after[1].Group, after[2].Group})
+	for _, original := range before {
+		reloaded, err := GetIQGroupConfig(original.Group)
+		require.NoError(t, err)
+		original.SortOrder = reloaded.SortOrder
+		require.Equal(t, original, *reloaded, "ordering must not change versions, schedules, prompts or models")
+	}
+	stillSnapshot, err := GetIQBatch(task.TaskID)
+	require.NoError(t, err)
+	require.Equal(t, snapshot, stillSnapshot)
+	var taskCount int64
+	require.NoError(t, DB.Model(&SystemTask{}).Count(&taskCount).Error)
+	require.EqualValues(t, 1, taskCount, "sorting must not enqueue model requests")
+	require.ErrorIs(t, SaveIQGroupOrder(previous, previous), ErrIQConflict)
+	for _, invalid := range []struct{ groups, previous []string }{
+		{nil, nil},
+		{[]string{"public"}, order},
+		{[]string{"public", "public", "default"}, order},
+		{[]string{"", "public", "private"}, order},
+		{order, []string{"default", "public", "public"}},
+		{[]string{"missing", "public", "private"}, order},
+	} {
+		require.ErrorIs(t, SaveIQGroupOrder(invalid.groups, invalid.previous), ErrIQInvalidOrder)
+	}
+	require.ErrorIs(t, SaveIQGroupOrder([]string{"public"}, []string{"public"}), ErrIQConflict, "a partial saved-plan list is stale")
+	unchanged, err := ListIQConfigs()
+	require.NoError(t, err)
+	require.Equal(t, after, unchanged, "failed saves are atomic")
+	// A regular editor (including older clients without sort_order) cannot reset it.
+	edit := before[0]
+	edit.SortOrder = 999
+	edit.Prompt = "edited prompt"
+	saved, err := SaveIQConfig(edit, 1, now)
+	require.NoError(t, err)
+	require.Equal(t, 2, saved.SortOrder)
+	require.NoError(t, DeleteIQGroupConfig("default", before[2].Version, now))
+	require.ErrorIs(t, SaveIQGroupOrder(previous, order), ErrIQConflict)
+	recreated, err := GetIQGroupConfig("default")
+	require.NoError(t, err)
+	_, err = SaveIQConfig(*recreated, 1, now)
+	require.NoError(t, err)
+	configs, err := ListIQConfigs()
+	require.NoError(t, err)
+	require.Equal(t, []string{"public", "private", "default"}, []string{configs[0].Group, configs[1].Group, configs[2].Group}, "recreated plans append rather than reclaim an old position")
+}
+
+func TestIQLegacyGroupOrderIsDeterministic(t *testing.T) {
+	iqTestDB(t)
+	cfg, err := GetIQConfig()
+	require.NoError(t, err)
+	cfg.Targets = IQTargets{{Group: "public", Models: []string{"m"}}, {Group: "private", Models: []string{"m"}}}
+	_, err = SaveIQConfig(*cfg, 1, time.Now())
+	require.NoError(t, err)
+	configs, err := ListIQConfigs()
+	require.NoError(t, err)
+	require.Equal(t, []string{"private", "public"}, []string{configs[0].Group, configs[1].Group})
+	require.NoError(t, SaveIQGroupOrder([]string{"public", "private"}, []string{"private", "public"}))
+	configs, err = ListIQConfigs()
+	require.NoError(t, err)
+	require.Equal(t, "public", configs[0].Group)
+}
+
 func TestIQPlansRequireSaveAndSupportVersionedDeletion(t *testing.T) {
 	iqTestDB(t)
 	now := time.Now()

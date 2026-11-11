@@ -77,6 +77,43 @@ func iqContext(user *model.User, path, id string) (*gin.Context, *httptest.Respo
 	c.Params = gin.Params{{Key: "id", Value: id}}
 	return c, w
 }
+func TestIQGroupOrderAPIAndVisibleResults(t *testing.T) {
+	root, viewer := setupIQController(t)
+	for _, group := range []string{"public", "private"} {
+		cfg, err := model.GetIQGroupConfig(group)
+		require.NoError(t, err)
+		_, err = model.SaveIQConfig(*cfg, root.Id, time.Now())
+		require.NoError(t, err)
+	}
+	put := func(body string) *httptest.ResponseRecorder {
+		c, w := iqContext(root, "/api/iq-tests/group-order", "")
+		c.Request = httptest.NewRequest(http.MethodPut, "/api/iq-tests/group-order", strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		PutIQGroupOrder(c)
+		return w
+	}
+	require.Equal(t, 400, put(`{`).Code)
+	require.Equal(t, 400, put(`{"groups":["public","public"],"previous":["public","private"]}`).Code)
+	require.Equal(t, 409, put(`{"groups":["public"],"previous":["public"]}`).Code)
+	require.Equal(t, 200, put(`{"groups":["private","public"],"previous":["public","private"]}`).Code)
+	require.Equal(t, 409, put(`{"groups":["public","private"],"previous":["public","private"]}`).Code)
+	c, w := iqContext(root, "/api/iq-tests/config?list=true", "")
+	GetIQConfig(c)
+	require.Equal(t, "private", gjson.Get(w.Body.String(), "data.tasks.0.group").String())
+	for i, group := range []string{"public", "private", "public"} {
+		r := model.IQResult{ID: fmt.Sprintf("order-result-%d", i), TaskID: fmt.Sprintf("order-run-%d", i), RunSeq: int64(i + 1), Group: group, Model: "m", Status: "success"}
+		require.NoError(t, model.DB.Create(&r).Error)
+	}
+	c, w = iqContext(root, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, `["private","public"]`, gjson.Get(w.Body.String(), "data.group_order").Raw)
+	require.Equal(t, "order-run-2", gjson.Get(w.Body.String(), "data.groups.0.task_id").String(), "history must still be chronological")
+	c, w = iqContext(viewer, "/api/iq-tests/results", "")
+	GetIQResults(c)
+	require.Equal(t, `["public"]`, gjson.Get(w.Body.String(), "data.group_order").Raw, "ordering must not leak hidden group names")
+	require.NotContains(t, w.Body.String(), "private")
+}
+
 func TestIQGalleryIncludesQuietPlansBeyondHistoryPage(t *testing.T) {
 	root, _ := setupIQController(t)
 	for _, group := range []string{"public", "private"} {

@@ -351,6 +351,34 @@ describe('authenticated IQ gallery', () => {
     expect(requests).toEqual(['/api/iq-tests/results'])
   })
 
+  it('uses shared group order for the gallery but leaves history chronological for members', async () => {
+    results.group_order = ['private', 'public']
+    results.groups.push({
+      ...results.groups[0],
+      group: 'private',
+      task_id: 'private-older-run',
+      created_at: 1_794_211_000,
+      models: [],
+      active_run: null,
+    })
+    mount()
+    await screen.findByRole('heading', { name: 'private' })
+    const headings = () =>
+      screen
+        .getAllByRole('heading', { level: 2 })
+        .map((heading) => heading.textContent)
+    expect(headings()).toEqual(['private', 'public'])
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Show run history' })
+    )
+    expect(headings()).toEqual(['public', 'private'])
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Hide run history' })
+    )
+    expect(headings()).toEqual(['private', 'public'])
+    expect(requests).toEqual(['/api/iq-tests/results'])
+  })
+
   it('shows one row per saved group until run history is explicitly opened', async () => {
     const older = latest(0)
     results.groups.push({

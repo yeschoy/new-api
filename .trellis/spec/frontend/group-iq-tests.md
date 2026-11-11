@@ -29,7 +29,20 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   while foreground). Load older runs explicitly; each backend page retains whole
   runs. Fetch artifacts lazily for visible cards or the open preview. Compare
   artifact revisions against metadata and fail closed on inconsistent responses.
-- The default gallery shows exactly one latest row per saved group plan. Never
+- Saved plan arrays arrive in shared display order. `PUT /api/iq-tests/group-order`
+  sends `{groups: string[], previous: string[]}` independently of task settings.
+  Show drag handles plus keyboard/up/down alternatives in settings when multiple
+  saved plans exist; require channel write for mutation and an explicit Save group
+  order action. Reuse AutoGroupOrderItem with optional removal omitted and disabled
+  controls while pending/read-only/conflicted. Keep the original previous list
+  throughout a draft so background refreshes never silently rebase stale edits.
+  On 409 retain the draft and require explicit reload. Successful ordering saves
+  invalidate configs/results without resetting the selected task or unsaved prompt
+  form. New-plan dialogs do not expose ordering.
+- The default gallery shows exactly one latest row per saved group plan. Sort this
+  derived view using results.group_order (already viewer-filtered by the server);
+  missing metadata on older servers preserves response order. Do not sort the
+  history arrays or change pagination/deduplication. Never
   expand every run into another apparent group by default. History is an explicit
   show/hide action, newest first, retaining taskID/group row keys and original
   artwork. Deduplicate rows across history pages: first-page backfills can appear
@@ -100,6 +113,8 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 | Unplanned catalog group | Absent from gallery/settings; only selectable in New plan |
 | Confirmed plan deletion | Hide all group runs, invalidate cache, stop schedule/unsent work; keep artwork |
 | Deletion 409 | Keep the row; require refresh before deleting a newer plan |
+| Ordering 409 | Preserve local order; block resubmission until explicit reload |
+| Ordering saved while editing a plan | Keep selected group and unsaved prompt/schedule edits |
 | Expanded preview | One frame; card frames paused; accessible close lifecycle |
 | Mobile viewport | No document overflow; settings fit viewport |
 | Model self-navigation / CPU abuse | Document limitation; never claim full isolation |
@@ -120,10 +135,13 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   independent horizontal group rows, default one-row-per-group, explicitly opened
   retained history, cross-page deduplication, confirmed deletion/cancel, explicit
   creation, per-group manual execution and fixed desktop thumbnail dimensions.
+  Verify member gallery follows group_order while history remains chronological.
 - `settings.test.tsx`: exact prompt/targets/schedule save, mode round-trip values,
   stale-save prompt/effort preservation, effort enum/default, single-group
   selection, saved-plan-only settings, explicit version=0 creation, prompt-pool
-  round trips and explicit discard/reload.
+  round trips and explicit discard/reload. Ordering tests cover arrow/keyboard
+  movement, explicit independent saves, reopen persistence, read-only controls,
+  conflict preservation/reload and unsaved plan-form preservation across reordering.
 - `localization.test.ts`: all static/dynamic feature keys in seven locales.
 - One local mock-backed browser smoke: real Canvas/SVG render, blocked parent
   DOM/storage/cookies, subresource/fetch/worker/popup/top/form attempts, mobile

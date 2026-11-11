@@ -184,6 +184,36 @@ func DeleteIQConfig(c *gin.Context) {
 	iqOK(c, nil)
 }
 
+func PutIQGroupOrder(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+	var input struct {
+		Groups   []string `json:"groups"`
+		Previous []string `json:"previous"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		iqError(c, 400, "Invalid IQ group order JSON")
+		return
+	}
+	if _, err := model.ListIQConfigs(); err != nil {
+		iqError(c, 500, "Unable to load IQ configuration")
+		return
+	}
+	err := model.SaveIQGroupOrder(input.Groups, input.Previous)
+	if errors.Is(err, model.ErrIQInvalidOrder) {
+		iqError(c, 400, err.Error())
+		return
+	}
+	if errors.Is(err, model.ErrIQConflict) {
+		iqError(c, 409, err.Error())
+		return
+	}
+	if err != nil {
+		iqError(c, 500, "Unable to save IQ group order")
+		return
+	}
+	iqOK(c, nil)
+}
+
 func GetIQTargets(c *gin.Context) {
 	targets, err := iqTargetCatalog()
 	if err != nil {
@@ -274,8 +304,10 @@ func GetIQResults(c *gin.Context) {
 		return
 	}
 	allowedGroups := []string{}
-	for group := range visible {
-		allowedGroups = append(allowedGroups, group)
+	for _, cfg := range configs {
+		if visible[cfg.Group] {
+			allowedGroups = append(allowedGroups, cfg.Group)
+		}
 	}
 	before, _ := strconv.ParseInt(c.Query("before"), 10, 64)
 	rows, nextCursor, err := model.ListIQHistory(allowedGroups, before)
@@ -434,7 +466,7 @@ func GetIQResults(c *gin.Context) {
 		}
 		return groups[i].Group < groups[j].Group
 	})
-	iqOK(c, gin.H{"groups": groups, "active_run": active, "next_cursor": nextCursor, "next_run_at": nextRunAt, "schedule_enabled": scheduleEnabled, "timezone": "Asia/Shanghai"})
+	iqOK(c, gin.H{"groups": groups, "group_order": allowedGroups, "active_run": active, "next_cursor": nextCursor, "next_run_at": nextRunAt, "schedule_enabled": scheduleEnabled, "timezone": "Asia/Shanghai"})
 }
 func GetIQArtifact(c *gin.Context) {
 	visible, err := iqVisibleGroups(c)

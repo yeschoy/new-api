@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AxiosError, type AxiosAdapter } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -50,11 +50,15 @@ const originalAdapter = api.defaults.adapter
 let client: QueryClient
 let saved: IQConfigInput[]
 let conflict: boolean
+let tasks: IQConfig[]
+let groupOrders: { groups: string[]; previous: string[] }[]
 
 beforeEach(() => {
   client = new QueryClient()
   saved = []
   conflict = false
+  tasks = [config]
+  groupOrders = []
   useAuthStore.getState().auth.setBundle({
     access_token: 'fixture-token',
     token_type: 'Bearer',
@@ -89,9 +93,38 @@ beforeEach(() => {
                 { group: 'public', models: ['model-0'] },
                 { group: 'private', models: ['model-private'] },
               ]
-            : { tasks: [config], default_prompt: config.prompt },
+            : { tasks, default_prompt: config.prompt },
         },
       }
+    }
+    if (request.url === '/api/iq-tests/group-order') {
+      const input = JSON.parse(request.data) as (typeof groupOrders)[number]
+      groupOrders.push(input)
+      const response = {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: request,
+        data: { success: true, message: '', data: null },
+      }
+      if (conflict) {
+        throw new AxiosError(
+          'Conflict',
+          'ERR_BAD_REQUEST',
+          request,
+          undefined,
+          {
+            ...response,
+            status: 409,
+          }
+        )
+      }
+      tasks = input.groups.map((group) => {
+        const task = tasks.find((task) => task.group === group)
+        if (!task) throw new Error(`Missing fixture group: ${group}`)
+        return task
+      })
+      return response
     }
     if (!request.url?.startsWith('/api/iq-tests/config')) {
       throw new Error('Unexpected API request')
@@ -151,7 +184,139 @@ function mount() {
   )
 }
 
+function mountSettings(canWrite = true) {
+  function Fixture() {
+    const scope = useIQViewerScope()
+    return (
+      scope && (
+        <IQSettings scope={scope} canWrite={canWrite} onClose={() => {}} />
+      )
+    )
+  }
+  return render(
+    <QueryClientProvider client={client}>
+      <Fixture />
+    </QueryClientProvider>
+  )
+}
+function addPrivatePlan() {
+  tasks.push({
+    ...config,
+    group: 'private',
+    targets: [{ group: 'private', models: ['model-private'] }],
+  })
+}
+function orderedNames() {
+  return [
+    ...screen.getByRole('list', { name: 'Group display order' }).children,
+  ].map((item) => item.querySelector('span[title]')?.textContent)
+}
+
 describe('IQ configuration editing', () => {
+  it('saves shared group order independently using arrows and keyboard, retaining it on reopen', async () => {
+    addPrivatePlan()
+    const user = userEvent.setup()
+    const view = mountSettings()
+    const saveOrder = await screen.findByRole('button', {
+      name: 'Save group order',
+    })
+    expect(saveOrder).toBeDisabled()
+    expect(orderedNames()).toEqual(['public', 'private'])
+    await user.type(screen.getByLabelText('Test prompt'), ' Unsaved edit.')
+    expect(
+      screen.queryByRole('button', { name: 'Remove public' })
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Move public down' }))
+    expect(orderedNames()).toEqual(['private', 'public'])
+    expect(groupOrders).toEqual([])
+    expect(saved).toEqual([])
+    screen.getByRole('button', { name: 'Drag public to reorder' }).focus()
+    await user.keyboard('{ArrowUp}')
+    expect(orderedNames()).toEqual(['public', 'private'])
+    expect(saveOrder).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Move private up' }))
+    await user.click(saveOrder)
+    await waitFor(() => expect(saveOrder).toBeDisabled())
+    expect(groupOrders).toEqual([
+      { groups: ['private', 'public'], previous: ['public', 'private'] },
+    ])
+    expect(screen.getByLabelText('Task group')).toHaveValue('public')
+    expect(screen.getByLabelText('Test prompt')).toHaveValue(
+      'Draw a pelican. Unsaved edit.'
+    )
+    expect(saved).toEqual([])
+    view.unmount()
+    mountSettings()
+    await screen.findByRole('list', { name: 'Group display order' })
+    expect(orderedNames()).toEqual(['private', 'public'])
+  })
+
+  it('preserves a conflicting order until an explicit reload and blocks read-only edits', async () => {
+    addPrivatePlan()
+    conflict = true
+    const user = userEvent.setup()
+    const view = mountSettings()
+    await screen.findByRole('list', { name: 'Group display order' })
+    await user.click(screen.getByRole('button', { name: 'Move private up' }))
+    await user.click(screen.getByRole('button', { name: 'Save group order' }))
+    await screen.findByRole('alert')
+    expect(orderedNames()).toEqual(['private', 'public'])
+    expect(
+      screen.getByRole('button', { name: 'Save group order' })
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Move public up' })
+    ).toBeDisabled()
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Reload configuration (discard edits)',
+      })
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    )
+    expect(orderedNames()).toEqual(['public', 'private'])
+    view.unmount()
+    mountSettings(false)
+    await screen.findByRole('list', { name: 'Group display order' })
+    expect(
+      screen.queryByRole('button', { name: 'Save group order' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Move public down' })
+    ).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Drag public to reorder' })
+    ).toBeDisabled()
+  })
+
+  it('keeps the original baseline when configuration refetches during an order draft', async () => {
+    addPrivatePlan()
+    const user = userEvent.setup()
+    mountSettings()
+    await screen.findByRole('list', { name: 'Group display order' })
+    await user.click(screen.getByRole('button', { name: 'Move private up' }))
+    tasks = [...tasks, { ...config, group: 'default', targets: [] }]
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ['iq-tests'] })
+    })
+    expect(orderedNames()).toEqual(['private', 'public'])
+    conflict = true
+    await user.click(screen.getByRole('button', { name: 'Save group order' }))
+    await screen.findByRole('alert')
+    expect(groupOrders).toEqual([
+      { groups: ['private', 'public'], previous: ['public', 'private'] },
+    ])
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Reload configuration (discard edits)',
+      })
+    )
+    await waitFor(() =>
+      expect(orderedNames()).toEqual(['public', 'private', 'default'])
+    )
+  })
+
   it('only offers saved plans in settings and creates a new group only after an explicit save', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
