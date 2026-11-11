@@ -174,8 +174,8 @@ func normalizePartnerSubscriptionPlan(c *gin.Context, plan *model.SubscriptionPl
 	return true
 }
 
-// Ordinary plans retain the historical USD contract. Tenant plans may be
-// catalogued in USD, but only positive, exact-cent CNY prices can use Epay.
+// Ordinary plans retain the historical USD contract. Tenant plans are priced
+// only in CNY; an explicit foreign currency is rejected, never reinterpreted.
 func normalizeSubscriptionPlanCurrency(plan *model.SubscriptionPlan) bool {
 	if plan.PartnerTenantId == 0 {
 		plan.Currency = "USD"
@@ -184,14 +184,11 @@ func normalizeSubscriptionPlanCurrency(plan *model.SubscriptionPlan) bool {
 	if plan.Currency == "" {
 		plan.Currency = "CNY"
 	}
-	if plan.Currency != "CNY" && plan.Currency != "USD" {
+	if plan.Currency != "CNY" {
 		return false
 	}
-	if plan.Currency == "CNY" {
-		_, err := model.PartnerTenantPlanCents(plan.PriceAmount)
-		return err == nil
-	}
-	return true
+	_, err := model.PartnerTenantPlanCents(plan.PriceAmount)
+	return err == nil
 }
 
 func validateApplicableGroup(plan *model.SubscriptionPlan) bool {

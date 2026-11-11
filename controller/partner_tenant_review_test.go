@@ -14,6 +14,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPartnerTenantPlanCurrencyNormalization(t *testing.T) {
+	for _, tc := range []struct {
+		name, currency, wantCurrency string
+		tenantID                     int64
+		price                        float64
+		valid                        bool
+	}{
+		{"tenant defaults to CNY", "", "CNY", 1, 9.99, true},
+		{"tenant exact cents", "CNY", "CNY", 1, 0.29, true},
+		{"tenant USD refused", "USD", "USD", 1, 9.99, false},
+		{"tenant EUR refused", "EUR", "EUR", 1, 9.99, false},
+		{"tenant zero refused", "CNY", "CNY", 1, 0, false},
+		{"tenant sub-cent refused", "CNY", "CNY", 1, 1.001, false},
+		{"ordinary USD unchanged", "USD", "USD", 0, 9.99, true},
+		{"ordinary retains USD contract", "CNY", "USD", 0, 9.99, true},
+		{"ordinary zero unchanged", "USD", "USD", 0, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan := model.SubscriptionPlan{PartnerTenantId: tc.tenantID, Currency: tc.currency, PriceAmount: tc.price}
+			require.Equal(t, tc.valid, normalizeSubscriptionPlanCurrency(&plan))
+			require.Equal(t, tc.wantCurrency, plan.Currency)
+			require.Equal(t, tc.price, plan.PriceAmount, "currency validation must not convert the amount")
+		})
+	}
+}
+
 // Docker-only controller integration: write through the actual admin handlers,
 // then purchase through the authenticated Tenant order API and mock gateway.
 func TestPartnerTenantAdminPlanCurrencyCheckout(t *testing.T) {
@@ -70,7 +96,7 @@ func TestPartnerTenantAdminPlanCurrencyCheckout(t *testing.T) {
 	for _, invalid := range []struct {
 		currency string
 		amount   float64
-	}{{"EUR", 9.99}, {"CNY", 1.001}, {"CNY", 0}} {
+	}{{"USD", 9.99}, {"EUR", 9.99}, {"CNY", 1.001}, {"CNY", 0}} {
 		bad := plan
 		bad.Currency, bad.PriceAmount = invalid.currency, invalid.amount
 		require.False(t, adminWrite(http.MethodPut, path, bad).Success)

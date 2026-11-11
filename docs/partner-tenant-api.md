@@ -56,7 +56,7 @@ Content-Type: application/json
 }
 ```
 
-Amounts are server-authoritative decimal strings backed by integer cents. The first adapter is **configured Epay methods, CNY plans only**, with positive prices exactly representable in cents. Other currencies fail with `unsupported_currency`; no implicit exchange rate. Newly edited Tenant plans in the admin UI use CNY; ordinary plan currency behavior is unchanged. Existing USD catalog entries are not silently converted.
+Amounts are server-authoritative decimal strings backed by integer cents. The first adapter is **configured Epay methods, CNY plans only**, with positive prices exactly representable in cents. Tenant plan creation and updates accept only CNY (the default when omitted); explicit foreign currencies are rejected. Historical non-CNY catalog entries still fail checkout with `unsupported_currency`; no implicit exchange rate or data migration is applied. The admin editor requires a new positive CNY price for such entries instead of carrying over their old amount. Ordinary plan currency behavior is unchanged.
 
 Open `checkout_url` after a user action. It is a sensitive, short-lived, order-only bearer capability, not a platform login or model Key. Do not log, embed in analytics, share, put its fragment into a query string, or replace the fragment with the tenant secret. The cashier scrubs the fragment before router initialization and retains only per-order sessionStorage for same-tab reload. It fetches public-safe order data using `GET /api/partner/checkout/{order_no}` with `Authorization: Bearer pc_...`; no merchant management scope or buyer identity is exposed.
 

@@ -175,6 +175,25 @@ describe('admin subscription purchase currency', () => {
     }
   )
 
+  it('requires repricing an existing USD tenant plan in the CNY editor', async () => {
+    render(
+      <SubscriptionsMutateDrawer
+        open
+        onOpenChange={() => {}}
+        currentRow={{ plan: { ...plan, partner_tenant_id: 42 } }}
+      />
+    )
+
+    expect(
+      await screen.findByRole('spinbutton', { name: 'Plan Price (CNY)' })
+    ).toHaveValue(0)
+    expect(
+      screen.getByText(
+        'Enter a positive CNY amount with up to 2 decimal places'
+      )
+    ).toBeVisible()
+  })
+
   it.each([
     { partnerTenantId: 42, currency: 'CNY', expected: '¥9.99' },
     { partnerTenantId: 0, currency: 'USD', expected: '$9.99' },
