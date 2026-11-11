@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
-- **Last Active**: 2026-11-09
+- **Total Sessions**: 11
+- **Last Active**: 2026-11-11
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~271 | Active |
+| `journal-1.md` | ~330 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-11-11 | Fix explicit IQ plan visibility and deletion | `a186b3e4f` | `iq-test` |
+| 9 | 2026-11-11 | IQ group tasks, prompt pools and retained run gallery | `187fc781d` | `iq-test` |
 | 8 | 2026-11-09 | Fix PostgreSQL IQ migration startup failure | `2089840ad` | `iq-test` |
 | 7 | 2026-11-09 | Scheduled group IQ tests and isolated gallery | `11d7d3d0b` | `iq-test` |
 | 6 | 2026-11-02 | 合作商账号与不限量套餐提交及远端整合 | `d2e908664`, `2f465c900` | `feat/partner-accounts` |

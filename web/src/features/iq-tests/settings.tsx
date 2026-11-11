@@ -41,7 +41,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { handleServerError } from '@/lib/handle-server-error'
 import { getServerErrorStatus } from '@/lib/server-error-message'
 
-import { getIQConfig, getIQTargets, saveIQConfig } from './api'
+import { getIQConfig, getIQConfigs, getIQTargets, saveIQConfig } from './api'
 import { editableIQConfig, iqConfigSchema } from './config-schema'
 import { iqKeys, iqQueryOptions, isCurrentIQScope } from './queries'
 import { IQTargetSelector } from './target-selector'
@@ -51,25 +51,56 @@ export function IQSettings(props: {
   scope: string
   canWrite: boolean
   onClose: () => void
+  group?: string
+  creating?: boolean
 }) {
   const { t } = useTranslation()
+  const [selection, setSelection] = useState(props.group ?? '')
   const config = useQuery({
     ...iqQueryOptions,
-    queryKey: iqKeys.config(props.scope),
-    queryFn: ({ signal }) => getIQConfig(signal),
+    queryKey: iqKeys.configs(props.scope),
+    queryFn: ({ signal }) => getIQConfigs(signal),
   })
   const targets = useQuery({
     ...iqQueryOptions,
     queryKey: iqKeys.targets(props.scope),
     queryFn: ({ signal }) => getIQTargets(signal),
   })
+  const savedGroups = config.data?.tasks.map((task) => task.group) ?? []
+  const groups = props.creating
+    ? (targets.data?.map((target) => target.group) ?? []).filter(
+        (group) => !savedGroups.includes(group)
+      )
+    : savedGroups
+  const group = selection || (props.creating ? '' : groups[0]) || ''
+  const selected = config.data?.tasks.find((task) => task.group === group)
+  const task: IQConfig | undefined =
+    selected ??
+    (props.creating && config.data && group && groups.includes(group)
+      ? {
+          group,
+          version: 0,
+          prompt: config.data.default_prompt,
+          prompts: [],
+          reasoning_effort: '',
+          targets: [],
+          enabled: false,
+          schedule_mode: 'interval',
+          interval_hours: 24,
+          daily_time: '09:00',
+          timezone: 'Asia/Shanghai',
+          next_run_at: 0,
+          updated_at: 0,
+          updated_by: 0,
+        }
+      : undefined)
   return (
     <Dialog
       open
       onOpenChange={(open) => {
         if (!open) props.onClose()
       }}
-      title={t('IQ test settings')}
+      title={props.creating ? t('New plan') : t('IQ test settings')}
       description={t(
         'Save before running. Tests use site resources, not your balance.'
       )}
@@ -92,12 +123,44 @@ export function IQSettings(props: {
         !targets.isError &&
         (config.isPending || targets.isPending) && <LoadingState />}
       {!config.isError && !targets.isError && config.data && targets.data && (
-        <IQConfigForm
-          scope={props.scope}
-          config={config.data}
-          catalog={targets.data}
-          canWrite={props.canWrite}
-        />
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor='iq-task-group'>{t('Task group')}</FieldLabel>
+            <NativeSelect
+              id='iq-task-group'
+              value={group}
+              onChange={(event) => setSelection(event.target.value)}
+            >
+              {props.creating && (
+                <NativeSelectOption value=''>
+                  {t('Select a group')}
+                </NativeSelectOption>
+              )}
+              {groups.map((name) => (
+                <NativeSelectOption key={name} value={name}>
+                  {name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+            <FieldDescription>
+              {t(
+                'Only saved plans appear in the gallery. Selecting a group does not create a plan.'
+              )}
+            </FieldDescription>
+          </Field>
+          {task ? (
+            <IQConfigForm
+              key={group}
+              scope={props.scope}
+              config={task}
+              catalog={targets.data.filter((target) => target.group === group)}
+              canWrite={props.canWrite}
+              onSaved={props.creating ? props.onClose : undefined}
+            />
+          ) : (
+            <p>{t('No compatible targets available')}</p>
+          )}
+        </FieldGroup>
       )}
     </Dialog>
   )
@@ -108,10 +171,14 @@ export function IQConfigForm(props: {
   config: IQConfig
   catalog: IQTarget[]
   canWrite: boolean
+  onSaved?: () => void
 }) {
   const { t } = useTranslation()
   const client = useQueryClient()
   const [conflict, setConflict] = useState(false)
+  const [promptKeys, setPromptKeys] = useState(() =>
+    editableIQConfig(props.config).prompts.map(() => crypto.randomUUID())
+  )
   const form = useForm<IQConfigInput>({
     resolver: zodResolver(iqConfigSchema),
     defaultValues: editableIQConfig(props.config),
@@ -123,11 +190,19 @@ export function IQConfigForm(props: {
     retry: false,
     onSuccess: (config) => {
       if (!isCurrentIQScope(props.scope)) return
-      client.setQueryData(iqKeys.config(props.scope), config)
+      client.setQueryData(
+        iqKeys.config(props.scope, props.config.group),
+        config
+      )
+      void client.invalidateQueries({ queryKey: iqKeys.configs(props.scope) })
       form.reset(editableIQConfig(config))
+      setPromptKeys(
+        editableIQConfig(config).prompts.map(() => crypto.randomUUID())
+      )
       setConflict(false)
       void client.invalidateQueries({ queryKey: iqKeys.results(props.scope) })
       toast.success(t('Saved successfully'))
+      props.onSaved?.()
     },
     onError: (error) => {
       if (getServerErrorStatus(error) === 409) setConflict(true)
@@ -136,10 +211,16 @@ export function IQConfigForm(props: {
   })
   async function reload() {
     try {
-      const config = await getIQConfig()
+      const config = await getIQConfig(props.config.group)
       if (!isCurrentIQScope(props.scope)) return
-      client.setQueryData(iqKeys.config(props.scope), config)
+      client.setQueryData(
+        iqKeys.config(props.scope, props.config.group),
+        config
+      )
       form.reset(editableIQConfig(config))
+      setPromptKeys(
+        editableIQConfig(config).prompts.map(() => crypto.randomUUID())
+      )
       setConflict(false)
       save.reset()
     } catch (error) {
@@ -149,21 +230,93 @@ export function IQConfigForm(props: {
   return (
     <form
       className='space-y-5'
-      onSubmit={form.handleSubmit((input) => save.mutate(input))}
+      onSubmit={form.handleSubmit((input) =>
+        save.mutate({ ...input, prompts: [input.prompt, ...input.prompts] })
+      )}
     >
       <fieldset
         className='min-w-0 space-y-5'
         disabled={!props.canWrite || save.isPending}
       >
-        <div className='space-y-2'>
-          <Label htmlFor='iq-prompt'>{t('Test prompt')}</Label>
-          <Textarea
-            id='iq-prompt'
-            rows={6}
-            {...form.register('prompt')}
-            aria-invalid={Boolean(form.formState.errors.prompt)}
+        <FieldGroup>
+          <Field data-invalid={Boolean(form.formState.errors.prompt)}>
+            <FieldLabel htmlFor='iq-prompt'>{t('Test prompt')}</FieldLabel>
+            <Textarea
+              id='iq-prompt'
+              rows={6}
+              {...form.register('prompt')}
+              aria-invalid={Boolean(form.formState.errors.prompt)}
+              aria-describedby='iq-prompts-help'
+            />
+            <FieldDescription id='iq-prompts-help'>
+              {t(
+                'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.'
+              )}
+            </FieldDescription>
+          </Field>
+          <Controller
+            name='prompts'
+            control={form.control}
+            render={({ field }) => (
+              <FieldGroup>
+                {field.value.map((prompt, index) => (
+                  <Field
+                    key={promptKeys[index]}
+                    data-invalid={Boolean(
+                      form.formState.errors.prompts?.[index]
+                    )}
+                  >
+                    <FieldLabel htmlFor={`iq-prompt-${index}`}>
+                      {t('Prompt {{number}}', { number: index + 2 })}
+                    </FieldLabel>
+                    <Textarea
+                      id={`iq-prompt-${index}`}
+                      rows={4}
+                      value={prompt}
+                      aria-invalid={Boolean(
+                        form.formState.errors.prompts?.[index]
+                      )}
+                      onChange={(event) =>
+                        field.onChange(
+                          field.value.map((value, position) =>
+                            position === index ? event.target.value : value
+                          )
+                        )
+                      }
+                    />
+                    <Button
+                      type='button'
+                      variant='outline'
+                      onClick={() => {
+                        setPromptKeys((keys) =>
+                          keys.filter((_, position) => position !== index)
+                        )
+                        field.onChange(
+                          field.value.filter(
+                            (_, position) => position !== index
+                          )
+                        )
+                      }}
+                    >
+                      {t('Remove prompt')}
+                    </Button>
+                  </Field>
+                ))}
+                <Button
+                  type='button'
+                  variant='outline'
+                  disabled={field.value.length >= 99}
+                  onClick={() => {
+                    setPromptKeys((keys) => [...keys, crypto.randomUUID()])
+                    field.onChange([...field.value, ''])
+                  }}
+                >
+                  {t('Add prompt')}
+                </Button>
+              </FieldGroup>
+            )}
           />
-        </div>
+        </FieldGroup>
         <FieldGroup>
           <Field data-invalid={Boolean(form.formState.errors.reasoning_effort)}>
             <FieldLabel htmlFor='iq-reasoning'>
@@ -211,7 +364,9 @@ export function IQConfigForm(props: {
             control={form.control}
             render={({ field }) => (
               <IQTargetSelector
-                catalog={props.catalog}
+                catalog={props.catalog.filter(
+                  (target) => target.group === props.config.group
+                )}
                 value={field.value}
                 onChange={field.onChange}
               />

@@ -16,11 +16,19 @@ type iqTaskHandler struct{}
 
 func (iqTaskHandler) Type() string { return model.SystemTaskTypeIQTest }
 func (iqTaskHandler) Schedule(now time.Time) error {
-	_, _, err := model.EnqueueIQBatch(true, now)
-	if errors.Is(err, model.ErrIQConflict) {
-		return nil
+	configs, err := model.ListIQConfigs()
+	if err != nil {
+		return err
 	}
-	return err
+	for _, cfg := range configs {
+		if !cfg.Enabled || cfg.NextRunAt == 0 || cfg.NextRunAt > now.Unix() {
+			continue
+		}
+		if _, _, err := model.EnqueueIQGroup(cfg.Group, true, now); err != nil && !errors.Is(err, model.ErrIQConflict) {
+			return err
+		}
+	}
+	return nil
 }
 func (iqTaskHandler) Run(ctx context.Context, task *model.SystemTask, runner string) {
 	cfg, err := model.GetIQBatch(task.TaskID)

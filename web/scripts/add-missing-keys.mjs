@@ -29,6 +29,31 @@ const newKeys = {
       'Check your wallet for current rewards.',
     'Offer details will appear when the campaign starts.':
       'Offer details will appear when the campaign starts.',
+    'New plan': 'New plan',
+    'Show run history': 'Show run history',
+    'Hide run history': 'Hide run history',
+    'Delete plan': 'Delete plan',
+    'Delete plan {{group}}?': 'Delete plan {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Create and save a plan to show its group here. Available groups are not added automatically.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Only saved plans appear in the gallery. Selecting a group does not create a plan.',
+    'Run result': 'Run result',
+    'Load older runs': 'Load older runs',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.',
+    'Task group': 'Task group',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Each group has its own task, models, prompts and schedule. Save changes before switching groups.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.',
+    'Prompt {{number}}': 'Prompt {{number}}',
+    'Remove prompt': 'Remove prompt',
+    'Add prompt': 'Add prompt',
     'Thinking level': 'Thinking level',
     Minimal: 'Minimal',
     Low: 'Low',
@@ -64,6 +89,31 @@ const newKeys = {
     'Check your wallet for current rewards.': '前往钱包查看当前充值赠送规则。',
     'Offer details will appear when the campaign starts.':
       '活动开始后展示具体赠送规则。',
+    'New plan': '新建计划',
+    'Show run history': '查看运行历史',
+    'Hide run history': '收起运行历史',
+    'Delete plan': '删除计划',
+    'Delete plan {{group}}?': '删除 {{group}} 的计划？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      '从展示列表移除此计划，停止定时和尚未发送的请求。已生成的作品会保留，已经开始的请求可能继续完成。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '每个已保存计划的分组只展示一行，运行历史需主动打开查看。时间均为北京时间。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      '新建并保存计划后，对应分组才会展示在这里，不会自动添加其他可用分组。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '仅展示已保存的计划，选择分组不会自动创建计划。',
+    'Run result': '本次结果',
+    'Load older runs': '加载更早的记录',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '每次运行结果独立保存，最新的排在前面。每行展示一个分组的一次运行，时间均为北京时间。',
+    'Task group': '任务分组',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      '每个分组独立配置任务、模型、提示词和定时。切换分组前请先保存修改。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '每次运行随机抽取一条提示词，该任务内所有模型共用。默认使用项目现有提示词。',
+    'Prompt {{number}}': '提示词 {{number}}',
+    'Remove prompt': '移除提示词',
+    'Add prompt': '添加提示词',
     'Thinking level': '思考等级',
     Minimal: '极低',
     Low: '低',
@@ -100,6 +150,31 @@ const newKeys = {
       '前往錢包查看目前的儲值贈送規則。',
     'Offer details will appear when the campaign starts.':
       '活動開始後將顯示詳細贈送規則。',
+    'New plan': '新增計畫',
+    'Show run history': '查看執行歷史',
+    'Hide run history': '收起執行歷史',
+    'Delete plan': '刪除計畫',
+    'Delete plan {{group}}?': '刪除 {{group}} 的計畫？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      '從展示清單移除此計畫，停止排程與尚未送出的請求。已產生的作品會保留，已開始的請求可能繼續完成。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '每個已儲存計畫的群組只顯示一行，執行歷史需主動開啟查看。時間均為北京時間。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      '新增並儲存計畫後，對應群組才會顯示在這裡，不會自動新增其他可用群組。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '僅顯示已儲存的計畫，選取群組不會自動建立計畫。',
+    'Run result': '本次結果',
+    'Load older runs': '載入更早的記錄',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '每次執行結果獨立儲存，最新的排在前面。每行顯示一個群組的一次執行，時間均為北京時間。',
+    'Task group': '任務群組',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      '每個群組獨立設定任務、模型、提示詞和排程。切換群組前請先儲存修改。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '每次執行隨機抽取一條提示詞，此任務內所有模型共用。預設使用專案現有提示詞。',
+    'Prompt {{number}}': '提示詞 {{number}}',
+    'Remove prompt': '移除提示詞',
+    'Add prompt': '新增提示詞',
     'Thinking level': '思考等級',
     Minimal: '極低',
     Low: '低',
@@ -136,6 +211,31 @@ const newKeys = {
       'Consultez votre portefeuille pour les bonus en cours.',
     'Offer details will appear when the campaign starts.':
       'Les détails seront affichés au début de la campagne.',
+    'New plan': 'Nouveau programme',
+    'Show run history': 'Voir l’historique',
+    'Hide run history': 'Masquer l’historique',
+    'Delete plan': 'Supprimer le programme',
+    'Delete plan {{group}}?': 'Supprimer le programme de {{group}} ?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Retirer ce programme de la galerie et arrêter sa planification et les requêtes non envoyées. Les œuvres sont conservées. Les requêtes déjà lancées peuvent se terminer.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Chaque programme enregistré occupe une ligne par groupe. L’historique reste masqué jusqu’à son ouverture. Horaires en heure de Pékin.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Créez et enregistrez un programme pour afficher son groupe ici. Les groupes disponibles ne sont pas ajoutés automatiquement.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Seuls les programmes enregistrés apparaissent dans la galerie. Sélectionner un groupe ne crée pas de programme.',
+    'Run result': 'Résultat de l’exécution',
+    'Load older runs': 'Charger les exécutions précédentes',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Chaque exécution est conservée, de la plus récente à la plus ancienne. Une ligne par exécution de groupe. Horaires de Pékin.',
+    'Task group': 'Groupe de la tâche',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Chaque groupe a sa tâche, ses modèles, ses prompts et sa planification. Enregistrez avant de changer de groupe.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Un prompt est tiré au sort à chaque exécution et partagé par tous les modèles de la tâche. Le prompt actuel du projet est utilisé par défaut.',
+    'Prompt {{number}}': 'Prompt {{number}}',
+    'Remove prompt': 'Retirer le prompt',
+    'Add prompt': 'Ajouter un prompt',
     'Thinking level': 'Niveau de réflexion',
     Minimal: 'Minimal',
     Low: 'Faible',
@@ -173,6 +273,31 @@ const newKeys = {
       '現在の特典はウォレットでご確認ください。',
     'Offer details will appear when the campaign starts.':
       'キャンペーン開始後に特典の詳細を表示します。',
+    'New plan': 'プランを新規作成',
+    'Show run history': '実行履歴を表示',
+    'Hide run history': '実行履歴を閉じる',
+    'Delete plan': 'プランを削除',
+    'Delete plan {{group}}?': '{{group}} のプランを削除しますか？',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'このプランをギャラリーから除外し、スケジュールと未送信のリクエストを停止します。保存済みの作品は保持されます。開始済みのリクエストは完了する場合があります。',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      '保存済みプランはグループごとに1行で表示します。実行履歴は開くまで表示されません。時刻は北京時間です。',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'プランを作成して保存すると、そのグループがここに表示されます。利用可能なグループは自動追加されません。',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      '保存済みのプランのみギャラリーに表示されます。グループの選択だけではプランは作成されません。',
+    'Run result': '今回の結果',
+    'Load older runs': '以前の実行を読み込む',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      '実行結果は毎回個別に保存され、新しい順に表示されます。1行が1グループの1回の実行です。時刻は北京時間です。',
+    'Task group': 'タスクのグループ',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'グループごとにタスク、モデル、プロンプト、スケジュールを個別に設定します。グループを切り替える前に変更を保存してください。',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      '実行ごとにプロンプトを1つランダムに選び、タスク内の全モデルで共有します。既定ではプロジェクトの既存プロンプトを使います。',
+    'Prompt {{number}}': 'プロンプト {{number}}',
+    'Remove prompt': 'プロンプトを削除',
+    'Add prompt': 'プロンプトを追加',
     'Thinking level': '思考レベル',
     Minimal: '最小',
     Low: '低',
@@ -209,6 +334,31 @@ const newKeys = {
       'Текущие бонусы за пополнение смотрите в кошельке.',
     'Offer details will appear when the campaign starts.':
       'Подробные условия появятся после начала акции.',
+    'New plan': 'Новый план',
+    'Show run history': 'История запусков',
+    'Hide run history': 'Скрыть историю',
+    'Delete plan': 'Удалить план',
+    'Delete plan {{group}}?': 'Удалить план группы {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Убрать план из галереи, отключить расписание и неотправленные запросы. Сохранённые работы останутся. Уже начатые запросы могут завершиться.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Каждый сохранённый план отображается одной строкой группы. История запусков скрыта до открытия. Время пекинское.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Создайте и сохраните план, чтобы его группа появилась здесь. Доступные группы не добавляются автоматически.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'В галерее видны только сохранённые планы. Выбор группы не создаёт план.',
+    'Run result': 'Результат запуска',
+    'Load older runs': 'Загрузить более ранние запуски',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Все запуски сохраняются отдельно, новые сверху. Одна строка — один запуск группы. Время пекинское.',
+    'Task group': 'Группа задачи',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'У каждой группы свои задача, модели, запросы и расписание. Сохраните изменения перед сменой группы.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Для каждого запуска случайно выбирается один запрос, общий для всех моделей задачи. По умолчанию используется текущий запрос проекта.',
+    'Prompt {{number}}': 'Запрос {{number}}',
+    'Remove prompt': 'Удалить запрос',
+    'Add prompt': 'Добавить запрос',
     'Thinking level': 'Уровень размышления',
     Minimal: 'Минимальный',
     Low: 'Низкий',
@@ -245,6 +395,31 @@ const newKeys = {
       'Xem ưu đãi nạp tiền hiện tại trong ví.',
     'Offer details will appear when the campaign starts.':
       'Chi tiết ưu đãi sẽ hiển thị khi chương trình bắt đầu.',
+    'New plan': 'Tạo kế hoạch',
+    'Show run history': 'Xem lịch sử chạy',
+    'Hide run history': 'Ẩn lịch sử chạy',
+    'Delete plan': 'Xóa kế hoạch',
+    'Delete plan {{group}}?': 'Xóa kế hoạch của {{group}}?',
+    'Remove this plan from the gallery and stop its schedule and unsent requests. Saved artwork is kept. Requests already started may finish.':
+      'Ẩn kế hoạch khỏi thư viện, dừng lịch chạy và các yêu cầu chưa gửi. Tác phẩm đã lưu được giữ lại. Các yêu cầu đã bắt đầu có thể tiếp tục hoàn tất.',
+    'Each saved plan has one group row. Run history is hidden until opened. Times are shown in Beijing time.':
+      'Mỗi kế hoạch đã lưu hiển thị một hàng cho nhóm. Lịch sử chạy được ẩn cho đến khi mở. Thời gian theo giờ Bắc Kinh.',
+    'Create and save a plan to show its group here. Available groups are not added automatically.':
+      'Tạo và lưu kế hoạch để hiển thị nhóm tại đây. Các nhóm khả dụng không được tự động thêm.',
+    'Only saved plans appear in the gallery. Selecting a group does not create a plan.':
+      'Chỉ các kế hoạch đã lưu xuất hiện trong thư viện. Chọn nhóm không tự tạo kế hoạch.',
+    'Run result': 'Kết quả lần chạy',
+    'Load older runs': 'Tải các lần chạy cũ hơn',
+    'Every run is saved separately, newest first. Each row is one group run. Times are shown in Beijing time.':
+      'Mỗi lần chạy được lưu riêng, mới nhất ở trên. Mỗi hàng là một lần chạy của một nhóm. Thời gian theo giờ Bắc Kinh.',
+    'Task group': 'Nhóm tác vụ',
+    'Each group has its own task, models, prompts and schedule. Save changes before switching groups.':
+      'Mỗi nhóm có tác vụ, mô hình, câu lệnh và lịch chạy riêng. Hãy lưu thay đổi trước khi chuyển nhóm.',
+    'One prompt is randomly selected for each run and shared by all models in this task. The existing project prompt is used by default.':
+      'Mỗi lần chạy chọn ngẫu nhiên một câu lệnh dùng chung cho mọi mô hình trong tác vụ. Mặc định dùng câu lệnh hiện có của dự án.',
+    'Prompt {{number}}': 'Câu lệnh {{number}}',
+    'Remove prompt': 'Xóa câu lệnh',
+    'Add prompt': 'Thêm câu lệnh',
     'Thinking level': 'Mức độ suy nghĩ',
     Minimal: 'Tối thiểu',
     Low: 'Thấp',

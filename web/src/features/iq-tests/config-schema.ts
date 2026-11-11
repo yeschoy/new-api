@@ -28,6 +28,19 @@ import {
 const message = 'Invalid IQ configuration'
 export const iqConfigSchema = z
   .object({
+    group: z.string().min(1).max(64),
+    prompts: z
+      .array(
+        z
+          .string()
+          .refine(
+            (value) =>
+              value.trim().length > 0 &&
+              new TextEncoder().encode(value).length <= 65_536,
+            message
+          )
+      )
+      .max(99),
     version: z.number().int(),
     prompt: z
       .string()
@@ -48,6 +61,16 @@ export const iqConfigSchema = z
     timezone: z.literal('Asia/Shanghai'),
   })
   .superRefine((value, context) => {
+    if (value.targets.some((target) => target.group !== value.group)) {
+      context.addIssue({ code: 'custom', path: ['targets'], message })
+    }
+    const totalBytes = [value.prompt, ...value.prompts].reduce(
+      (total, prompt) => total + new TextEncoder().encode(prompt).length,
+      0
+    )
+    if (totalBytes > 1_048_576) {
+      context.addIssue({ code: 'custom', path: ['prompts'], message })
+    }
     const pairs = value.targets.reduce(
       (count, target) => count + target.models.length,
       0
@@ -73,8 +96,10 @@ export const iqConfigSchema = z
 
 export function editableIQConfig(config: IQConfig): IQConfigInput {
   return {
+    group: config.group,
     version: config.version,
-    prompt: config.prompt,
+    prompt: config.prompts?.[0] ?? config.prompt,
+    prompts: config.prompts?.slice(1) ?? [],
     reasoning_effort: config.reasoning_effort ?? '',
     targets: config.targets,
     enabled: config.enabled,

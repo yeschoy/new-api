@@ -86,7 +86,7 @@ export function IQResultCard(props: {
         <CardDescription>
           {latest ? (
             <>
-              {t('Latest result')} · <IQTime seconds={latest.completed_at} />
+              {t('Run result')} · <IQTime seconds={latest.completed_at} />
             </>
           ) : (
             t('No result yet')
@@ -94,7 +94,7 @@ export function IQResultCard(props: {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className='bg-muted flex min-h-64 items-center justify-center overflow-hidden rounded-lg'>
+        <div className='bg-muted flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg'>
           {success && latest && props.live ? (
             <IQPreview scope={props.scope} result={latest} />
           ) : (
