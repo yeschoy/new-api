@@ -21,7 +21,9 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 
-import { isPartnerCheckoutPath, prepareCashierEntry } from '@/features/partner-checkout/lib/access'
+import { prepareCashierEntry } from '@/features/partner-checkout/lib/access'
+import { preparePurchaseEntry } from '@/features/partner-purchase/lib/access'
+import { isPartnerPublicPath } from '@/features/partner-purchase/lib/surface'
 import { installBuildMetadata } from '@/lib/build-metadata'
 import { resolveLogoUrl } from '@/lib/constants'
 import { applyFaviconToDom } from '@/lib/dom-utils'
@@ -44,7 +46,8 @@ import './styles/index.css'
 // Ensure VChart theme is initialized before any chart mounts (prevents white default theme flash)
 // VChart theme is driven by our ThemeProvider (html.light/html.dark) via per-chart `theme` prop.
 prepareCashierEntry()
-if (!isPartnerCheckoutPath(window.location.pathname)) initializeFrontendCache()
+preparePurchaseEntry()
+if (!isPartnerPublicPath(window.location.pathname)) initializeFrontendCache()
 installBuildMetadata()
 
 const queryClient = createAppQueryClient(() => {
@@ -75,7 +78,7 @@ if (!rootElement) {
 ;(function initSystemBranding() {
   try {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
-    if (isPartnerCheckoutPath(window.location.pathname)) return
+    if (isPartnerPublicPath(window.location.pathname)) return
     const apply = (name?: string | null) => {
       const resolvedName = resolveProductName(name)
       document.title = resolvedName
@@ -87,14 +90,18 @@ if (!rootElement) {
     // Cache-first
     const cached = readCachedStatus()
     if (cached?.system_name) apply(cached.system_name as string)
-    applyFaviconToDom(resolveLogoUrl(typeof cached?.logo === 'string' ? cached.logo : undefined))
+    applyFaviconToDom(
+      resolveLogoUrl(typeof cached?.logo === 'string' ? cached.logo : undefined)
+    )
 
     // Prime the shared status query before React mounts; the query owns storage sync.
     queryClient
       .ensureQueryData(statusQueryOptions)
       .then((s) => {
         if (s?.system_name) apply(s.system_name as string)
-        applyFaviconToDom(resolveLogoUrl(typeof s?.logo === 'string' ? s.logo : undefined))
+        applyFaviconToDom(
+          resolveLogoUrl(typeof s?.logo === 'string' ? s.logo : undefined)
+        )
       })
       .catch(() => {
         /* empty */

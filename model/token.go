@@ -280,6 +280,12 @@ func GetTokenById(id int) (*Token, error) {
 }
 
 func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
+	// Subscription lookup capabilities are never Coding credentials. Reject
+	// before caches/SQL (including debug query interpolation).
+	if strings.HasPrefix(key, "sub_") {
+		return nil, gorm.ErrRecordNotFound
+	}
+
 	if !fromDB && common.RedisEnabled {
 		// Try Redis first
 		token, err := cacheGetTokenByKey(key)

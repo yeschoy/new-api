@@ -509,6 +509,11 @@ func downgradeUserGroupForSubscriptionTx(tx *gorm.DB, sub *UserSubscription, now
 }
 
 func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, source string) (*UserSubscription, error) {
+	return createUserSubscriptionFromPlanAtTx(tx, userId, plan, source, 0)
+}
+
+// Callers with security-sensitive lock-time decisions supply a strict DB clock.
+func createUserSubscriptionFromPlanAtTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, source string, nowUnix int64) (*UserSubscription, error) {
 	if tx == nil {
 		return nil, errors.New("tx is nil")
 	}
@@ -532,7 +537,9 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, common.NewMessage("Purchase limit for this plan has been reached")
 		}
 	}
-	nowUnix := getDBTimestampOn(tx)
+	if nowUnix == 0 {
+		nowUnix = getDBTimestampOn(tx)
+	}
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {

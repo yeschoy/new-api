@@ -1,0 +1,316 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "商户订阅 Key API",
+    "version": "1.0.0",
+    "description": "对应实现 58616beef。商户 pt_ 无买家 ID 下单，返回平台付款 URL；首次可信付款后的完整交付才开户。续费在相同 POST 用 X-Subscription-Key 指定原订阅。买家独立查询只需 sub_，不需商户密钥或 Cookie。成功直接返回业务 JSON，无 success/data 包装。此文件不是生产部署或真实支付验收证明；请将示例服务器替换为实际已部署的 HTTPS 地址。不要导入真实秘密或默认执行付款请求。"
+  },
+  "servers": [
+    {"url": "https://platform.example", "description": "占位地址，替换为实际已部署的 HTTPS 平台域名"}
+  ],
+  "tags": [
+    {"name": "Merchant", "description": "商户后端使用 pt_，不可向买家暴露"},
+    {"name": "Subscription", "description": "买家仅凭 sub_ 查询关联单订阅"}
+  ],
+  "paths": {
+    "/api/partner/v1/plans": {
+      "get": {
+        "tags": ["Merchant"],
+        "operationId": "listPartnerSubscriptionKeyPlans",
+        "summary": "查询本商户启用套餐",
+        "description": "复用已有目录，返回完整 SubscriptionPlan；本 schema 描述常用字段并允许额外字段。price_amount/total_amount 保留旧数字协议，不能当作新的字符串额度 DTO；大整数应无损解析。历史非CNY或其他不可支付配置仍可能出现在目录，实际下单会校验。",
+        "security": [{"MerchantBearer": []}],
+        "responses": {
+          "200": {
+            "description": "本商户启用套餐，空目录为 plans: []",
+            "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PlansResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/IntegrationError"},
+          "401": {"$ref": "#/components/responses/IntegrationError"},
+          "429": {"$ref": "#/components/responses/IntegrationError"},
+          "500": {"$ref": "#/components/responses/IntegrationError"}
+        }
+      }
+    },
+    "/api/partner/v1/subscription-key-orders": {
+      "post": {
+        "tags": ["Merchant"],
+        "operationId": "createPartnerSubscriptionKeyOrder",
+        "summary": "新购或通过原订阅 Key 创建续费订单",
+        "description": "完全不传 external_user_id。省略 X-Subscription-Key 为独立新购；有该头则当前 pt_ 与 sub_ 必须同属商户，且 plan_id 必须是原套餐。头为空/错误/旧版本不能退化新购。JSON 只有 plan_id/payment_method，最大2KB，拒绝未知/重复/大小写别名/null/尾随JSON；拒绝任何query（含空?）及多值凭证/幂等头。首次201、原意图重放200，返回 order_no/checkout_url，无长期Key。订单创建和URL返回不开户；只有可信付款后完整交付才新增用户。续费复用原用户/订阅/双Key，活跃提前续费不立即加当期额度，自然到期可续原行，取消拒绝。超时/准备503保留原参数和幂等键重试，原订单/价格/deadline不变。",
+        "security": [{"MerchantBearer": []}],
+        "parameters": [
+          {"$ref": "#/components/parameters/IdempotencyKey"},
+          {"name": "X-Subscription-Key", "in": "header", "required": false, "description": "仅续费发送当前原订阅 Key；新购必须完全省略，不能发空值。不是商户鉴权的替代。", "schema": {"$ref": "#/components/schemas/SubscriptionKey"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateOrderRequest"}, "example": {"plan_id": 42, "payment_method": "alipay"}}}
+        },
+        "responses": {
+          "201": {"$ref": "#/components/responses/CreatedOrder"},
+          "200": {"$ref": "#/components/responses/CreatedOrder"},
+          "400": {"$ref": "#/components/responses/IntegrationError"},
+          "401": {"$ref": "#/components/responses/IntegrationError"},
+          "403": {"$ref": "#/components/responses/IntegrationError"},
+          "404": {"$ref": "#/components/responses/IntegrationError"},
+          "409": {"$ref": "#/components/responses/IntegrationError"},
+          "429": {"$ref": "#/components/responses/IntegrationError"},
+          "500": {"$ref": "#/components/responses/IntegrationError"},
+          "503": {"$ref": "#/components/responses/IntegrationError"}
+        }
+      }
+    },
+    "/api/partner/v1/subscription-key-orders/{order_no}": {
+      "get": {
+        "tags": ["Merchant"],
+        "operationId": "getPartnerSubscriptionKeyOrder",
+        "summary": "只读查询本模式订单",
+        "description": "只允许当前商户的 subscription_key 模式订单，旧模式/其他商户返回 scoped404。拒绝query和X-Subscription-Key。GET不准备网关、不开户、不补签。仅paid+fulfilled可进入领钥；paid未fulfilled不可再次要求付款。响应不含checkout_url、QR、直接网关链接、买家/内部账户身份或长期Key。",
+        "security": [{"MerchantBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/OrderNo"}],
+        "responses": {
+          "200": {
+            "description": "安全订单状态；未交付时subscription_id省略",
+            "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Referrer-Policy": {"$ref": "#/components/headers/NoReferrer"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderStatus"}}}
+          },
+          "400": {"$ref": "#/components/responses/IntegrationError"},
+          "401": {"$ref": "#/components/responses/IntegrationError"},
+          "404": {"$ref": "#/components/responses/IntegrationError"},
+          "429": {"$ref": "#/components/responses/IntegrationError"},
+          "500": {"$ref": "#/components/responses/IntegrationError"}
+        }
+      }
+    },
+    "/api/partner/v1/subscription-key-orders/{order_no}/subscription-key": {
+      "get": {
+        "tags": ["Merchant"],
+        "operationId": "claimPartnerSubscriptionKey",
+        "summary": "支付并交付完成后商户领取订阅 Key",
+        "description": "仅paid+fulfilled且付费关联完整时可领取。拒绝query和X-Subscription-Key。重复领取返回当前版本，轮换后只返回新Key；不开户/授予/修复/补签。到期仍可领取查询Key，不等于取得过期Coding Key。商户必须自行核对订单的买家归属，禁止做任意浏览器可调用的公共取钥代理。",
+        "security": [{"MerchantBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/OrderNo"}],
+        "responses": {
+          "200": {
+            "description": "当前订阅查询Key及版本，高敏响应，不可缓存/记录",
+            "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Referrer-Policy": {"$ref": "#/components/headers/NoReferrer"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClaimKeyResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/IntegrationError"},
+          "401": {"$ref": "#/components/responses/IntegrationError"},
+          "403": {"$ref": "#/components/responses/IntegrationError"},
+          "404": {"$ref": "#/components/responses/IntegrationError"},
+          "409": {"$ref": "#/components/responses/IntegrationError"},
+          "429": {"$ref": "#/components/responses/IntegrationError"},
+          "500": {"$ref": "#/components/responses/IntegrationError"},
+          "503": {"$ref": "#/components/responses/IntegrationError"}
+        }
+      }
+    },
+    "/api/partner/subscription": {
+      "get": {
+        "tags": ["Subscription"],
+        "operationId": "getIndependentPartnerSubscription",
+        "summary": "买家仅凭 sub_ 查询单订阅、额度与 Coding Key",
+        "description": "仅Authorization: Bearer sub_...；不要发送pt_、Cookie、商户ID或X-Subscription-Key。不接受query（包括空?）、URL/JSON/x-api-key替代鉴权。Key本身定位唯一订阅。所有quota均精确十进制字符串；自然到期/取消返回历史统计、不重置新周期、不返回api_key，当前remaining为0且不可消费。活跃但耗尽仍可能返回正常Coding Key、quota_usable=false，实际模型消费由订阅funding拒绝。禁用/错组/损坏/不可用Token失败关闭，不补发。sub_不能调用Coding。",
+        "security": [{"SubscriptionBearer": []}],
+        "responses": {
+          "200": {
+            "description": "单份订阅；api_key只在关联订阅有效且凭证正常时存在",
+            "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Referrer-Policy": {"$ref": "#/components/headers/NoReferrer"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IndependentSubscription"}, "examples": {
+              "active": {"summary": "有效订阅（Key为占位示例）", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "active", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "9223372036854775807", "quota_used": "9007199254740993", "quota_remaining": "9214364837600034814", "quota_unlimited": false, "quota_usable": true, "next_reset_time": 1801440000}, "api_key": "sk-REPLACE_WITH_ACTUAL_MODEL_KEY"}},
+              "expired": {"summary": "到期历史，不含api_key", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "expired", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "5000000", "quota_used": "250", "quota_remaining": "0", "quota_unlimited": false, "quota_usable": false, "next_reset_time": 1802678400, "historical_quota_remaining": "4999750"}}}
+            }}}
+          },
+          "400": {"$ref": "#/components/responses/IntegrationError"},
+          "401": {"$ref": "#/components/responses/IntegrationError"},
+          "403": {"$ref": "#/components/responses/IntegrationError"},
+          "404": {"$ref": "#/components/responses/IntegrationError"},
+          "409": {"$ref": "#/components/responses/IntegrationError"},
+          "429": {"$ref": "#/components/responses/IntegrationError"},
+          "500": {"$ref": "#/components/responses/IntegrationError"},
+          "503": {"$ref": "#/components/responses/IntegrationError"}
+        }
+      }
+    },
+    "/api/partner/v1/subscriptions/{subscription_id}/key/rotate": {
+      "post": {
+        "tags": ["Merchant"],
+        "operationId": "rotatePartnerSubscriptionKey",
+        "summary": "商户显式重置订阅查询 Key",
+        "description": "仅所属商户pt_可调用，拒绝query/X-Subscription-Key。JSON严格只有expected_version，最大2KB。同幂等键同参数重试若结果仍当前则返回同Key；被后续轮换超越/expected_version落后返回409，不复活旧Key。新Key提交后旧Key后续请求失效，不换Coding Key/权益，不撤回已发响应、已授权请求或已保存Coding Key。已接受支付订单按冻结目标继续交付。",
+        "security": [{"MerchantBearer": []}],
+        "parameters": [
+          {"name": "subscription_id", "in": "path", "required": true, "description": "当前商户已签发查询Key的订阅ID，正整数的规范十进制形式", "schema": {"type": "integer", "format": "int64", "minimum": 1}, "example": 123},
+          {"$ref": "#/components/parameters/IdempotencyKey"}
+        ],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RotateKeyRequest"}, "example": {"expected_version": 1}}}},
+        "responses": {
+          "200": {
+            "description": "当前新Key与版本，高敏响应",
+            "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Referrer-Policy": {"$ref": "#/components/headers/NoReferrer"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RotateKeyResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/IntegrationError"},
+          "401": {"$ref": "#/components/responses/IntegrationError"},
+          "403": {"$ref": "#/components/responses/IntegrationError"},
+          "404": {"$ref": "#/components/responses/IntegrationError"},
+          "409": {"$ref": "#/components/responses/IntegrationError"},
+          "429": {"$ref": "#/components/responses/IntegrationError"},
+          "500": {"$ref": "#/components/responses/IntegrationError"},
+          "503": {"$ref": "#/components/responses/IntegrationError"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "MerchantBearer": {"type": "http", "scheme": "bearer", "bearerFormat": "pt_ merchant developer secret", "description": "商户服务端秘密。工具的Bearer认证输入只填pt_值，由工具添加Bearer前缀；禁止与买家共享。"},
+      "SubscriptionBearer": {"type": "http", "scheme": "bearer", "bearerFormat": "sub_ followed by 64 lowercase hexadecimal characters", "description": "只用于独立查询。仅填sub_值，不要再要求pt_或Cookie；可读取Coding Key，必须按秘密保护。"}
+    },
+    "headers": {
+      "NoStore": {"description": "禁止缓存敏感响应", "schema": {"type": "string", "enum": ["no-store"]}},
+      "NoReferrer": {"description": "新增接口不发送referrer", "schema": {"type": "string", "enum": ["no-referrer"]}},
+      "RequestId": {"description": "排障用请求ID，不含秘密", "schema": {"type": "string"}},
+      "RetryAfter": {"description": "429或部分503响应的建议重试间隔（秒）；不保证所有错误都有此头", "schema": {"type": "string"}}
+    },
+    "parameters": {
+      "IdempotencyKey": {"name": "Idempotency-Key", "in": "header", "required": true, "description": "同一购买/轮换意图保持不变，单值；新键代表新意图，不用于修复超时。支付和轮换用途分别隔离。", "schema": {"type": "string", "minLength": 16, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]{16,64}$"}, "example": "merchant-intent-00000001"},
+      "OrderNo": {"name": "order_no", "in": "path", "required": true, "description": "平台订单号，不是幂等键", "schema": {"type": "string", "minLength": 35, "maxLength": 35, "pattern": "^PTO[A-Za-z0-9]{32}$"}, "example": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV"}
+    },
+    "responses": {
+      "CreatedOrder": {
+        "description": "新订单201，原参数同幂等重放200；包含平台checkout_url，未返回长期Key",
+        "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Referrer-Policy": {"$ref": "#/components/headers/NoReferrer"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreatedOrderResponse"}, "example": {"order_no": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV", "plan_id": 42, "plan_title": "Monthly plan", "amount": "9.99", "currency": "CNY", "payment_method": "alipay", "payment_status": "pending", "fulfillment_status": "not_ready", "created_at": 1800000000, "expires_at": 1800001800, "checkout_url": "https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_REPLACE_WITH_ORDER_CAPABILITY"}}}
+      },
+      "IntegrationError": {
+        "description": "统一错误结构，依据HTTP状态和error.code处理。可能代码：400 invalid_request/unsupported_currency；401 invalid_partner_secret/invalid_subscription_key；403 account_disabled；404 plan_not_found/order_not_found/subscription_not_found/subscription_key_not_found；409 subscription_key_not_ready/credential_unavailable/idempotency_conflict/subscription_key_changed；429 rate_limited；503 payment_unavailable/subscription_key_unavailable；500 server_error。各接口只返回其适用代码，message不作为稳定枚举。",
+        "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}, "Retry-After": {"$ref": "#/components/headers/RetryAfter"}},
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/APIError"}}}
+      }
+    },
+    "schemas": {
+      "SubscriptionKey": {"type": "string", "minLength": 68, "maxLength": 68, "pattern": "^sub_[0-9a-f]{64}$", "description": "高敏查询Key；不能用于模型调用，禁止URL/日志/公共缓存传输"},
+      "QuotaAmount": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$", "maxLength": 19, "description": "精确非负int64十进制字符串，实际最大9223372036854775807；不要转JavaScript Number", "example": "9007199254740993"},
+      "CreateOrderRequest": {
+        "type": "object", "additionalProperties": false, "required": ["plan_id", "payment_method"],
+        "properties": {
+          "plan_id": {"type": "integer", "format": "int64", "minimum": 1, "description": "本商户可支付套餐；续费必须等于原套餐", "example": 42},
+          "payment_method": {"type": "string", "minLength": 1, "maxLength": 16, "description": "服务端最长16字节；平台当前启用的Epay方法，示例alipay不代表已启用，不固定枚举", "example": "alipay"}
+        }
+      },
+      "RotateKeyRequest": {
+        "type": "object", "additionalProperties": false, "required": ["expected_version"],
+        "properties": {"expected_version": {"type": "integer", "format": "int64", "minimum": 1, "description": "当前key_version；落后冲突，最大int64不可继续轮换", "example": 1}}
+      },
+      "Plan": {
+        "type": "object", "additionalProperties": true,
+        "description": "原完整SubscriptionPlan的常用字段投影说明，实际可含更多非秘密配置字段。目录total_amount保持number，未改成新字符串协议。",
+        "required": ["id", "title", "price_amount", "currency", "total_amount", "enabled"],
+        "properties": {
+          "id": {"type": "integer", "format": "int64"},
+          "partner_tenant_id": {"type": "integer", "format": "int64"},
+          "title": {"type": "string"},
+          "subtitle": {"type": "string"},
+          "price_amount": {"type": "number", "format": "double", "description": "原数字价格，应付金额以订单冻结amount为准"},
+          "currency": {"type": "string", "description": "目录原币种；历史非CNY仍可能列出但不可走本Epay支付，不自动换算"},
+          "duration_unit": {"type": "string"},
+          "duration_value": {"type": "integer"},
+          "total_amount": {"type": "integer", "format": "int64", "description": "原有数字协议，0表示不限量；大值需无损解析"},
+          "quota_reset_period": {"type": "string"},
+          "requests_per_minute": {"type": "integer"},
+          "enabled": {"type": "boolean"}
+        }
+      },
+      "PlansResponse": {"type": "object", "additionalProperties": false, "required": ["plans"], "properties": {"plans": {"type": "array", "items": {"$ref": "#/components/schemas/Plan"}}}},
+      "OrderBase": {
+        "type": "object",
+        "description": "新模式商户安全订单公共字段，无external_user_id/内部账户/长期Key/QR/直接网关链接。",
+        "required": ["order_no", "plan_id", "plan_title", "amount", "currency", "payment_method", "payment_status", "fulfillment_status", "created_at", "expires_at"],
+        "properties": {
+          "order_no": {"type": "string", "pattern": "^PTO[A-Za-z0-9]{32}$"},
+          "plan_id": {"type": "integer", "format": "int64", "minimum": 1},
+          "plan_title": {"type": "string", "description": "订单创建时套餐名称快照"},
+          "amount": {"type": "string", "pattern": "^[0-9]+\\.[0-9]{2}$", "description": "精确CNY金额，服务器冻结，以分保存", "example": "9.99"},
+          "currency": {"type": "string", "enum": ["CNY"]},
+          "payment_method": {"type": "string"},
+          "payment_status": {"type": "string", "enum": ["pending", "paid", "failed", "expired"], "description": "expired是未付超时投影，不代表网关已取消；failed是协议保留状态"},
+          "fulfillment_status": {"type": "string", "enum": ["not_ready", "pending", "fulfilled", "failed_retryable"], "description": "paid且fulfilled才可领钥；paid未交付不能重复收款"},
+          "created_at": {"type": "integer", "format": "int64", "description": "Unix秒"},
+          "expires_at": {"type": "integer", "format": "int64", "description": "初始收银台deadline，创建+30分钟；原意图重放不延长"},
+          "subscription_id": {"type": "integer", "format": "int64", "minimum": 1, "description": "实际交付关联存在时出现，未交付省略"}
+        }
+      },
+      "OrderStatus": {"allOf": [{"$ref": "#/components/schemas/OrderBase"}], "description": "只读GET返回，无checkout_url；不准备支付、不补发。"},
+      "CreatedOrderResponse": {
+        "allOf": [
+          {"$ref": "#/components/schemas/OrderBase"},
+          {"type": "object", "required": ["checkout_url"], "properties": {"checkout_url": {"type": "string", "format": "uri", "description": "已有平台统一收银台URL，fragment含短期pc_；不可缓存/日志/分析，勿改成pt_/sub_"}}}
+        ]
+      },
+      "ClaimKeyResponse": {
+        "type": "object", "additionalProperties": false, "required": ["order_no", "subscription_id", "subscription_key", "key_version"],
+        "properties": {
+          "order_no": {"type": "string", "pattern": "^PTO[A-Za-z0-9]{32}$"},
+          "subscription_id": {"type": "integer", "format": "int64", "minimum": 1},
+          "subscription_key": {"$ref": "#/components/schemas/SubscriptionKey"},
+          "key_version": {"type": "integer", "format": "int64", "minimum": 1, "description": "当前版本，用于显式重置"}
+        }
+      },
+      "RotateKeyResponse": {
+        "type": "object", "additionalProperties": false, "required": ["subscription_id", "subscription_key", "key_version"],
+        "properties": {
+          "subscription_id": {"type": "integer", "format": "int64", "minimum": 1},
+          "subscription_key": {"$ref": "#/components/schemas/SubscriptionKey"},
+          "key_version": {"type": "integer", "format": "int64", "minimum": 1}
+        }
+      },
+      "SubscriptionInfo": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "plan_id", "plan_title", "status", "start_time", "end_time", "requests_per_minute"],
+        "properties": {
+          "id": {"type": "integer", "format": "int64", "minimum": 1},
+          "plan_id": {"type": "integer", "format": "int64", "minimum": 1},
+          "plan_title": {"type": "string", "description": "当前关联套餐名称"},
+          "status": {"type": "string", "enum": ["active", "expired", "cancelled"]},
+          "start_time": {"type": "integer", "format": "int64", "description": "Unix秒"},
+          "end_time": {"type": "integer", "format": "int64", "description": "Unix秒，未来有效期不是永久授权"},
+          "requests_per_minute": {"type": "integer", "description": "套餐当前RPM，系统/分组限制仍适用"}
+        }
+      },
+      "QuotaInfo": {
+        "type": "object", "additionalProperties": false,
+        "required": ["quota_total", "quota_used", "quota_remaining", "quota_unlimited", "quota_usable", "next_reset_time"],
+        "properties": {
+          "quota_total": {"$ref": "#/components/schemas/QuotaAmount"},
+          "quota_used": {"$ref": "#/components/schemas/QuotaAmount"},
+          "quota_remaining": {"$ref": "#/components/schemas/QuotaAmount"},
+          "quota_unlimited": {"type": "boolean", "description": "total为字符串0时true，此时remaining=0不代表耗尽"},
+          "quota_usable": {"type": "boolean", "description": "订阅当前有效且有余额，或不限量；终态false"},
+          "next_reset_time": {"type": "integer", "format": "int64", "description": "Unix秒或0；终态保留值不表示将发生新周期"},
+          "historical_quota_remaining": {"$ref": "#/components/schemas/QuotaAmount"}
+        },
+        "description": "额度全部为精确非负int64十进制字符串。活跃处理现有周期重置；过期/取消不重置，remaining=0、usable=false，另返回不可消费的历史remaining。"
+      },
+      "IndependentSubscription": {
+        "type": "object", "additionalProperties": false, "required": ["subscription", "quota"],
+        "properties": {
+          "subscription": {"$ref": "#/components/schemas/SubscriptionInfo"},
+          "quota": {"$ref": "#/components/schemas/QuotaInfo"},
+          "api_key": {"type": "string", "description": "关联订阅有效且凭证正常时返回的真实sk-模型Key；过期/取消字段完全省略。活跃但额度耗尽仍可能返回Key，不承诺能消费。"}
+        }
+      },
+      "APIError": {
+        "type": "object", "additionalProperties": false, "required": ["error", "request_id"],
+        "properties": {
+          "error": {"type": "object", "additionalProperties": false, "required": ["code", "message"], "properties": {"code": {"type": "string", "description": "稳定机器错误码，按接口适用范围返回"}, "message": {"type": "string", "description": "人类可读文案，不作为稳定枚举"}}},
+          "request_id": {"type": "string", "description": "排障请求ID，与X-Request-Id对应"}
+        }
+      }
+    }
+  }
+}

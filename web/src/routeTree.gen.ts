@@ -36,6 +36,7 @@ import { Route as AboutIndexRouteImport } from './routes/about/index'
 import { Route as DesktopConnectRouteImport } from './routes/desktop/connect'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as PartnerCheckoutRouteImport } from './routes/partner/checkout'
+import { Route as PartnerPurchaseRouteImport } from './routes/partner/purchase'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
@@ -219,6 +220,11 @@ const OauthProviderRoute = OauthProviderRouteImport.update({
 const PartnerCheckoutRoute = PartnerCheckoutRouteImport.update({
   id: '/partner/checkout',
   path: '/partner/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerPurchaseRoute = PartnerPurchaseRouteImport.update({
+  id: '/partner/purchase',
+  path: '/partner/purchase',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingIndexRoute = PricingIndexRouteImport.update({
@@ -531,6 +537,7 @@ export interface FileRoutesByFullPath {
   '/desktop/connect': typeof DesktopConnectRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/partner/checkout': typeof PartnerCheckoutRoute
+  '/partner/purchase': typeof PartnerPurchaseRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -606,6 +613,7 @@ export interface FileRoutesByTo {
   '/desktop/connect': typeof DesktopConnectRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/partner/checkout': typeof PartnerCheckoutRoute
+  '/partner/purchase': typeof PartnerPurchaseRoute
   '/about': typeof AboutIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
@@ -685,6 +693,7 @@ export interface FileRoutesById {
   '/desktop/connect': typeof DesktopConnectRoute
   '/oauth/$provider': typeof OauthProviderRoute
   '/partner/checkout': typeof PartnerCheckoutRoute
+  '/partner/purchase': typeof PartnerPurchaseRoute
   '/about/': typeof AboutIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -763,6 +772,7 @@ export interface FileRouteTypes {
     | '/desktop/connect'
     | '/oauth/$provider'
     | '/partner/checkout'
+    | '/partner/purchase'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -838,6 +848,7 @@ export interface FileRouteTypes {
     | '/desktop/connect'
     | '/oauth/$provider'
     | '/partner/checkout'
+    | '/partner/purchase'
     | '/about'
     | '/pricing'
     | '/rankings'
@@ -916,6 +927,7 @@ export interface FileRouteTypes {
     | '/desktop/connect'
     | '/oauth/$provider'
     | '/partner/checkout'
+    | '/partner/purchase'
     | '/about/'
     | '/pricing/'
     | '/rankings/'
@@ -984,6 +996,7 @@ export interface RootRouteChildren {
   DesktopConnectRoute: typeof DesktopConnectRoute
   OauthProviderRoute: typeof OauthProviderRoute
   PartnerCheckoutRoute: typeof PartnerCheckoutRoute
+  PartnerPurchaseRoute: typeof PartnerPurchaseRoute
   AboutIndexRoute: typeof AboutIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
@@ -1180,6 +1193,13 @@ declare module '@tanstack/react-router' {
       path: '/partner/checkout'
       fullPath: '/partner/checkout'
       preLoaderRoute: typeof PartnerCheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner/purchase': {
+      id: '/partner/purchase'
+      path: '/partner/purchase'
+      fullPath: '/partner/purchase'
+      preLoaderRoute: typeof PartnerPurchaseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing/': {
@@ -1710,6 +1730,7 @@ const rootRouteChildren: RootRouteChildren = {
   DesktopConnectRoute: DesktopConnectRoute,
   OauthProviderRoute: OauthProviderRoute,
   PartnerCheckoutRoute: PartnerCheckoutRoute,
+  PartnerPurchaseRoute: PartnerPurchaseRoute,
   AboutIndexRoute: AboutIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,

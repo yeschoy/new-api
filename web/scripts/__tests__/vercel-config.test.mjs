@@ -26,6 +26,58 @@ for (const root of roots) {
     )
     assert.equal(result.status, 0, result.stderr)
     const config = JSON.parse(result.stdout)
+    const privacy = config.headers.find((rule) =>
+      rule.source.startsWith('/:partnerDocument(')
+    )
+    assert.ok(
+      privacy,
+      'shared generator must emit partner HTML privacy headers'
+    )
+    const matcher = new RegExp(
+      `^/${privacy.source.slice('/:partnerDocument('.length, -1)}$`
+    )
+    for (const path of [
+      '/partner/checkout',
+      '/partner/checkout/',
+      '/partner/%63heckout',
+      '/%70artner/checkout',
+      '/partner%2Fcheckout',
+      '/partner/%63heckout%2f',
+      '/partner/purchase',
+      '/partner/purchase/',
+      '/partner/%70urchase',
+      '/%70artner/purchase',
+      '/partner%2fpurchase',
+      '/partner/%70urchase%2F',
+    ]) {
+      assert.ok(matcher.test(path), `private HTML alias: ${path}`)
+    }
+    for (const path of [
+      '/',
+      '/sign-in',
+      '/partner/checkout-other',
+      '/partner/purchase-other',
+      '/partner/purchase/child',
+      '/partner/%2570urchase',
+      '/partner/%2563heckout',
+      '/partner/%',
+      '/partner/%FFpurchase',
+    ]) {
+      assert.equal(matcher.test(path), false, `ordinary HTML: ${path}`)
+    }
+    for (const [key, value] of [
+      ['Cache-Control', 'private, no-store'],
+      ['Referrer-Policy', 'no-referrer'],
+      ['X-Frame-Options', 'DENY'],
+      ['Content-Security-Policy', "frame-ancestors 'none'"],
+    ]) {
+      assert.ok(
+        privacy.headers.some(
+          (header) => header.key === key && header.value === value
+        )
+      )
+    }
+
     for (const prefix of ['api', 'pg', 'v1', 'mj']) {
       const index = config.rewrites.findIndex(
         (route) => route.source === `/${prefix}/:path*`

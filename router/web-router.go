@@ -22,26 +22,31 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 	frontendFS := common.EmbedFolder(assets.BuildFS, "web/dist")
 	router.GET("/oauth/handoff", middleware.RouteTag("web"), controller.DomainOAuthHandoffBridge)
 	router.GET("/partner-authorize", middleware.RouteTag("web"), controller.ServePartnerAuthorizePage(assets.IndexPage))
-	// The cashier capability lives in the fragment, but the HTML must also
-	// avoid caches/referrers and must never be embedded by another origin.
-	cashierHTML := func(c *gin.Context) {
-		c.Header("Referrer-Policy", "no-referrer")
-		c.Header("X-Frame-Options", "DENY")
-		c.Header("Content-Security-Policy", "frame-ancestors 'none'")
-		// Gin routes on decoded URL.Path. Never serve cashier HTML under an
-		// encoded alias whose browser pathname differs from the canonical route.
-		if c.Request.URL.EscapedPath() != "/partner/checkout" {
-			destination := "/partner/checkout"
-			if c.Request.URL.RawQuery != "" {
-				destination += "?" + c.Request.URL.RawQuery
+	// Purchase and cashier capabilities live in fragments. Both HTML surfaces
+	// avoid caches/referrers and remain standalone (never iframe-embeddable).
+	partnerPublicHTML := func(canonical string) gin.HandlerFunc {
+		return func(c *gin.Context) {
+			c.Header("Referrer-Policy", "no-referrer")
+			c.Header("X-Frame-Options", "DENY")
+			c.Header("Content-Security-Policy", "frame-ancestors 'none'")
+			// Gin routes on decoded URL.Path; canonicalize only these exact,
+			// once-decoded paths, not double-encoded or lookalike aliases.
+			if c.Request.URL.EscapedPath() != canonical {
+				destination := canonical
+				if c.Request.URL.RawQuery != "" {
+					destination += "?" + c.Request.URL.RawQuery
+				}
+				c.Redirect(http.StatusMovedPermanently, destination)
+				return
 			}
-			c.Redirect(http.StatusMovedPermanently, destination)
-			return
+			c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
 		}
-		c.Data(http.StatusOK, "text/html; charset=utf-8", assets.IndexPage)
 	}
-	router.GET("/partner/checkout", middleware.RouteTag("web"), middleware.DisableCache(), cashierHTML)
-	router.GET("/partner/checkout/", middleware.RouteTag("web"), middleware.DisableCache(), cashierHTML)
+	for _, path := range []string{"/partner/checkout", "/partner/purchase"} {
+		handler := partnerPublicHTML(path)
+		router.GET(path, middleware.RouteTag("web"), middleware.DisableCache(), handler)
+		router.GET(path+"/", middleware.RouteTag("web"), middleware.DisableCache(), handler)
+	}
 	compress := gzip.Gzip(gzip.DefaultCompression)
 	router.GET("/desktop/connect", middleware.RouteTag("web"), middleware.DisableCache(), func(c *gin.Context) {
 		controller.ServeDesktopConnectSPA(c, assets.IndexPage)

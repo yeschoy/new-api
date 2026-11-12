@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	PartnerTenantStatusEnabled  = 1
-	PartnerTenantStatusDisabled = 2
+	PartnerTenantStatusEnabled           = 1
+	PartnerTenantStatusDisabled          = 2
+	PartnerTenantIdentityExternal        = "external"
+	PartnerTenantIdentitySubscriptionKey = "subscription_key"
 )
 
 var ErrPartnerTenantNotFound = errors.New("partner tenant not found")
@@ -43,6 +45,8 @@ type PartnerTenant struct {
 func (PartnerTenant) TableName() string { return "partner_tenants" }
 
 type PartnerTenantAccount struct {
+	IdentitySource     string `json:"-" gorm:"type:varchar(24);not null;default:external"`
+	SourceOrderId      *int64 `json:"-" gorm:"uniqueIndex:idx_pt_account_source_order"`
 	Id                 int64  `json:"id" gorm:"primaryKey"`
 	TenantId           int64  `json:"tenant_id" gorm:"not null;uniqueIndex:idx_pt_account_external_hash,priority:1"`
 	ExternalUserId     string `json:"external_user_id" gorm:"type:varchar(128);not null"`
@@ -271,60 +275,11 @@ func provisionPartnerTenantAccountTx(tx *gorm.DB, tenant *PartnerTenant, externa
 			return nil
 		}
 
-		usernameSuffix, err := common.GenerateRandomCharsKey(12)
-		if err != nil {
-			return err
-		}
-		rawPassword, err := common.GenerateRandomCharsKey(48)
-		if err != nil {
-			return err
-		}
-		password, err := common.HashAccountPassword(rawPassword)
-		if err != nil {
-			return err
-		}
-		affCode, err := common.GenerateRandomCharsKey(12)
-		if err != nil {
-			return err
-		}
 		if displayName == "" {
 			displayName = externalUserId
 		}
-		if runes := []rune(displayName); len(runes) > 20 {
-			displayName = string(runes[:20])
-		}
-		user := &User{
-			Username:    "p_" + usernameSuffix,
-			Password:    password,
-			DisplayName: displayName,
-			Role:        common.RoleCommonUser,
-			Status:      common.UserStatusEnabled,
-			Group:       tenant.Group,
-			Quota:       0,
-			UsedQuota:   0,
-			AffCode:     affCode,
-			AuthVersion: 1,
-		}
-		if err := tx.Create(user).Error; err != nil {
-			return err
-		}
-		apiKey, err := common.GenerateKey()
+		user, token, err := createPartnerTenantUserTokenTx(tx, tenant, displayName)
 		if err != nil {
-			return err
-		}
-		now := common.GetTimestamp()
-		token := &Token{
-			UserId:         user.Id,
-			Key:            apiKey,
-			Status:         common.TokenStatusEnabled,
-			Name:           tenant.Name + " subscription account",
-			CreatedTime:    now,
-			AccessedTime:   now,
-			ExpiredTime:    -1,
-			UnlimitedQuota: true,
-			Group:          tenant.Group,
-		}
-		if err := tx.Create(token).Error; err != nil {
 			return err
 		}
 		account = PartnerTenantAccount{
@@ -337,7 +292,7 @@ func provisionPartnerTenantAccountTx(tx *gorm.DB, tenant *PartnerTenant, externa
 		if err := CreatePartnerTenantAccountWithTx(tx, &account); err != nil {
 			return err
 		}
-		result.APIKey = "sk-" + apiKey
+		result.APIKey = "sk-" + token.Key
 		result.Created = true
 		accountUserID = user.Id
 		return nil
@@ -347,6 +302,10 @@ func provisionPartnerTenantAccountTx(tx *gorm.DB, tenant *PartnerTenant, externa
 
 // A broken mapping is never repaired by issuing a new credential.
 func validatePartnerTenantAccountTx(tx *gorm.DB, tenant *PartnerTenant, account *PartnerTenantAccount) (*Token, error) {
+	return validatePartnerTenantAccountClockTx(tx, tenant, account, false)
+}
+
+func validatePartnerTenantAccountClockTx(tx *gorm.DB, tenant *PartnerTenant, account *PartnerTenantAccount, strict bool) (*Token, error) {
 	if account.Status != PartnerTenantStatusEnabled {
 		return nil, ErrPartnerTenantAccountDisabled
 	}
@@ -367,7 +326,17 @@ func validatePartnerTenantAccountTx(tx *gorm.DB, tenant *PartnerTenant, account 
 		}
 		return nil, err
 	}
-	if token.Status != common.TokenStatusEnabled || token.Key == "" || token.Group != tenant.Group || (token.ExpiredTime != -1 && token.ExpiredTime <= getDBTimestampOn(tx)) {
+	now := int64(0)
+	if strict {
+		var err error
+		now, err = getDBTimestampOnStrict(tx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		now = getDBTimestampOn(tx)
+	}
+	if token.Status != common.TokenStatusEnabled || token.Key == "" || token.Group != tenant.Group || (token.ExpiredTime != -1 && token.ExpiredTime <= now) {
 		return nil, ErrPartnerTenantCredentialUnavailable
 	}
 	return &token, nil
@@ -383,6 +352,7 @@ func CreatePartnerTenantAccountWithTx(tx *gorm.DB, account *PartnerTenantAccount
 	now := common.GetTimestamp()
 	account.CreatedAt = now
 	account.UpdatedAt = now
+	account.IdentitySource = PartnerTenantIdentityExternal
 	account.ExternalUserIdHash = partnerTenantHash(account.ExternalUserId)
 	return tx.Create(account).Error
 }
@@ -390,10 +360,13 @@ func CreatePartnerTenantAccountWithTx(tx *gorm.DB, account *PartnerTenantAccount
 // Tenant and account locks serialize delivery of different orders for the same
 // account. Extending the term does not add quota to its current reset period.
 func grantPartnerTenantSubscriptionTx(tx *gorm.DB, userID int, plan *SubscriptionPlan, renewalID int) (*UserSubscription, bool, error) {
+	return grantPartnerTenantSubscriptionAtTx(tx, userID, plan, renewalID, getDBTimestampOn(tx))
+}
+
+func grantPartnerTenantSubscriptionAtTx(tx *gorm.DB, userID int, plan *SubscriptionPlan, renewalID int, now int64) (*UserSubscription, bool, error) {
 	var subscription *UserSubscription
 	var created bool
 	err := func() error {
-		now := getDBTimestampOn(tx)
 		var activeSubscription UserSubscription
 		query := lockForUpdate(tx).Where("user_id = ? AND plan_id = ?", userID, plan.Id)
 		if renewalID > 0 {
@@ -444,7 +417,7 @@ func grantPartnerTenantSubscriptionTx(tx *gorm.DB, userID int, plan *Subscriptio
 				return err
 			}
 		} else {
-			newSubscription, createErr := CreateUserSubscriptionFromPlanTx(tx, userID, plan, SubscriptionSourcePartner)
+			newSubscription, createErr := createUserSubscriptionFromPlanAtTx(tx, userID, plan, SubscriptionSourcePartner, now)
 			if createErr != nil {
 				return createErr
 			}
@@ -458,4 +431,63 @@ func grantPartnerTenantSubscriptionTx(tx *gorm.DB, userID int, plan *Subscriptio
 		return nil, false, err
 	}
 	return subscription, created, nil
+}
+
+// Shared creation primitive: caller owns transaction and publishes membership only after commit.
+func createPartnerTenantUserTokenTx(tx *gorm.DB, tenant *PartnerTenant, displayName string) (*User, *Token, error) {
+	tx = partnerTenantSecretDB(tx)
+	usernameSuffix, err := common.GenerateRandomCharsKey(12)
+	if err != nil {
+		return nil, nil, err
+	}
+	rawPassword, err := common.GenerateRandomCharsKey(48)
+	if err != nil {
+		return nil, nil, err
+	}
+	password, err := common.HashAccountPassword(rawPassword)
+	if err != nil {
+		return nil, nil, err
+	}
+	affCode, err := common.GenerateRandomCharsKey(12)
+	if err != nil {
+		return nil, nil, err
+	}
+	if runes := []rune(displayName); len(runes) > 20 {
+		displayName = string(runes[:20])
+	}
+	user := &User{
+		Username:    "p_" + usernameSuffix,
+		Password:    password,
+		DisplayName: displayName,
+		Role:        common.RoleCommonUser,
+		Status:      common.UserStatusEnabled,
+		Group:       tenant.Group,
+		Quota:       0,
+		UsedQuota:   0,
+		AffCode:     affCode,
+		AuthVersion: 1,
+	}
+	if err := tx.Create(user).Error; err != nil {
+		return nil, nil, err
+	}
+	apiKey, err := common.GenerateKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	now := common.GetTimestamp()
+	token := &Token{
+		UserId:         user.Id,
+		Key:            apiKey,
+		Status:         common.TokenStatusEnabled,
+		Name:           tenant.Name + " subscription account",
+		CreatedTime:    now,
+		AccessedTime:   now,
+		ExpiredTime:    -1,
+		UnlimitedQuota: true,
+		Group:          tenant.Group,
+	}
+	if err := tx.Create(token).Error; err != nil {
+		return nil, nil, err
+	}
+	return user, token, nil
 }

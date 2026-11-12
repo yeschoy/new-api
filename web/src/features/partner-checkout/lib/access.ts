@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { partnerPublicSurface } from '@/features/partner-purchase/lib/surface'
+
 const STORAGE_PREFIX = 'partner-checkout:v1:'
 const MAX_ACCESS_MS = 30 * 60 * 1000
 const TOKEN_PATTERN = /^pc_[a-f0-9]{64}$/
@@ -32,13 +34,7 @@ export interface CashierAccess {
 let memoryAccess: CashierAccess | null = null
 
 export function isPartnerCheckoutPath(pathname: string): boolean {
-  // Match Go's single path decode; keep the pre-bundle policy in index.html aligned.
-  try {
-    const decoded = decodeURIComponent(pathname)
-    return decoded === '/partner/checkout' || decoded === '/partner/checkout/'
-  } catch {
-    return false
-  }
+  return partnerPublicSurface(pathname) === 'checkout'
 }
 
 export function forgetCashierAccess(orderNo: string): void {

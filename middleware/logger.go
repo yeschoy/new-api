@@ -36,7 +36,10 @@ func SetUpLogger(server *gin.Engine) {
 			strings.HasPrefix(path, "/oauth/") ||
 			strings.HasPrefix(path, "/api/partner-oauth/") ||
 			strings.HasPrefix(path, "/partner-authorize") ||
-			strings.HasPrefix(path, "/sign-in") {
+			strings.HasPrefix(path, "/sign-in") ||
+			strings.HasPrefix(path, "/api/partner/subscription") ||
+			strings.HasPrefix(path, "/api/partner/v1/subscription-key-orders") ||
+			strings.HasPrefix(path, "/api/partner/v1/subscriptions/") {
 			path, _, _ = strings.Cut(path, "?")
 		}
 		return fmt.Sprintf("[GIN] %s | %s | %s | %3d | %13v | %15s | %7s %s\n",

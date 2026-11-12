@@ -1,3 +1,17 @@
+// One URL-path decode, matching Go and the early document classifier. Cover
+// raw and percent-encoded letters/separators without affecting ordinary pages.
+const encodedLiteral = (text) =>
+  [...text]
+    .map((character) => {
+      const hex = character
+        .charCodeAt(0)
+        .toString(16)
+        .replaceAll(/[a-f]/g, (letter) => `[${letter}${letter.toUpperCase()}]`)
+      return `(?:${character}|%${hex})`
+    })
+    .join('')
+export const partnerDocumentSource = `/:partnerDocument(${encodedLiteral('partner')}(?:/|%2[fF])(?:${encodedLiteral('checkout')}|${encodedLiteral('purchase')})(?:/|%2[fF])?)`
+
 /** Build-time configuration shared by the supported Vercel project roots. */
 export function createVercelConfig(commands) {
   const rawTarget = process.env.VITE_REACT_APP_SERVER_URL?.trim()
@@ -29,12 +43,23 @@ export function createVercelConfig(commands) {
       })),
       { source: '/(.*)', destination: '/index.html' },
     ],
-    headers: prefixes.map((prefix) => ({
-      source: `/${prefix}/:path*`,
-      headers: [
-        { key: 'x-vercel-enable-rewrite-caching', value: '0' },
-        { key: 'Cache-Control', value: 'private, no-store' },
-      ],
-    })),
+    headers: [
+      ...prefixes.map((prefix) => ({
+        source: `/${prefix}/:path*`,
+        headers: [
+          { key: 'x-vercel-enable-rewrite-caching', value: '0' },
+          { key: 'Cache-Control', value: 'private, no-store' },
+        ],
+      })),
+      {
+        source: partnerDocumentSource,
+        headers: [
+          { key: 'Cache-Control', value: 'private, no-store' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+        ],
+      },
+    ],
   }
 }

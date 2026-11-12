@@ -9,6 +9,7 @@ import (
 func SetPartnerTenantRouter(router *gin.Engine) {
 	partner := router.Group("/api/partner/v1")
 	partner.Use(
+		controller.PartnerTenantSubscriptionKeyRequestPolicy(),
 		middleware.RouteTag("api"),
 		middleware.PartnerOAuthRequestID(),
 		middleware.PartnerOAuthNoStore(),
@@ -16,12 +17,29 @@ func SetPartnerTenantRouter(router *gin.Engine) {
 		middleware.PartnerTenantBearer(),
 	)
 	{
+		partner.POST("/subscription-key-orders", controller.PartnerTenantCreateSubscriptionKeyOrder)
+		partner.GET("/subscription-key-orders/:order_no", controller.PartnerTenantGetSubscriptionKeyOrder)
+		partner.GET("/subscription-key-orders/:order_no/subscription-key", controller.PartnerTenantClaimSubscriptionKey)
+		partner.POST("/subscriptions/:subscription_id/key/rotate", controller.PartnerTenantRotateSubscriptionKey)
 		partner.GET("/plans", controller.PartnerTenantListPlans)
+		partner.POST("/purchase-sessions", controller.PartnerTenantCreatePurchaseSession)
+		partner.GET("/purchase-sessions/:session_id", controller.PartnerTenantGetPurchaseSession)
 		partner.PUT("/accounts", controller.PartnerTenantProvisionAccount)
 		partner.POST("/subscription-orders", controller.PartnerTenantCreateSubscriptionOrder)
 		partner.GET("/subscription-orders/:order_no", controller.PartnerTenantGetSubscriptionOrder)
 		partner.GET("/accounts/:external_user_id/subscription/quota", controller.PartnerTenantSubscriptionQuota)
 	}
+	independent := router.Group("/api/partner/subscription")
+	independent.Use(controller.PartnerTenantSubscriptionKeyRequestPolicy(), middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), middleware.PartnerOAuthRateLimit("PT-SUBSCRIPTION", 120, 60, "integration"))
+	independent.GET("", controller.PartnerTenantIndependentSubscription)
+	purchase := router.Group("/api/partner/purchase-sessions")
+	purchase.Use(middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), func(c *gin.Context) {
+		c.Header("Referrer-Policy", "no-referrer")
+		c.Next()
+	}, middleware.PartnerOAuthRateLimit("PT-PURCHASE", 120, 60, "integration"))
+	purchase.POST("/:session_id/exchange", controller.PartnerTenantExchangePurchaseSession)
+	purchase.GET("/:session_id", controller.PartnerTenantPublicPurchaseSession)
+	purchase.POST("/:session_id/orders", controller.PartnerTenantPurchaseSessionCreateOrder)
 	cashier := router.Group("/api/partner/checkout")
 	cashier.Use(middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), middleware.PartnerOAuthRateLimit("PT-CASHIER", 120, 60, "integration"))
 	cashier.GET("/:order_no", controller.PartnerTenantCashier)

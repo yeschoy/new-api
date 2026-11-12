@@ -98,4 +98,55 @@ describe('cashier main bootstrap isolation', () => {
     expect(observers.readCachedStatus).toHaveBeenCalledTimes(1)
     expect(observers.ensureQueryData).toHaveBeenCalledTimes(1)
   })
+  it.each([
+    '/partner/purchase',
+    '/partner/purchase/',
+    '/partner/%70urchase',
+    '/%70artner/purchase',
+    '/partner%2Fpurchase',
+    '/partner/%70urchase%2f',
+  ])(
+    'scrubs hosted purchase %s before router without cache/status/branding',
+    async (pathname) => {
+      const sessionId = `PPS${'s'.repeat(32)}`
+      const launch = `pl_${'a'.repeat(64)}`
+      window.history.replaceState(
+        null,
+        '',
+        `${pathname}?session_id=${sessionId}#launch=${launch}`
+      )
+      observers.createRouter.mockImplementationOnce(() => {
+        expect(window.location.pathname).toBe('/partner/purchase')
+        expect(window.location.hash).toBe('')
+        return { navigate: vi.fn() }
+      })
+      await import('@/main')
+      expect(observers.createRouter).toHaveBeenCalledTimes(1)
+      expect(observers.initializeFrontendCache).not.toHaveBeenCalled()
+      expect(observers.readCachedStatus).not.toHaveBeenCalled()
+      expect(observers.ensureQueryData).not.toHaveBeenCalled()
+      const staged = JSON.parse(
+        sessionStorage.getItem(`partner-purchase:v1:${sessionId}`) || '{}'
+      )
+      expect(staged.launchCode).toBe(launch)
+      expect(staged.nonce).toMatch(/^[a-f0-9]{64}$/)
+    }
+  )
+
+  it.each([
+    '/partner/%2570urchase',
+    '/partner/purchase-other',
+    '/partner/%',
+    '/partner/%FFpurchase',
+    '/partner/purchase/child',
+    '/partner/%2563heckout',
+    '/partner/checkout-other',
+    '/sign-in',
+  ])('keeps ordinary bootstrap for negative path %s', async (pathname) => {
+    window.history.replaceState(null, '', pathname)
+    await import('@/main')
+    expect(observers.initializeFrontendCache).toHaveBeenCalledTimes(1)
+    expect(observers.readCachedStatus).toHaveBeenCalledTimes(1)
+    expect(observers.ensureQueryData).toHaveBeenCalledTimes(1)
+  })
 })

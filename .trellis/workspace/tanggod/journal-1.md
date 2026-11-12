@@ -357,3 +357,63 @@ Fixed the gallery regression: saved plans show one latest group row by default, 
 - Removed 36 recorded temporary files: local browser observations/screenshots, dev-server log, generated i18n reports, the external truncated build log, and `.iq-plan-visibility-temp-artifacts.md`; removed the two now-empty artifact/report directories.
 - Removed only the owned, unstarted `postgres:15` container `iq-plan-visibility-test` (`6dee1b00b4f5`); verified no matching container remains.
 - Preserved all Trellis logs, tracked translation tools, `web/dist/`, and the three pre-existing IQ artifact manifests. No production data or application code changed during cleanup.
+
+
+## Session 12: 商户订阅 Key：付款后开户与原 Key 续费
+<!-- trellis-session: v=2 fp=6980cf1759c52f95 -->
+
+**Date**: 2026-11-13
+**Task**: 商户订阅 Key：付款后开户与原 Key 续费
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+实现无 external_user_id 的商户 pt_ 下单并返回付款 URL；仅可信付款后原子创建真实 User/Token/账户/单订阅/sub_，支持商户领取、sub_ 独立查询精确额度/Coding Key、原 Key 续费复用用户和双 Key、到期历史及幂等轮换。显式隔离旧 external API/H5 并保留共享收银台/支付读取。必要 Docker PostgreSQL 15.19 定向测试 4 顶层+7模型子例全PASS，无skip；离线build/vet、gofmt、独立trellis-check及精确25路径提交核对通过。原daemon/缺Linux缓存/setup失败和30分钟代理超时保留，限定恢复补两已锁定模块后同源实测成功，go.mod/go.sum未变。归档至 .trellis/tasks/archive/2026-11/11-12-partner-subscription-access-key/，详见verification.md；未做生产/真实支付/部署/完整启动或无关全量。用户原中文guide、私钥及其他未跟踪内容保留未提交，任务Docker/导出/日志在TEMPORARY_ARTIFACTS.md登记，清理待单独授权；未push。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `58616beef` | feat(partner): add subscription access keys and paid-only provisioning |
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 13: 商户接入 Demo：并行审查、订单恢复修复与提交
+<!-- trellis-session: v=2 fp=57fc2831361717cf -->
+
+**Date**: 2026-11-13
+**Task**: 商户接入 Demo：并行审查、订单恢复修复与提交
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+完成精简接入指南与零依赖本机 Demo，三个全新上下文只读审查后修复两项 P1 订单串单问题；按用户要求提交并准备普通推送当前 feat/partner-accounts 分支。
+
+### Main Changes
+
+- 接入指南与完整 Demo 共9个文件精确提交；默认mock、live默认只读、凭证仅后端、固定用户归属及明确真实写入开关。
+- 页面展示与购买草稿解耦，仅create/replay绑定本意图订单；收银台链接绑定待付款订单，切换/编辑/终态清除并拦截旧查询；补入实际app.js的VM状态回归。
+- 用户管理源码核对：开户后内部用户可见并可查订阅；Tenant归属尚未接入现有Partner OAuth列，未扩展该功能。私钥、reports及临时清单保留不提交，不创建或归档其他任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `16c4acaa3` | docs(spec): preserve demo purchase intent and checkout isolation |
+| `1d3e4b324` | feat(partner): add integration demo with safe order recovery |
+
+### Testing
+
+- [OK] 原有服务端15例与页面状态回归合计28/28 PASS；新增回归先在旧实现中复现11项失败，再修复全通过。
+- [OK] 全部Demo JS语法、限定oxlint deny-warnings、暂存及新文件空白、文档链接、假凭证/私钥标记扫描与精确提交路径集合检查PASS。未访问生产或真实支付，未部署、安装依赖或清理。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- P2大整数额度展示精度仍待后续授权处理；真实浏览器/支付渠道验收及商户归属用户管理增强不在本次范围。

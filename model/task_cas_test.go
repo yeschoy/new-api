@@ -3,7 +3,9 @@ package model
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -17,6 +19,13 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	// The isolated subscription-key suite owns its PostgreSQL fixture. Do not
+	// initialize SQLite (or a shared schema) before that suite starts.
+	flag.Parse()
+	if os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "SubscriptionKey") {
+		os.Exit(m.Run())
+	}
+
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		panic("failed to open test db: " + err.Error())

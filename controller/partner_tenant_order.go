@@ -189,37 +189,43 @@ func PartnerTenantCreateSubscriptionOrder(c *gin.Context) {
 		writePartnerTenantAPIError(c, 400, "invalid_request", "Idempotency-Key must be 16-64 URL-safe characters")
 		return
 	}
-	// Replays of paid/expired/already-prepared orders do not depend on the
-	// availability switch for NEW purchases. They still require pt_ auth and
-	// the exact original body, and never create or grant anything.
-	prior, findErr := model.FindPartnerTenantOrderByIdempotency(tenant.Id, hash)
-	if findErr == nil {
-		if prior.RequestHash != model.PartnerTenantOrderRequestHash(req.ExternalUserId, req.PlanId, req.PaymentMethod) {
-			partnerTenantOrderError(c, model.ErrPartnerTenantIdempotencyConflict)
-			return
-		}
-		respondPartnerTenantCreatedOrder(c, prior, false)
-		return
-	}
-	if !errors.Is(findErr, model.ErrPartnerTenantOrderNotFound) {
-		partnerTenantOrderError(c, findErr)
-		return
-	}
-	// Validate server checkout configuration before inserting a new payable row.
-	if _, err := partnerTenantCheckoutURL(&model.PartnerTenantSubscriptionOrder{}); err != nil {
-		partnerTenantOrderError(c, err)
-		return
-	}
-	if !partnerEpayMethodAvailable(req.PaymentMethod) {
-		partnerTenantOrderError(c, model.ErrPartnerTenantOrderUnavailable)
-		return
-	}
-	order, created, err := model.CreatePartnerTenantSubscriptionOrder(model.PartnerTenantOrderInput{TenantId: tenant.Id, ExternalUserId: req.ExternalUserId, PlanId: req.PlanId, PaymentMethod: req.PaymentMethod, MerchantId: operation_setting.EpayId, IdempotencyHash: hash})
+	order, created, err := createOrReplayPartnerTenantOrder(model.PartnerTenantOrderInput{TenantId: tenant.Id, ExternalUserId: req.ExternalUserId, PlanId: req.PlanId, PaymentMethod: req.PaymentMethod, MerchantId: operation_setting.EpayId, IdempotencyHash: hash})
 	if err != nil {
 		partnerTenantOrderError(c, err)
 		return
 	}
 	respondPartnerTenantCreatedOrder(c, order, created)
+}
+
+// Merchant API replay stays ahead of NEW-payment checks. H5 uses its guarded
+// model entry instead: no prelookup may bypass transaction-time authorization.
+func createOrReplayPartnerTenantOrder(in model.PartnerTenantOrderInput) (*model.PartnerTenantSubscriptionOrder, bool, error) {
+	prior, findErr := model.FindPartnerTenantOrderByIdempotency(in.TenantId, in.IdempotencyHash)
+	if findErr == nil {
+		if prior.RequestHash != model.PartnerTenantOrderRequestHash(in.ExternalUserId, in.PlanId, in.PaymentMethod) {
+			return nil, false, model.ErrPartnerTenantIdempotencyConflict
+		}
+		return prior, false, nil
+	}
+	if !errors.Is(findErr, model.ErrPartnerTenantOrderNotFound) {
+		return nil, false, findErr
+	}
+	if err := validatePartnerTenantNewCheckout(in.PaymentMethod); err != nil {
+		return nil, false, err
+	}
+	return model.CreatePartnerTenantSubscriptionOrder(in)
+}
+
+// Local predicates only: safe to call after guarded replay lookup while holding
+// the order transaction's tenant lock. Actual gateway preparation stays outside.
+func validatePartnerTenantNewCheckout(method string) error {
+	if _, err := partnerTenantCheckoutURL(&model.PartnerTenantSubscriptionOrder{}); err != nil {
+		return err
+	}
+	if !partnerEpayMethodAvailable(method) {
+		return model.ErrPartnerTenantOrderUnavailable
+	}
+	return nil
 }
 
 func respondPartnerTenantCreatedOrder(c *gin.Context, order *model.PartnerTenantSubscriptionOrder, created bool) {
@@ -252,6 +258,9 @@ func PartnerTenantGetSubscriptionOrder(c *gin.Context) {
 		return
 	}
 	order, err := model.GetPartnerTenantSubscriptionOrder(tenant.Id, c.Param("order_no"))
+	if err == nil && order.EntryMode != model.PartnerTenantIdentityExternal {
+		err = model.ErrPartnerTenantOrderNotFound
+	}
 	if err != nil {
 		partnerTenantOrderError(c, err)
 		return
