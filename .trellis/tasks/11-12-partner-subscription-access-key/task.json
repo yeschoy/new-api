@@ -29,9 +29,9 @@
     "docs/partner-tenant-api.md",
     "docs/partner-tenant-integration.zh-CN.md"
   ],
-  "notes": "用户最新明确不传 external_user_id，已撤回旧买家身份依赖，需确认首次新购内部账户粒度与凭订阅 Key 续费定位。专属套餐 A、付款 URL、独立查询/续费沿用/到期历史/商户重置保持；仅必要 pq 测试，尚未实施。",
+  "notes": "不传 external_user_id 已确认；用户询问完全不新增 users，已取证可用独立订阅主体实现，但需鉴权/计费/RPM/日志适配，尚待正式选择；自动创建内部 User 同样未获同意。仅必要 pq 测试，尚未实施。",
   "meta": {
-    "planning_review": "identity_redesign_required",
+    "planning_review": "userless_subject_decision_pending",
     "test_policy": "targeted_necessary_postgresql_only"
   }
 }
