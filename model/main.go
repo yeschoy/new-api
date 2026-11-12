@@ -401,6 +401,8 @@ func migrateDB() error {
 		&PartnerTenantSubscriptionGrant{},
 		&PartnerTenantSubscriptionOrder{},
 		&PartnerTenantPurchaseSession{},
+		&PartnerTenantSubscriptionAccessKey{},
+		&PartnerTenantSubscriptionKeyRotation{},
 		&PartnerServerConfig{},
 		&PartnerServerSecret{},
 		&PartnerServerToken{},
@@ -411,7 +413,7 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
-	if err := migratePartnerTenantAccountIdentity(DB); err != nil {
+	if err := MigratePartnerTenantSubscriptionKeys(DB); err != nil {
 		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {

@@ -258,6 +258,9 @@ func PartnerTenantGetSubscriptionOrder(c *gin.Context) {
 		return
 	}
 	order, err := model.GetPartnerTenantSubscriptionOrder(tenant.Id, c.Param("order_no"))
+	if err == nil && order.EntryMode != model.PartnerTenantIdentityExternal {
+		err = model.ErrPartnerTenantOrderNotFound
+	}
 	if err != nil {
 		partnerTenantOrderError(c, err)
 		return

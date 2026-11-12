@@ -2,7 +2,7 @@
 
 ## 1. Scope / Trigger
 
-Read before changing pt_ Tenant account/key provisioning, subscription plan ownership/currency, order checkout/notification/fulfillment, the public partner cashier or Tenant model funding. This replaces the external Tenant direct-grant API; it does not replace Partner OAuth, pst_ PartnerServer wallet recharge or ordinary-user checkout. No legacy/new-mode switch exists. For the optional standalone selector before order creation, also read [Optional Hosted H5](partner-hosted-h5.md); API/H5 are coexisting entry choices, not legacy/direct-grant modes.
+Read before changing pt_ Tenant account/key provisioning, subscription plan ownership/currency, order checkout/notification/fulfillment, the public partner cashier or Tenant model funding. This replaces the external Tenant direct-grant API; it does not replace Partner OAuth, pst_ PartnerServer wallet recharge or ordinary-user checkout. The original external-buyer API/H5 do not use a tenant-wide mode switch. The separate user-ID-free `subscription_key` entry is documented in [Subscription Access Keys](partner-subscription-key.md); it preserves the original external contracts and shares mode-neutral internal payment reads. For the optional standalone selector before order creation, also read [Optional Hosted H5](partner-hosted-h5.md); API/H5 are coexisting entry choices, not legacy/direct-grant modes.
 
 ## 2. Signatures
 

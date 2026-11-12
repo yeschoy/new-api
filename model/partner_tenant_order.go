@@ -29,6 +29,8 @@ var (
 // This is deliberately separate from TopUp and ordinary SubscriptionOrder: no
 // wallet credit, cashback or ordinary-account settlement can run for this row.
 type PartnerTenantSubscriptionOrder struct {
+	EntryMode         string `gorm:"type:varchar(24);not null;default:external"`
+	AccountId         int64  `gorm:"not null;default:0"`
 	Id                int64  `gorm:"primaryKey"`
 	TenantId          int64  `gorm:"not null;uniqueIndex:idx_pt_order_request,priority:1;index:idx_pt_order_budget,priority:1"`
 	IdempotencyHash   string `gorm:"type:char(64);not null;uniqueIndex:idx_pt_order_request,priority:2"`
@@ -156,7 +158,7 @@ func CreatePartnerTenantSubscriptionOrder(in PartnerTenantOrderInput) (*PartnerT
 func createPartnerTenantSubscriptionOrderTx(tx *gorm.DB, tenant *PartnerTenant, in PartnerTenantOrderInput, validateNew func() error) (*PartnerTenantSubscriptionOrder, bool, error) {
 	requestHash := PartnerTenantOrderRequestHash(in.ExternalUserId, in.PlanId, in.PaymentMethod)
 	var order PartnerTenantSubscriptionOrder
-	prior := lockForUpdate(tx).Where("tenant_id = ? AND idempotency_hash = ?", in.TenantId, in.IdempotencyHash).Limit(1).Find(&order)
+	prior := lockForUpdate(tx).Where("tenant_id = ? AND entry_mode = ? AND idempotency_hash = ?", in.TenantId, PartnerTenantIdentityExternal, in.IdempotencyHash).Limit(1).Find(&order)
 	if prior.Error != nil {
 		return nil, false, prior.Error
 	}
@@ -208,7 +210,7 @@ func createPartnerTenantSubscriptionOrderTx(tx *gorm.DB, tenant *PartnerTenant, 
 	if err := base.Session(&gorm.Session{}).Where("created_at > ?", now-3600).Count(&tenantRecent).Error; err != nil {
 		return nil, false, err
 	}
-	own := tx.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ? AND external_user_hash = ?", tenant.Id, partnerTenantHash(in.ExternalUserId))
+	own := tx.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ? AND entry_mode = ? AND external_user_hash = ?", tenant.Id, PartnerTenantIdentityExternal, partnerTenantHash(in.ExternalUserId))
 	if err := own.Session(&gorm.Session{}).Where("created_at > ?", now-3600).Count(&recent).Error; err != nil {
 		return nil, false, err
 	}
@@ -266,7 +268,7 @@ func partnerTenantPurchaseIntentTx(tx *gorm.DB, tenant *PartnerTenant, account *
 	// cashier expiry. Do not sell the same limited slot twice. Replays reuse
 	// the original order; expiry alone cannot safely release a paid intent.
 	if err := tx.Model(&PartnerTenantSubscriptionOrder{}).
-		Where("tenant_id = ? AND external_user_hash = ? AND plan_id = ? AND renewal_subscription_id = 0", tenant.Id, partnerTenantHash(externalID), plan.Id).
+		Where("tenant_id = ? AND entry_mode = ? AND external_user_hash = ? AND plan_id = ? AND renewal_subscription_id = 0", tenant.Id, PartnerTenantIdentityExternal, partnerTenantHash(externalID), plan.Id).
 		Where("payment_status IN ? AND fulfillment_status <> ?", []string{"pending", "paid"}, "fulfilled").Count(&reserved).Error; err != nil {
 		return 0, err
 	}
@@ -278,7 +280,7 @@ func partnerTenantPurchaseIntentTx(tx *gorm.DB, tenant *PartnerTenant, account *
 
 func FindPartnerTenantOrderByIdempotency(tenantID int64, keyHash string) (*PartnerTenantSubscriptionOrder, error) {
 	var order PartnerTenantSubscriptionOrder
-	if err := DB.Where("tenant_id = ? AND idempotency_hash = ?", tenantID, keyHash).First(&order).Error; err != nil {
+	if err := DB.Where("tenant_id = ? AND entry_mode = ? AND idempotency_hash = ?", tenantID, PartnerTenantIdentityExternal, keyHash).First(&order).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPartnerTenantOrderNotFound
 		}
@@ -374,11 +376,26 @@ func FulfillPartnerTenantSubscriptionOrder(orderNo string) error {
 		if err := lockForUpdate(tx).First(&order, initial.Id).Error; err != nil {
 			return err
 		}
+		if order.TenantId != tenant.Id || order.OrderNo != orderNo {
+			return ErrPartnerTenantOrderNotFound
+		}
 		if order.PaymentStatus != "paid" {
 			return ErrPartnerTenantPaymentEvidence
 		}
 		if order.FulfillmentStatus == "fulfilled" {
+			if order.EntryMode == PartnerTenantIdentitySubscriptionKey {
+				_, err := lockPartnerTenantSubscriptionBindingTx(partnerTenantSecretDB(tx), &tenant, order.AccountId, order.SubscriptionId, "", false, nil)
+				return err
+			}
 			return nil
+		}
+		if order.EntryMode == PartnerTenantIdentitySubscriptionKey {
+			var err error
+			userID, err = fulfillPartnerTenantSubscriptionKeyOrderTx(tx, &tenant, &order)
+			return err
+		}
+		if order.EntryMode != PartnerTenantIdentityExternal {
+			return ErrPartnerTenantOrderNotFound
 		}
 		var plan, frozen SubscriptionPlan
 		if err := lockForUpdate(tx).First(&plan, order.PlanId).Error; err != nil {
@@ -441,21 +458,21 @@ func partnerTenantAccountQuery(tx *gorm.DB, tenantID int64, externalID string) *
 	case "sqlite":
 		exact = "external_user_id = ? COLLATE BINARY"
 	}
-	return tx.Where("tenant_id = ?", tenantID).Where("(external_user_id_hash = ? OR (external_user_id_hash IS NULL AND "+exact+"))", partnerTenantHash(externalID), externalID)
+	return tx.Where("tenant_id = ? AND identity_source = ?", tenantID, PartnerTenantIdentityExternal).Where("(external_user_id_hash = ? OR (external_user_id_hash IS NULL AND "+exact+"))", partnerTenantHash(externalID), externalID)
 }
 
 // Preserve every legacy mapping while replacing collation-dependent uniqueness.
 func migratePartnerTenantAccountIdentity(db *gorm.DB) error {
 	for {
 		var accounts []PartnerTenantAccount
-		if err := db.Where("external_user_id_hash IS NULL").Order("id").Limit(200).Find(&accounts).Error; err != nil {
+		if err := db.Where("identity_source = ? AND external_user_id_hash IS NULL", PartnerTenantIdentityExternal).Order("id").Limit(200).Find(&accounts).Error; err != nil {
 			return err
 		}
 		if len(accounts) == 0 {
 			break
 		}
 		for _, a := range accounts {
-			if err := db.Model(&PartnerTenantAccount{}).Where("id = ? AND external_user_id_hash IS NULL", a.Id).Update("external_user_id_hash", partnerTenantHash(a.ExternalUserId)).Error; err != nil {
+			if err := db.Model(&PartnerTenantAccount{}).Where("id = ? AND identity_source = ? AND external_user_id_hash IS NULL", a.Id, PartnerTenantIdentityExternal).Update("external_user_id_hash", partnerTenantHash(a.ExternalUserId)).Error; err != nil {
 				return err
 			}
 		}

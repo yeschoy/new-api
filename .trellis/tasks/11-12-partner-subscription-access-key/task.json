@@ -3,7 +3,7 @@
   "name": "partner-subscription-access-key",
   "title": "商户开发者密钥下单与独立订阅 Key 查询",
   "description": "商户开发者密钥无用户 ID 下单返回付款 URL，可信付款后开户并交付独立订阅 Key；原 Key 定位续费，用户仅凭 Key 查询权益/额度/Coding API Key，支持专属套餐及商户重置",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "backend",
   "scope": "partner",
   "package": null,
@@ -12,7 +12,7 @@
   "assignee": "tanggod",
   "createdAt": "2026-11-12",
   "completedAt": null,
-  "branch": null,
+  "branch": "feat/partner-accounts",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -32,9 +32,9 @@
     "docs/partner-tenant-api.md",
     "docs/partner-tenant-integration.zh-CN.md"
   ],
-  "notes": "续费通过原订阅 Key 指定目标已确认；商户 pt_ + X-Subscription-Key 下单仍返回付款 URL，复用原用户/订阅/两种 Key。首次新购仅可信付款后原子开户，不传 external_user_id；新旧身份显式隔离，无 users 大改不实施。PRD/设计/执行计划已收敛，仅必要 pq 验证；等待新版最终摘要后明确批准，尚未实施。",
+  "notes": "续费通过原订阅 Key 指定目标已确认；商户 pt_ + X-Subscription-Key 下单仍返回付款 URL，复用原用户/订阅/两种 Key。首次新购仅可信付款后原子开户，不传 external_user_id；新旧身份显式隔离，无 users 大改不实施。用户在最终摘要后答复“开始”批准实施，task.py start 已成功。仅必要 pq 验证；保留原 Docker/两Linux模块 setup失败及 implement代理30分钟超时历史、check未启动。限定恢复仅下载锁定 procfs v0.15.1 / numcpus v0.6.1，匹配既有 go.sum且锁文件不变；internal/只读新runner的4顶层+7子用例首次实际全PASS，无源码修复/重跑。后续独立trellis-check已审阅完整任务diff/16个Go文件及同源pq证据，无本范围业务P0/P1/P2；仅纠正文档过时状态、补齐英文合同，不重复runtime。不运行宿主测试/其他数据库；完整启动/生产/部署仍未验证，详见 verification.md。",
   "meta": {
-    "planning_review": "awaiting_user_approval",
+    "planning_review": "approved_after_final_summary",
     "test_policy": "targeted_necessary_postgresql_only"
   }
 }

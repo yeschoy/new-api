@@ -9,6 +9,7 @@ import (
 func SetPartnerTenantRouter(router *gin.Engine) {
 	partner := router.Group("/api/partner/v1")
 	partner.Use(
+		controller.PartnerTenantSubscriptionKeyRequestPolicy(),
 		middleware.RouteTag("api"),
 		middleware.PartnerOAuthRequestID(),
 		middleware.PartnerOAuthNoStore(),
@@ -16,6 +17,10 @@ func SetPartnerTenantRouter(router *gin.Engine) {
 		middleware.PartnerTenantBearer(),
 	)
 	{
+		partner.POST("/subscription-key-orders", controller.PartnerTenantCreateSubscriptionKeyOrder)
+		partner.GET("/subscription-key-orders/:order_no", controller.PartnerTenantGetSubscriptionKeyOrder)
+		partner.GET("/subscription-key-orders/:order_no/subscription-key", controller.PartnerTenantClaimSubscriptionKey)
+		partner.POST("/subscriptions/:subscription_id/key/rotate", controller.PartnerTenantRotateSubscriptionKey)
 		partner.GET("/plans", controller.PartnerTenantListPlans)
 		partner.POST("/purchase-sessions", controller.PartnerTenantCreatePurchaseSession)
 		partner.GET("/purchase-sessions/:session_id", controller.PartnerTenantGetPurchaseSession)
@@ -24,6 +29,9 @@ func SetPartnerTenantRouter(router *gin.Engine) {
 		partner.GET("/subscription-orders/:order_no", controller.PartnerTenantGetSubscriptionOrder)
 		partner.GET("/accounts/:external_user_id/subscription/quota", controller.PartnerTenantSubscriptionQuota)
 	}
+	independent := router.Group("/api/partner/subscription")
+	independent.Use(controller.PartnerTenantSubscriptionKeyRequestPolicy(), middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), middleware.PartnerOAuthRateLimit("PT-SUBSCRIPTION", 120, 60, "integration"))
+	independent.GET("", controller.PartnerTenantIndependentSubscription)
 	purchase := router.Group("/api/partner/purchase-sessions")
 	purchase.Use(middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), func(c *gin.Context) {
 		c.Header("Referrer-Policy", "no-referrer")
