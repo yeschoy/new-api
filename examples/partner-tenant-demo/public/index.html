@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>野菜 API · 商户接入 Demo</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header><div class="brand"><span class="logo">野</span><div>野菜 API<small>商户服务端接入示例</small></div></div><span id="mode" class="badge">正在连接本地后端</span></header>
+  <main>
+    <section class="intro"><p class="eyebrow">PARTNER INTEGRATION / PT_</p><h1>把套餐购买，接入你的产品。</h1><p>商户负责登录与商品展示，平台负责收银、确认付款和套餐交付。</p></section>
+    <div id="notice" class="notice" role="status">正在读取配置…</div>
+    <div class="layout"><div>
+      <section class="panel"><div class="section-heading"><h2><span>01</span> 选择专属套餐</h2><button id="reload" class="secondary">刷新套餐</button></div><div id="plans" class="plans"><p>正在查询套餐…</p></div></section>
+      <section class="panel"><h2><span>02</span> 创建购买订单</h2>
+        <p class="muted">用户身份由本地后端配置固定，浏览器不能指定其他用户。真实模式下点击下单会产生平台订单，但不会自动付款。</p>
+        <form id="purchase">
+          <label>套餐<select id="plan" required><option value="">请选择套餐</option></select></label>
+          <label>支付方式<input id="method" value="alipay" pattern="[A-Za-z0-9_-]{1,16}" maxlength="16" required><small>需由平台确认实际启用的渠道；alipay 只是示例。</small></label>
+          <label>本次购买的幂等键<input id="idempotency" readonly placeholder="首次下单时生成"><small>超时或失败后仍用同一键和原参数重试；刷新页面也保留。</small></label>
+          <div class="actions"><button id="create" type="submit">创建订单 / 原键重试</button><button id="new-attempt" type="button" class="secondary">开始另一笔购买</button></div>
+        </form>
+      </section>
+      <section class="panel"><div class="section-heading"><h2><span>03</span> 收银与交付</h2><button id="stop" class="secondary">停止轮询</button></div>
+        <label>平台订单号<input id="order-no" placeholder="PTO…" autocomplete="off"></label>
+        <div class="actions"><button id="query" class="secondary">查询订单并轮询</button><a id="checkout" class="button" target="_blank" rel="noopener noreferrer" hidden>打开平台统一收银台 ↗</a><button id="mock-pay" hidden>模拟付款并交付（不扣款）</button></div>
+        <p id="order-status" class="status" aria-live="polite">尚未下单。只有 paid + fulfilled 才表示套餐已开通。</p>
+        <p class="muted">收银台过期不等于渠道已关单；已付款但交付待恢复时，请勿再次付款。</p>
+      </section>
+    </div><aside>
+      <section class="panel"><h2>当前演示用户</h2><p class="muted">来自后端 DEMO_USER_ID，不是网页输入</p><code id="user">—</code><p id="origin" class="muted"></p><hr><button id="account" class="secondary full">独立开户 / 获取 Key（后端保存）</button><p class="muted">可跳过此步骤，首次付款交付会自动开户。Key 不下发到本页面；开户本身不赠送套餐。</p></section>
+      <section class="panel"><div class="section-heading"><h2>订阅额度</h2><button id="quota" class="secondary">查询</button></div><div id="quota-result" class="muted">尚未查询。不限量套餐的剩余额度为 0 不代表耗尽。</div></section>
+      <section class="panel"><h2>请求结果</h2><p class="muted">仅显示安全业务字段，不显示商户密钥、用户 Key 或收银台令牌。</p><pre id="result" aria-live="polite">等待操作…</pre></section>
+      <section class="security"><strong>仅供本机接入演示</strong><p>没有真实登录、多用户会话或持久化存储，不能直接部署为商户生产后端。模拟付款按钮只在 mock 模式存在。</p></section>
+    </aside></div>
+  </main>
+  <footer>浏览器 → 商户后端 → 野菜 API · 商户密钥始终留在服务端</footer>
+</body>
+</html>

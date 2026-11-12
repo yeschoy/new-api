@@ -1,0 +1,46 @@
+:root { color-scheme: light; font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #192c25; background: #f4f7f5; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+header { background: #102d24; color: #fff; padding: 20px max(24px, calc((100vw - 1180px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 650; }
+.logo { display: grid; place-items: center; width: 42px; height: 42px; background: #c7edbd; color: #173e2e; border-radius: 12px; }
+small { display: block; color: #64776d; font-size: 12px; font-weight: 400; }
+.brand small { color: #b4cdbf; }
+.badge { padding: 5px 12px; border: 1px solid #5a7c69; border-radius: 24px; font-size: 12px; color: #d1f4c9; white-space: nowrap; }
+main { max-width: 1228px; margin: auto; padding: 36px 24px; }
+.eyebrow { color: #4b785a; letter-spacing: 2px; font-size: 11px; font-weight: 700; }
+h1 { font-size: clamp(25px, 4vw, 36px); letter-spacing: -1px; margin: 12px 0; line-height: 1.3; }
+.intro > p:last-child { color: #64776d; }
+.notice { background: #e8f2e8; border: 1px solid #c7dcc9; border-radius: 10px; padding: 14px 18px; margin: 24px 0; font-size: 13px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr); gap: 22px; align-items: start; }
+.panel { border: 1px solid #dfe7e1; background: #fff; border-radius: 14px; padding: 24px; margin-bottom: 20px; }
+h2 { font-size: 16px; margin: 0 0 16px; font-weight: 650; }
+h2 span { font-size: 12px; color: #62856b; margin-right: 8px; }
+h3 { font-size: 14px; margin: 0 0 8px; }
+p { margin: 10px 0; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.section-heading h2 { margin: 0; }
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.plans article { background: #f8fbf7; border: 1px solid #d8e6d7; border-radius: 10px; padding: 18px; }
+.price { font-weight: 700; font-size: 22px; letter-spacing: -0.5px; }
+.muted { color: #64776d; font-size: 12px; }
+.warning { font-size: 12px; color: #a24516; }
+label { display: block; font-size: 13px; font-weight: 550; margin: 16px 0; }
+input, select { font: inherit; display: block; width: 100%; padding: 10px 12px; margin: 6px 0; border: 1px solid #cdd9d0; border-radius: 7px; background: #fff; color: #20392c; min-width: 0; }
+input[readonly] { background: #f5f7f5; font: 12px/1.65 ui-monospace, monospace; }
+button, .button { font: inherit; font-size: 12px; border: 1px solid #1d5939; border-radius: 7px; background: #245c3d; color: #fff; padding: 9px 14px; cursor: pointer; text-decoration: none; text-align: center; }
+button:hover, .button:hover { filter: brightness(.94); }
+button.secondary { color: #344e3e; background: #fff; border-color: #d3ded5; }
+button:disabled, select:disabled, input:disabled { opacity: .55; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #80b98e; outline-offset: 3px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.full { width: 100%; }
+.status { background: #f2f6f2; border-radius: 8px; padding: 14px; font-size: 13px; margin-top: 18px; }
+code { overflow-wrap: anywhere; font: 13px/1.7 ui-monospace, monospace; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #142d23; color: #d3e9d4; padding: 14px; border-radius: 8px; font: 11px/1.8 ui-monospace, monospace; max-height: 340px; overflow: auto; }
+hr { border: 0; border-top: 1px solid #e3e9e4; margin: 20px 0; }
+.security { padding: 0 14px; font-size: 12px; color: #64776d; }
+#quota-result { white-space: pre-line; }
+footer { text-align: center; font-size: 11px; color: #738478; padding: 10px 24px 30px; }
+[hidden] { display: none !important; }
+@media (max-width: 820px) { .layout { grid-template-columns: 1fr; } main { padding: 24px 16px; } header { padding: 16px; } .panel { padding: 18px; } .badge { white-space: normal; } }
