@@ -1,6 +1,6 @@
 # Partner Tenant API
 
-For request examples and error codes, see the [Chinese API reference](./partner-tenant-integration.zh-CN.md). This describes the current branch implementation, not a claim that it has been deployed or payment/DB integration tests have passed.
+This page describes the original **external-buyer** API/H5 contract. For its request examples and errors, see the [Chinese API reference](./partner-tenant-integration.zh-CN.md). For the separate **buyer-ID-free subscription Key** integration (paid-only user creation, independent sub_ query and same-Key renewal), see the [subscription Key API reference](./partner-subscription-key-api.zh-CN.md) and [importable OpenAPI 3.0.3 document](./openapi/partner-subscription-key.openapi.json). Do not send the new request body to the old `/subscription-orders` entry. Documentation describes branch implementation, not proof of production deployment or live payment acceptance.
 
 ## Contract and authentication
 
