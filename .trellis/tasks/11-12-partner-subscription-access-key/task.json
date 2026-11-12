@@ -1,0 +1,37 @@
+{
+  "id": "partner-subscription-access-key",
+  "name": "partner-subscription-access-key",
+  "title": "商户开发者密钥下单与独立订阅 Key 查询",
+  "description": "新增商户开发者密钥创建订阅订单的对接方式，支付成功交付独立订阅 Key，并提供查询订阅信息、剩余额度和 Coding API Key 的专用接口",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": "partner",
+  "package": null,
+  "priority": "P2",
+  "creator": "tanggod",
+  "assignee": "tanggod",
+  "createdAt": "2026-11-12",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "model/partner_tenant_order.go",
+    "model/partner_tenant.go",
+    "model/main.go",
+    "controller/partner_tenant_order.go",
+    "router/partner_tenant.go",
+    "docs/partner-tenant-api.md",
+    "docs/partner-tenant-integration.zh-CN.md"
+  ],
+  "notes": "需求已收敛并完成技术方案；等待最终摘要的后续实施批准。用户要求只做必要测试，数据库只验证 PostgreSQL（pq），不跑 SQLite/MySQL 或无关全量套件。",
+  "meta": {
+    "planning_review": "awaiting_user_approval",
+    "test_policy": "targeted_necessary_postgresql_only"
+  }
+}

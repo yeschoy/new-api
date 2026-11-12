@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend layer conventions and relevant contract entry points"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Additive migration with isolated PostgreSQL evidence only, per latest user scope; no SQLite/MySQL testing or production fallback"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Reuse payment truth, atomic delivery, account fail-closed and existing cashier privacy boundaries"}
+{"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Preserve public H5 credential separation and unchanged strict public DTOs"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse credential validation, strict DB time and quota reset rather than duplicating payment or account APIs"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Define merchant versus subscription authentication, DTO precision and credential lifecycle boundaries"}
+{"file":".trellis/tasks/11-12-partner-subscription-access-key/research.md","reason":"Repository evidence and user lifecycle decisions; run only necessary PostgreSQL-backed tests, never unrelated suites or SQLite/MySQL fixtures"}
