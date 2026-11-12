@@ -35,6 +35,7 @@
 ### 2.3 读取、额度与轮换
 
 - [ ] 实现只读商户领取；校验订单 paid + fulfilled、实际订阅和账户归属；不调用 Provision 来实现读取。
+- [ ] Coding API Key 只沿 `(tenant_id, external_user_id) → UserId/TokenId` 维护；sub_ 查询读取当前 Token，不在订单/订阅/凭证绑定复制 Key，不因一份订阅到期或重置 sub_ 而作废整账户 Token。
 - [ ] 实现单订阅专用查询，**只要求 sub_，不要求 pt_、商户 ID 或 Cookie**；hash 预定位后在实际事务重新校验当前绑定、账户、商户状态，锁后严格时钟判断到期。
 - [ ] 活跃订阅按原周期重置，构造精确十进制额度 DTO；无限额、耗尽、到期、取消、其他份有效订阅的边界按 design.md。
 - [ ] 到期不输出 api_key；可用 remaining=0、quota_usable=false，保留明确命名的历史 remaining 与 total/used。
@@ -48,7 +49,7 @@
 - [ ] 新增商户重置 `/api/partner/v1/subscriptions/:subscription_id/key/rotate`。
 - [ ] 新增独立 `/api/partner/subscription` GET，只认 sub_，无可指定目标的 query/body/path。
 - [ ] 严格请求上限、未知/重复/大小写别名字段、尾随 JSON 与 query 拒绝；新敏感接口 no-store/no-referrer、统一请求 ID、错误与限流。
-- [ ] 旧下单、查单、账户、额度、H5、cashier 响应不新增秘密字段；不改变旧请求哈希或强制新模式。
+- [ ] 旧下单、查单、账户、额度、H5、cashier 响应不新增秘密字段；不改变旧请求哈希或强制新模式。明确初始下单成功含 order_no + checkout_url（付款入口），不含订阅 Key/Coding API Key；断言并入现有必要用例，不另跑无关套件。
 - [ ] 路由回归覆盖 sub_ 不能用于 Coding、其他用途 Key 不能查询、sub_ 不能重置、跨商户不泄露、没有平台登录依赖。
 
 ### 2.5 文档、规范与检查

@@ -30,8 +30,9 @@
 
 - 继续使用 `Authorization: Bearer pt_...` 和 `Idempotency-Key`。
 - 请求保持 `{external_user_id, plan_id, payment_method}`，不增加 delivery_mode 开关或改变现有请求哈希。
+- 成功响应明确含 `order_no` 和 `checkout_url`：这是用户可打开付款的平台统一收银台入口，不是要求商户自行收款，也不是把内部网关 pay_url 新增为商户返回字段。复用 `respondPartnerTenantCreatedOrder` 的原 DTO。
 - 现有业务字段、201/200/409、金额、快照、超时及 cashier URL 语义不变。
-- 未支付不创建订阅 Key；`paid` 但未 `fulfilled` 也不允许领取。
+- 初始下单响应不返回订阅 Key 或 Coding API Key；未支付不创建订阅 Key，`paid` 但未 `fulfilled` 也不允许领取。
 
 ### 2.2 商户领取订阅 Key（新增）
 
@@ -145,6 +146,17 @@
 - 查询先用哈希索引定位，再在实际事务中重新核对当前绑定及常量时间比较；不能只凭事务外查询的过期副本放行。
 - 重置替换随机 Seed、递增版本并更新哈希；所有节点实时读 DB，不缓存 Bearer 或撤销状态。
 - 必须与收银台同样配置稳定、跨副本一致的 SESSION_SECRET/CRYPTO_SECRET。部署根秘密变更会使原 Key 无法验证；恢复旧配置或由已鉴权商户显式重置，不静默生成替代凭证。MVP 不新增根秘密轮换/KMS 系统。
+
+### 3.3 账户级 Coding API Key 的维护边界
+
+- 账户级指 `(tenant_id, external_user_id)` 对应的模型子账户，不是商户主账户、更不是所有买家共用一个调用凭证。PartnerTenantAccount 用 UserId/TokenId 绑定具体用户与一条稳定 Token；不同商户或不同 external_user_id 不共用这条映射。
+- 首次付费交付可自动创建 User/Token；若已独立开户则复用既有正常 Token。同一用户购买其他套餐或续费不另发 Coding API Key，不借新订阅覆盖账户映射。
+- 新订阅 Key 只绑定 Tenant/Account/UserSubscription；查询时沿 Account.TokenId 读取并校验当前 Token。订单、订阅和 sub_ 绑定中不复制存储 Coding API Key 字符串，以 Token 记录为单一来源。
+- 校验包括商户及账户启用、用户启用与正确 group、Token.UserId 匹配、Token.Status/Key/Group/ExpiredTime 正常；坏映射 fail closed，不调用 Provision 重新发钥。
+- 当前项目实际将可恢复原值存于 tokens.key（`model/token.go`），本期沿用既有存储，不声称已是哈希或加密存储。sub_ 的种子/哈希机制不改变旧模型凭证的存储安全模型。
+- Token.UnlimitedQuota=true 只是此模型凭证不另外维护独立 Token 额度；实际可用权益仍由 UserSubscription 的当前周期 total/used 及专属订阅扣费控制，不表示账户可以无限调用。
+- 一份订阅到期只让该 sub_ 查询不再返回 api_key，不把账户 Token 过期时间改成该份订阅的结束时间；否则会误伤同账户其他有效订阅。全部可用订阅耗尽/到期时由现有订阅专用计费阻止调用，无钱包回退。
+- 同账户多份 sub_ 可读取同一 Coding API Key；消费时原计费逻辑从该账户适用订阅中选择。sub_ 轮换不能收回已复制的 Coding API Key。若另行要求单订阅消费级隔离，必须调整 Token 与订阅的计费绑定，仅多创建几条 Token 不能实现。
 
 ## 4. 事务与数据流
 
