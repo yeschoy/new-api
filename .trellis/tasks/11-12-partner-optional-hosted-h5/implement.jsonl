@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend layer discovery and applicable Tenant checkout rules."}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Preserve paid-only order/fulfillment, identity, cashier privacy, original API and Docker test contracts."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Additive schema; PostgreSQL live migration acceptance and no substitute validation claims."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend rules, public checkout references and component/context boundaries."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Public fetch policy separation and regressions without platform authentication effects."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse existing order creation/preparation and existing cashier rather than duplicate payment logic."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Single owned DTO boundary across session model, controller and H5."}
+{"file":".trellis/tasks/11-12-partner-optional-hosted-h5/research/current-contracts.md","reason":"Current source anchors, approved standalone scope, environment limitations and dirty-worktree protection."}
+{"file": ".trellis/tasks/11-12-partner-optional-hosted-h5/research/review-findings.md", "reason": "Accepted independent F1/F2/F3 evidence and exact in-scope recovery/authorization/quota corrections"}

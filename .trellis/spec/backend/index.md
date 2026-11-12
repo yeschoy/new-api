@@ -20,6 +20,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
 | [Partner Tenant Paid Checkout](./partner-tenant-checkout.md) | Paid-only Tenant order/cashier/fulfillment, identity isolation and subscription-only funding | Implemented; DB runtime gate pending |
+| [Optional Hosted H5](./partner-hosted-h5.md) | Limited purchase sessions, transactional authority, exact quota DTO and standalone selector/cashier recovery | Implemented; DB runtime gate pending |
 | [Group IQ Tests](./group-iq-tests.md) | Single-attempt routing, calendar/lease persistence, private latest artwork and API permissions | Implemented |
 
 ---

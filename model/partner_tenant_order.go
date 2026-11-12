@@ -125,12 +125,15 @@ type PartnerTenantOrderInput struct {
 	IdempotencyHash string
 }
 
+func validPartnerTenantOrderInput(in PartnerTenantOrderInput) bool {
+	return !(in.TenantId <= 0 || !IsValidPartnerTenantExternalUserID(in.ExternalUserId) || in.PlanId <= 0 || len(in.IdempotencyHash) != 64 || in.MerchantId == "" || len(in.MerchantId) > 64 || len(in.PaymentMethod) > 16 || in.PaymentMethod == "")
+}
+
 func CreatePartnerTenantSubscriptionOrder(in PartnerTenantOrderInput) (*PartnerTenantSubscriptionOrder, bool, error) {
-	if in.TenantId <= 0 || !IsValidPartnerTenantExternalUserID(in.ExternalUserId) || in.PlanId <= 0 || len(in.IdempotencyHash) != 64 || in.MerchantId == "" || len(in.MerchantId) > 64 || len(in.PaymentMethod) > 16 || in.PaymentMethod == "" {
+	if !validPartnerTenantOrderInput(in) {
 		return nil, false, ErrPartnerTenantOrderUnavailable
 	}
-	requestHash := PartnerTenantOrderRequestHash(in.ExternalUserId, in.PlanId, in.PaymentMethod)
-	var order PartnerTenantSubscriptionOrder
+	var order *PartnerTenantSubscriptionOrder
 	created := false
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var tenant PartnerTenant
@@ -140,82 +143,97 @@ func CreatePartnerTenantSubscriptionOrder(in PartnerTenantOrderInput) (*PartnerT
 			}
 			return err
 		}
-		prior := lockForUpdate(tx).Where("tenant_id = ? AND idempotency_hash = ?", in.TenantId, in.IdempotencyHash).Limit(1).Find(&order)
-		if prior.Error != nil {
-			return prior.Error
-		}
-		if prior.RowsAffected > 0 {
-			if order.RequestHash != requestHash {
-				return ErrPartnerTenantIdempotencyConflict
-			}
-			return nil
-		}
-		var plan SubscriptionPlan
-		if err := lockForUpdate(tx).Where("id = ?", in.PlanId).First(&plan).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrPartnerTenantPlanNotFound
-			}
-			return err
-		}
-		if !validPartnerTenantPlan(&plan, &tenant) {
-			return ErrPartnerTenantPlanNotFound
-		}
-		if plan.Currency != "CNY" {
-			return ErrPartnerTenantUnsupportedCurrency
-		}
-		cents, err := PartnerTenantPlanCents(plan.PriceAmount)
-		if err != nil {
-			return err
-		}
-		var account PartnerTenantAccount
-		found := partnerTenantAccountQuery(lockForUpdate(tx), tenant.Id, in.ExternalUserId).Limit(1).Find(&account)
-		if found.Error != nil {
-			return found.Error
-		}
-		if found.RowsAffected > 0 {
-			if _, err := validatePartnerTenantAccountTx(tx, &tenant, &account); err != nil {
-				return err
-			}
-		}
-		now := getDBTimestampOn(tx)
-		renewalID, err := partnerTenantPurchaseIntentTx(tx, &tenant, &account, in.ExternalUserId, &plan, now)
-		if err != nil {
-			return err
-		}
-		var recent, pending, tenantRecent int64
-		base := tx.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ?", tenant.Id)
-		if err := base.Session(&gorm.Session{}).Where("created_at > ?", now-3600).Count(&tenantRecent).Error; err != nil {
-			return err
-		}
-		own := tx.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ? AND external_user_hash = ?", tenant.Id, partnerTenantHash(in.ExternalUserId))
-		if err := own.Session(&gorm.Session{}).Where("created_at > ?", now-3600).Count(&recent).Error; err != nil {
-			return err
-		}
-		if err := own.Session(&gorm.Session{}).Where("payment_status = ? AND expires_at > ?", "pending", now).Count(&pending).Error; err != nil {
-			return err
-		}
-		if tenantRecent >= 2000 || recent >= 20 || pending >= 5 {
-			return ErrPartnerTenantOrderLimited
-		}
-		suffix, err := common.GenerateRandomCharsKey(32)
-		if err != nil {
-			return err
-		}
-		snapshot, err := json.Marshal(plan)
-		if err != nil {
-			return err
-		}
-		order = PartnerTenantSubscriptionOrder{TenantId: tenant.Id, ExternalUserId: in.ExternalUserId, ExternalUserHash: partnerTenantHash(in.ExternalUserId),
-			IdempotencyHash: in.IdempotencyHash, RequestHash: requestHash, OrderNo: "PTO" + suffix, PlanId: plan.Id, PlanTitle: plan.Title, PlanSnapshot: string(snapshot),
-			AmountCents: cents, Currency: "CNY", PaymentProvider: PaymentProviderEpay, PaymentMethod: in.PaymentMethod, MerchantId: in.MerchantId,
-			PaymentStatus: "pending", FulfillmentStatus: "not_ready", CreatedAt: now, ExpiresAt: now + PartnerTenantOrderLifetime, RenewalSubscriptionId: renewalID}
-		if err := tx.Create(&order).Error; err != nil {
-			return err
-		}
-		created = true
-		return nil
+		var err error
+		order, created, err = createPartnerTenantSubscriptionOrderTx(tx, &tenant, in, nil)
+		return err
 	})
-	return &order, created, err
+	return order, created, err
+}
+
+// Both entries own the tenant lock in this transaction. The optional callback
+// checks only local NEW-payment configuration, after exact replay; it must never
+// perform network I/O. Merchant validation and replay ordering remain unchanged.
+func createPartnerTenantSubscriptionOrderTx(tx *gorm.DB, tenant *PartnerTenant, in PartnerTenantOrderInput, validateNew func() error) (*PartnerTenantSubscriptionOrder, bool, error) {
+	requestHash := PartnerTenantOrderRequestHash(in.ExternalUserId, in.PlanId, in.PaymentMethod)
+	var order PartnerTenantSubscriptionOrder
+	prior := lockForUpdate(tx).Where("tenant_id = ? AND idempotency_hash = ?", in.TenantId, in.IdempotencyHash).Limit(1).Find(&order)
+	if prior.Error != nil {
+		return nil, false, prior.Error
+	}
+	if prior.RowsAffected > 0 {
+		if order.RequestHash != requestHash {
+			return nil, false, ErrPartnerTenantIdempotencyConflict
+		}
+		return &order, false, nil
+	}
+	if validateNew != nil {
+		if err := validateNew(); err != nil {
+			return nil, false, err
+		}
+	}
+	var plan SubscriptionPlan
+	if err := lockForUpdate(tx).Where("id = ?", in.PlanId).First(&plan).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, ErrPartnerTenantPlanNotFound
+		}
+		return nil, false, err
+	}
+	if !validPartnerTenantPlan(&plan, tenant) {
+		return nil, false, ErrPartnerTenantPlanNotFound
+	}
+	if plan.Currency != "CNY" {
+		return nil, false, ErrPartnerTenantUnsupportedCurrency
+	}
+	cents, err := PartnerTenantPlanCents(plan.PriceAmount)
+	if err != nil {
+		return nil, false, err
+	}
+	var account PartnerTenantAccount
+	found := partnerTenantAccountQuery(lockForUpdate(tx), tenant.Id, in.ExternalUserId).Limit(1).Find(&account)
+	if found.Error != nil {
+		return nil, false, found.Error
+	}
+	if found.RowsAffected > 0 {
+		if _, err := validatePartnerTenantAccountTx(tx, tenant, &account); err != nil {
+			return nil, false, err
+		}
+	}
+	now := getDBTimestampOn(tx)
+	renewalID, err := partnerTenantPurchaseIntentTx(tx, tenant, &account, in.ExternalUserId, &plan, now)
+	if err != nil {
+		return nil, false, err
+	}
+	var recent, pending, tenantRecent int64
+	base := tx.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ?", tenant.Id)
+	if err := base.Session(&gorm.Session{}).Where("created_at > ?", now-3600).Count(&tenantRecent).Error; err != nil {
+		return nil, false, err
+	}
+	own := tx.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ? AND external_user_hash = ?", tenant.Id, partnerTenantHash(in.ExternalUserId))
+	if err := own.Session(&gorm.Session{}).Where("created_at > ?", now-3600).Count(&recent).Error; err != nil {
+		return nil, false, err
+	}
+	if err := own.Session(&gorm.Session{}).Where("payment_status = ? AND expires_at > ?", "pending", now).Count(&pending).Error; err != nil {
+		return nil, false, err
+	}
+	if tenantRecent >= 2000 || recent >= 20 || pending >= 5 {
+		return nil, false, ErrPartnerTenantOrderLimited
+	}
+	suffix, err := common.GenerateRandomCharsKey(32)
+	if err != nil {
+		return nil, false, err
+	}
+	snapshot, err := json.Marshal(plan)
+	if err != nil {
+		return nil, false, err
+	}
+	order = PartnerTenantSubscriptionOrder{TenantId: tenant.Id, ExternalUserId: in.ExternalUserId, ExternalUserHash: partnerTenantHash(in.ExternalUserId),
+		IdempotencyHash: in.IdempotencyHash, RequestHash: requestHash, OrderNo: "PTO" + suffix, PlanId: plan.Id, PlanTitle: plan.Title, PlanSnapshot: string(snapshot),
+		AmountCents: cents, Currency: "CNY", PaymentProvider: PaymentProviderEpay, PaymentMethod: in.PaymentMethod, MerchantId: in.MerchantId,
+		PaymentStatus: "pending", FulfillmentStatus: "not_ready", CreatedAt: now, ExpiresAt: now + PartnerTenantOrderLifetime, RenewalSubscriptionId: renewalID}
+	if err := tx.Create(&order).Error; err != nil {
+		return nil, false, err
+	}
+	return &order, true, nil
 }
 
 // The tenant lock serializes this eligibility check with order creation and

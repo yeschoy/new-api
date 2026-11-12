@@ -21,7 +21,7 @@ import vm from 'node:vm'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { isPartnerCheckoutPath } from '../lib/access'
+import { isPartnerPublicPath } from '@/features/partner-purchase/lib/surface'
 
 const html = fs.readFileSync('index.html', 'utf8')
 const inlineScripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
@@ -68,6 +68,12 @@ describe('cashier document policy before injected analytics', () => {
     '/%70artner/checkout',
     '/partner%2Fcheckout',
     '/partner/%63heckout%2f',
+    '/partner/purchase',
+    '/partner/purchase/',
+    '/partner/%70urchase',
+    '/%70artner/purchase',
+    '/partner%2Fpurchase',
+    '/partner/%70urchase%2f',
   ])('never mounts backend-injected analytics on %s', (pathname) => {
     const template = document.createElement('template')
     template.id = 'site-analytics'
@@ -80,7 +86,7 @@ describe('cashier document policy before injected analytics', () => {
     })
     vm.runInContext(entryPolicy, context)
     vm.runInContext(analyticsLoader, context)
-    expect(isPartnerCheckoutPath(pathname)).toBe(true)
+    expect(isPartnerPublicPath(pathname)).toBe(true)
     const policy = document
       .querySelector('meta[http-equiv="Content-Security-Policy"]')
       ?.getAttribute('content')
@@ -120,12 +126,17 @@ describe('cashier document policy before injected analytics', () => {
     '/partner/%2563heckout',
     '/partner/%',
     '/partner/%FFcheckout',
+    '/partner/%2570urchase',
+    '/partner/purchase-other',
+    '/partner/purchase/child',
+    '/partner/%FFpurchase',
+    '/sign-in',
   ])('does not restrict non-cashier or malformed path %s', (pathname) => {
     vm.runInNewContext(entryPolicy, {
       document,
       window: { location: { pathname } },
     })
-    expect(isPartnerCheckoutPath(pathname)).toBe(false)
+    expect(isPartnerPublicPath(pathname)).toBe(false)
     expect(
       document.querySelector('meta[http-equiv="Content-Security-Policy"]')
     ).toBeNull()

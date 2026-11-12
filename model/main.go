@@ -400,6 +400,7 @@ func migrateDB() error {
 		&PartnerTenantAccount{},
 		&PartnerTenantSubscriptionGrant{},
 		&PartnerTenantSubscriptionOrder{},
+		&PartnerTenantPurchaseSession{},
 		&PartnerServerConfig{},
 		&PartnerServerSecret{},
 		&PartnerServerToken{},

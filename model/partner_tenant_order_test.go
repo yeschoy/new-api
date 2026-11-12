@@ -125,6 +125,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				require.False(t, db.Migrator().HasIndex(&PartnerTenantAccount{}, "idx_partner_tenant_external_user"))
 				require.True(t, db.Migrator().HasIndex(&PartnerTenantAccount{}, "idx_pt_account_external_hash"))
 			})
+			runPartnerTenantPurchaseSessionDatabaseTests(t, db)
 			fixture := func(t *testing.T) (*PartnerTenant, *SubscriptionPlan) {
 				t.Helper()
 				tenant, _, err := CreatePartnerTenant("test", fmt.Sprintf("tenant-%d", time.Now().UnixNano()))
