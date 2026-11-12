@@ -247,6 +247,24 @@ async function showCards(indices: number[]) {
 }
 
 describe('authenticated IQ gallery', () => {
+  it('shows safe failure diagnostics from result metadata without fetching failed artifacts', async () => {
+    results.groups[0].models[0].latest = {
+      ...latest(0),
+      status: 'error',
+      error_code: 'upstream_http_429',
+      error_message: 'secret-provider-error',
+    }
+    mount()
+    expect(
+      await screen.findByText('Upstream rejected the request (HTTP 429).')
+    ).toBeInTheDocument()
+    expect(screen.queryByText('secret-provider-error')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Preview model-0' })
+    ).not.toBeInTheDocument()
+    expect(requests).toEqual(['/api/iq-tests/results'])
+  })
+
   it('keeps prior results dated during a run and exposes no member admin actions or eager artifacts', async () => {
     mount()
     await screen.findByRole('heading', { name: 'public' })

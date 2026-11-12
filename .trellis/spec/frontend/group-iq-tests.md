@@ -55,6 +55,15 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   in a labeled keyboard-focusable horizontal scroll region; never wrap a group
   across multiple rows or overflow the page. Retain lazy observation and the
   global live-preview cap across all retained cards.
+- Terminal failure cards display localized explanations below the placeholder.
+  `result-card.tsx` owns the allowlist: status handles timeout/interrupted/
+  unavailable/invalid_artifact; `upstream_http_<100..599>` (excluding 200) displays
+  only a strictly matched numeric status, and setup/transport/transport-timeout/read codes use
+  fixed translations. Never render `error_message` or an unknown raw error_code.
+  Legacy `execution_failed`/unknown codes explicitly say detailed diagnostics are
+  unavailable; do not retrofit historical HTTP statuses. Pending/running/success
+  cards have no failure explanation. No extra artifact/API requests or changes
+  to preview lifecycle are needed for error details.
 - Preserve in-budget run cards during and after a new run. Do not merge new
   progress into a previous run or label historical artwork as the latest result.
   A pruned artifact is unavailable (404), never silently substituted with a newer
@@ -122,6 +131,8 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
 | Session/account/group/permissions change | Unmount old artwork/forms/dialogs |
 | Artifact revision mismatch or fetch failure | Honest unavailable state; no cross-run document reuse |
 | Metadata error | Hide active frames; retryable error, no stale success |
+| Terminal failure metadata | Localized safe explanation, HTTP status only when strictly encoded; no failed-artifact fetch |
+| Legacy/unknown error code or untrusted error_message | Honest generic explanation; never display raw provider content |
 | Config 409 | Preserve edits; require explicit reload/reconciliation |
 | Unplanned catalog group | Absent from gallery/settings; only selectable in New plan |
 | Confirmed plan deletion | Hide all group runs, invalidate cache, stop schedule/unsent work; keep in-budget artwork |
@@ -160,6 +171,10 @@ HTML/SVG previews and IQ administration. Do not change generic HtmlContent.
   movement, explicit independent saves, reopen persistence, read-only controls,
   conflict preservation/reload and unsaved plan-form preservation across reordering.
   Retention tests assert default 30, custom saves and integer/range validation.
+- `result-card.test.tsx`: safe HTTP/setup/transport/read explanations, historical
+  statuses, unknown/malformed-code fallback, no raw backend text or false failure
+  labels on pending/running/success. `gallery.test.tsx` also covers metadata-to-card
+  error display without fetching failed artifacts.
 - `localization.test.ts`: all static/dynamic feature keys in seven locales.
 - One local mock-backed browser smoke: real Canvas/SVG render, blocked parent
   DOM/storage/cookies, subresource/fetch/worker/popup/top/form attempts, mobile

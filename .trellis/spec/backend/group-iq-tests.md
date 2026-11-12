@@ -31,6 +31,8 @@ The controller owns orchestration to avoid a service/controller import cycle.
   `GET /api/iq-tests/targets`, `POST /api/iq-tests/run`; use channel
   read/write/operate RBAC and PAT scopes.
 - `testChannelWithIQ(..., options)` extends existing health-test conversion;
+  `testResult.iqStage` / `iqHTTPStatus` carry internal failure diagnostics into
+  `classifyIQFailure(ctx, result)` and `logIQFailure(...)` in `iq_executor.go`.
   `ExtractIQArtifact(text)` and `IQVisibleText(body, stream)` own extraction.
 
 ## 3. Contracts
@@ -123,6 +125,24 @@ The controller owns orchestration to avoid a service/controller import cycle.
 - Set `ContextKeyUsingGroup` before relay-info generation. Use the root/system
   test identity and resource logs; never debit the viewing user's quota or
   modify channel health/test-time state. Do not log artifact bodies/credentials.
+- Failure diagnostics must be allowlisted, never copied from `err.Error()`,
+  provider bodies/headers, request URLs or prompts. Preserve non-200 status as
+  `IQResult.ErrorCode=upstream_http_<100..599>` (excluding 200), with fixed safe
+  English ErrorMessage. Distinguish `request_setup_failed`, `transport_error`,
+  `transport_timeout` (HTTP/network timeout before the pair context expires),
+  `response_read_failed`, and existing `invalid_artifact` / `timeout` /
+  `interrupted` / `execution_failed`. Pair context expiry/cancellation takes
+  precedence; do not guess a status or historical cause when none was recorded.
+  Persist through existing error fields without a schema change. Operator logs
+  contain only hashed pair_id, channel_id, prepare/request/response/artifact stage,
+  numeric http_status (0 if unavailable), allowlisted error_code and duration_ms.
+  Never expose channel IDs to viewers. Suppress the shared HTTP transport's raw
+  `do request failed` error log for IQ only, and preserve its typed transport
+  cause internally until classification. The ordinary hide-error option replaces
+  the underlying error and would otherwise erase `net.Error.Timeout`; do not
+  flatten IQ failures or classify timeouts by parsing raw messages. Ordinary
+  channel/relay logs and error hiding retain their behavior. Diagnostics must not add a provider call, retry, failover,
+  channel-health update or change the existing deadline/budgets.
 - Response limit 2 MiB; normalized artifact limit 1 MiB. Recognize complete
   direct/fenced HTML or SVG; prefer the whole HTML scene over nested SVG.
   Preserve inline scripts, not thinking/tool-only/file-link outputs. Extraction
@@ -162,7 +182,10 @@ The controller owns orchestration to avoid a service/controller import cycle.
 | Anonymous / ordinary member admin action | 401 / 403 |
 | Hidden, removed or unsuccessful artifact ID | Indistinguishable 404 |
 | Duplicate manual enqueue for the same group | Existing active task, created=false; other groups enqueue independently |
-| Provider failure / timeout / incomplete markup | Sanitized truthful terminal status |
+| Non-200 upstream response | error / upstream_http_<status>; body is closed without reading/logging it |
+| HTTP/network timeout before pair deadline / failed response read | error / transport_timeout or response_read_failed, not a fabricated pair timeout |
+| Pair deadline / cancellation / incomplete markup | Sanitized timeout / interrupted / invalid_artifact; no retry |
+| Legacy generic failure with no diagnostics | Preserve execution_failed; do not infer the historical channel/status |
 | Lease loss / crashed started request | interrupted, never resend |
 | Viewer reads results | No upstream call, quota change or channel mutation |
 
@@ -171,6 +194,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
 - Good: three backing channels for one selected pair produce one IQ request.
 - Base: old dated artwork remains in its original run row after new work terminates,
   up to the saved retention budget. Do not merely hide unlimited stored bodies.
+- Good: a 429 returns `upstream_http_429`; operator logs identify the channel,
+  but neither viewer metadata nor logs contain the provider's error body/key.
+- Bad: logging `localErr` or raw transport URLs to make IQ diagnostics richer.
 - Bad: putting HTML in SystemTask.Result, exposing a public HTML URL, or using
   the public relay retry controller to implement a supposedly single attempt.
 
@@ -228,6 +254,11 @@ The controller owns orchestration to avoid a service/controller import cycle.
   group names in viewer group_order metadata. Saving retention returns the new
   count, immediately purges old artifact IDs (404), preserves retained IDs (200),
   validates bounds, and a results GET never prunes data.
+- `controller/iq_diagnostics_test.go`: 3xx/401/429/5xx numeric status without
+  reading error bodies; wrapped timeout and raw-error sanitization, preparation,
+  transport, response and artifact classification; operator log allowlist and
+  suppression of lower-level credential-bearing URL logs. Real local mock HTTP
+  calls must remain single-attempt; persisted IQ errors retain the safe code.
 - `service/iq_artifact_test.go`: full/fenced markup and final native text,
   incomplete/oversized output, preservation of active self-contained content.
 - `router/iq_router_test.go`: all eight anonymous denials and admin/member scopes,

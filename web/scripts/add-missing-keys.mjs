@@ -10,6 +10,24 @@ function stableStringify(obj) {
 
 const newKeys = {
   en: {
+    'Upstream rejected the request (HTTP {{status}}).':
+      'Upstream rejected the request (HTTP {{status}}).',
+    'The upstream connection timed out.': 'The upstream connection timed out.',
+    'The upstream request failed before a response was received.':
+      'The upstream request failed before a response was received.',
+    'Could not read the upstream response.':
+      'Could not read the upstream response.',
+    'The IQ request could not be prepared.':
+      'The IQ request could not be prepared.',
+    'The IQ request timed out.': 'The IQ request timed out.',
+    'Execution was interrupted and was not retried.':
+      'Execution was interrupted and was not retried.',
+    'No compatible enabled route is available.':
+      'No compatible enabled route is available.',
+    'The model did not return a complete HTML or SVG artwork within the size limit.':
+      'The model did not return a complete HTML or SVG artwork within the size limit.',
+    'The request failed. Detailed diagnostics are not available for this run.':
+      'The request failed. Detailed diagnostics are not available for this run.',
     'Retained runs per group': 'Retained runs per group',
     'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
       'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.',
@@ -105,6 +123,21 @@ const newKeys = {
       'Opened subscription plan {{plan}} with a redemption code, code ID {{id}}',
   },
   zh: {
+    'Upstream rejected the request (HTTP {{status}}).':
+      '上游拒绝了请求（HTTP {{status}}）。',
+    'The upstream connection timed out.': '上游连接超时。',
+    'The upstream request failed before a response was received.':
+      '尚未收到响应，上游请求就已失败。',
+    'Could not read the upstream response.': '无法读取上游响应。',
+    'The IQ request could not be prepared.': '无法完成 IQ 请求的准备工作。',
+    'The IQ request timed out.': 'IQ 请求执行超时。',
+    'Execution was interrupted and was not retried.':
+      '执行已中断，未进行重试。',
+    'No compatible enabled route is available.': '没有兼容且已启用的可用路由。',
+    'The model did not return a complete HTML or SVG artwork within the size limit.':
+      '模型未返回大小限制内的完整 HTML 或 SVG 作品。',
+    'The request failed. Detailed diagnostics are not available for this run.':
+      '请求失败，本次运行没有可用的详细诊断信息。',
     'Retained runs per group': '每组保留轮数',
     'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
       '保留该分组最近完成的执行轮次（1–1000，默认 30）。更早的记录、作品和不再使用的快照将永久删除，正在执行的任务不受影响。',
@@ -199,6 +232,21 @@ const newKeys = {
       '已通过兑换码开通订阅套餐 {{plan}}，兑换码 ID {{id}}',
   },
   'zh-TW': {
+    'Upstream rejected the request (HTTP {{status}}).':
+      '上游拒絕了請求（HTTP {{status}}）。',
+    'The upstream connection timed out.': '上游連線逾時。',
+    'The upstream request failed before a response was received.':
+      '尚未收到回應，上游請求就已失敗。',
+    'Could not read the upstream response.': '無法讀取上游回應。',
+    'The IQ request could not be prepared.': '無法完成 IQ 請求的準備作業。',
+    'The IQ request timed out.': 'IQ 請求執行逾時。',
+    'Execution was interrupted and was not retried.':
+      '執行已中斷，未進行重試。',
+    'No compatible enabled route is available.': '沒有相容且已啟用的可用路由。',
+    'The model did not return a complete HTML or SVG artwork within the size limit.':
+      '模型未傳回大小限制內的完整 HTML 或 SVG 作品。',
+    'The request failed. Detailed diagnostics are not available for this run.':
+      '請求失敗，本次執行沒有可用的詳細診斷資訊。',
     'Retained runs per group': '每組保留輪數',
     'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
       '保留此分組最近完成的執行輪次（1–1000，預設 30）。更早的紀錄、作品及不再使用的快照將永久刪除，執行中的任務不受影響。',
@@ -294,6 +342,24 @@ const newKeys = {
       '已使用兌換碼開通訂閱方案 {{plan}}，兌換碼 ID {{id}}',
   },
   fr: {
+    'Upstream rejected the request (HTTP {{status}}).':
+      'Le service en amont a refusé la requête (HTTP {{status}}).',
+    'The upstream connection timed out.': 'La connexion en amont a expiré.',
+    'The upstream request failed before a response was received.':
+      'La requête en amont a échoué avant la réception de la réponse.',
+    'Could not read the upstream response.':
+      'Impossible de lire la réponse en amont.',
+    'The IQ request could not be prepared.':
+      'Impossible de préparer la requête IQ.',
+    'The IQ request timed out.': 'Le délai de la requête IQ est dépassé.',
+    'Execution was interrupted and was not retried.':
+      'L’exécution a été interrompue sans nouvelle tentative.',
+    'No compatible enabled route is available.':
+      'Aucune route compatible et activée n’est disponible.',
+    'The model did not return a complete HTML or SVG artwork within the size limit.':
+      'Le modèle n’a pas renvoyé de création HTML ou SVG complète respectant la taille limite.',
+    'The request failed. Detailed diagnostics are not available for this run.':
+      'La requête a échoué. Aucun diagnostic détaillé n’est disponible pour cette exécution.',
     'Retained runs per group': 'Exécutions conservées par groupe',
     'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
       'Conserve les dernières exécutions terminées du groupe (1–1000, 30 par défaut). Les anciens résultats, œuvres et instantanés inutilisés sont supprimés définitivement. Les exécutions en cours sont protégées.',
@@ -390,6 +456,25 @@ const newKeys = {
       "Abonnement {{plan}} activé avec un code d'échange (ID du code : {{id}})",
   },
   ja: {
+    'Upstream rejected the request (HTTP {{status}}).':
+      '上流サービスがリクエストを拒否しました（HTTP {{status}}）。',
+    'The upstream connection timed out.':
+      '上流サービスへの接続がタイムアウトしました。',
+    'The upstream request failed before a response was received.':
+      '応答を受信する前に上流サービスへのリクエストが失敗しました。',
+    'Could not read the upstream response.':
+      '上流サービスの応答を読み取れませんでした。',
+    'The IQ request could not be prepared.':
+      'IQ リクエストを準備できませんでした。',
+    'The IQ request timed out.': 'IQ リクエストがタイムアウトしました。',
+    'Execution was interrupted and was not retried.':
+      '実行が中断され、再試行は行われませんでした。',
+    'No compatible enabled route is available.':
+      '互換性のある有効なルートがありません。',
+    'The model did not return a complete HTML or SVG artwork within the size limit.':
+      'モデルはサイズ制限内の完全な HTML または SVG 作品を返しませんでした。',
+    'The request failed. Detailed diagnostics are not available for this run.':
+      'リクエストが失敗しました。この実行の詳細な診断情報はありません。',
     'Retained runs per group': 'グループごとの保持実行数',
     'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
       'このグループの完了済み実行を新しい順に保持します（1～1000、既定は30）。古い記録・作品・未使用のスナップショットは完全に削除されます。実行中のタスクは保護されます。',
@@ -485,6 +570,25 @@ const newKeys = {
       '引き換えコードでサブスクリプションプラン {{plan}} を有効化（コード ID: {{id}}）',
   },
   ru: {
+    'Upstream rejected the request (HTTP {{status}}).':
+      'Вышестоящий сервис отклонил запрос (HTTP {{status}}).',
+    'The upstream connection timed out.':
+      'Время ожидания соединения с вышестоящим сервисом истекло.',
+    'The upstream request failed before a response was received.':
+      'Запрос к вышестоящему сервису завершился ошибкой до получения ответа.',
+    'Could not read the upstream response.':
+      'Не удалось прочитать ответ вышестоящего сервиса.',
+    'The IQ request could not be prepared.':
+      'Не удалось подготовить запрос IQ.',
+    'The IQ request timed out.': 'Время ожидания запроса IQ истекло.',
+    'Execution was interrupted and was not retried.':
+      'Выполнение прервано без повторной попытки.',
+    'No compatible enabled route is available.':
+      'Нет доступного совместимого включённого маршрута.',
+    'The model did not return a complete HTML or SVG artwork within the size limit.':
+      'Модель не вернула завершённую работу HTML или SVG в пределах допустимого размера.',
+    'The request failed. Detailed diagnostics are not available for this run.':
+      'Запрос завершился ошибкой. Подробная диагностика этого запуска недоступна.',
     'Retained runs per group': 'Хранимых запусков на группу',
     'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
       'Хранить последние завершённые запуски группы (1–1000, по умолчанию 30). Старые записи, работы и неиспользуемые снимки удаляются навсегда. Активные запуски защищены.',
@@ -580,6 +684,24 @@ const newKeys = {
       'План подписки {{plan}} активирован кодом погашения (ID кода: {{id}})',
   },
   vi: {
+    'Upstream rejected the request (HTTP {{status}}).':
+      'Dịch vụ thượng nguồn đã từ chối yêu cầu (HTTP {{status}}).',
+    'The upstream connection timed out.':
+      'Kết nối đến dịch vụ thượng nguồn đã hết thời gian chờ.',
+    'The upstream request failed before a response was received.':
+      'Yêu cầu đến dịch vụ thượng nguồn thất bại trước khi nhận được phản hồi.',
+    'Could not read the upstream response.':
+      'Không thể đọc phản hồi từ dịch vụ thượng nguồn.',
+    'The IQ request could not be prepared.': 'Không thể chuẩn bị yêu cầu IQ.',
+    'The IQ request timed out.': 'Yêu cầu IQ đã hết thời gian chờ.',
+    'Execution was interrupted and was not retried.':
+      'Quá trình thực thi đã bị gián đoạn và không được thử lại.',
+    'No compatible enabled route is available.':
+      'Không có tuyến tương thích nào đang được bật và khả dụng.',
+    'The model did not return a complete HTML or SVG artwork within the size limit.':
+      'Mô hình không trả về tác phẩm HTML hoặc SVG hoàn chỉnh trong giới hạn kích thước.',
+    'The request failed. Detailed diagnostics are not available for this run.':
+      'Yêu cầu thất bại. Không có thông tin chẩn đoán chi tiết cho lần chạy này.',
     'Retained runs per group': 'Số lần chạy giữ lại mỗi nhóm',
     'Keep the latest completed runs in this group (1–1000, default 30). Older records, artwork and unused snapshots are permanently deleted. Active runs are protected.':
       'Giữ các lần chạy đã hoàn tất gần nhất của nhóm (1–1000, mặc định 30). Bản ghi, tác phẩm cũ và ảnh chụp trạng thái không còn dùng sẽ bị xóa vĩnh viễn. Lần chạy đang hoạt động được bảo vệ.',
@@ -971,6 +1093,7 @@ async function main() {
         JSON.parse(
           execFileSync('git', ['show', `:${stage}:${relativePath}`], {
             encoding: 'utf8',
+            maxBuffer: 16 * 1024 * 1024,
           })
         )
       )
