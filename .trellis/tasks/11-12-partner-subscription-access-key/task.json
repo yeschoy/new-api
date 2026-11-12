@@ -2,7 +2,7 @@
   "id": "partner-subscription-access-key",
   "name": "partner-subscription-access-key",
   "title": "商户开发者密钥下单与独立订阅 Key 查询",
-  "description": "新增商户开发者密钥创建订阅订单的对接方式，支付成功交付独立订阅 Key，并提供查询订阅信息、剩余额度和 Coding API Key 的专用接口",
+  "description": "为商户配置可订阅套餐，复用开发者密钥下单，支付后交付独立订阅 Key；用户仅凭订阅 Key 查询订阅信息、剩余额度及 Coding API Key，并支持商户重置订阅 Key",
   "status": "planning",
   "dev_type": "backend",
   "scope": "partner",
@@ -29,9 +29,9 @@
     "docs/partner-tenant-api.md",
     "docs/partner-tenant-integration.zh-CN.md"
   ],
-  "notes": "需求已收敛并完成技术方案；等待最终摘要的后续实施批准。用户要求只做必要测试，数据库只验证 PostgreSQL（pq），不跑 SQLite/MySQL 或无关全量套件。",
+  "notes": "原 Key 生命周期已确认；用户新增商户可订阅套餐配置，等待专属/共享授权边界后重新审阅。用户查询只需订阅 Key，不再要商户密钥。仅必要 pq 测试，不跑 SQLite/MySQL 或无关全量套件。",
   "meta": {
-    "planning_review": "awaiting_user_approval",
+    "planning_review": "scope_clarification_required",
     "test_policy": "targeted_necessary_postgresql_only"
   }
 }
