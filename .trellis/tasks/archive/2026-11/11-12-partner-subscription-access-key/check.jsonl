@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify real isolated PostgreSQL migration/persistence only; user explicitly excludes SQLite/MySQL validation"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Check paid-only delivery, isolation and old API compatibility; do not impose the old merchant-user identity on the NEW external_user_id-free integration"}
+{"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Ensure H5/cashier DTOs and capability scopes remain unchanged; do not run unrelated frontend suites"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Audit endpoint auth, one-subscription isolation, exact quota DTO and expiry/rotation authority"}
+{"file":".trellis/tasks/11-12-partner-subscription-access-key/research.md","reason":"Audit paid-only exactly-once creation and renewal by current sub_ with pt_; no new user/key/subscription on renewal, no external identity alias/backfill collision, mode-neutral internal payment reads, exact DTOs and necessary pq-only verification"}

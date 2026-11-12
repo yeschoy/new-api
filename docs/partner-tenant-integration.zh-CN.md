@@ -1,211 +1,194 @@
-# 野菜 API · 商户套餐购买接口
+# 野菜 API · 商户接入
 
-本文对应当前分支代码，不代表已经上线或通过真实支付联调。商户负责自己的网页、用户登录和套餐购买弹窗；**我方负责订单、统一收银台、付款确认和套餐交付**。不支持商户自行报“已付款”后直接开通，旧直接开通接口已移除，不保留兼容模式。
+商户负责用户登录与套餐展示；野菜 API 负责收银、付款确认和套餐交付。
 
-## 基本约定
+## 基本配置
 
-- 部署后的服务地址由我方提供，例如 `https://yeschoy.com`；以下路径均相对该地址。
-- 商户后端：`Authorization: Bearer pt_<PARTNER_SECRET>`，仅限 HTTPS 服务端调用，不进入网页、日志或支付链接。与 OAuth/PartnerServer 充值接口不是同一套凭证和账号。
-- 用户模型请求：`Authorization: Bearer sk-<USER_API_KEY>`，不能用 `pt_`。
-- 成功响应直接返回业务对象，无 `{success,data}` 包装；响应禁止缓存。时间为 Unix 秒，额度为内部整数单位，不是 Token 数或支付金额。
-- `external_user_id` 是商户稳定用户 ID，由商户后端从自己的可信登录态取得，不能把前端任意指定的 ID 原样透传。去除前后空白后为 1–128 个 Unicode 字符，不允许控制字符，区分大小写；身份按商户隔离。放入路径时须进行路径段编码。
-- 写请求为 JSON，只接受列出的字段及单个 JSON 对象。账号接口上限 1 KiB，下单接口 2 KiB；订单接口不接受查询参数。
+- **服务地址**：由平台提供，例如 `https://yeschoy.com`。
+- **接口前缀**：`/api/partner/v1`，以下商户接口路径均相对此前缀。
+- **鉴权**：`Authorization: Bearer pt_<商户密钥>`，只允许商户后端调用。
+- **请求格式**：`Content-Type: application/json`；成功响应直接返回 JSON，无 `success/data` 包装。
+- **用户标识**：`external_user_id` 使用商户的固定用户 ID，由后端登录态取得；区分大小写，去除首尾空白后 1–128 个 Unicode 字符，不含控制字符。用于路径时按单个路径段编码。
 
-## 1. 独立创建账号 / 获取用户 Key
+商户密钥和用户 `api_key` 均保存在后端，不放进网页、App、URL 或日志。正式接入前请与平台确认已上线版本、CNY 套餐和可用支付渠道。
+
+## 接入流程
+
+```text
+查询套餐 → 创建订单 → 用户打开收银台付款 → 查询订单确认交付 → 获取用户 Key → 调用模型
+```
+
+首次付款交付会自动开户，不必提前创建账号。
+
+## 商户接口
+
+### 1. 查询套餐
 
 ```http
-PUT /api/partner/v1/accounts
-Authorization: Bearer pt_<PARTNER_SECRET>
-Content-Type: application/json
+GET /plans
 ```
+
+响应示例（仅列常用字段）：
 
 ```json
-{"external_user_id":"customer-1001","display_name":"用户1001"}
+{
+  "plans": [{
+    "id": 42,
+    "title": "标准月套餐",
+    "price_amount": 99,
+    "currency": "CNY",
+    "duration_unit": "month",
+    "duration_value": 1,
+    "total_amount": 5000000,
+    "requests_per_minute": 60
+  }]
+}
 ```
 
-`external_user_id` 必填；`display_name` 可选，去空白后最多 128 个 Unicode 字符。首次 HTTP 201，重复请求 HTTP 200：
+- `id` 用于下单；价格以平台为准，当前收银台仅支持 **CNY**。
+- `total_amount` 为每周期额度，`0` 表示不限量；不是 Token 数或人民币金额。
+- `requests_per_minute` 为每用户套餐 RPM，`0` 不设套餐级限制，系统限制仍有效。
+- 无可用套餐返回 `{"plans":[]}`。
 
-```json
-{"external_user_id":"customer-1001","api_key":"sk-<USER_API_KEY>","created":true}
-```
-
-- 重复请求返回同一可用 Key，`created:false`，不更新既有资料。
-- 此操作不下单、不收款、不赠送套餐。也可以不先调用，待首次已付款交付时由我方自动创建账号与 Key。
-- 用户/成员被禁用、用户分组错误或 Key 被禁用、删除、过期时拒绝，不自动换 Key。
-- Key 应由商户后端保管；不要放进支付链接、订单状态、回跳参数或跨页消息。
-
-## 2. 查询本商户专属套餐
+### 2. 创建订单
 
 ```http
-GET /api/partner/v1/plans
-Authorization: Bearer pt_<PARTNER_SECRET>
-```
-
-HTTP 200，只返回当前商户已启用套餐，以下省略非核心字段：
-
-```json
-{"plans":[{"id":42,"title":"标准月套餐","price_amount":99,"currency":"CNY","duration_unit":"month","duration_value":1,"applicable_group":"merchant-exclusive","total_amount":5000000,"requests_per_minute":60,"quota_reset_period":"monthly","max_purchase_per_user":0}]}
-```
-
-| 字段 | 说明 |
-| --- | --- |
-| `id` | 下单使用的 `plan_id` |
-| `price_amount` / `currency` | 平台价格及币种；下单由我方重新验证、保存快照，不能由商户提交金额 |
-| `duration_unit` / `duration_value` | 当前固定为一个日历月 |
-| `applicable_group` | 商户专属模型分组 |
-| `total_amount` | 每周期额度，`0` 表示不限量 |
-| `requests_per_minute` | 每用户适用的套餐 RPM；`0` 不设套餐级限制，系统/分组限制仍生效 |
-| `quota_reset_period` | 当前固定为 `monthly` |
-| `max_purchase_per_user` | `0` 不限购买次数；非零存在购买名额预留约束，见后文 |
-
-无可用套餐时返回 `{"plans":[]}`。第一版复用 Epay，Tenant 套餐统一使用 **CNY、正数且精确到分** 的价格；创建和修改时省略币种默认 CNY，显式提交 USD 等其他币种会被拒绝。历史非 CNY 条目下单仍返回 `unsupported_currency`，不会自动换算或迁移；在管理界面编辑时须重新填写人民币价格，不会将原金额直接改标为 CNY。普通用户套餐币种行为不变。
-
-## 3. 创建套餐购买订单
-
-```http
-POST /api/partner/v1/subscription-orders
-Authorization: Bearer pt_<PARTNER_SECRET>
+POST /subscription-orders
 Idempotency-Key: purchase_20261111_0001
-Content-Type: application/json
 ```
 
 ```json
 {"external_user_id":"customer-1001","plan_id":42,"payment_method":"alipay"}
 ```
 
-| 参数 | 必填 | 说明 |
-| --- | --- | --- |
-| `external_user_id` | 是 | 当前登录用户在商户侧的稳定 ID，不必提前开户 |
-| `plan_id` | 是 | 本商户启用的正整数套餐 ID |
-| `payment_method` | 是 | 我方实际配置可用的 Epay 方式，例如 `alipay`；不保证所有渠道可用 |
-| `Idempotency-Key` 请求头 | 是 | 16–64 位字母、数字、`-`、`_`，每次购买固定一个值，超时重试必须复用 |
+三个字段均必填：用户 ID、套餐 ID、平台已启用的支付方式。**不提交金额或“已付款”标记。**
 
-不接受 `amount`、`paid`、内部用户 ID 或任意回调地址。商户无需先创建自己的应付订单号。
-
-首次 HTTP 201，同请求重试 HTTP 200：
+首次 HTTP 201，原请求重试 HTTP 200：
 
 ```json
 {
-  "order_no":"PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
-  "external_user_id":"customer-1001",
-  "plan_id":42,
-  "plan_title":"标准月套餐",
-  "amount":"99.00",
-  "currency":"CNY",
-  "payment_method":"alipay",
-  "payment_status":"pending",
-  "fulfillment_status":"not_ready",
-  "created_at":1800000000,
-  "expires_at":1800001800,
-  "checkout_url":"https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_<ORDER_CAPABILITY>"
+  "order_no": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
+  "external_user_id": "customer-1001",
+  "plan_id": 42,
+  "plan_title": "标准月套餐",
+  "amount": "99.00",
+  "currency": "CNY",
+  "payment_method": "alipay",
+  "payment_status": "pending",
+  "fulfillment_status": "not_ready",
+  "created_at": 1800000000,
+  "expires_at": 1800001800,
+  "checkout_url": "https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_<订单令牌>"
 }
 ```
 
-- `order_no` 由我方生成；`Idempotency-Key` 只是请求重试标识，二者不能混淆。
-- 同租户、同键改用户/套餐/支付方式返回 `409 idempotency_conflict`。
-- 重试复用原订单、原有效期，不会刷新有效期或再次收费。首次支付准备失败后用原键重试。
-- 未付款下单不自动创建模型账号、不产生套餐权益。
+**重试规则**：幂等键为 16–64 位字母、数字、`-`、`_`。每笔购买保存一个固定键；超时或失败后使用**原参数、原键**重试。同键改参数返回 409，不要盲目换键重复下单。
 
-## 4. 打开统一收银台
+用户点击后，新窗口打开返回的 `checkout_url`（建议 `rel="noopener noreferrer"`），无需登录野菜账号。不保证支持 iframe；链接含敏感订单令牌，不改写、不记录日志或埋点。初始有效期 30 分钟，重试不延长；过期后通过商户后端查单，不能据此认定渠道已关单。
 
-商户网页在用户操作后打开返回的 `checkout_url`。我方页面展示订单、二维码/付款链接和交付状态；用户不必另行登录我方完整账号。支付渠道可能要求新窗口，不承诺 iframe 内付款。
-
-`#token=...` 是敏感、短期、仅限此订单的访问能力，不是用户 Key。不得写入日志、分析系统、转成 query 或替换为商户密钥。页面会在路由初始化前清除 fragment，仅保存在该订单的 `sessionStorage` 以便同标签页刷新，不使用 `localStorage`。
-
-收银台内部使用：
+### 3. 查询订单
 
 ```http
-GET /api/partner/checkout/{order_no}
-Authorization: Bearer pc_<ORDER_CAPABILITY>
+GET /subscription-orders/{order_no}
 ```
 
-此公开安全响应不含用户 ID、租户凭证或 Key；不能用订单号直接查，也不能凭它管理账号。商户不需要自行调用此接口。
-
-访问能力在初始 30 分钟截止时失效。失效后通过商户后端查询订单，不应把收银台过期理解为支付渠道已关单。付款回跳仅用于展示，不会触发开通。
-
-## 5. 查询付款与交付状态
-
-```http
-GET /api/partner/v1/subscription-orders/{order_no}
-Authorization: Bearer pt_<PARTNER_SECRET>
-```
-
-返回订单业务对象，字段与创建响应一致，但不返回 `checkout_url`、二维码、付款链接或 Key；交付后可带 `subscription_id`。只允许查询本商户订单，商户后端还必须检查它属于自己当前登录用户。
+返回与创建订单相同的业务字段，但不含 `checkout_url`、付款链接或用户 Key；交付后可有 `subscription_id`。商户后端须核对返回的 `external_user_id` 属于当前登录用户。
 
 | 字段 | 值 | 含义 |
 | --- | --- | --- |
-| `payment_status` | `pending` | 等待可信付款确认 |
-|  | `paid` | 我方已记录核实的付款 |
-|  | `failed` / `expired` | 支付不可继续或待付款订单超时；不代表已经收到的晚到付款可丢弃 |
-| `fulfillment_status` | `not_ready` | 尚未具备交付条件 |
-|  | `pending` | 已付款、等待交付 |
-|  | `fulfilled` | 套餐交付完成 |
-|  | `failed_retryable` | 已付款、本地交付待恢复，不要再次付款 |
+| `payment_status` | `pending` / `paid` / `failed` / `expired` | 待付款 / 已付款 / 失败 / 收银台过期 |
+| `fulfillment_status` | `not_ready` / `pending` / `fulfilled` / `failed_retryable` | 未就绪 / 待交付 / 已交付 / 交付待恢复 |
 
-**只有 `paid + fulfilled` 才表示已开通。** 商户网页经自己的后端适当轮询；关闭页面后后台照常交付，再打开时恢复查询。
+**只有 `payment_status=paid` 且 `fulfillment_status=fulfilled` 才算开通成功。**
 
-我方验签通知会核对商户号、订单、金额、支付方式和交易唯一性；浏览器“我已支付”、回跳及商户声明均不构成付款凭据。付款事实单独持久保存，交付失败不会抹去。启动及每 30 秒扫描已付款待交付订单，重复通知/重试不重复续期。
+建议每 3–5 秒经商户后端查询，页面离开时停止。付款以平台确认结果为准，不能凭浏览器回跳开通；已付款但未交付时等待或联系平台，**不要再次付款**。当前不提供商户 webhook。
 
-本版依赖支付渠道可信通知重试建立付款事实，没有调用会将商户密钥放入 URL 的不安全主动查单接口；如果所有通知均丢失，仍需运营与渠道对账。
-
-## 6. 查询订阅额度
+### 4. 开户 / 获取用户 Key
 
 ```http
-GET /api/partner/v1/accounts/{external_user_id}/subscription/quota
-Authorization: Bearer pt_<PARTNER_SECRET>
+PUT /accounts
 ```
 
 ```json
-{"external_user_id":"customer-1001","subscriptions":[{"plan_id":42,"plan_title":"标准月套餐","start_time":1800000000,"end_time":1802678400,"status":"active","quota_total":5000000,"quota_used":250,"quota_remaining":4999750,"quota_unlimited":false,"next_reset_time":1801440000}]}
+{"external_user_id":"customer-1001","display_name":"用户1001"}
 ```
 
-只返回当前有效且属于本商户的订阅；无有效套餐为 `subscriptions:[]`。`quota_unlimited:true` 时总额/剩余额为 `0`，不能视为耗尽。账号不存在返回 404。
-
-同账号、同套餐有效时续费延长一个日历月，不增加当期额度。已被订单接受的续费即使在付款前自然到期，仍可在原订阅上恢复履约；不会恢复取消或删除的订阅。
-
-## 7. 模型接口
-
-以下使用用户 Key，模型 ID 和支持协议以实际模型列表/配置为准：
-
-| 方法 | 路径 | 请求体示例 |
-| --- | --- | --- |
-| GET | `/v1/models` | 无 |
-| POST | `/v1/chat/completions` | `{"model":"<MODEL_ID>","messages":[{"role":"user","content":"你好"}],"stream":false}` |
-| POST | `/v1/responses` | `{"model":"<MODEL_ID>","input":"你好","stream":false}` |
-| POST | `/v1/messages` | `{"model":"<MODEL_ID>","messages":[{"role":"user","content":"你好"}],"max_tokens":128}` |
-
-`/v1/messages` 附带 `anthropic-version: 2023-06-01`，也支持 `x-api-key`。流式 Chat 设置 `stream:true`，文本在 `choices[].delta.content`，以 `data: [DONE]` 结束；HTTP 200 不代表流完整成功，须检查流内错误。
-
-Tenant 身份强制仅套餐资金来源：钱包即使有钱、用户偏好钱包，无适用套餐或套餐过期/额度不足也不回退钱包。旧 Midjourney/SwapFace 不支持订阅，Tenant 用户会在请求上游前被拒绝，不走钱包。普通用户及独立 PartnerServer 充值不受此合同替代。
-
-## 8. 错误码
+`external_user_id` 必填；`display_name` 可选，去除首尾空白后最多 128 个 Unicode 字符。
 
 ```json
-{"error":{"code":"order_not_found","message":"order not found"},"request_id":"<REQUEST_ID>"}
+{"external_user_id":"customer-1001","api_key":"sk-<用户Key>","created":true}
 ```
 
-| HTTP | `error.code` | 说明 |
+首次 HTTP 201；重复调用 HTTP 200，返回同一可用 Key，`created:false`。可提前开户，也可付款交付后再获取 Key；**开户本身不赠送套餐**。既有 Key 不可用时会报错，不自动换新。
+
+### 5. 查询订阅额度
+
+```http
+GET /accounts/{external_user_id}/subscription/quota
+```
+
+```json
+{
+  "external_user_id": "customer-1001",
+  "subscriptions": [{
+    "plan_id": 42,
+    "plan_title": "标准月套餐",
+    "start_time": 1800000000,
+    "end_time": 1802678400,
+    "status": "active",
+    "quota_total": 5000000,
+    "quota_used": 250,
+    "quota_remaining": 4999750,
+    "quota_unlimited": false,
+    "next_reset_time": 1801440000
+  }]
+}
+```
+
+- 时间均为 Unix 秒；额度为内部整数单位。
+- `quota_unlimited:true` 表示不限量，剩余额度为 `0` 不代表耗尽。
+- 无有效套餐返回 `subscriptions:[]`；未开户返回 `404 account_not_found`。
+- 同套餐有效期内续费延长一个日历月，不增加当期额度；无有效订阅时不回退钱包扣费。
+
+## 模型调用
+
+由商户后端使用上一步取得的 **用户 Key（`sk-`）**，不是商户密钥（`pt_`）。路径相对服务根地址：
+
+```http
+GET /v1/models
+Authorization: Bearer sk-<用户Key>
+```
+
+从模型列表选择实际模型 ID，再发起请求：
+
+```http
+POST /v1/chat/completions
+Authorization: Bearer sk-<用户Key>
+Content-Type: application/json
+
+{"model":"<MODEL_ID>","messages":[{"role":"user","content":"你好"}],"stream":false}
+```
+
+模型 ID 及支持协议以实际模型列表和平台配置为准。
+
+## 常见错误
+
+```json
+{"error":{"code":"order_not_found","message":"order not found"},"request_id":"..."}
+```
+
+| HTTP | 错误码 | 处理 |
 | --- | --- | --- |
-| 400 | `invalid_request` | 身份/参数/请求体/幂等键错误或未知字段、禁止的 query |
-| 400 | `unsupported_currency` | 当前套餐币种不能使用 CNY Epay 支付 |
-| 401 | `invalid_partner_secret` | 密钥缺失/错误/已轮换，或租户被禁用 |
-| 401 | `invalid_checkout_access` | 收银台能力缺失、错误或过期，返回商户查询 |
-| 403 | `account_disabled` | 已有账号、成员被禁用或用户分组错误 |
-| 404 | `account_not_found` / `plan_not_found` / `order_not_found` | 当前商户范围内资源不存在或不可用 |
-| 409 | `credential_unavailable` | 既有 Key 不可用，不能自动换新 |
-| 409 | `idempotency_conflict` | 同键请求内容发生变化 |
-| 409 | `purchase_limit_reached` | 历史购买或待支付预留名额已达上限 |
-| 429 | `rate_limited` | 按 Retry-After 等待；下单每用户每小时 20 笔、同时待付款 5 笔、租户每小时 2000 笔，另有 API 限流 |
-| 503 | `payment_unavailable` | 支付配置/准备暂不可用，等待后使用原请求和原幂等键重试 |
-| 500 | `server_error` | 服务异常；不确定是否创建成功时不要换键再次购买 |
+| 400 | `invalid_request` / `unsupported_currency` | 检查参数；非 CNY 套餐联系平台重新定价 |
+| 401 | `invalid_partner_secret` | 检查密钥或联系平台 |
+| 403 / 409 | `account_disabled` / `credential_unavailable` | 账号或 Key 不可用，联系平台 |
+| 404 | `account_not_found` / `plan_not_found` / `order_not_found` | 资源不存在或不属于本商户 |
+| 409 | `idempotency_conflict` / `purchase_limit_reached` | 恢复原购买参数，或核查购买上限 |
+| 429 | `rate_limited` | 按 `Retry-After` 等待 |
+| 500 / 503 | `server_error` / `payment_unavailable` | 下单时使用原参数、原幂等键重试 |
 
-模型接口保留各自协议错误格式。
+报障提供订单号、错误码及 `request_id`，不要提供密钥或收银台完整链接。
 
-## 9. 配置与运营注意
+---
 
-- 我方需启用租户、专属分组和 CNY 套餐，配置可用 Epay、规范 HTTPS 回调域，以及副本间一致且稳定的 `SESSION_SECRET` / `CRYPTO_SECRET`。轮换签名密钥会使旧收银台链接失效。
-- CDN/反向代理须保持收银台 `no-store`、`no-referrer` 和禁止嵌入，不注入第三方分析脚本；内置 HTML 路由已设置这些响应头。
-- 套餐非零 `max_purchase_per_user` 时，未履约的新购订单会预留名额，**收银台过期不会自动释放**，因为仍可能晚到付款。目前没有安全的渠道关单/自动释放接口，废弃订单需运营与渠道核实；普通可持续续费的月套餐建议使用 `0`，除非确实需要该保守限制。
-- 已付款后套餐被禁用/删除或冻结权益、归属分组发生变化，可能停留在待恢复交付；不要要求用户再次付款。当前不包含自动退款或商户 webhook。
-- 禁用租户会停止商户管理，不等于自动撤销已发放模型 Key；既有已交付权益按当前模型鉴权和套餐策略执行。
-- 不兼容旧外部直接开通不等于清空测试/历史数据，本次也未部署或执行真实付款。
+[运行接入 Demo](../examples/partner-tenant-demo/README.md) · [详细接口与边界说明](./partner-tenant-api.md)

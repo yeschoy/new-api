@@ -3,19 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <!-- Apply before any injected analytics scripts or external resources. The
-         cashier is an order-only surface, never an analytics/account page. -->
+         purchase and cashier pages are capability-only surfaces, never an analytics/account page. -->
     <script>
       // Decode once, matching lib/access.ts and Go's request path handling.
-      var isPartnerCheckoutDocument = false
+      var isPartnerPublicDocument = false
       try {
-        isPartnerCheckoutDocument = /^\/partner\/checkout\/?$/.test(
+        isPartnerPublicDocument = /^\/partner\/(checkout|purchase)\/?$/.test(
           decodeURIComponent(window.location.pathname)
         )
       } catch (e) {}
-      if (isPartnerCheckoutDocument) {
+      if (isPartnerPublicDocument) {
         var cashierPolicy = document.createElement('meta')
         cashierPolicy.httpEquiv = 'Content-Security-Policy'
-        cashierPolicy.content = "default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'"
+        cashierPolicy.content =
+          "default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-src 'none'"
         document.head.appendChild(cashierPolicy)
         var cashierReferrer = document.createElement('meta')
         cashierReferrer.name = 'referrer'
@@ -54,24 +55,26 @@
         document.documentElement.classList.add(theme)
       })()
     </script>
-    <!-- Backend-injected analytics remain inert on the order-only cashier. -->
+    <!-- Backend-injected analytics remain inert on the capability-only partner pages. -->
     <template id="site-analytics">
-    <!--umami-->
-    <!--Google Analytics-->
+      <!--umami-->
+      <!--Google Analytics-->
     </template>
     <script>
       ;(function () {
         var template = document.getElementById('site-analytics')
         if (!template) return
-        if (!isPartnerCheckoutDocument) {
-          template.content.querySelectorAll('script').forEach(function (original) {
-            var script = document.createElement('script')
-            Array.from(original.attributes).forEach(function (attribute) {
-              script.setAttribute(attribute.name, attribute.value)
+        if (!isPartnerPublicDocument) {
+          template.content
+            .querySelectorAll('script')
+            .forEach(function (original) {
+              var script = document.createElement('script')
+              Array.from(original.attributes).forEach(function (attribute) {
+                script.setAttribute(attribute.name, attribute.value)
+              })
+              script.textContent = original.textContent
+              document.head.appendChild(script)
             })
-            script.textContent = original.textContent
-            document.head.appendChild(script)
-          })
         }
         template.remove()
       })()

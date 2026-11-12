@@ -34,7 +34,7 @@ import { ThemeCustomizationProvider } from '@/context/theme-customization-provid
 import { saveAffiliateCode } from '@/features/auth/lib/storage'
 import { GeneralError } from '@/features/errors/general-error'
 import { NotFoundError } from '@/features/errors/not-found-error'
-import { isPartnerCheckoutPath } from '@/features/partner-checkout/lib/access'
+import { isPartnerPublicPath } from '@/features/partner-purchase/lib/surface'
 import { RewardBanner } from '@/features/reward-banner'
 import { getSetupStatus } from '@/features/setup/api'
 import { useSystemConfig } from '@/hooks/use-system-config'
@@ -49,8 +49,10 @@ import { resolveLegacyRoute } from '@/lib/legacy-route'
 import { useAuthStore } from '@/stores/auth-store'
 
 function RootComponent() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
-  if (isPartnerCheckoutPath(pathname)) return <Outlet />
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  if (isPartnerPublicPath(pathname)) return <Outlet />
   return <StandardRootComponent />
 }
 
@@ -126,9 +128,9 @@ export const Route = createRootRouteWithContext<{
 }>()({
   // 应用初始化与路由解析前统一校验会话
   beforeLoad: async ({ location }) => {
-    // Cashier access is order-only: never bootstrap/refresh a platform session,
-    // redirect to setup/login, or run generic root status and reward effects.
-    if (isPartnerCheckoutPath(location.pathname)) return
+    // Purchase/cashier capabilities are not platform sessions: never bootstrap
+    // auth, redirect to setup/login, or run generic status/reward effects.
+    if (isPartnerPublicPath(location.pathname)) return
     const legacyTarget = resolveLegacyRoute(location.href)
     if (legacyTarget) {
       throw createInternalRedirect(legacyTarget)

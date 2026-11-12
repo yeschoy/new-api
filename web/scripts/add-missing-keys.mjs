@@ -676,6 +676,293 @@ const newKeys = {
   },
 }
 
+// Hosted purchase copy. --partner-purchase applies only this scoped batch.
+const purchaseKeys = {
+  en: {
+    'Choose your subscription': 'Choose your subscription',
+    'One purchase per link. Final payment and delivery status are shown in the checkout.':
+      'One purchase per link. Final payment and delivery status are shown in the checkout.',
+    'Loading purchase options…': 'Loading purchase options…',
+    'Purchase access expires': 'Purchase access expires',
+    'An order already exists for this purchase':
+      'An order already exists for this purchase',
+    'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.':
+      'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.',
+    'Resume checkout / view order': 'Resume checkout / view order',
+    'No purchase options are available': 'No purchase options are available',
+    'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.':
+      'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.',
+    'One calendar month': 'One calendar month',
+    'Unlimited quota': 'Unlimited quota',
+    'Internal quota units: {{amount}}': 'Internal quota units: {{amount}}',
+    'Plan rate limit: {{rpm}} requests/min':
+      'Plan rate limit: {{rpm}} requests/min',
+    'Payment method': 'Payment method',
+    'Your original options are locked for safe retry. A new purchase must start from the merchant.':
+      'Your original options are locked for safe retry. A new purchase must start from the merchant.',
+    'Original plan {{plan}} · payment {{method}}':
+      'Original plan {{plan}} · payment {{method}}',
+    'Opening checkout…': 'Opening checkout…',
+    'Retry original purchase': 'Retry original purchase',
+    'Continue to checkout': 'Continue to checkout',
+    'Check purchase status': 'Check purchase status',
+    'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.':
+      'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.',
+    'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.':
+      'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.',
+    'Purchase access has expired. Return to the merchant to check your order before starting again.':
+      'Purchase access has expired. Return to the merchant to check your order before starting again.',
+    'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.':
+      'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.',
+    'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.':
+      'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.',
+    'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.':
+      'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.',
+  },
+  zh: {
+    'Choose your subscription': '选择订阅套餐',
+    'One purchase per link. Final payment and delivery status are shown in the checkout.':
+      '每个链接仅限一次购买。最终付款与交付状态以收银台为准。',
+    'Loading purchase options…': '正在加载购买选项…',
+    'Purchase access expires': '购买入口到期时间',
+    'An order already exists for this purchase': '本次购买已有订单',
+    'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.':
+      '请继续此订单，不要另行购买。如已付款，请等待核验确认。',
+    'Resume checkout / view order': '继续付款 / 查看订单',
+    'No purchase options are available': '暂无可用购买选项',
+    'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.':
+      '商户目前没有可付款的套餐或支付方式。请返回商户或稍后查看。',
+    'One calendar month': '一个日历月',
+    'Unlimited quota': '不限额度',
+    'Internal quota units: {{amount}}': '内部额度单位：{{amount}}',
+    'Plan rate limit: {{rpm}} requests/min': '套餐限速：{{rpm}} 次请求/分钟',
+    'Payment method': '支付方式',
+    'Your original options are locked for safe retry. A new purchase must start from the merchant.':
+      '已锁定原购买选项，以便安全重试。新购买须从商户重新发起。',
+    'Original plan {{plan}} · payment {{method}}':
+      '原套餐 {{plan}} · 支付方式 {{method}}',
+    'Opening checkout…': '正在打开收银台…',
+    'Retry original purchase': '重试原购买',
+    'Continue to checkout': '前往收银台',
+    'Check purchase status': '查询购买状态',
+    'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.':
+      '浏览器存储不可用，刷新恢复受限。如页面关闭，请返回商户查单。',
+    'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.':
+      '购买入口无效、已撤销或已在其他窗口使用。请返回商户查询本次购买。',
+    'Purchase access has expired. Return to the merchant to check your order before starting again.':
+      '购买入口已过期。再次发起前，请返回商户查询订单。',
+    'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.':
+      '本次购买已使用其他选项。请查询状态或返回商户，不要重复付款。',
+    'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.':
+      '当前购买选项不可用。再次发起前，请查询购买状态或联系商户。',
+    'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.':
+      '无法确认请求结果。请重试原购买或查询状态，不要另行付款。',
+  },
+  'zh-TW': {
+    'Choose your subscription': '選擇訂閱方案',
+    'One purchase per link. Final payment and delivery status are shown in the checkout.':
+      '每個連結僅限一次購買。最終付款與交付狀態以收銀台為準。',
+    'Loading purchase options…': '正在載入購買選項…',
+    'Purchase access expires': '購買入口到期時間',
+    'An order already exists for this purchase': '本次購買已有訂單',
+    'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.':
+      '請繼續此訂單，不要另行購買。如已付款，請等待驗證確認。',
+    'Resume checkout / view order': '繼續付款 / 檢視訂單',
+    'No purchase options are available': '暫無可用購買選項',
+    'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.':
+      '商戶目前沒有可付款的方案或付款方式。請返回商戶或稍後查看。',
+    'One calendar month': '一個曆月',
+    'Unlimited quota': '不限額度',
+    'Internal quota units: {{amount}}': '內部額度單位：{{amount}}',
+    'Plan rate limit: {{rpm}} requests/min':
+      '方案速率限制：每分鐘 {{rpm}} 次請求',
+    'Payment method': '付款方式',
+    'Your original options are locked for safe retry. A new purchase must start from the merchant.':
+      '已鎖定原購買選項，以便安全重試。新購買須從商戶重新發起。',
+    'Original plan {{plan}} · payment {{method}}':
+      '原方案 {{plan}} · 付款方式 {{method}}',
+    'Opening checkout…': '正在開啟收銀台…',
+    'Retry original purchase': '重試原購買',
+    'Continue to checkout': '前往收銀台',
+    'Check purchase status': '查詢購買狀態',
+    'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.':
+      '瀏覽器儲存不可用，重新整理後的恢復受限。如頁面關閉，請返回商戶查單。',
+    'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.':
+      '購買入口無效、已撤銷或已在其他視窗使用。請返回商戶查詢本次購買。',
+    'Purchase access has expired. Return to the merchant to check your order before starting again.':
+      '購買入口已過期。再次發起前，請返回商戶查詢訂單。',
+    'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.':
+      '本次購買已使用其他選項。請查詢狀態或返回商戶，不要重複付款。',
+    'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.':
+      '目前購買選項不可用。再次發起前，請查詢購買狀態或聯絡商戶。',
+    'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.':
+      '無法確認請求結果。請重試原購買或查詢狀態，不要另行付款。',
+  },
+  fr: {
+    'Choose your subscription': 'Choisissez votre abonnement',
+    'One purchase per link. Final payment and delivery status are shown in the checkout.':
+      'Un achat par lien. Le paiement et la livraison définitifs sont indiqués dans la caisse.',
+    'Loading purchase options…': 'Chargement des options d’achat…',
+    'Purchase access expires': 'Expiration de l’accès à l’achat',
+    'An order already exists for this purchase':
+      'Une commande existe déjà pour cet achat',
+    'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.':
+      'Reprenez cette commande sans nouvel achat. Si vous avez payé, attendez la confirmation vérifiée.',
+    'Resume checkout / view order': 'Reprendre le paiement / voir la commande',
+    'No purchase options are available': 'Aucune option d’achat disponible',
+    'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.':
+      'Le marchand n’a aucun forfait payable ou moyen de paiement disponible. Revenez chez lui ou réessayez plus tard.',
+    'One calendar month': 'Un mois calendaire',
+    'Unlimited quota': 'Quota illimité',
+    'Internal quota units: {{amount}}': 'Unités de quota internes : {{amount}}',
+    'Plan rate limit: {{rpm}} requests/min':
+      'Limite du forfait : {{rpm}} requêtes/min',
+    'Payment method': 'Moyen de paiement',
+    'Your original options are locked for safe retry. A new purchase must start from the merchant.':
+      'Vos choix initiaux sont verrouillés pour réessayer sans risque. Tout nouvel achat doit partir du marchand.',
+    'Original plan {{plan}} · payment {{method}}':
+      'Forfait initial {{plan}} · paiement {{method}}',
+    'Opening checkout…': 'Ouverture de la caisse…',
+    'Retry original purchase': 'Réessayer l’achat initial',
+    'Continue to checkout': 'Passer au paiement',
+    'Check purchase status': 'Vérifier l’état de l’achat',
+    'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.':
+      'Le stockage du navigateur est indisponible. La reprise après actualisation est limitée ; si la page se ferme, consultez la commande chez le marchand.',
+    'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.':
+      'L’accès est invalide, révoqué ou déjà utilisé dans une autre fenêtre. Vérifiez votre achat auprès du marchand.',
+    'Purchase access has expired. Return to the merchant to check your order before starting again.':
+      'L’accès à l’achat a expiré. Vérifiez la commande chez le marchand avant de recommencer.',
+    'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.':
+      'Cet achat utilise déjà d’autres options. Vérifiez son état ou contactez le marchand ; ne payez pas deux fois.',
+    'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.':
+      'Ces options d’achat sont indisponibles. Vérifiez l’état de l’achat ou contactez le marchand avant de recommencer.',
+    'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.':
+      'La demande n’a pas pu être confirmée. Réessayez le même achat ou vérifiez son état ; ne lancez pas un second paiement.',
+  },
+  ja: {
+    'Choose your subscription': 'サブスクリプションを選択',
+    'One purchase per link. Final payment and delivery status are shown in the checkout.':
+      'リンクごとに購入は1回限りです。最終的な支払い・提供状況は決済画面に表示されます。',
+    'Loading purchase options…': '購入オプションを読み込み中…',
+    'Purchase access expires': '購入アクセスの有効期限',
+    'An order already exists for this purchase':
+      'この購入には既存の注文があります',
+    'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.':
+      '新たに購入せず、この注文を再開してください。支払い済みの場合は確認をお待ちください。',
+    'Resume checkout / view order': '決済を再開 / 注文を表示',
+    'No purchase options are available': '購入できるオプションがありません',
+    'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.':
+      '現在、この加盟店には購入可能なプランまたは支払い方法がありません。加盟店に戻るか、後ほどご確認ください。',
+    'One calendar month': '1暦月',
+    'Unlimited quota': 'クォータ無制限',
+    'Internal quota units: {{amount}}': '内部クォータ単位：{{amount}}',
+    'Plan rate limit: {{rpm}} requests/min':
+      'プランの制限：毎分 {{rpm}} リクエスト',
+    'Payment method': '支払い方法',
+    'Your original options are locked for safe retry. A new purchase must start from the merchant.':
+      '安全に再試行するため、最初の選択内容を固定しました。新規購入は加盟店から開始してください。',
+    'Original plan {{plan}} · payment {{method}}':
+      '元のプラン {{plan}} · 支払い {{method}}',
+    'Opening checkout…': '決済画面を開いています…',
+    'Retry original purchase': '元の購入を再試行',
+    'Continue to checkout': '決済へ進む',
+    'Check purchase status': '購入状況を確認',
+    'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.':
+      'ブラウザーのストレージが利用できず、再読み込み後の復元は制限されます。ページを閉じた場合は加盟店で注文をご確認ください。',
+    'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.':
+      '購入アクセスが無効、取り消し済み、または別のウィンドウで使用済みです。加盟店で購入状況をご確認ください。',
+    'Purchase access has expired. Return to the merchant to check your order before starting again.':
+      '購入アクセスの有効期限が切れました。再開する前に加盟店で注文をご確認ください。',
+    'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.':
+      'この購入は別の選択内容で処理されています。状況を確認するか加盟店に戻ってください。二重に支払わないでください。',
+    'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.':
+      'これらの購入オプションは利用できません。再開する前に購入状況を確認するか加盟店へお問い合わせください。',
+    'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.':
+      'リクエストの結果を確認できませんでした。同じ購入を再試行するか状況を確認してください。別の支払いは開始しないでください。',
+  },
+  ru: {
+    'Choose your subscription': 'Выберите подписку',
+    'One purchase per link. Final payment and delivery status are shown in the checkout.':
+      'Одна покупка на ссылку. Итоговый статус оплаты и выдачи указан на странице оплаты.',
+    'Loading purchase options…': 'Загрузка вариантов покупки…',
+    'Purchase access expires': 'Срок доступа к покупке',
+    'An order already exists for this purchase':
+      'Для этой покупки уже есть заказ',
+    'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.':
+      'Продолжите этот заказ, не создавайте новую покупку. Если вы уже оплатили, дождитесь проверки.',
+    'Resume checkout / view order': 'Продолжить оплату / открыть заказ',
+    'No purchase options are available': 'Нет доступных вариантов покупки',
+    'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.':
+      'Сейчас у продавца нет доступных тарифов или способов оплаты. Вернитесь к продавцу или проверьте позже.',
+    'One calendar month': 'Один календарный месяц',
+    'Unlimited quota': 'Неограниченная квота',
+    'Internal quota units: {{amount}}': 'Внутренние единицы квоты: {{amount}}',
+    'Plan rate limit: {{rpm}} requests/min':
+      'Лимит тарифа: {{rpm}} запросов/мин',
+    'Payment method': 'Способ оплаты',
+    'Your original options are locked for safe retry. A new purchase must start from the merchant.':
+      'Исходные параметры зафиксированы для безопасного повтора. Новую покупку нужно начинать у продавца.',
+    'Original plan {{plan}} · payment {{method}}':
+      'Исходный тариф {{plan}} · оплата {{method}}',
+    'Opening checkout…': 'Открытие страницы оплаты…',
+    'Retry original purchase': 'Повторить исходную покупку',
+    'Continue to checkout': 'Перейти к оплате',
+    'Check purchase status': 'Проверить статус покупки',
+    'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.':
+      'Хранилище браузера недоступно. Восстановление после обновления ограничено; если страница закроется, проверьте заказ у продавца.',
+    'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.':
+      'Доступ недействителен, отозван или уже использован в другом окне. Проверьте покупку у продавца.',
+    'Purchase access has expired. Return to the merchant to check your order before starting again.':
+      'Срок доступа истёк. Проверьте заказ у продавца, прежде чем начинать заново.',
+    'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.':
+      'Для этой покупки уже выбраны другие параметры. Проверьте статус или вернитесь к продавцу; не платите дважды.',
+    'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.':
+      'Эти варианты покупки недоступны. Прежде чем начать заново, проверьте статус или свяжитесь с продавцом.',
+    'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.':
+      'Не удалось подтвердить результат запроса. Повторите ту же покупку или проверьте её статус; не начинайте вторую оплату.',
+  },
+  vi: {
+    'Choose your subscription': 'Chọn gói đăng ký',
+    'One purchase per link. Final payment and delivery status are shown in the checkout.':
+      'Mỗi liên kết chỉ cho một lần mua. Trạng thái thanh toán và cấp gói cuối cùng được hiển thị tại trang thanh toán.',
+    'Loading purchase options…': 'Đang tải tùy chọn mua…',
+    'Purchase access expires': 'Thời hạn truy cập mua',
+    'An order already exists for this purchase': 'Lần mua này đã có đơn hàng',
+    'Resume this order, not a new purchase. If you already paid, wait for verified confirmation.':
+      'Tiếp tục đơn hàng này, không mua mới. Nếu đã trả tiền, hãy chờ xác minh.',
+    'Resume checkout / view order': 'Tiếp tục thanh toán / xem đơn',
+    'No purchase options are available': 'Không có tùy chọn mua',
+    'The merchant has no payable plans or payment methods right now. Return to the merchant or check again later.':
+      'Hiện người bán không có gói hoặc phương thức thanh toán khả dụng. Hãy quay lại người bán hoặc kiểm tra sau.',
+    'One calendar month': 'Một tháng theo lịch',
+    'Unlimited quota': 'Hạn mức không giới hạn',
+    'Internal quota units: {{amount}}': 'Đơn vị hạn mức nội bộ: {{amount}}',
+    'Plan rate limit: {{rpm}} requests/min':
+      'Giới hạn gói: {{rpm}} yêu cầu/phút',
+    'Payment method': 'Phương thức thanh toán',
+    'Your original options are locked for safe retry. A new purchase must start from the merchant.':
+      'Tùy chọn ban đầu đã được khóa để thử lại an toàn. Mua mới phải bắt đầu từ người bán.',
+    'Original plan {{plan}} · payment {{method}}':
+      'Gói ban đầu {{plan}} · thanh toán {{method}}',
+    'Opening checkout…': 'Đang mở trang thanh toán…',
+    'Retry original purchase': 'Thử lại lần mua ban đầu',
+    'Continue to checkout': 'Tiếp tục đến thanh toán',
+    'Check purchase status': 'Kiểm tra trạng thái mua',
+    'Browser storage is unavailable. Refresh recovery is limited; return to the merchant to check your order if this page closes.':
+      'Bộ nhớ trình duyệt không khả dụng. Khả năng khôi phục sau khi tải lại bị hạn chế; nếu trang đóng, hãy kiểm tra đơn tại người bán.',
+    'Purchase access is invalid, revoked or already used in another window. Return to the merchant to check your purchase.':
+      'Quyền mua không hợp lệ, đã bị thu hồi hoặc đã dùng ở cửa sổ khác. Hãy quay lại người bán để kiểm tra.',
+    'Purchase access has expired. Return to the merchant to check your order before starting again.':
+      'Quyền mua đã hết hạn. Hãy kiểm tra đơn tại người bán trước khi bắt đầu lại.',
+    'This purchase already uses different options. Check its status or return to the merchant; do not pay twice.':
+      'Lần mua này đã dùng tùy chọn khác. Hãy kiểm tra trạng thái hoặc quay lại người bán; không trả tiền hai lần.',
+    'These purchase options are unavailable. Check purchase status or contact the merchant before starting again.':
+      'Các tùy chọn mua này không khả dụng. Hãy kiểm tra trạng thái hoặc liên hệ người bán trước khi bắt đầu lại.',
+    'The request could not be confirmed. Retry the same purchase or check its status; do not start a second payment.':
+      'Không thể xác nhận kết quả yêu cầu. Hãy thử lại cùng lần mua hoặc kiểm tra trạng thái; không tạo thanh toán thứ hai.',
+  },
+}
+
 async function main() {
   if (process.argv.includes('--merge-git-index')) {
     for (const locale of Object.keys(newKeys)) {
@@ -718,7 +1005,15 @@ async function main() {
   }
   let totalAdded = 0
 
-  for (const [locale, trans] of Object.entries(newKeys)) {
+  const additions = process.argv.includes('--partner-purchase')
+    ? purchaseKeys
+    : Object.fromEntries(
+        Object.entries(newKeys).map(([locale, values]) => [
+          locale,
+          { ...values, ...purchaseKeys[locale] },
+        ])
+      )
+  for (const [locale, trans] of Object.entries(additions)) {
     const filePath = path.join(LOCALES_DIR, `${locale}.json`)
     const json = JSON.parse(await fs.readFile(filePath, 'utf8'))
 

@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest'
 
 const feature = path.resolve('src/features/partner-checkout')
 const sources = [fs.readFileSync(path.join(feature, 'index.tsx'), 'utf8')]
-const keys = [...sources.join('\n').matchAll(/\bt\('([^']+)'\)/g)].map(
+const keys = [...sources.join('\n').matchAll(/\bt\(\s*'([^']+)'/g)].map(
   (match) => match[1]
 )
 

@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Review old API parity, payment truth, idempotent order replay and isolated cashier access."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Require real isolated PostgreSQL migration tests and accurate Docker-blocked reporting."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check anonymous fetch policies and unchanged ordinary authenticated page behavior."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify exact request/DTO/session capability ownership and complete cross-layer test coverage."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Check no duplicated payment/fulfillment or unsafe over-broad refactor."}
+{"file":".trellis/tasks/11-12-partner-optional-hosted-h5/research/current-contracts.md","reason":"Approved A scope, source evidence, protected worktree and known verification gaps."}
+{"file": ".trellis/tasks/11-12-partner-optional-hosted-h5/research/review-findings.md", "reason": "Verify accepted findings fixed without scope or legacy-contract regression"}
