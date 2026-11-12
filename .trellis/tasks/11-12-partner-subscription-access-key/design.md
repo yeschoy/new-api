@@ -1,61 +1,56 @@
-# 技术方案：商户交付独立订阅 Key
+# 技术方案：无外部用户 ID 的商户订阅 Key 接入
 
-## 1. 审阅状态与架构边界
+## 1. 审阅状态与边界
 
-**已确认 A：仅在可信付款成功后新增真实内部 User。** 不再实施无 users 独立主体，商户仍不传 external_user_id；创建订单/返回付款 URL 不开户。专属套餐、商户交付、sub_ 独立查询、续费保留 Key、到期历史查询和重置规则继续有效；当前待确认续费定位，尚未批准实施。
+本版对应 PRD R1–R13 / AC1–AC14，**planning，等待最终审阅，未授权实施**。已确认商户通过原订阅 Key 指定续费目标；仅可信付款后的首次新购新增真实 User。无 users principal/funding/RPM/日志重构不实施。
 
-复用 pt_ 鉴权及可信支付基础设施，不把旧 controller/model 的必填 external_user_id 当成新需求；以下新入口、持久化扩展和交付路径仍是草案，待产品关系确认后收敛并重新审阅。
+保持一个端到端任务：新模式订单、隔离身份及凭证在同一付费交付事务验证，不能独立上线；不为已存在的套餐 UI/支付系统另建子任务或重复实现。
 
-- 商户开发者密钥复用现有 `pt_`，仅在商户服务端使用。
-- 复用现有订阅订单、平台收银台、Epay 验证、原子交付及恢复扫描。
-- 新增独立 `sub_` 订阅 Key，只访问一份实际 `UserSubscription`；不写入模型 `Token` 表。
-- Coding API Key 使用真实内部 User/Token；首次新购在可信支付后的原子交付中由平台创建，不要求商户提供终端用户 ID，不挂共享用户。
-- 公共收银台 `pc_`、H5 `pl_/ps_`、商户 `pt_`、订阅 `sub_`、模型 `sk-` 严格分离。
-- 不新增买家平台页面：商户负责持有、领取和交付订阅 Key；现有收银台和 H5 响应不增加秘密字段。本期复用已有后台配置，无需新增前端页面或改动文案。
+复用 pt_、专属套餐、订单支付事实、Epay 校验、平台收银台、恢复扫描、User/Token、UserSubscription、周期重置及订阅专用 funding。只增加新模式和查询凭证；旧 external_user_id API、H5 和普通用户路径保持兼容。
 
-### 1.1 商户专属套餐配置（用户已选 A）
+## 2. 接口与权限
 
-- 平台 root 在现有“套餐管理”的创建表单选择所属商户，为其创建一份或多份专属套餐；后续在同一入口编辑价格、额度、RPM 和启停。沿用 AdminCreate/UpdateSubscriptionPlan，不新增映射表或管理 API。
-- 每份套餐只有一个 PartnerTenantId，保持该归属不可修改；复用现有 dedicated group、CNY、单日历月/月重置及无钱包兜底规则，不改变套餐所有权/计费算法。
-- `GET /api/partner/v1/plans` 用当前 pt_ 只返回此商户名下 enabled 套餐；真实新下单在 model 层仍校验归属、启用状态和对应 group。直接提交他人或平台套餐 ID 返回 scoped 404，不因前端可见性而放宽服务端边界。
-- 现有 H5 继续用其会话绑定商户的同一目录与订单核心；重试保留原订单，不把套餐停用当作取消已有真实支付或另起订单的理由，既有 paid-unfulfilled 恢复策略不变。
-- 该选择已由现有后台/后端支持，因此本期以接入文档和一组 pq 定向回归保证“配置 → 目录 → 下单”的完整链路，不为实现同一能力重复造 UI 或修改已稳定接口。
-- 用户查询仍与商户配置身份分离：GET /api/partner/subscription 只要 sub_，不再要 pt_、商户 ID、Cookie 或商户后端代签。
+### 2.1 接口表
 
-## 2. 接口契约
+| 接口 | 鉴权/输入 | 输出与边界 |
+| --- | --- | --- |
+| GET /api/partner/v1/plans | 当前 pt_ | 复用启用的本商户专属套餐目录 |
+| POST /api/partner/v1/subscription-key-orders | 当前 pt_、Idempotency-Key，严格 JSON `{plan_id,payment_method}` | 新建 201/原样重试 200，返回订单安全 DTO 和 checkout_url |
+| 同一 POST 的续费形式 | 同上，额外 `X-Subscription-Key: sub_...` | 当前 Key 指定原订阅；仍返回付款 URL，不返回长期凭证 |
+| GET /api/partner/v1/subscription-key-orders/:order_no | 当前 pt_ | 本商户、本模式订单状态，无买家 ID/秘密；GET 不准备支付 |
+| GET /api/partner/v1/subscription-key-orders/:order_no/subscription-key | 当前 pt_ | paid+fulfilled 才返回 `{order_no,subscription_id,subscription_key,key_version}` |
+| GET /api/partner/subscription | 仅 `Authorization: Bearer sub_...` | 关联单订阅、额度、条件允许时的 Coding API Key；不需要 pt_/商户 ID/Cookie |
+| POST /api/partner/v1/subscriptions/:subscription_id/key/rotate | 当前 pt_、Idempotency-Key、严格 JSON `{expected_version:1}` | `{subscription_id,subscription_key,key_version}`，不更换 Coding Key/权益 |
 
-新接口沿用 plain JSON、统一错误对象和 request_id。所有响应包含 no-store / Pragma，额外配置 no-referrer；禁止 URL 携带任何秘密凭证，不使用平台 Cookie 或 OAuth 身份替代 Bearer。
+新 API 使用 plain JSON、request_id、安全错误、no-store/Pragma/no-referrer。新增商户路由放在现有 pt_ 组内；独立查询在该组之外，不能误挂平台登录或商户鉴权。
 
-### 2.1 无用户 ID 的新下单入口（草案）
+所有新请求拒绝 query，JSON 限 2KB，拒绝未知/重复/大小写别名字段、尾随 JSON 和重复鉴权/幂等/订阅 Key 请求头。sub_ 为固定前缀加 64 位小写 hex；不接受 URL、JSON、Cookie、x-api-key 中的替代凭证。续费 Key 放单独请求头，避免与 pt_ 的 Authorization 混用，也避免业务 JSON/请求摘要保存原秘密。出现该头但为空/错误时拒绝，绝不能退化为新购。
 
-- 旧 `POST /api/partner/v1/subscription-orders` 及 H5 会话继续保留原身份契约，不能直接去掉校验，避免静默改变旧客户端行为。
-- 建议为新模式新增明确的入口，例如 `POST /api/partner/v1/subscription-key-orders`；路径待技术收敛，不对商户要求任何 external_user_id 或先开户动作。
-- 商户用 `Authorization: Bearer pt_...` 和 Idempotency-Key；首次新购请求的业务字段为 `{plan_id, payment_method}`。幂等键表示购买意图，不表示用户。
-- 建议续费请求显式带原订阅 Key，以便确定续期对象并沿用 Key；这是当前待确认的产品关系，不得擅自按同商户+套餐推断买家或续费目标。
-- 成功返回 order_no 和 checkout_url：可直接打开平台统一收银台付款；下单阶段不返回订阅 Key/Coding API Key，也不以商户自报 paid 标记交付。
-- 可复用订单号、精确金额、快照、支付准备、cashier URL 和恢复基础设施；新旧订单模式、请求摘要与内部账户关联需显式区分，不能借旧 request hash 混用幂等。
-- 初始新购及续费的具体数据模型，在当前产品问题确认后补齐，不能把订单号/随机外部 ID 包装成商户真实用户身份。
+Idempotency-Key 沿用 16–64 URL-safe 字符校验。新模式写请求在真正的事务内、Tenant 锁后重验当前开发者密钥哈希及启用状态；中间件早期鉴权不是最终变更授权。
 
-### 2.2 商户领取订阅 Key（新增）
+### 2.2 新购与续费
 
-候选路径：`GET /api/partner/v1/subscription-key-orders/:order_no/subscription-key`（与新下单命名统一后定稿）。
+- 无 X-Subscription-Key：一次独立购买意图。商户不提供任何用户 ID，不能按 tenant/plan 推断同一人；下单只保存订单，User/Token/订阅/长期凭证均不创建。
+- 有 X-Subscription-Key：当前 pt_ 与当前 sub_ 必须归同一商户；锁内验证真实账户、订阅和凭证绑定。只能续其原 plan_id，不能以此换购/升级或授权其他订阅。
+- 活跃/自然到期的原订阅均可显式续同一行，取消/删除/禁用或损坏关系拒绝。自然到期是可查询状态，不使长期查询 Key 自动作废。这里显式指定原订阅，与“到期后另一次独立新购”不同，后者仍创建新关系，不改绑旧 Key。
+- 创建订单冻结 RenewalSubscriptionId、账户 ID、plan/精确 CNY 价格/币种/方式/商户支付配置。接受的续费可跨自然到期交付，取消/损坏不能换一份新订阅补救。
+- 支付交付从 max(原 end_time, 交付时严格 DB 时间) 延长一个日历月；沿用现有周期重置语义，活跃期提前续费不立即重置/叠加当期额度，已到期复活不携带旧周期余额。不换 User/Token/订阅行/查询 Key（期间显式重置 Key 除外）。
+- 两种下单都返回现有 checkout_url，仍使用原 pc_、30 分钟固定收银台 deadline 和安全公共 DTO；初始响应绝不含 sub_/Coding Key。不新增直接网关秘密链接字段。
+- 网关准备失败保留原 pending 订单，原参数/同幂等 POST 恢复原订单和 deadline；GET 不准备支付、不自动另开新单。新幂等键才表示新意图。
 
-- 用当前 pt_ 鉴权并校验该订单属于此商户；不要求任何外部用户 ID，拒绝 query。
-- 成功响应：`{order_no, subscription_id, subscription_key, key_version}`，不返回虚构的 external_user_id。
-- 商户根据自己保存的订单号/购买意图决定如何交付，平台不推断买家身份；不得暴露可由任意客户端传订单号的通用查钥代理。
-- 仅 `paid + fulfilled` 且该订单实际 SubscriptionId、账户归属、凭证绑定一致时返回。
-- GET 为只读：不补发、不开户、不授予权益，不通过查询修复历史映射。
-- 重复领取返回当前有效 Key；重置后从任一合法关联订单领取的都是重置后的当前 Key，不复活旧版本。
-- 到期订阅仍可领取它的查询 Key以读取历史，但不能由此直接取得 Coding API Key。
-- 历史已完成订单若不存在凭证绑定，返回明确 `subscription_key_not_found`，不在 GET 中补迁移。升级后新的付费续期可给同一订阅首次建立绑定。
+### 2.3 商户领取与重置
 
-### 2.3 独立订阅查询（新增）
+领取只读地核对订单模式/归属、paid+fulfilled、实际 AccountId/SubscriptionId 及绑定锚点，返回当前 Key。不能创建 User/Token/权益/凭证，不能修复坏映射。到期仍可领取查询 Key，但不是直接取 Coding Key。
 
-`GET /api/partner/subscription`
+旧模式订单在新模式领取入口返回 scoped order_not_found；新模式已交付但缺少凭证绑定返回 subscription_key_not_found，不静默补签。旧 API/H5 未来交付同样不自动签发 sub_。重置后从任何合法关联的新模式付费订单领取的都是当前 Key，不复活旧版本。
 
-- 仅接受 `Authorization: Bearer sub_<64位小写十六进制>`；**不要求商户密钥、商户 ID、商户登录或平台 Cookie**。请求不接受 query、目标用户、订单号或订阅 ID。
-- 绑定由 Key 的当前哈希确定，不依赖客户端指定查询范围。
-- 响应结构：
+轮换在当前商户锁下验证 expected_version，并原子替换随机种子/哈希、递增版本，写独立轮换幂等事实。同幂等键同参数重试：结果版本仍当前则派生同一 Key；已被后续轮换超越则 409 subscription_key_changed，不返回旧 Key、不再轮换。新幂等键但旧 expected_version 同样 409；版本溢出拒绝。
+
+提交后新请求不能用旧 Key 查询或新建/重放续费。已经由旧 Key 授权并冻结目标的付费订单仍按原目标履约，不因后来换钥而抹掉支付事实；已授权请求/已发出的响应不可追溯撤回。
+
+### 2.4 独立查询与精确额度
+
+请求仅由 sub_ 决定范围，拒绝目标订阅/订单/用户等 query；不要求商户密钥、商户 ID、平台登录或 Cookie。
 
 ```json
 {
@@ -80,131 +75,117 @@
 }
 ```
 
-- 新 DTO 的全部 int64 额度为精确十进制字符串，覆盖完整非负 int64；不改变旧商户额度接口的数字契约。
-- total/used 来源于绑定的订阅行；有效订阅先使用现有周期重置逻辑处理到期周期。remaining = max(total-used, 0)，无限额用 quota_unlimited 明示，不把零解释为耗尽。
-- 只有该绑定订阅本身在当前有效期内、未取消，且账户/用户/现有模型 Token 均正常时可返回 api_key。同账户其他有效订阅不能替它放行。
-- 活跃但已耗尽的订阅可返回其正常模型 Key，`quota_usable:false`；模型调用仍由现有计费边界拒绝，不提前承诺可消费。
-- 自然到期时返回有效投影 `status:expired`，即使持久化状态尚未由后台更新；`api_key` 字段完全省略，`quota_remaining:"0"`、`quota_usable:false`。保留 total/used 和 `historical_quota_remaining`（当期历史的 max(total-used,0)），明确其不是可用额度。
-- 已取消的有效绑定可返回终态信息但不返回 api_key或可用额度；账户、用户或商户禁用/删除、绑定损坏等仍 fail closed，不因可查历史而绕过禁用。
-- 现有模型 Token 被禁用/删除/过期/错组时不创建或替换 Key，不把不可用凭证返回；错误按照既有 account_disabled / credential_unavailable 风格安全分类。
-- 查询时只返回一份订阅，不返回账户标识、其他订阅、商户秘密、订阅 Key 本身或内部存储材料。
+全部 int64 额度用精确十进制字符串；验证 total/used 非负后计算 max(total-used,0)，避免溢出/浮点转换。total=0 表示 unlimited，remaining 为 "0"、quota_unlimited=true，不当作耗尽。旧数字 DTO 不变。
 
-### 2.4 商户重置订阅 Key（新增）
+锁定的有效订阅先调用 maybeResetUserSubscriptionWithPlanTx；到期/取消历史不重置。自然到期即投影为 expired，不等后台状态更新；省略 api_key，quota_remaining="0"、quota_usable=false，另给 historical_quota_remaining，保留 total/used，明确历史不是权益。取消同样无 API Key/可用额度。
 
-`POST /api/partner/v1/subscriptions/:subscription_id/key/rotate`
+只有关联订阅本身有效，且商户、账户、User、Token 状态/分组/绑定/有效期均正常才返回实际 TokenId 的 Coding Key。活跃但耗尽可返回正常 Key，quota_usable=false，真实调用仍由既有 subscription_only funding 拒绝。其他有效订阅不能替关联订阅放行取钥；禁用/坏映射均 fail closed，不自动补发。
 
-- 当前 `pt_`、严格请求体 `{expected_version: 1}`，并要求现有格式的 `Idempotency-Key`。
-- 只能操作当前商户下已由付费交付签发凭证的订阅；订阅 Key 本身无重置权限。
-- 返回 `{subscription_id, subscription_key, key_version}`；不返回或更换 Coding API Key，不改变金额、有效期、当前额度或订单支付状态。
-- 一次成功轮换原子替换当前种子/哈希并递增版本，提交后开始的新请求无法再用旧 Key 鉴权。与轮换并发且此前已完成授权的请求不能被追溯撤回，不能承诺撤回已发送响应。
-- 同幂等键、同订阅和 expected_version 的重试不再轮换；若该操作的结果仍是当前版本，返回同一 Key。
-- 旧幂等操作被后续轮换超越时返回 `subscription_key_changed`，不返回废弃 Key也不再次轮换；商户通过领取接口获取当前 Key。
-- 新幂等键但 expected_version 过时返回 409，避免并发重置无声覆盖或失去响应后盲目多次换钥。
+响应不返回账户标识、其他订阅、商户秘密、sub_ 本身、种子或内部存储材料。
 
-### 2.5 错误矩阵
+## 3. 数据模型与身份隔离
+
+### 3.1 扩展现有订单和账户，而不伪造买家 ID
+
+**PartnerTenantSubscriptionOrder** 增量增加：
+
+- EntryMode：非空 varchar(24)，默认 external；历史及旧 API/H5 为 external，新入口为 subscription_key。
+- AccountId：非空 bigint 默认 0；新购在交付前为 0，交付时写入；续费在接受订单时冻结现有账户 ID。
+- 沿用 RenewalSubscriptionId/SubscriptionId、支付与交付状态、价格快照/交易证据/恢复字段。新模式 ExternalUserId 留空，ExternalUserHash 是内部意图/账户预算哈希，不作为买家身份，不对外导出。
+- 新模式幂等摘要为 SHA256(版本化用途域 + 经原校验得到的幂等哈希)，不改变现有唯一索引或旧/H5 摘要。请求摘要用无歧义编码包含模式、新购/续费、plan、method、实际续费订阅 ID；不含原始 sub_ 或当前版本，Key 显式重置后仍可用新 Key 原样重试同一订阅订单。
+
+**PartnerTenantAccount** 增量增加：
+
+- IdentitySource：非空 varchar(24) 默认 external，历史映射及旧 helper 仍为 external，新内部账户为 subscription_key。
+- SourceOrderId：nullable bigint、唯一索引 idx_pt_account_source_order；仅新模式首次付费新购填写该原订单 ID。与持久化 UserId/TokenId 一起构成固定内部身份。
+- 新内部账户 ExternalUserId=""，ExternalUserIdHash 必须为非空 SHA256("partner-tenant-subscription-account:v1\\0" + 初始订单号)，用途域实际编码含 NUL。不是 SHA256(空串)、不是随机假 external_user_id，也不留 NULL 给旧回填误处理。
+- 保持既有 tenant/hash、UserId、TokenId 唯一约束；新内部哈希不同于合法外部 ID 的输入域（外部 ID 禁止控制字符），且所有新版本外部查询仍显式过滤 IdentitySource=external，包含旧哈希为空时的精确值 fallback。猜订单号/用户名/空串均不能命中新内部映射。
+- 历史空/缺省 source 统一为 external；migratePartnerTenantAccountIdentity 只回填 external 来源，不能将内部账户改写成外部账户。既有行和哈希保留。
+
+在 partner_tenant.go 提取事务内通用的 User/Token 创建部分，旧外部开户 helper 保持输入和输出；另设私有内部开户 helper，按 SourceOrderId get-or-create 并核对来源/归属。不能给旧 helper 填随机 external_user_id 冒充隔离。
+
+内部 User 使用不可预测用户名/随机密码哈希、普通角色、启用状态、商户分组、零钱包额度，不向买家/商户提供登录密码。Token 使用现有生成器、UnlimitedQuota=true、固定 TokenId，不代表无限订阅额度；PartnerTenantAccount 仍被 IsPartnerTenantUser 识别，沿用钱包拒绝、套餐 RPM 和消费日志，无新 funding 主体。缓存只在完整交付提交后发布。
+
+新模式正常创建/续费只给该独立 User 维护这一份订阅，不通过旧身份 API向其增加其他订阅。模型计费仍按现有用户选订阅，不声称 sub_ 是全站 Token 的计费过滤器；管理员另行直授/修改用户不在本次消费隔离保证内。
+
+### 3.2 两张凭证表
+
+**PartnerTenantSubscriptionAccessKey**：Id、TenantId、AccountId、UserSubscriptionId、IssuedOrderId、Seed、KeyVersion、SecretHash、CreatedAt/UpdatedAt；全部内部字段不直接 JSON 导出。
+
+- AccountId 和 UserSubscriptionId 各有明确短名唯一索引（idx_pt_subkey_account / idx_pt_subkey_subscription）；SecretHash 用 idx_pt_subkey_hash 唯一索引。
+- IssuedOrderId 是首次新购真实付费锚点，与账户 SourceOrderId 对齐；续费只复用该绑定。
+- Seed 为 crypto/rand 的 32 字节随机种子（规范 hex），KeyVersion 从 1 开始，SecretHash 为完整当前 Bearer 的 SHA256。
+
+**PartnerTenantSubscriptionKeyRotation**：TenantId、IdempotencyHash、RequestHash、UserSubscriptionId、ResultVersion、CreatedAt；tenant+幂等哈希用 idx_pt_subkey_rotate_request 唯一约束。不保存旧种子/旧明文 Key，请求摘要含订阅 ID 和 expected_version，独立于支付幂等用途域。
+
+新文件以 model/partner_tenant_subscription_key.go 为主；新模式订单可置于 model/partner_tenant_subscription_key_order.go。新增字段/两表注册在 model/main.go 的实际迁移入口，必要迁移 helper 同时供入口及测试复用。显式 text/合适字段长度，不能由 serializer size 制造 PostgreSQL 超长 varchar。
+
+### 3.3 可重复领取与根秘密
+
+`sub_ + hex(HMAC-SHA256(common.CryptoSecret, purpose + tenant_id + account_id + subscription_id + seed + key_version))`
+
+用途为固定版本化域（partner-tenant-subscription-key:v1 + NUL），字段采用固定顺序/无歧义编码，不与 pt_/pc_/pl_/ps_ 共用域。库中只存随机种子和当前 Bearer 哈希，领取稳定派生后必须核对持久化哈希；查询也验证当前种子派生关系及常量时间比较，不依赖缓存授权。
+
+根秘密必须跨副本/重启稳定一致；仅数据库而无根秘密不能派生 sub_。配置变更导致派生与旧哈希不符时 503 subscription_key_unavailable，不静默重签；恢复原配置，或由当前合法商户显式轮换。MVP 不做 KMS/根秘密轮换。
+
+现有 Coding Token 原值仍保存在 tokens.key，本期不声称它已加密，也不在每订单/查询凭证复制一份。
+
+## 4. 事务、锁与恢复
+
+### 4.1 统一锁偏序和授权
+
+对本期路径按 Tenant → 必要时 Order → Plan → Account → User → Token → UserSubscription → AccessKey → RotationRecord；跳过无关项但不能逆序。预查 hash/order_no 只定位，不是最终授权。实施时核对实际复用 helper，不把同一资源的再加锁反转顺序。
+
+Tenant 锁后重验当前 pt_（新购/续费/重置/领取），禁用或换钥中的慢请求不能继续用旧授权。续费和查询在持有资源锁后重新核对当前 sub_、绑定及派生关系；锁后用 getDBTimestampOnStrict(tx) 新鲜 DB 时间判断订阅和 Token 有效期，PostgreSQL 用 clock_timestamp()，不能只用请求时间或事务开始 NOW。DB 时间失败即失败。
+
+续费已存在订单的同参数重放同样要验证当前 pt_/sub_；当前 Key 轮换后可先领取新 Key，再用新头重放。目标 ID 不变，规范请求摘要不变；旧 Key 的新请求失败。读取同一锁定快照构造额度，不能拼接事务外旧数据。
+
+### 4.2 下单
+
+新事务验证当前凭证、模式、幂等和目标；锁 plan/必要账户与订阅，冻结精确快照并保存一次订单。仅在真正新下单检查当前支付配置和套餐启用；精确重放沿用原快照/deadline，不因套餐编辑/停用改价、另建订单或丢弃已付事实。续费即使是重放也不能忽略当前 Key 或损坏/取消的目标。
+
+无买家身份时不伪造每买家限购/预算：新购保持 tenant 每小时订单预算和现有 IP/商户请求限流，独立意图各自开户；续费可按固定账户做 20/小时、5 个未过期待付订单预算。旧模式的 external_user_hash 限额/预约计数不受影响，相关查询显式按模式隔离。MaxPurchasePerUser 仍是内部真实 User 的规则，不宣传为匿名买家的跨新购识别能力。
+
+事务提交后才调用已有网关准备；没有任何外部 I/O 跨 DB 事务。共用收银台/支付准备的底层订单 getter 保持模式中立，旧 merchant status/get-by-idempotency 和 H5 在各自入口只接受 external，新 merchant GET 只接受 subscription_key；不能把共用 GetPartnerTenantSubscriptionOrder 全局改成 external 过滤而破坏新支付读取，也不能让内部身份进入旧 BFF 归属检查。
+
+### 4.3 可信付款后的交付
+
+1. 现有签名/pid/方式/金额/币种/交易唯一性校验通过后，独立提交 paid。收银台过期不是网关取消，可信迟付仍可记录和履约。
+2. FulfillPartnerTenantSubscriptionOrder 在锁内按 EntryMode 分派；external 保持旧路径。subscription_key 必须 paid；已 fulfilled 则只验证必要既有一致性并早返回，不再开户/延期/补签。
+3. 新购按 SourceOrderId 建立独立内部 User/Token/Account，再授予一份 UserSubscription；续费按冻结 AccountId/RenewalSubscriptionId 校验原关系，不重新通过当前/旧 sub_ 定位，也不把取消/损坏目标退化成新购。
+4. 新购建立 AccessKey，续费核对并复用现有绑定、种子/版本。账户、User、Token、订阅、凭证及订单 AccountId/SubscriptionId/fulfilled 标记同事务提交；任一失败整体回滚，仅 paid 保留，failed_retryable/恢复沿用原机制。
+5. 新路径的续期/周期 helper 接受严格锁后 DB 时间；需要抽取共享实现时保留旧调用封装语义，不复制一份计费/日历算法。
+6. 提交后发布账户 membership 缓存；重复通知、后台恢复、多副本并发依靠 Tenant/Order 锁和唯一约束只交付一次。
+
+## 5. 安全与错误矩阵
 
 | 条件 | 行为 |
 | --- | --- |
-| 商户凭证无效/已轮换/商户停用 | 401 invalid_partner_secret |
-| 商户查询他人订单或重置他人订阅 | 404 order_not_found / subscription_not_found |
-| 合法订单未 paid + fulfilled | 409 subscription_key_not_ready，不泄露 Key |
-| 已交付历史订单无凭证绑定 | 404 subscription_key_not_found，无副作用 |
-| 缺失/伪造/旧版/其他用途 Key 查询新接口 | 401 invalid_subscription_key，统一安全文案 |
-| 格式、未知/重复/大小写别名字段、query 不合法 | 400 invalid_request |
-| 重置参数同键冲突/版本落后 | 409 idempotency_conflict / subscription_key_changed |
-| 用户/账户禁用、模型凭证不可用 | 403 account_disabled / 409 credential_unavailable；不泄露或补发 |
-| 凭证派生根与持久化哈希不一致 | 503 subscription_key_unavailable，不自动换钥 |
-| DB/严格时间读取失败 | 500 server_error，无敏感内部错误 |
-| 限流 | 429 rate_limited 和 Retry-After |
+| 商户凭证错误/轮换/商户停用 | 401 invalid_partner_secret，新路径锁内复核 |
+| 外商户/错误模式订单或订阅 | scoped 404 order_not_found / subscription_not_found，不暴露另一方存在性 |
+| 非 paid+fulfilled 的领取 | 409 subscription_key_not_ready，无副作用 |
+| 新模式缺失交付凭证绑定 | 404 subscription_key_not_found，不补签 |
+| 查询 sub_ 缺失/格式错/旧版/其他用途 | 401 invalid_subscription_key，统一安全文案 |
+| 续费头错误/已轮换/跨归属或目标不匹配 | 安全拒绝，不创建新购/第二订阅，不泄露 Key |
+| JSON/query/重复头或字段错误 | 400 invalid_request |
+| 同幂等键不同意图/版本落后/已超越轮换 | 409 idempotency_conflict / subscription_key_changed |
+| 禁用账户/User、错误 group、损坏/禁用/删除/过期 Token | 403 account_disabled / 409 credential_unavailable，不补发 |
+| 根秘密与存储哈希不匹配 | 503 subscription_key_unavailable，不静默换钥 |
+| 严格时钟/数据库失败 | 500 server_error，不返回内部错误或秘密 |
+| 预算超限 | 429 rate_limited + Retry-After |
 
-错误码在实现期可依据现有统一错误处理器收敛命名，但不得改变以上行为或隐私边界；如行为改变需重新审阅。
+sub_ 不进入 tokens 表，不能通过 TokenAuth/TokenAuthReadOnly，测试以 /v1/models 和一个代表 Coding 请求证明拒绝发生在上游之前。独立查询拒绝 pt_/pc_/pl_/ps_/sk-/Cookie-only，商户重置拒绝 sub_。
 
-## 3. 持久化与凭证材料
+沿用请求 ID 和 IP/凭证哈希预算，不在限流/日志键放原始秘密；明确禁止记录 Authorization、X-Subscription-Key、完整凭证响应/派生材料。新的机密不进入 URL；既有 pc_ fragment 收银台及其 scrub 规则保持不变，不新增第三方脚本。
 
-本节仅保留独立查询凭证的可复用草案；无身份新订单的模式、内部账户 namespace 和新增/扩展表仍待产品关系确认后补齐。不能把下面两张凭证表误当作本轮完整迁移设计已就绪。
+## 6. 套餐配置、验证与回滚
 
-### 3.1 每份订阅一个当前绑定
+root 复用套餐管理创建时单选商户及编辑价格/额度/RPM/启停，归属不可变；沿用 dedicated group、CNY、单月/月重置和无钱包兜底。目录与新订单验证商户归属/启用，不能伪造普通平台或他方 plan_id。没有共享授权表、管理 API 或新前端文案。
 
-新增 `PartnerTenantSubscriptionAccessKey`（建议文件 `model/partner_tenant_subscription_key.go`），字段：
+只运行本次必要 PostgreSQL 迁移、持久化、HTTP 与关键并发验证，Go runner/空库均在任务专属 Docker。新 fixture 使用 TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN，不调用隐式 SQLite setup；无 DSN/跳过/no tests to run 不当作通过。不跑 SQLite/MySQL/FoundRows、全站、无关前端/计费或旧完整矩阵，保留跨驱动代码。覆盖明细和命令见 implement.md。
 
-- Id / TenantId / AccountId / UserSubscriptionId；订阅 ID 唯一，Tenant/账户索引。
-- IssuedOrderId：首次创建绑定的真实付费订单锚点，不以客户端字段建立归属。
-- Seed：crypto/rand 生成的 32 字节随机数，规范小写 hex。
-- KeyVersion：从 1 开始递增的 int64。
-- SecretHash：当前完整 sub_ Bearer 的 SHA-256，唯一索引，按精确输入字节计算。
-- CreatedAt / UpdatedAt。全部内部字段禁止 JSON 直接导出；控制器只能使用专门 DTO。
+主要风险是新身份模式/迁移、交付失败恢复、Key 派生根配置和重置竞态。匿名购买无法按买家跨意图合并或限购，独立付费新购会增加真实用户。模型 Token 仍沿用现有可恢复存储安全模型。
 
-新增 `PartnerTenantSubscriptionKeyRotation` 存轮换幂等事实：TenantId + IdempotencyHash 唯一、RequestHash、UserSubscriptionId、ResultVersion、CreatedAt。它不保存旧明文 Key 或旧种子。请求摘要按明确用途包含订阅 ID 和 expected_version，与支付幂等独立命名空间。
+回滚保留新列/两表、账户、权益、所有订单和 paid，不 drop、不 backfill 改绑、不回收已交付权益。旧版本无新路由，不应继续承接新模式下单；旧交付不能解释新模式，应协调回滚并保留 paid-unfulfilled 待恢复新版本履约。内部哈希非 NULL 避免旧回填误处理，ExternalUserId 为空令旧外部开户不能误领内部账户；回滚不等于已验证可混跑新旧二进制。
 
-两表均为增量 AutoMigrate，注册 `model/main.go`；不修改旧订单请求哈希/唯一约束，不重新开户或迁移已有完成交付数据。
-
-### 3.2 可重复领取而不保存明文
-
-采用仓库已有的 HMAC-SHA256 + 稳定 `common.CryptoSecret` 模式：
-
-`sub_ + hex(HMAC-SHA256(CryptoSecret, purpose + tenant_id + account_id + subscription_id + seed + key_version))`
-
-- purpose 固定为独立的版本化域（例如 `partner-tenant-subscription-key:v1\0`）；字段采用无歧义固定顺序编码，不能与 pc_/pl_/ps_ 复用。
-- 数据库存 Seed + 当前 Bearer 哈希；单独拿到数据库没有服务端根秘密不能派生 Bearer。不会保存明文 Key，也无需引入与现有登录 RSA 加密不相容的通用加密层。
-- 商户重复领取可稳定派生 Key，并验证其摘要等于当前 SecretHash；不在 GET 中修复不匹配。
-- 查询先用哈希索引定位，再在实际事务中重新核对当前绑定及常量时间比较；不能只凭事务外查询的过期副本放行。
-- 重置替换随机 Seed、递增版本并更新哈希；所有节点实时读 DB，不缓存 Bearer 或撤销状态。
-- 必须与收银台同样配置稳定、跨副本一致的 SESSION_SECRET/CRYPTO_SECRET。部署根秘密变更会使原 Key 无法验证；恢复旧配置或由已鉴权商户显式重置，不静默生成替代凭证。MVP 不新增根秘密轮换/KMS 系统。
-
-### 3.3 无外部用户身份的内部账户关系（已选，付款后开户）
-
-- 已撤回按 `(tenant_id, external_user_id)` 为新接入识别买家的方案；这一映射只是旧 API 的源码现状，不是新方式的要求。
-- 已选择自动维护真实内部 User/Token，商户无须提供、保存或理解内部 UserId/TokenId；不同新购不因商户/套餐相同而合并。首次新购只有可信付款成功后才在交付事务创建用户；未付订单、准备失败、浏览器回跳或伪造通知不创建。明确续费复用原用户，具体定位方式待确认。
-- 推荐续费显式携带原订阅 Key，锁定其实际订阅并沿用内部账户、API Key、订阅 Key；不传续费目标则只能视为新购，不能猜测同一人。该建议须用户确认。
-- 同一 Idempotency-Key 的原购买重试必须复用订单和其固定内部关联，不再创建一套账户；支付重复通知/恢复不能重复开户或授予权益。
-- 新模式内部身份须有与旧 external_user_id 映射分离的身份来源/唯一约束；仅生成一个可被旧 /accounts 外部 ID 命中的字符串并不构成隔离。新表、模式字段或显式身份 namespace 的具体实现须在最终设计收敛，未在本轮选定。
-- sub_ 绑定 Tenant/订阅及其内部账户，查询按持久化的 TokenId 读取当前 Key，不在每订单/订阅复制 API Key；读取必须校验 Token.UserId/状态/有效期/group 与绑定一致，坏映射拒绝，不自动补发。
-- 当前项目实际将可恢复原值存于 tokens.key；本期不声称它已有哈希/加密存储。额度仍在 UserSubscription 上统一维护，TokenUnlimited 不表示无限权益。
-- 续费延续的到期规则、API Key 生命周期及模型消费隔离，须基于最终确认的“内部账户 ↔ 订阅”关系证明；不再承诺同一商户用户的多份新购共享账户。不因 sub_ 重置而轮换已确认不变的 Coding API Key。
-
-### 3.4 未选方案记录
-
-无 users 独立主体的源码评估保留在 research/userless-feasibility.md，仅供历史参考。用户已因改造范围选择新增内部 User；本期不做新 principal/funding/RPM/日志体系，也不运行该候选方案的 users 零新增测试。
-
-## 4. 事务与数据流
-
-### 4.1 支付交付
-
-用户已确认付款成功后开户。订单创建/网关准备阶段只保存订单和支付准备状态，不插入 User/Token/订阅/查询凭证。支付事实独立持久化后，首次开户与完整交付同事务提交；失败不得留下孤立用户或半套权益。收银台过期不是网关取消；无付款时不开户，但后续可信迟付仍按已付交付。
-
-1. 原订单写入与网关准备不变；可信回调独立记录支付事实。
-2. 在新模式的本地交付事务中，根据本次固定的新购内部关联或明确续费目标处理账户/Token 和订阅；不要拿 merchant external_user_id 作为前提。现有交付核心能复用的部分须按模式边界重构，不能直接调用旧公开开户 API。
-3. 仅新模式的实际交付按 SubscriptionId get-or-create 订阅凭证绑定；已存在则核对商户、内部账户和订阅，不覆盖 Seed 或版本。
-4. 凭证绑定和账户/模型 Key/订阅/fulfilled 标记一起提交。任一步失败均回滚本地交付，保留已提交支付事实并沿用恢复扫描。
-5. 已 fulfilled 的旧订单重试保持原先早返回语义，不因缺少新凭证而重做权益或续费；历史补签不属于本期。
-6. 同订阅续期复用绑定；自然到期后另一次新购若产生新订阅行则得到另一把 Key，不重绑旧 Key。
-
-### 4.2 查询/领取/重置授权
-
-- 事务外可以按 hash/order_no 预查用于定位，但该结果不是最终授权。
-- 同一事务遵循现有锁偏序：Tenant →（需要时 Order）→ Plan → Account → User/Token → UserSubscription → SubscriptionAccessKey → RotationRecord。若某步骤不需要则跳过，不逆序加锁。
-- 轮换接收请求体后，在真正写入事务的 Tenant 锁内重新核对当前开发者密钥哈希，防止慢请求绕过商户换钥/禁用。
-- 订阅查询在锁内重新验证当前哈希及绑定，锁等待后用 `getDBTimestampOnStrict(tx)` 的新鲜时间判断有效期；PostgreSQL 使用 clock_timestamp，不能用事务开始 NOW 或请求到达时间。
-- 用同一份锁定的订阅快照构造 total/used/remaining/status；活跃重置复用 `maybeResetUserSubscriptionWithPlanTx`。到期历史不触发新周期重置。
-- 不调用会创建用户或凭证的公开 Provision API 来“读取” Coding Key；复用现有账户校验/TokenId 映射。
-- 无外部网络操作处于 DB 事务内；API Key、派生输入、完整 Authorization 不写应用/审计日志。
-
-## 5. 兼容性与安全
-
-- 老 merchant create/status/quota/accounts DTO、托管 H5 DTO、cashier DTO 均不增加秘密字段。只有新领取和查询接口返回各自必要的凭证。
-- 订阅凭证仅由新无身份接入的真实付费交付创建；旧 external_user_id API/H5 保留原行为，不自动给其未来订单签发新模式凭证。无免费直授或遗留订单暗中改绑。
-- 订阅 `sub_` 不进入 `tokens` 表、不被普通 TokenAuth 识别；测试覆盖 /v1/models 及模型请求，错误在上游调用前发生。
-- 新查询接口拒绝 pt_/pc_/pl_/ps_/sk- 和 Cookie-only 请求；新重置接口拒绝 sub_。不从 Query、x-api-key 等替代来源读取新凭证。
-- 全接口 no-store/no-referrer；新查询独立于平台登录拦截器。沿用 request ID、IP 预算与基于当前凭证哈希的预算，不在限流/日志键里放原始 Key。复用现有限流基础设施，无新 Redis 依赖。
-- 密钥轮换只阻止今后查询，不能撤回已复制的账户 API Key；同账户 Coding 使用仍可消费其其他合法订阅，这不属于查询隔离的承诺。
-- 不改钱包、计费算法、套餐计价或 RPM 合并规则，不升级前端依赖，不做生产部署。
-
-## 6. 验证与运维
-
-- 主要风险：交付事务新增故障点、跨节点根秘密一致性、重置/领取/查询竞态、到期临界点、历史订单缺少绑定、新 DTO int64 精度。
-- 按用户最新要求只做必要测试：真实 PostgreSQL 增量/重复迁移、持久化及关键锁并发；本次 Key 签发/领取/查询/续期/到期/轮换；相关交付失败与重复通知；单订阅隔离、敏感 DTO 与鉴权边界。合并覆盖，避免重复跑同一路径。
-- 按用户最终指示只验证 PostgreSQL（pq），不运行 SQLite、MySQL/FoundRows 或完整旧订单矩阵；必要的接口 fixture 也建立在隔离 PostgreSQL 上。保留代码原有跨驱动兼容性，不删除其他驱动支持。
-- 不跑全站、无关前端或计费套件。未执行无关全量测试及未验证其他数据库不作为本次新增验收阻塞，明确披露验证范围即可。
-- 所有 Go runner 与 DB 测试均在本任务专属 Docker；不使用生产、宿主 DB 或已有未知数据。缺少 Docker 或本次必需的 PostgreSQL 时如实报告未验证，build/静态检查不能代替 runtime。
-- 回滚应用时保留两张新表、所有订单及支付事实，不做 drop/backfill 回滚、不回收已交付权益。旧版本不能提供新查询能力，需告知新增接入方；恢复新版本和原 CryptoSecret 后凭证可继续工作。
-- 不清理当前未跟踪私钥、reports、examples 或既有临时文档。新增非业务临时产物登记到 TEMPORARY_ARTIFACTS.md，需用户同意后清理；Trellis 规划/日志保留。相关 Trellis 文件按明确路径强制纳入 Git，不能整体强加被忽略目录。
+不访问生产/真实付款/私钥，不覆盖已有用户文档。不新增未登记非业务产物；后续容器/网络/空库/输出登记 TEMPORARY_ARTIFACTS.md，用户同意后才清理，Trellis 记录保留。

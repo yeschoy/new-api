@@ -52,14 +52,14 @@
 - 用户询问“既然是账户级的api key凭证，你是如何维护的”。现有 `model/partner_tenant.go:45` 的映射是 `(tenant_id, external_user_id) → UserId/TokenId`，不是一商户共用一 Key。`:255` 创建或复用对应模型子账户及 Token，`:349` 校验现有凭证，禁止坏映射自动补发。
 - `model/token.go` 的 Token.Key 保存可恢复原值；本期不声称它已是哈希/加密存储，也不把新 sub_ 的安全模型当成旧 Token 的变化。
 - `model/subscription.go:1422` 附近原计费从同一用户的有效适用订阅中选择；因此查询按订阅隔离，不等于 Coding 消费按订阅隔离。到期不返回 api_key 不会撤回已取得 Key，也不能通过作废整个账户 Token 来模拟单份订阅到期，否则误伤其他有效权益。
-- 上一版 design.md 3.3 据旧映射解释账户级 Token 的方案已被用户纠正：商户新下单不传 external_user_id。原解释不再作为新方式的身份设计；单一 Token 数据源和安全校验可保留，内部账户粒度须重新确认。
+- 上一版 design.md 3.3 据旧映射解释账户级 Token 的方案已被用户纠正：商户新下单不传 external_user_id。原解释不再作为新方式的身份设计；单一 Token 数据源和安全校验保留，最终内部 User 粒度及隔离设计见第 10 节。
 
 ### 7. 新方式不传 external_user_id（当前重规划依据）
 
 - 用户原话：“不是，商户下单时不会传external_user_id这个”。已记为 R12/AC13，明确撤回此前助手自加的身份前提，不能以旧代码必须该字段为由反向要求用户迁就。
 - `model/partner_tenant_order.go:119` 的旧输入及 validPartnerTenantOrderInput、原 controller 下单处理确实需要 external_user_id；所以“只复用原下单路由不改语义”不满足最新要求。旧 API/H5 留原行为，新方式应新增明确的无身份入口/模式。
 - 没有买家身份时，无法从同商户/同 plan_id 判断不同订单是否为同一人，也不能据此决定续哪份订阅；Idempotency-Key 只确定一个购买意图，不能当作用户 ID。
-- 早期提出自动内部 User 后，用户先询问无 users 可行性；后续已选择付款后开户（见第 9 节）。仍不要求商户用户 ID，显式续费定位待收敛。
+- 早期提出自动内部 User 后，用户先询问无 users 可行性；后续已选择付款后开户（见第 9 节）。仍不要求商户用户 ID；后续续费定位已确认，见第 10 节。
 - 技术上不能仅给新身份一个可被旧 /accounts 外部 ID 命中的字符串就称隔离；需要来源/namespace 或独立映射唯一约束，最终 schema 与交付模式须在后续设计收敛。
 
 ### 8. 完全不新增 users 的可行性（已评估、本期未选）
@@ -75,7 +75,20 @@
 - 确认规则：首次新购仅在支付渠道可信确认付款后，通过原子交付创建 User/Token/订阅/sub_；创建订单、返回付款 URL、未付/支付失败/超时均不开户。
 - 本地交付中途失败整体回滚，已确认的 paid 独立保留；重复支付通知/交付恢复不得重复开户或延期。
 - `model/partner_tenant_order.go:375` 先检查 paid 再调用内部开户 helper，可复用该付款后开户边界；`model/partner_tenant.go:392` 的旧授予核心能按冻结续费 ID 复用原订阅，但新方式无买家 ID，不能推断目标。
-- 当前继续收敛续费原订阅定位。尚未获得最终实施批准，未改业务代码。
+- 后续续费原订阅定位已确认，见第 10 节。尚未获得最终实施批准，未改业务代码。
+
+### 10. 续费定位已确认，最终技术方案收敛
+
+- 用户确认“续费通过订阅key下单，对”，上下文为商户 pt_ 鉴权加原订阅 Key 指定目标；并非要求用户查询再提供商户秘密，也不是将 sub_ 改成 Coding Key。
+- 本版设计：新 POST /api/partner/v1/subscription-key-orders，JSON 为 plan_id/payment_method；续费以 X-Subscription-Key 头携带原 sub_，避免同时占用 Authorization 或把秘密放 URL/JSON/请求摘要。仍返回 order_no/checkout_url。
+- 新购没有终端用户身份，付款后的原子交付为该意图建立独立 User/Token/Account/Subscription/Key。续费冻结原账户和 SubscriptionId，复用两种 Key；同套餐活跃或自然到期可显式续原行，取消/损坏拒绝，原独立新购不自动合并。
+- `model/partner_tenant.go:45` 的 Account 同时是 membership/funding 判定锚点，复用该表可避免新增无 users 的调用主体；新增 IdentitySource=external/subscription_key 和 nullable 唯一 SourceOrderId，而不往旧 helper 填假外部 ID。
+- `model/partner_tenant_order.go:436` 的外部哈希查询和 NULL 精确 fallback 都须限制 external 来源；`:448` 回填也只处理 external。新内部 ExternalUserId 留空，hash 则是含 NUL 用途域加首单号的非空 SHA256，既不被合法外部 ID 命中，也避免旧回填将所有内部空 ID 变成同一哈希。
+- `model/main.go:400`、`:414` 表明实际迁移顺序是模型 AutoMigrate 后执行身份回填；设计要求真实入口和测试复用受影响迁移，新增默认 external 的模式列与两张凭证表，旧数据不改绑。
+- `controller/partner_tenant_order.go:109` 的支付准备会在 claim/保存后用共享订单 getter 重读；新模式必须仍可被此内部读取及收银台/回调读取，不能全局过滤 external。只在旧 merchant/H5 投影和幂等入口限制模式，新路由返回无买家身份的专用 DTO。
+- `model/partner_tenant.go:392` 可按明确 renewalID 续原行并处理自然到期；共享日历/周期逻辑保留，新路径使用锁后严格 DB 时间，提前续费不额外叠加当期额度。旧调用封装行为不变。
+- 新模式幂等哈希用途分离，规范请求摘要只含实际目标订阅 ID、不含 Key/版本；商户轮换后可领取当前 Key 来重放原单，旧 Key 不再授权新请求。原已接受付费订单仍用冻结目标交付，不被后来重置抹掉。
+- PRD/设计/执行计划已收敛，只有最终摘要的后续实施批准尚未获得。本轮未创建运行资源或临时构建产物；仅任务文档/上下文检查，必要 pq 测试留待实施后。
 
 ## 产品决策与后续问题
 
@@ -88,7 +101,7 @@
 - **已确认：新下单不传 external_user_id 或其他终端用户身份**。商户按其订单/购买意图领取和交付，用户依然只凭订阅 Key 查询。
 - **已确认：允许自动新增真实内部 User**，放弃本期无 users 大改；商户不传外部用户 ID 的约束不变。
 - **已确认 A：可信付款成功后才新增 User**。创建订单/返回付款 URL 不开户，首次开户和完整交付原子提交，失败保留 paid 以便幂等恢复。
-- **当前待确认：续费目标定位**。建议商户用当前 pt_ 鉴权并携带原订阅 Key 指定原订阅，复用原用户/订阅/两种 Key；未指定则独立新购，不按商户+套餐猜测用户。
+- **已确认：续费通过原订阅 Key 指定目标下单**。商户用当前 pt_ + 原 sub_，返回付款 URL，付费交付复用原用户/订阅/两种 Key；无续费目标为独立新购，不按商户+套餐猜测买家。全部产品范围决策收敛，等待本版最终摘要的后续明确实施批准。
 
 ## 验证与资源约束
 

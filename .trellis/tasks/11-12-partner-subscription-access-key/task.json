@@ -2,7 +2,7 @@
   "id": "partner-subscription-access-key",
   "name": "partner-subscription-access-key",
   "title": "商户开发者密钥下单与独立订阅 Key 查询",
-  "description": "商户用开发者密钥下单且不传 external_user_id，返回付款 URL；配置商户专属套餐，支付后交付独立订阅 Key，用户仅凭该 Key 查询权益/额度/Coding API Key，支持商户重置",
+  "description": "商户开发者密钥无用户 ID 下单返回付款 URL，可信付款后开户并交付独立订阅 Key；原 Key 定位续费，用户仅凭 Key 查询权益/额度/Coding API Key，支持专属套餐及商户重置",
   "status": "planning",
   "dev_type": "backend",
   "scope": "partner",
@@ -23,15 +23,18 @@
   "relatedFiles": [
     "model/partner_tenant_order.go",
     "model/partner_tenant.go",
+    "model/partner_tenant_subscription_key.go",
+    "model/partner_tenant_subscription_key_order.go",
     "model/main.go",
     "controller/partner_tenant_order.go",
+    "controller/partner_tenant_subscription_key.go",
     "router/partner_tenant.go",
     "docs/partner-tenant-api.md",
     "docs/partner-tenant-integration.zh-CN.md"
   ],
-  "notes": "用户选择 A：仅可信付款成功后的交付事务新增真实内部 User，返回付款 URL 不开户；重复通知/恢复不重复新增。商户不传 external_user_id，续费定位待收敛；不实施无 users 大改。仅必要 pq 测试，尚未实施。",
+  "notes": "续费通过原订阅 Key 指定目标已确认；商户 pt_ + X-Subscription-Key 下单仍返回付款 URL，复用原用户/订阅/两种 Key。首次新购仅可信付款后原子开户，不传 external_user_id；新旧身份显式隔离，无 users 大改不实施。PRD/设计/执行计划已收敛，仅必要 pq 验证；等待新版最终摘要后明确批准，尚未实施。",
   "meta": {
-    "planning_review": "renewal_target_decision_pending",
+    "planning_review": "awaiting_user_approval",
     "test_policy": "targeted_necessary_postgresql_only"
   }
 }

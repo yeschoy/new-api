@@ -1,85 +1,105 @@
-# 执行计划：无外部用户 ID 的订阅 Key 接入（重规划中）
+# 执行计划：商户下单、付款后开户与订阅 Key 续费
 
-## 1. 状态与启动门禁
+## 1. 规划门禁
 
-- [x] 用户允许创建任务；已取证现有 pt_、付费订单、收银台、交付、账户及专属套餐配置。
-- [x] 已确认：商户交付、同订阅续费沿用 Key、到期历史查询不取 Coding Key、商户重置 Key、每商户多份专属套餐 A、下单返回付款 URL。
-- [x] 最新用户明确：商户下单**不传 external_user_id**。前版依赖该字段识别买家/复用账户的实施步骤已撤回，旧代码事实不等于新需求。
-- [x] 仅必要测试、数据库只验证 PostgreSQL（pq）；不运行 SQLite、MySQL/FoundRows 或无关全量套件。
-- [x] 源码级评估完全不新增 users 的可行性，证据与所需主体/鉴权/计费/RPM/日志适配见 research/userless-feasibility.md；本轮未运行代码测试。
-- [x] 用户选择自动新增内部 User，放弃无 users 主体改造；要求“下单成功”之后才新增，商户仍不传 external_user_id。
-- [x] 用户选择 A：可信付款成功后，首次新购才在交付事务新增 User；创建订单/返回 URL 不开户，失败回滚本地交付并保留 paid。
-- [ ] 收敛续费显式定位，不按商户/套餐猜测买家；建议商户带原订阅 Key 指定原订阅。
-- [ ] 按该决定收敛 PRD R1–R13 / AC1–AC14，完成新旧订单模式、内部账户关联和新增入口设计，检查无商户 external_user_id 依赖残留。
-- [ ] 再验证 implement/check 上下文清单，向用户呈现最新版最终摘要并等待后续明确批准。
-- [ ] 获批后读取执行阶段指引和 trellis-before-dev，再 task.py start；此前不改业务代码、不运行代码测试、不派实施子代理。
+- [x] 用户允许创建本任务并进行规划；已有支付/收银台/专属套餐及无 users 可行性证据。
+- [x] 已确认：商户交付、sub_ 独立查询、到期历史不取 Coding Key、商户重置、每商户多份专属套餐、不传 external_user_id、下单返回付款 URL。
+- [x] 已确认真实内部 User 方案，且选 A：仅可信付款成功后的首次交付新增 users，未付款不创建，重试不重复。
+- [x] 用户确认“续费通过订阅key下单，对”：商户 pt_ + 原 sub_ 指定原订阅，付款后复用原用户/订阅/两种 Key。
+- [x] 完成 design.md 的订单模式、内部身份隔离、迁移、鉴权/事务/锁、兼容/回滚设计；PRD R1–R13 / AC1–AC14 进行最终收敛。
+- [x] 用户限定仅必要测试，数据库只验证任务专属 Docker PostgreSQL，不跑 SQLite/MySQL/FoundRows 或无关全量套件。
+- [x] 本轮 task.py validate（implement 7 / check 5 条）及 git diff --check 已通过；本轮回复展示最新版最终摘要，不据此启动实施。
+- [ ] **等待后续明确批准本版最终摘要**，然后读取执行阶段及 trellis-before-dev 再 task.py start；此前不改业务代码、不运行测试、不派实施代理。
 
-仍在一个端到端任务规划中。未来如按适用项目流程委派，先读取 task.py current，所有子代理提示第一行必须为 `Active task: <实际任务路径>`；无适用授权不启动额外并行代理，同 cwd 同时只有一个写入者。
+这是同一付费交付边界上的一个端到端任务，不拆为可单独上线的 UI/支付子任务。无额外代理授权时由当前会话执行；如后续按适用指令委派，先 task.py current，所有提示首行必须 `Active task: <实际任务路径>`，同 cwd 只有一个写入者。
 
-## 2. 重新收敛技术设计所需工作（不是实施授权）
+## 2. 获批后的有序实施清单
 
-1. **新旧接入区分**：旧 POST /api/partner/v1/subscription-orders 与 H5 要求 external_user_id，保留原契约；新无身份方式应有明确新入口/模式，不把旧客户端漏字段错误静默解释为新购。
-2. **新购意图**：请求由 pt_ 鉴权，业务字段至少 plan_id/payment_method，Idempotency-Key 表示购买意图，不能当作人。响应 order_no + checkout_url，无长期 Key。
-3. **新购调用主体**：已选择真实内部 User/Token，仅在可信付款成功后的交付事务创建。新购 User/Token/订阅/sub_ 与 fulfilled 一起原子提交，交付失败整体回滚但保留先行提交的 paid；同订单恢复不重复创建。不实施无 users 新 principal/funding/RPM/日志体系，不用用户 0/共享用户伪装。
-4. **续费目标**：建议用原订阅 Key 显式定位原订阅并复用原账户/Key；同商户+同套餐不足以识别续费。明确相关请求摘要、权限、快照与锁序。
-5. **支付复用**：继续使用独立支付事实、准确金额/币种/签名、初始订单 deadline、现有收银台和 paid-unfulfilled 恢复；首次交付内部账户/Token/订阅/sub_ 和 fulfilled 标记原子提交。
-6. **独立查询**：只带 sub_，无 pt_/商户 ID/Cookie/外部用户 ID。按该 Key 的实际订阅和内部账户读取最新额度/Token；不调用旧 Provision API 去“读取”，不复制存储 Coding Key。
-7. **商户领取/重置**：按当前商户和订单/订阅归属，不要求平台识别买家；商户本地保存购买意图并交付。轮换幂等和 expected_version 保留，旧 sub_ 后续请求无效，不更换 Coding API Key。
-8. **精确 DTO 与终态**：活跃周期复用既有重置逻辑，额度用精确十进制字符串；到期不返回 api_key，历史余额不表示可消费；坏映射/禁用/错组/过期凭证 fail closed，不自动补发。
-9. **专属套餐 A**：复用 root 套餐管理、PartnerTenantId 单归属和 dedicated group；目录与新购/续费选择必须按当前商户允许范围。无共享授权表或重复 UI。
-10. **范围复核**：原“今后所有旧订单交付都签发 sub_”方案撤回；新凭证仅来自新模式真实支付。旧订单/账户/H5 不迁移、不暗中改绑，不回归免费直授。
+### 2.1 基线与迁移（首个回滚点：仅新增兼容结构）
 
-## 3. 获批后实施顺序（详细文件/事务清单待上述决定收敛）
+- [ ] 复查 git status 和用户既有 docs/partner-tenant-integration.zh-CN.md 差异，不覆盖；不读取/暂存私钥及已有 examples/reports。加载 backend index、数据库、checkout/H5、复用和跨层规范。
+- [ ] 检索 PartnerTenantAccount/SubscriptionOrder、partnerTenantAccountQuery、migratePartnerTenantAccountIdentity、AutoMigrate 及相关 fixture 调用点，确认共享读取/外部投影边界。
+- [ ] model/partner_tenant.go：Account 增 IdentitySource（external 默认）及 nullable 唯一 SourceOrderId。新内部 hash 为含 NUL 用途域 + 首购订单号的 SHA256，ExternalUserId 留空；不使用假外部用户 ID 或 NULL hash。
+- [ ] model/partner_tenant_order.go：Order 增 EntryMode（external 默认）、AccountId；保持旧索引/旧请求摘要/H5 哈希不变。外部账户查询及 legacy backfill 只处理 external；校验旧身份不能命中新内部账户。
+- [ ] model/partner_tenant_subscription_key.go：AccessKey/Rotation 两表及明确短名唯一索引，内部字段不导出；model/main.go 注册实际增量迁移，迁移 helper 由实际入口及测试复用，不用单独模拟 schema 代替。
+- [ ] 用任务专属 pq 验证 fresh、旧数据升级及重复迁移，保留账户/订单哈希和数据。无业务新模式写入前可回退代码；不可为回滚 drop 新列/表。
 
-- [ ] 复查 git status 与已有用户文档差异；不覆盖 docs/partner-tenant-integration.zh-CN.md，不读取/暂存未跟踪私钥。
-- [ ] 新增/扩展新模式订单及内部身份关联，增量迁移；保留旧订单索引/请求摘要与外部用户映射。先检索所有同名 Symbol 和相关 AutoMigrate fixture。
-- [ ] 在模型层实现用途分离 sub_ 种子/哈希/版本、真实支付交付、新购与续费隔离和同幂等重试；模型 Key 仍以现有 Token 记录为单一来源。
-- [ ] 新商户写请求在 actual transaction/锁内重新核对开发者密钥与资源状态；新查询在锁后复核当前 sub_ 和严格 DB 时钟，防慢 body/锁等待绕过到期或轮换。
-- [ ] 实现新下单、商户查单/领取、sub_ 独立查询、商户重置路由与最小 DTO；拒绝 query 秘密和未知/重复/大小写别名字段，设置 no-store/no-referrer、请求 ID、限流与安全错误。
-- [ ] 更新接入文档，突出“无 external_user_id 下单 → checkout_url → 付款交付 → 商户领取 sub_ → 用户只凭 sub_ 查询”；明确内部账户关系，不能继续要求商户稳定用户 ID。
-- [ ] 按 trellis-update-spec 保存最终真实合同；按 trellis-check 仅做本次必要核对，记录运行命令和未验证项到任务 verification.md。
-- [ ] 相关代码/文档/Trellis 文件按明确路径提交；不 git add .、不 force add 整个忽略目录，不 push 或部署。npm/pnpm 缓存/诊断记录保持忽略。
+### 2.2 凭证与内部账户（第二回滚点：尚未开放新路由）
 
-可复用点：pt_ Bearer、专属套餐配置、严格 DB 时钟、支付验证/准备、收银台 URL/capability、订阅周期重置、现有模型 Token 校验、统一错误与限流。新购身份、订单模式及交付关联必须重新设计，不能因为可复用某 helper 就沿用其不符合新需求的 external_user_id 前提。
+- [ ] 模型层实现用途分离 HMAC、随机 Seed、固定 sub_ 格式、哈希/版本、派生一致性和安全错误，不写 tokens，不缓存凭证，不保存原始 sub_。
+- [ ] 在原事务内抽取可共享 User/Token 创建逻辑，旧 helper 输入/输出保持；新私有 helper 按 SourceOrderId 校验或创建内部账户。zero wallet、商户 group、固定 TokenId；validatePartnerTenantAccountTx 的坏映射 fail closed，不补发。
+- [ ] 授予/重置周期使用共享日历/订阅 helper；为新路径接受严格锁后 DB 时间，旧调用封装语义保持，不复制计费实现。
+- [ ] 领取只读返回当前 Key；轮换 expected_version + 独立幂等事实，超越版本返回冲突，旧种子不保存。根秘密不匹配 fail closed，只有显式合法商户轮换能更换当前材料。
 
-## 4. 最小必要验证（仅获批实施后执行）
+### 2.3 无买家 ID 的下单与付款交付
 
-### 4.1 静态检查
+- [ ] 新 model/partner_tenant_subscription_key_order.go（或相同职责文件）实现新购/续费入口：pt_ 锁后重验、独立幂等用途域、规范请求摘要、套餐/预算、冻结 AccountId/RenewalSubscriptionId。
+- [ ] 续费 Key 仅在 X-Subscription-Key 请求头；缺头是新购，有头但错误不得退化为新购。用 Key 定位并校验同商户/同套餐/当前绑定，活跃或自然到期可续原行，取消/损坏拒绝；不依赖 external_user_id。
+- [ ] 新购/续费及精确重放都在 Tenant → Order → Plan → Account → User/Token → Subscription → Key 的实际事务里授权，慢 body/锁等待后仍看当前 pt_/sub_ 和严格 DB 时钟。幂等请求摘要用实际目标 ID，不存 Key/版本，显式换钥后可用新 Key 重放原订单。
+- [ ] 订单创建/返回 URL 不新增 User/Token/订阅/长期凭证；网络网关准备在事务提交后复用旧实现。原 pending 失败准备可同幂等重试，不更换 snapshot/deadline；只读查单无准备副作用。
+- [ ] FulfillPartnerTenantSubscriptionOrder 按 EntryMode 分派：旧路径原样保留；新路径 paid 后新购开户或按冻结目标续费，User/Token/Account/Subscription/AccessKey/fulfilled 同事务提交。已 fulfilled 保持早返回，不补签/重新授予。
+- [ ] 失败回滚全部本地新建但 paid 独立保留，沿用 failed_retryable/扫描恢复；可信迟付和重复通知行为不退化。续费不按已轮换 Key 再定位，不因改钥/自然到期重建 User/订阅。
+- [ ] 提交后才发布 membership cache，证明内部账户被 IsPartnerTenantUser 识别、无钱包兜底，复用既有 RPM/日志，不增加新主体或重写模型计费。
+
+### 2.4 路由、严格 DTO 与安全（第三回滚点：新入口启用前）
+
+- [ ] controller/partner_tenant_subscription_key.go（建议）和 router/partner_tenant.go 增新下单/状态/领取/查询/重置。新商户路由在 pt_ 组内，GET /api/partner/subscription 在组外，只带 sub_ 即可。
+- [ ] 新模式商户 DTO 无 external_user_id/内部身份材料/长期凭证；状态 GET 不准备网关。旧商户 API/H5 的外部投影显式限制模式，底层共享订单读取仍允许收银台/准备/支付回调读取两模式，不能全局加 external 过滤使新模式支付失效。
+- [ ] 严格头/JSON/query 解析，2KB 上限、无重复/别名/尾随数据；no-store/no-referrer、request_id、IP/哈希预算、统一错误。审计周边日志，Authorization/X-Subscription-Key/响应凭证不可记录。
+- [ ] 查询在锁后核对当前 hash/派生/真实绑定/状态，用同一快照处理周期和额度。所有 quota 为十进制字符串；自然到期/取消不返回 api_key，历史余额单列且不可消费。读取当前 TokenId，不触发补发。
+- [ ] 验证 sub_ 在 /v1/models 和代表 Coding 请求被上游之前拒绝；查询拒绝其他用途 Key/Cookie-only，重置拒绝 sub_，不存在 URL/其他头鉴权 fallback。
+
+### 2.5 文档、规范和提交
+
+- [ ] docs/partner-tenant-api.md 记录新购/续费 X-Subscription-Key、checkout_url、paid/fulfilled 后领取、独立查询、到期/重置与幂等；若编辑已有用户修改文档，只做明确不重叠追加，否则单独文档引用，不覆盖。
+- [ ] 说明 root 如何用现有套餐管理创建多个专属套餐，不造重复 UI/共享授权表，不增加前端翻译键或升级依赖。
+- [ ] 按 trellis-update-spec 将真实新合同写入 backend 对应规范；区分旧 external API、可选 H5、新 subscription_key 身份，避免把已实施现状提前写成上线结论。
+- [ ] 按 trellis-check 对本任务全范围做必要核对，实际命令/通过用例/未验证项记入 verification.md；只运行下方最小 pq 范围。
+- [ ] 按明确文件路径提交业务代码/文档/规范/任务记录，不 git add . 或 force add 整个忽略目录，不 push/部署。npm/pnpm 记录保持忽略。
+
+## 3. 必要验证与证据
+
+### 3.1 规划检查（本轮仅运行）
 
 ```bash
 python3 ./.trellis/scripts/task.py validate .trellis/tasks/11-12-partner-subscription-access-key
-git diff --check
-# 实施后仅对实际修改的 Go 文件 gofmt，构建受影响后端包：
-go build ./model ./controller ./router
+git diff --check -- .trellis/tasks/11-12-partner-subscription-access-key
 ```
 
-规划阶段只做任务文档/上下文检查，不运行代码测试。若实现后生成非业务缓存/输出，记录具体位置到 TEMPORARY_ARTIFACTS.md，不新增重复登记文档。
+规划阶段不创建数据库/容器、不运行代码测试，不产生无关构建缓存。
 
-### 4.2 PostgreSQL 定向验证
+### 3.2 获批实施后的隔离环境
 
-Go runner 与数据库在本任务专属 Docker；只配置隔离 pq DSN，不用生产/宿主 DB，不调用原 SQLite fixture 或多数据库矩阵。必要新增用例统一带 SubscriptionKey，实际命名与配置在实施期核对：
+Go runner/空 PostgreSQL/网络/缓存卷全部任务专属，预先把精确名称、用途、路径登记到已有 TEMPORARY_ARTIFACTS.md，不登记明文 DSN 密码/凭证。DSN 使用 TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN，fixture 必须自包含并走实际受影响迁移，不调用旧 SQLite/OAuth setup 或完整矩阵。
 
 ```bash
 docker info
-docker exec "$TASK_GO_RUNNER" go test ./model ./controller ./router -run '^TestPartnerTenant.*SubscriptionKey.*$' -count=1 -v
+# 在已登记的任务 runner 中，针对修改文件做 gofmt 检查及受影响包构建：
+docker exec "$TASK_GO_RUNNER" go build ./model ./controller ./router
+# 用实际实现的 SubscriptionKey 命名统一选择必要新用例：
+docker exec "$TASK_GO_RUNNER" go test ./model ./controller ./router \
+  -run '^TestPartnerTenant.*SubscriptionKey.*$' -count=1 -v
 ```
 
-一次覆盖本次必要边界，避免重复跑：
+环境变量在 runner 中安全配置，禁止指向生产/宿主/已有未知数据。确认每组预期测试实际执行；缺 DSN、skip、no tests to run、build/vet 成功不算 runtime 通过。必需 Docker/pq 不可用时明确记录阻塞，不改跑其他数据库，也不扩大无关测试。
 
-- 不传 external_user_id 的新购成功及 checkout_url；新旧 API 互不改变身份契约。
-- 创建订单/返回付款 URL、未付、准备失败、支付失败/未付超时和伪造通知均不增加 users；首次可信支付交付成功只新增一个用户（保留可信迟付交付）。注入本地交付失败时用户/凭证/订阅整体回滚但 paid 保留；同订单恢复成功、重复通知及续费不重复开户。不测试已放弃的无 users 候选方案。
-- 同购买意图幂等重试、不同新购不因同商户/同套餐误合并，续费明确定位原订阅及同 Key 保留（待产品决定确认）。
-- 专属套餐 root 配置 → 商户目录 → 正常下单；跨商户/平台/停用套餐不能伪造 plan_id 绕过。
-- 未支付无凭证；可信支付下内部账户/Token/订阅/sub_ 原子交付；重复通知/恢复不重复开户或延期，失败保留 paid。
-- sub_ 独立查询、额度周期/无限额/耗尽/int64 精度、到期历史不取 api_key、映射损坏/禁用/错组拒绝、不在 DTO/日志泄露。
-- 商户领取/重置归属、旧 Key 失效、轮换幂等/版本冲突及关键并发；无 sub_ 轮换顺带更换 Coding API Key。
-- 严格时钟与锁后当前凭证验证；真实 pq fresh/增量/重复迁移与持久化，旧数据保持。
+### 3.3 一次定向测试集覆盖
 
-不跑全站、无关前端、计费算法或完整旧订单矩阵。race 仅新进程共享状态/具体竞态风险时定向补跑。确认实际执行目标测试，no tests to run、skip、build 或静态检查不能当作 runtime 通过。必需 Docker/pq 不可用时如实报告，不用其他数据库替代。
+| 分组 | 必要断言 |
+| --- | --- |
+| 迁移/身份 | pq fresh/旧数据升级/重复迁移；external 历史数据/哈希保留；新内部账户不被外部 ID/fallback/backfill 命中，nullable SourceOrderId 唯一；只生成一次固定关联 |
+| 套餐/下单 | root 现有配置 → 商户目录 → 无买家 ID 下单 → checkout_url；跨商户/普通/停用 plan 不可新购；同幂等重放、变参冲突、新旧模式/H5 隔离及公共 DTO 无秘密 |
+| 付款后开户 | 未付/准备失败/失败/超时/假通知 users 零新增；可信支付独立保存，交付只新增一套；注入失败回滚本地但保留 paid，重复通知/恢复/并发只交付一次，可信迟付可恢复 |
+| 续费 | pt_ + 原 sub_ 续同套餐和同 SubscriptionId/UserId/TokenId/两种 Key；自然到期续原行、活跃提前续不额外重置当期额度；旧/错/外商户 Key 不退化新购；原单换钥后用当前 Key 重放；已接受订单换钥后仍履约 |
+| 查询 | 仅 sub_ 无 pt_/Cookie 即可读单订阅；周期/无限额/耗尽/2^53/int64 精度；自然到期历史/取消无 api_key；禁用/错组/缺 Token/过期/坏映射 fail closed；无跨订阅读取或补发 |
+| 重置/并发 | 商户归属、expected_version、同幂等键重试、被后续版本超越、旧 Key 失效但 Coding Key/权益不变；领取/查询/续费/重置关键锁竞态，慢 body/锁等待后重验当前凭证/时间 |
+| 兼容/用途 | sub_ 不能 Coding/列模型，其他用途 Key 不能独立查询；新内部账户 membership 和代表模型 funding 保持 subscription_only，钱包不动；旧模式代表订单/取钥/H5/收银台 DTO 保持原契约 |
 
-## 5. 资源、兼容与回滚
+尽量合并 fixture/断言、一次执行该定向集，不反复跑同一路径；不跑全站、无关前端、所有模型协议/计费或多引擎旧矩阵。race 仅出现新共享状态/具体风险时针对补跑。相关普通用户最小回归仅在确实触及其共享 helper 时纳入，不扩张为全量套件。
 
-- 测试网络/容器/空数据库/输出预先登记 TEMPORARY_ARTIFACTS.md；不清理已有 reports/examples/私钥/既有临时文档，任务结束后经用户同意再清理新增非业务产物，Trellis 记录保留。
-- 重试要求空库时用另一个任务专属空数据库，不为通过测试清空未知数据。没有服务安装、生产 DDL 或真实付款权限。
-- 保留所有订单和可信支付事实；回滚不 drop 新表、不删订单/账户/权益。新接口依赖对应应用版本，回滚需告知接入方。
-- 若设计再次涉及买家页面、Coding API Key 轮换、旧数据补签/改绑或消费隔离扩展，回到规划，不把任何局部答复当作新版最终计划批准。
+## 4. 收尾、回滚与资源
+
+- 只在实现/必要验收及规范更新完成后报告已实现；本轮规划通过不等于部署、数据库迁移或支付验证通过。
+- 任何阶段回滚都保留订单/paid 和新结构/已交付权益，不 drop、不重建已交付关系。旧应用无法承接新路由或安全解释新模式交付，回滚须协调停新入口，恢复新版本处理已付待交付，不宣称新旧二进制可无条件混跑。
+- 不删除既有 reports/examples/私钥/临时文档；任务专属容器/网络/卷/输出完成后也必须先获得用户同意再清理，Trellis 记录保留。
+- 若实施发现需买家页面、跨套餐换购、Coding Key 轮换、历史补签/改绑、独立无 users 主体或更大消费隔离改造，返回规划，不将用户局部答复作为范围扩张授权。
