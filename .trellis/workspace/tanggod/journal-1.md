@@ -379,3 +379,41 @@ Fixed the gallery regression: saved plans show one latest group row by default, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 13: 商户接入 Demo：并行审查、订单恢复修复与提交
+<!-- trellis-session: v=2 fp=57fc2831361717cf -->
+
+**Date**: 2026-11-13
+**Task**: 商户接入 Demo：并行审查、订单恢复修复与提交
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+完成精简接入指南与零依赖本机 Demo，三个全新上下文只读审查后修复两项 P1 订单串单问题；按用户要求提交并准备普通推送当前 feat/partner-accounts 分支。
+
+### Main Changes
+
+- 接入指南与完整 Demo 共9个文件精确提交；默认mock、live默认只读、凭证仅后端、固定用户归属及明确真实写入开关。
+- 页面展示与购买草稿解耦，仅create/replay绑定本意图订单；收银台链接绑定待付款订单，切换/编辑/终态清除并拦截旧查询；补入实际app.js的VM状态回归。
+- 用户管理源码核对：开户后内部用户可见并可查订阅；Tenant归属尚未接入现有Partner OAuth列，未扩展该功能。私钥、reports及临时清单保留不提交，不创建或归档其他任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `16c4acaa3` | docs(spec): preserve demo purchase intent and checkout isolation |
+| `1d3e4b324` | feat(partner): add integration demo with safe order recovery |
+
+### Testing
+
+- [OK] 原有服务端15例与页面状态回归合计28/28 PASS；新增回归先在旧实现中复现11项失败，再修复全通过。
+- [OK] 全部Demo JS语法、限定oxlint deny-warnings、暂存及新文件空白、文档链接、假凭证/私钥标记扫描与精确提交路径集合检查PASS。未访问生产或真实支付，未部署、安装依赖或清理。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- P2大整数额度展示精度仍待后续授权处理；真实浏览器/支付渠道验收及商户归属用户管理增强不在本次范围。

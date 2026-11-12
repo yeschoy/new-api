@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
+- **Total Sessions**: 13
 - **Last Active**: 2026-11-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~381 | Active |
+| `journal-1.md` | ~419 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 13 | 2026-11-13 | 商户接入 Demo：并行审查、订单恢复修复与提交 | `16c4acaa3`, `1d3e4b324` | `feat/partner-accounts` |
 | 12 | 2026-11-13 | 商户订阅 Key：付款后开户与原 Key 续费 | `58616beef` | `feat/partner-accounts` |
 | 11 | 2026-11-11 | Fix explicit IQ plan visibility and deletion | `a186b3e4f` | `iq-test` |
 | 10 | 2026-11-11 | Tenant paid checkout implementation; DB verification blocked | `a117c925f` | `feat/partner-accounts` |
