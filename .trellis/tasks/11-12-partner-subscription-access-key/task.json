@@ -29,9 +29,9 @@
     "docs/partner-tenant-api.md",
     "docs/partner-tenant-integration.zh-CN.md"
   ],
-  "notes": "原 Key 生命周期已确认；用户新增商户可订阅套餐配置，等待专属/共享授权边界后重新审阅。用户查询只需订阅 Key，不再要商户密钥。仅必要 pq 测试，不跑 SQLite/MySQL 或无关全量套件。",
+  "notes": "R1–R11 已收敛；套餐配置选择 A，复用既有后台为每商户配置多份专属套餐，不建共享授权。用户查询仅需订阅 Key，不再要商户密钥。仅必要 pq 测试；等待新版最终摘要后的实施批准。",
   "meta": {
-    "planning_review": "scope_clarification_required",
+    "planning_review": "awaiting_user_approval",
     "test_policy": "targeted_necessary_postgresql_only"
   }
 }
