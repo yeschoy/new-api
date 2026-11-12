@@ -29,9 +29,9 @@
     "docs/partner-tenant-api.md",
     "docs/partner-tenant-integration.zh-CN.md"
   ],
-  "notes": "不传 external_user_id 已确认；用户询问完全不新增 users，已取证可用独立订阅主体实现，但需鉴权/计费/RPM/日志适配，尚待正式选择；自动创建内部 User 同样未获同意。仅必要 pq 测试，尚未实施。",
+  "notes": "用户已选择自动新增真实内部 User，放弃无 users 大改；要求下单成功后才新增，待明确是订单创建成功或可信付款成功。商户不传 external_user_id，续费定位待收敛。仅必要 pq 测试，尚未实施。",
   "meta": {
-    "planning_review": "userless_subject_decision_pending",
+    "planning_review": "user_creation_timing_pending",
     "test_policy": "targeted_necessary_postgresql_only"
   }
 }

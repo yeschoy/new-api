@@ -4,5 +4,4 @@
 {"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Preserve public H5 credential separation and unchanged strict public DTOs"}
 {"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse credential validation, strict DB time and quota reset rather than duplicating payment or account APIs"}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Define merchant versus subscription authentication, DTO precision and credential lifecycle boundaries"}
-{"file":".trellis/tasks/11-12-partner-subscription-access-key/research.md","reason":"No merchant external_user_id; user is considering zero users inserts, automatic internal User NOT approved. Preserve sub_-only queries, exclusive plans and necessary pq-only verification"}
-{"file":".trellis/tasks/11-12-partner-subscription-access-key/research/userless-feasibility.md","reason":"Source-backed feasibility of a subscription principal without users; auth/billing/RPM/log adaptations and explicit guard against user 0 or shared-user workarounds; not yet implementation-approved"}
+{"file":".trellis/tasks/11-12-partner-subscription-access-key/research.md","reason":"User chose real internal User creation, no userless redesign; merchant supplies no external_user_id. Creation timing (order vs payment success) and renewal targeting pending. Only necessary pq tests"}
