@@ -56,7 +56,7 @@
 - [x] 说明 root 如何用现有套餐管理创建多个专属套餐，不造重复 UI/共享授权表，不增加前端翻译键或升级依赖。
 - [x] 按 trellis-update-spec 将真实新合同写入 backend 对应规范；区分旧 external API、可选 H5、新 subscription_key 身份，避免把已实施现状提前写成上线结论。
 - [x] 按 trellis-check 对本任务全范围做必要核对：16个任务Go文件/新与ignored规范、同源真实pq日志及共享启动迁移fixture已审阅；无经证据确认的本范围业务P0/P1/P2，不重复runtime。纠正新接入文档过时未执行状态、补齐英文可执行合同；实际命令/已有通过用例/证据边界记入 verification.md。
-- [ ] 按明确文件路径提交业务代码/文档/规范/任务记录，不 git add . 或 force add 整个忽略目录，不 push/部署。npm/pnpm 记录保持忽略。
+- [x] 用户确认25文件单业务提交计划后，主会话按精确路径提交为 `58616beef`（feat(partner): add subscription access keys and paid-only provisioning），提交前后路径集合校验一致，未包含原用户guide/私钥/旧产物/临时目录。未 git add . / force add 整个忽略目录，未 push/部署；npm/pnpm记录保持忽略。后续仅本任务归档/日志记账。
 
 ## 3. 必要验证与证据
 
