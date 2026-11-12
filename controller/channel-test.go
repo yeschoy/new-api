@@ -37,10 +37,12 @@ import (
 )
 
 type testResult struct {
-	context     *gin.Context
-	localErr    error
-	newAPIError *types.NewAPIError
-	text        string
+	context      *gin.Context
+	localErr     error
+	newAPIError  *types.NewAPIError
+	text         string
+	iqStage      string
+	iqHTTPStatus int
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) string {
@@ -83,7 +85,14 @@ type iqChannelTestOptions struct {
 	reasoningEffort string
 }
 
-func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool, iq *iqChannelTestOptions) testResult {
+func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool, iq *iqChannelTestOptions) (result testResult) {
+	if iq != nil {
+		defer func() {
+			if result.localErr != nil && result.iqStage == "" {
+				result.iqStage = "prepare"
+			}
+		}()
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -494,15 +503,16 @@ func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID i
 			context:     c,
 			localErr:    err,
 			newAPIError: types.NewOpenAIError(err, types.ErrorCodeDoRequestFailed, http.StatusInternalServerError),
+			iqStage:     "request",
 		}
 	}
 	if iq != nil {
 		if resp == nil {
-			return testResult{localErr: errors.New("empty upstream response")}
+			return testResult{localErr: errors.New("empty upstream response"), iqStage: "response"}
 		}
 		httpResp, ok := resp.(*http.Response)
 		if !ok || httpResp == nil {
-			return testResult{localErr: errors.New("invalid upstream response")}
+			return testResult{localErr: errors.New("invalid upstream response"), iqStage: "response"}
 		}
 		return captureIQResponse(c, httpResp, info, testUserID, channel.Id, priceData, tik)
 	}
@@ -544,8 +554,8 @@ func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID i
 			newAPIError: types.NewOpenAIError(usageErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError),
 		}
 	}
-	result := w.Result()
-	respBody, err := readTestResponseBody(result.Body, isStream)
+	response := w.Result()
+	respBody, err := readTestResponseBody(response.Body, isStream)
 	if err != nil {
 		return testResult{
 			context:     c,

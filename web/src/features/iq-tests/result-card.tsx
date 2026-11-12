@@ -31,7 +31,12 @@ import {
 import { toIntlLocale } from '@/i18n/languages'
 
 import { IQPreview } from './preview'
-import { artifactRevision, type IQModelCard, type IQStatus } from './types'
+import {
+  artifactRevision,
+  type IQModelCard,
+  type IQResult,
+  type IQStatus,
+} from './types'
 
 export function IQStatusLabel(props: { status: IQStatus }) {
   const { t } = useTranslation()
@@ -52,6 +57,46 @@ export function IQStatusLabel(props: { status: IQStatus }) {
       return t('Interrupted')
     default:
       return t('Failed')
+  }
+}
+
+function IQFailureMessage(props: { result: IQResult }) {
+  const { t } = useTranslation()
+  // Never render raw backend/provider messages, including historical records.
+  // The numeric HTTP suffix is the only interpolated diagnostic value.
+  switch (props.result.status) {
+    case 'timeout':
+      return t('The IQ request timed out.')
+    case 'interrupted':
+      return t('Execution was interrupted and was not retried.')
+    case 'unavailable':
+      return t('No compatible enabled route is available.')
+    case 'invalid_artifact':
+      return t(
+        'The model did not return a complete HTML or SVG artwork within the size limit.'
+      )
+  }
+  const httpStatus = /^upstream_http_([1-5]\d{2})$/.exec(
+    props.result.error_code
+  )?.[1]
+  if (httpStatus && httpStatus !== '200') {
+    return t('Upstream rejected the request (HTTP {{status}}).', {
+      status: httpStatus,
+    })
+  }
+  switch (props.result.error_code) {
+    case 'transport_timeout':
+      return t('The upstream connection timed out.')
+    case 'transport_error':
+      return t('The upstream request failed before a response was received.')
+    case 'response_read_failed':
+      return t('Could not read the upstream response.')
+    case 'request_setup_failed':
+      return t('The IQ request could not be prepared.')
+    default:
+      return t(
+        'The request failed. Detailed diagnostics are not available for this run.'
+      )
   }
 }
 
@@ -78,6 +123,11 @@ export function IQResultCard(props: {
   const latest = props.card.latest
   const progress = props.card.progress
   const success = latest?.status === 'success'
+  const failed =
+    latest &&
+    !success &&
+    latest.status !== 'pending' &&
+    latest.status !== 'running'
   const revision = latest ? artifactRevision(latest) : ''
   return (
     <Card className='min-w-0' data-iq-preview={success ? revision : undefined}>
@@ -103,6 +153,11 @@ export function IQResultCard(props: {
             </p>
           )}
         </div>
+        {failed && latest && (
+          <p className='text-destructive mt-3 text-sm break-words'>
+            <IQFailureMessage result={latest} />
+          </p>
+        )}
       </CardContent>
       <CardFooter className='flex-wrap justify-between gap-3'>
         <div className='flex flex-wrap gap-2'>

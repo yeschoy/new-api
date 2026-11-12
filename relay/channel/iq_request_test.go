@@ -45,6 +45,7 @@ func TestIQRequestDeadlineAndNoRedirectReplay(t *testing.T) {
 			_ = resp.Body.Close()
 		} else {
 			require.Error(t, err)
+			require.ErrorIs(t, err, context.DeadlineExceeded, "IQ diagnostics need the typed transport cause, not a flattened message")
 			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
 		}
 		cancel()

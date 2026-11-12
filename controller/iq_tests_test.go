@@ -308,6 +308,8 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 	failed, err := model.GetIQResult(privateID)
 	require.NoError(t, err)
 	require.Equal(t, "error", failed.Status)
+	require.Equal(t, "upstream_http_500", failed.ErrorCode)
+	require.Equal(t, "Upstream rejected IQ request (HTTP 500)", failed.ErrorMessage)
 	require.NotContains(t, failed.ErrorMessage, "secret")
 	var log model.Log
 	require.NoError(t, model.DB.Where("token_name = ?", "IQ test").First(&log).Error)
