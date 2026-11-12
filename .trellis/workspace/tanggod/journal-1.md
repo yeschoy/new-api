@@ -357,3 +357,25 @@ Fixed the gallery regression: saved plans show one latest group row by default, 
 - Removed 36 recorded temporary files: local browser observations/screenshots, dev-server log, generated i18n reports, the external truncated build log, and `.iq-plan-visibility-temp-artifacts.md`; removed the two now-empty artifact/report directories.
 - Removed only the owned, unstarted `postgres:15` container `iq-plan-visibility-test` (`6dee1b00b4f5`); verified no matching container remains.
 - Preserved all Trellis logs, tracked translation tools, `web/dist/`, and the three pre-existing IQ artifact manifests. No production data or application code changed during cleanup.
+
+
+## Session 12: 商户订阅 Key：付款后开户与原 Key 续费
+<!-- trellis-session: v=2 fp=6980cf1759c52f95 -->
+
+**Date**: 2026-11-13
+**Task**: 商户订阅 Key：付款后开户与原 Key 续费
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+实现无 external_user_id 的商户 pt_ 下单并返回付款 URL；仅可信付款后原子创建真实 User/Token/账户/单订阅/sub_，支持商户领取、sub_ 独立查询精确额度/Coding Key、原 Key 续费复用用户和双 Key、到期历史及幂等轮换。显式隔离旧 external API/H5 并保留共享收银台/支付读取。必要 Docker PostgreSQL 15.19 定向测试 4 顶层+7模型子例全PASS，无skip；离线build/vet、gofmt、独立trellis-check及精确25路径提交核对通过。原daemon/缺Linux缓存/setup失败和30分钟代理超时保留，限定恢复补两已锁定模块后同源实测成功，go.mod/go.sum未变。归档至 .trellis/tasks/archive/2026-11/11-12-partner-subscription-access-key/，详见verification.md；未做生产/真实支付/部署/完整启动或无关全量。用户原中文guide、私钥及其他未跟踪内容保留未提交，任务Docker/导出/日志在TEMPORARY_ARTIFACTS.md登记，清理待单独授权；未push。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `58616beef` | feat(partner): add subscription access keys and paid-only provisioning |
+
+### Status
+
+[OK] **Completed**
