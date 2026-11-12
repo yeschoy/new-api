@@ -29,9 +29,9 @@
     "docs/partner-tenant-api.md",
     "docs/partner-tenant-integration.zh-CN.md"
   ],
-  "notes": "用户已选择自动新增真实内部 User，放弃无 users 大改；要求下单成功后才新增，待明确是订单创建成功或可信付款成功。商户不传 external_user_id，续费定位待收敛。仅必要 pq 测试，尚未实施。",
+  "notes": "用户选择 A：仅可信付款成功后的交付事务新增真实内部 User，返回付款 URL 不开户；重复通知/恢复不重复新增。商户不传 external_user_id，续费定位待收敛；不实施无 users 大改。仅必要 pq 测试，尚未实施。",
   "meta": {
-    "planning_review": "user_creation_timing_pending",
+    "planning_review": "renewal_target_decision_pending",
     "test_policy": "targeted_necessary_postgresql_only"
   }
 }

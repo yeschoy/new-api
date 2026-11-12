@@ -8,7 +8,8 @@
 - [x] 仅必要测试、数据库只验证 PostgreSQL（pq）；不运行 SQLite、MySQL/FoundRows 或无关全量套件。
 - [x] 源码级评估完全不新增 users 的可行性，证据与所需主体/鉴权/计费/RPM/日志适配见 research/userless-feasibility.md；本轮未运行代码测试。
 - [x] 用户选择自动新增内部 User，放弃无 users 主体改造；要求“下单成功”之后才新增，商户仍不传 external_user_id。
-- [ ] 首先澄清新增 User 的时点：可信付款成功（建议）或仅订单创建成功返回 URL；随后收敛续费显式定位，不按商户/套餐猜测买家。
+- [x] 用户选择 A：可信付款成功后，首次新购才在交付事务新增 User；创建订单/返回 URL 不开户，失败回滚本地交付并保留 paid。
+- [ ] 收敛续费显式定位，不按商户/套餐猜测买家；建议商户带原订阅 Key 指定原订阅。
 - [ ] 按该决定收敛 PRD R1–R13 / AC1–AC14，完成新旧订单模式、内部账户关联和新增入口设计，检查无商户 external_user_id 依赖残留。
 - [ ] 再验证 implement/check 上下文清单，向用户呈现最新版最终摘要并等待后续明确批准。
 - [ ] 获批后读取执行阶段指引和 trellis-before-dev，再 task.py start；此前不改业务代码、不运行代码测试、不派实施子代理。
@@ -19,7 +20,7 @@
 
 1. **新旧接入区分**：旧 POST /api/partner/v1/subscription-orders 与 H5 要求 external_user_id，保留原契约；新无身份方式应有明确新入口/模式，不把旧客户端漏字段错误静默解释为新购。
 2. **新购意图**：请求由 pt_ 鉴权，业务字段至少 plan_id/payment_method，Idempotency-Key 表示购买意图，不能当作人。响应 order_no + checkout_url，无长期 Key。
-3. **新购调用主体**：已选择真实内部 User/Token。明确“下单成功”的创建边界后再设计首次开户原子性与幂等；不实施无 users 新 principal/funding/RPM/日志体系，不用用户 0/共享用户伪装。
+3. **新购调用主体**：已选择真实内部 User/Token，仅在可信付款成功后的交付事务创建。新购 User/Token/订阅/sub_ 与 fulfilled 一起原子提交，交付失败整体回滚但保留先行提交的 paid；同订单恢复不重复创建。不实施无 users 新 principal/funding/RPM/日志体系，不用用户 0/共享用户伪装。
 4. **续费目标**：建议用原订阅 Key 显式定位原订阅并复用原账户/Key；同商户+同套餐不足以识别续费。明确相关请求摘要、权限、快照与锁序。
 5. **支付复用**：继续使用独立支付事实、准确金额/币种/签名、初始订单 deadline、现有收银台和 paid-unfulfilled 恢复；首次交付内部账户/Token/订阅/sub_ 和 fulfilled 标记原子提交。
 6. **独立查询**：只带 sub_，无 pt_/商户 ID/Cookie/外部用户 ID。按该 Key 的实际订阅和内部账户读取最新额度/Token；不调用旧 Provision API 去“读取”，不复制存储 Coding Key。
@@ -66,7 +67,7 @@ docker exec "$TASK_GO_RUNNER" go test ./model ./controller ./router -run '^TestP
 一次覆盖本次必要边界，避免重复跑：
 
 - 不传 external_user_id 的新购成功及 checkout_url；新旧 API 互不改变身份契约。
-- 内部 User 仅在确认后的成功边界新增；边界之前、失败请求、重复同订单/支付恢复不重复开户。无 users 候选方案不再作为实施或测试范围。
+- 创建订单/返回付款 URL、未付、准备失败、支付失败/未付超时和伪造通知均不增加 users；首次可信支付交付成功只新增一个用户（保留可信迟付交付）。注入本地交付失败时用户/凭证/订阅整体回滚但 paid 保留；同订单恢复成功、重复通知及续费不重复开户。不测试已放弃的无 users 候选方案。
 - 同购买意图幂等重试、不同新购不因同商户/同套餐误合并，续费明确定位原订阅及同 Key 保留（待产品决定确认）。
 - 专属套餐 root 配置 → 商户目录 → 正常下单；跨商户/平台/停用套餐不能伪造 plan_id 绕过。
 - 未支付无凭证；可信支付下内部账户/Token/订阅/sub_ 原子交付；重复通知/恢复不重复开户或延期，失败保留 paid。
