@@ -12,7 +12,7 @@ Research date: 2026-11-13. Repository baseline: `1595f89cc` on `feat/partner-acc
 
 `GET /plans` is shared. The absence of buyer IDs in the new API does not remove its tenant dedicated group or plan ownership: paid fulfillment calls the same grouped User/Token creation helper (`model/partner_tenant_subscription_key_order.go:222`, `model/partner_tenant.go:437`).
 
-Product decision still needed: expose only new subscription-key API and hosted H5 to newly created tenants (keep old external API for legacy tenants), or offer external API as a third explicit mutually exclusive choice. OAuth browser consent and pst_ wallet/server integration are separate systems and are not implicitly included.
+Product decision D1 confirmed after the two-versus-three-options question: newly created tenants choose only Subscription Key API or hosted H5; old external API is for existing-tenant compatibility, not a third creation option. Existing tenants' exact retained permissions and mode-switch policy remain unresolved (D2). OAuth browser consent and pst_ wallet/server integration are separate systems and are not implicitly included.
 
 ## 2. Current tenant has no integration-mode field
 
