@@ -2,49 +2,43 @@
 
 ## Goal and source requirements
 
-Child of `../11-13-partner-access-mode-audit/`. The parent PRD owns the source requirements. This child owns R3/R5, with R1/R2/R4/R6 used as authorization and default-mode boundaries.
+父任务 `../11-13-partner-access-mode-audit/prd.md` 为 R1-R7 的源需求。本子任务负责 R3/R5，并遵守 R1/R2/R4/R6/R7 的身份与模式边界：复用既有后台授权日志展示新免用户 ID 订阅 Key 的凭证事件，不伪装成 OAuth 用户同意。
 
-Expose safe, tenant-correlated authorization/credential events for the new buyer-ID-free subscription-key integration in the existing admin authorization-log UI, without pretending these are OAuth consent events or asking merchants to supply user IDs.
+## Background
 
-## Evidence
-
-See parent `research/current-boundaries.md`, section 4. Existing safe log/action allowlists and frontend only cover OAuth/older partner server/account events; tenant admin actions use a separate security audit. Current log filters do not include tenant references, and ClickHouse migration needs explicit existing-table treatment if fields are added.
+父任务 `research/current-boundaries.md` 第4节记录：既有安全日志没有 tenant/order/subscription 关联；租户管理另有 security admin audit；日志使用 LOG_DB，与业务库可能分离。ClickHouse 当前只有建表逻辑，扩字段时必须考虑既有表升级。
 
 ## Requirements
 
-- Add a clear tenant event namespace and truthful event semantics; no synthetic OAuth client/binding identifiers or external buyer IDs.
-- Associate trusted merchant, order, subscription and internally created user identifiers only where actually known. Failed unknown credentials cannot be attributed to an attacker-supplied target.
-- The user approved the complete security-event scope: paid provisioning/credential issuance, Subscription Key claims/rotations, authentication failures and wrong-mode denials, plus every successful independent subscription query. Successful expired-subscription/history queries also count even though they omit Coding API Key; log only metadata, never the returned credentials. Higher log volume from successful reads is an accepted trade-off.
-- Keep a bounded metadata-only projection: no raw pt_/sub_/sk_, headers, request/response bodies, query secrets, seeds, secret hashes, or capability URLs.
-- Extend existing admin query/list/filter capabilities and labels without weakening authorization or exposing cross-permission data through shared caches.
-- Preserve existing OAuth/server logs and current tenant security admin audit; do not replace them with misleading events.
-- Business payment/provisioning state and log persistence must not be coupled in a way that rolls back durable paid evidence or duplicates delivery. Final log reliability policy and idempotent event behavior belong in design review.
-- Match existing main/log database separation and supported log backends; migration of historical logs must be additive and repeatable.
+- 完整事件范围已获用户认可：付款后凭证签发、订阅 Key 领取/重置、鉴权失败、模式不匹配拒绝；每次成功独立查询也记录，包括活跃、耗尽、到期和取消等正常结果，不采样。
+- 只关联真正可确认的商户、订单、订阅及内部用户；无效/未知凭证不得把攻击者给的目标当成已验证归属，也不造 OAuth client_id/binding_id/external_user_id。
+- 采用允许列表的事件、原因及固定安全元数据；不保存 pt_/sub_/sk_、鉴权头、体、能力 URL、根/种子或凭证哈希。不得以原始错误/请求转储作为失败原因。
+- 已有授权日志页和接口增加租户关联显示及商户过滤，继续支持事件/结果/时间；保留原 OAuth/server/account 字段、旧数据、权限、分页及会话隔离。
+- 签发记录只描述已提交的实际交付，不能把回滚尝试记成成功或因重复通知再次宣称新签发；领取/查询按每次访问记录，轮换请求重放应如实识别，不宣称新增版本。
+- 不将独立日志库写入与业务库付款/交付耦合成跨库事务；日志故障不得抹去支付证据或回滚交付。
+- 日志库正常时每次应记录事件；沿用最佳努力同步写入和脱敏服务端故障告警，不新增持久 outbox，不承诺日志库故障/进程崩溃零丢失。该限制必须在最终方案和交付说明披露。
+- LOG_DB 的增量迁移可重复并保留历史，兼容默认主库复用与独立日志库；ClickHouse 有明确既有表加列逻辑，不因只 CREATE TABLE IF NOT EXISTS 漏掉升级。
+- UI 新标签/筛选/状态说明完整覆盖七语言，不新增公开日志或秘密导出接口。
 
 ## Acceptance criteria
 
-- L-AC1 (parent AC2): every successful independent subscription query (active/exhausted/expired), credential issuance/claim/rotation and approved denial event has a safe record. Trusted tenant events are filterable by tenant reference, event, result and time without OAuth-only identifiers; failed unknown credentials do not invent tenant attribution.
-- L-AC2 (parent AC4): invalid log actions/reasons/identifiers and duplicate/unknown filter fields are safely rejected; no secret appears in log storage, errors or admin DTOs.
-- L-AC3 (parent AC2/AC3): credential claims and rotations have accurate success/failure results; signing/claim retries do not create duplicate business effects.
-- L-AC4 (parent AC1/AC2): wrong-mode denial from the mode child is visible with the correct merchant when authenticated, safe route template/request ID and reason, with no unintended business side effects.
-- L-AC5: existing OAuth/server/account logs, access control, pagination and query cache isolation remain unchanged; new UI text covers all seven locales.
-- L-AC6: relevant log-backend fresh/upgrade/repeat migration behavior is demonstrated or explicitly reported as unverified; no full acceptance claim from static checks alone.
+| ID | Parent mapping | Result |
+| --- | --- | --- |
+| L-AC1 | AC2 | 正常 LOG_DB 下，签发/领取/重置/拒绝及每次成功独立查询均有准确记录；可信商户可按商户、事件、结果、时间定位，未知凭证不伪造归属。 |
+| L-AC2 | AC4 | 无效事件/原因/元数据及重复/未知过滤项拒绝；日志库、后台响应、错误输出、日志故障告警均无秘密。 |
+| L-AC3 | AC2/AC3 | 本地回滚不记成功签发，已交付重复通知不重复记签发；访问重试均有请求事件；轮换幂等重放保持原版本及如实元数据，不产生业务重复效果。 |
+| L-AC4 | AC1/AC2 | 由模式子任务触发的禁止入口调用产生正确的拒绝、可信租户/固定路由/请求 ID 记录，业务无副作用；最终后台可筛选。 |
+| L-AC5 | AC4 | OAuth/server/account 旧日志与读取权限、分页、Query 缓存隔离不退化；七语言和移动端基本布局通过。 |
+| L-AC6 | AC5 | 必要 pq fresh/upgrade/repeat、独立 LOG_DB 写读及故障隔离实测；ClickHouse DDL 至少有定向契约检查，未实跑引擎必须报告，不能称全引擎验收。 |
 
-## Dependencies and integration order
+## Dependencies
 
-- Event scope and success-read frequency are approved in parent R3; any mode-switch implications depend on resolving parent D2b before final planning approval.
-- Tenant-auth/credential-event projection can proceed independently of mode implementation after approval.
-- Wrong-mode event wiring and tests depend on `../11-13-partner-access-mode/` defining the authoritative persisted mode/denial contract first.
-- Parent integration must exercise denied API -> safe event -> admin query/filter end to end. Parent/child linkage does not by itself express this ordering.
+产品决策已全部确认，模式创建后固定。先由 `../11-13-partner-access-mode/` 定义实际模式及拒绝合同，再接入拒绝日志；日志投影与凭证事件可独立验证，执行顺序仍先模式后日志。父任务最后验证拒绝 -> 安全日志 -> 后台筛选，不因父子链接省略依赖或集成测试。
 
-## Out of scope
+## Out of scope and risks
 
-Not a general model usage/request-body log, not a new payment reconciliation service, not OAuth consent redesign, and no plaintext secret export. No production/payment calls, real-data cleanup, or global frontend/backend test sweep.
+不是模型调用/请求体日志、支付对账服务或 OAuth 改造；不新增 outbox/跨库事务/秘密导出、日志采样/保留清理策略、生产/真实支付/资源清理。成功查询日志量增长是已接受的取舍；不以业务可用冒充日志零丢失保证。
 
-## Blocking product decisions
+## Planning status
 
-Complete event scope, including every successful independent query, is approved. Only parent D2b (whether mode can change after creation) remains a product blocker. No legacy merchant mode is needed: the user reports no existing merchants and requires subscription_key defaults. Existing OAuth/server/account log history must nevertheless be preserved. Existing log failure-isolation semantics are current behavior, not a new user-approved reliability guarantee; make the proposed reliability guarantees explicit in the final design review.
-
-## Artifact status
-
-Planning PRD only. Design/implementation plan/context pending product decisions and subsequent final-review approval. Do not run task.py start.
+PRD 已收敛，无未决产品问题。design.md / implement.md 和上下文清单完成后，等待父任务最终摘要之后的明确实施批准；状态保持 planning。

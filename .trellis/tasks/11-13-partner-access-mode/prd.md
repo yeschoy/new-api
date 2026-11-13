@@ -1,49 +1,48 @@
-# 商户接入方式必选与后端隔离
+# 商户接入方式单选、默认与后端隔离
 
 ## Goal and source requirements
 
-Child of `../11-13-partner-access-mode-audit/`. The parent PRD is the authoritative source of R1-R6 and cross-child acceptance. This child owns R1/R2/R4/R6 and the access-mode portion of R3/R5.
+父任务 `../11-13-partner-access-mode-audit/prd.md` 为 R1-R7 的唯一源需求。本子任务负责 R1/R2/R4/R6/R7，以及与 R3/R5 对接的安全拒绝合同：管理员只能创建默认订阅 Key 或明确 H5 的单一模式商户，创建后不可切换，后端不能绕过购买入口。
 
-Make merchant creation select exactly one integration mode, defaulting to the recently delivered buyer-ID-free Subscription Key API. Only explicitly choosing hosted H5 enables H5. Enforce the choice at the backend rather than treating it as a UI preference.
+## Background
 
-## Evidence
-
-See parent `research/current-boundaries.md`, sections 1-3. Current pt_ tenant creation accepts name/group only; all three purchase entries coexist. Hosted H5 still requires external_user_id; the new subscription-key API does not. Neither changes dedicated group or tenant plan ownership.
+父任务 `research/current-boundaries.md` 第1-3节记录现状：创建只有 name/group，pt_ 可调用三个入口；H5 需要 external_user_id，新订阅 Key API 不需要。无用户 ID 不移除商户专属分组或套餐归属。用户已说明没有旧商户，无需历史兼容模式；该说明不授权查看/删除生产数据。
 
 ## Requirements
 
-- User-approved creation options are exactly buyer-ID-free Subscription Key API and hosted H5, mutually exclusive. Hosted H5 retains its external_user_id requirement; old external API and legacy compatibility are not selectable modes.
-- The user reports no current merchants and requests Subscription Key as the default for all. Default the creation UI and omitted create-mode field to subscription_key; database defaults/backfill use the same policy. Reject unknown or explicitly empty values rather than falling back. Do not delete, relabel identity sources, or rebind any stored accounts/orders based on the reported deployment state; no production DB inspection is authorized.
-- Authorized shared functions and merchant plan isolation remain available; prohibited purchase entry cannot be bypassed by calling its route directly or by existing public H5 capabilities.
-- Credential issuance/account lookup must not bypass selected identity/entry boundaries.
-- Existing accepted payments, shared cashier/notifications, order lookup and retry delivery remain safe under the approved compatibility rules.
-- Root permissions, single-use sensitive-write proof, no-store handling and existing admin audit are preserved.
-- Provide a safe, structured wrong-mode denial event for the audit child to consume; never include credentials or invent a tenant/user association.
-- Frontend descriptions and protocol/spec docs accurately state which mode requires external_user_id and which does not.
+- 仅 subscription_key / hosted_h5 两个模式；UI 默认订阅 Key，创建请求省略字段也默认订阅 Key；显式空/null、未知值或 legacy/external 模式拒绝。持久化及管理 DTO 明确真实模式。
+- 创建后固定；状态更新、密钥轮换或附加输入不能改变模式，不提供切换 UI/API。
+- 订阅 Key 模式只能用对应订单/领取/轮换/独立查询链路，不能创建/兑换/消费 H5 会话或使用旧 external 身份接口。
+- H5 模式通过购买会话和受保护公开 H5 下单，不能调用订阅 Key 链路或旧直接下单；查单、账户 Key 和额度辅助接口保持为 H5 所需能力，而非开放另一购买入口。
+- 模式检查覆盖实际模型事务和公开能力入口，不只依赖创建 UI 或 pt_ 路由前置检查；坏/空持久化模式运行时 fail closed，不把它当作任意入口通行证。
+- 新字段默认/空历史值增量回填为 subscription_key，重复迁移保留显式 H5；不重写账户/订单 identity_source/entry_mode、不删除存量数据。
+- 保持 Root 权限、单次安全验证证明、管理员审计、专属分组和套餐权限、无买家 ID 的 paid-only 原子交付/续费、H5 原会话/订单期限及恢复协议。
+- 不把模式检查装到可信回调、共享收银台、交付底层绑定校验等会使已接受付款无法履约的位置。
+- 提供允许列表内的接入方式拒绝错误，供日志子任务记录经验证商户元数据；不输出秘密或伪造 OAuth 标识。
+- 管理界面复用现有组件并补全七语言；相关文档/规范必须撤销旧“API/H5 任意混用”的过时承诺。
 
 ## Acceptance criteria
 
-- M-AC1 (parent AC1): the form defaults to Subscription Key and an omitted create-mode field produces subscription_key; only explicit H5 chooses H5. Reject unknown/explicitly empty/legacy-mode values. Each of the two valid modes persists and appears in admin list/details.
-- M-AC2 (parent AC1): direct HTTP calls to disallowed new-purchase/account/session entries fail without creating users, orders, sessions, payment preparations or credentials.
-- M-AC3 (parent AC3): allowed buyer-ID-free new purchase, same-subscription renewal and paid-only provisioning retain their existing contracts and dedicated group.
-- M-AC4 (parent AC5): fresh and repeat additive migrations apply the subscription_key default/backfill policy without a legacy mode, retain accounts/orders/paid evidence, preserve any already stored explicit H5 mode, and do not interrupt shared accepted-payment delivery.
-- M-AC5 (parent AC2/AC4): a denied wrong-mode request produces only allowlisted audit metadata and is locatable in the existing authorization-log UI after child integration.
-- M-AC6: all seven locales cover added UI labels and the frontend cannot misrepresent a stored mode or offer a forbidden choice.
+| ID | Parent mapping | Result |
+| --- | --- | --- |
+| M-AC1 | AC1 | 默认/省略创建得到 subscription_key，显式 H5 得到 hosted_h5，非法/空/null/legacy 值拒绝；模式和专属分组在后台可见。 |
+| M-AC2 | AC1 | 对禁止入口直接发 HTTP，包括 H5 公开会话能力绕路，不能创建用户、订单、会话、付款准备或签发凭证；允许模式完成原流程。 |
+| M-AC3 | AC3 | 无用户 ID 新购、同订阅续费及付款后开户保留；H5 可创建会话、下单、原单恢复、查单和获取原账户额度/Key；不同身份不能串用。 |
+| M-AC4 | AC5 | 真实受影响 pq fresh/upgrade/repeat 迁移保持默认策略、原数据和显式 H5；共享付款/迟付/恢复不被模式拦截。 |
+| M-AC5 | AC2/AC4 | 模式拒绝与日志子任务集成后可由后台安全筛选定位，未知/跨租户输入不能污染可信关联。 |
+| M-AC6 | AC6 | 无模式切换入口，状态/轮换附加字段改模式拒绝且持久化不变，安全证明不能从一个模式重放到另一个模式。 |
+| M-AC7 | AC1/AC6 | 七语言标签覆盖，取消/重开创建框恢复默认，选择 H5 不被异步刷新重置，列表显示实际模式。 |
 
-## Dependencies and integration order
+## Dependencies and execution boundary
 
-- The two new-tenant options and subscription_key default/no-legacy-mode policy are confirmed; post-creation mode-change policy still awaits the user's decision.
-- Authoritative mode/denial contract precedes the audit child's wrong-mode event integration, irrespective of parent/child tree ordering.
-- Audit projection/schema work can be implemented independently after its own planning approval, but this child's integration is not complete without parent wrong-mode logging acceptance.
+产品决策已全部确认。先实现权威模式/错误合同，完成本子任务定向验证，再由日志子任务接入相关安全事件，最后由父任务验收模式拒绝 -> LOG_DB -> 后台查询。子任务树不隐含依赖。
 
-## Out of scope
+模式子任务的 M-AC5 是最终跨子集成门禁，不要求在日志子任务尚未实现时伪造通过。本子任务可先提交模式及其独立测试，但父任务不得提前标完成。
 
-No changes to ordinary OAuth consent, pst_ wallet integration, ordinary billing algorithms, payment truth, real provider/production operations, or private-key/temporary-file cleanup.
+## Out of scope and risks
 
-## Blocking product decisions
+不新增历史兼容模式、模式切换、免身份 H5、普通 OAuth/pst_ 行为或支付/计费重写；不操作生产、真实支付和既有临时产物。新版本模式边界不能由旧二进制保证，发布/回退需禁止旧节点接收商户入口；不为回退 drop 新列或付款事实。
 
-Two options and the subscription_key default/no-legacy-mode policy are resolved in parent R2/R6. Post-creation mode-change policy remains unresolved; the user's no-existing-merchants statement does not approve mutable or immutable modes. Do not invent a compatibility mode.
+## Planning status
 
-## Artifact status
-
-Planning PRD only. Design/implementation plan/context pending product decisions and subsequent final-review approval. Do not run task.py start.
+PRD 已收敛，无未决产品问题。design.md / implement.md 定义技术方案及验收步骤；等待父任务最终摘要后的明确实施批准，状态保持 planning。

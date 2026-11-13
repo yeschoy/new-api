@@ -12,7 +12,7 @@ Research date: 2026-11-13. Repository baseline: `1595f89cc` on `feat/partner-acc
 
 `GET /plans` is shared. The absence of buyer IDs in the new API does not remove its tenant dedicated group or plan ownership: paid fulfillment calls the same grouped User/Token creation helper (`model/partner_tenant_subscription_key_order.go:222`, `model/partner_tenant.go:437`).
 
-Product decisions D1 and default/no-legacy portion of D2 confirmed: newly created tenants choose only Subscription Key API or hosted H5. The user subsequently stated there are no merchants and all should default to Subscription Key; this supersedes the earlier legacy-compatibility proposal. No third/legacy mode is needed. Omitted creation mode and additive field defaults/backfill use subscription_key; unknown/explicitly empty values do not fall back. This is user-reported deployment context, not production DB evidence or authority to remove/rebind data. Post-creation mode switching remains unresolved (D2b). OAuth browser consent and pst_ wallet/server integration are separate systems and are not implicitly included.
+Product decisions D1 and default/no-legacy portion of D2 confirmed: newly created tenants choose only Subscription Key API or hosted H5. The user subsequently stated there are no merchants and all should default to Subscription Key; this supersedes the earlier legacy-compatibility proposal. No third/legacy mode is needed. Omitted creation mode and additive field defaults/backfill use subscription_key; unknown/explicitly empty values do not fall back. This is user-reported deployment context, not production DB evidence or authority to remove/rebind data. D2b is now user-confirmed: mode is fixed after creation with no switching UI/API in scope. OAuth browser consent and pst_ wallet/server integration are separate systems and are not implicitly included.
 
 ## 2. Current tenant has no integration-mode field
 
@@ -29,7 +29,7 @@ Potential implementation constraint (not yet an approved design): bind selected 
 - `router/partner_tenant.go:32-53`: sub_ lookup, purchase-session access, cashier, notify and return have separate route groups.
 - Subscription Key and external orders share mode-neutral preparation, cashier, payment evidence and background delivery.
 - `.trellis/spec/backend/partner-subscription-key.md` and archived task `.trellis/tasks/archive/2026-11/11-12-partner-subscription-access-key/prd.md` explicitly preserve shared internal mode-neutral reads, committed paid evidence, atomic paid-only local delivery and old entry identity isolation.
-- A new-entry restriction must not be installed on gateway notification/return or shared order retrieval in a way that strands accepted/paid orders. Although no existing merchants are reported, shared payment fixtures/data must remain intact. The default/backfill policy is subscription_key, not a legacy compatibility mode; an already stored explicit H5 choice must survive repeat migration. Whether modes can change after creation still needs a product decision.
+- A new-entry restriction must not be installed on gateway notification/return or shared order retrieval in a way that strands accepted/paid orders. Although no existing merchants are reported, shared payment fixtures/data must remain intact. The default/backfill policy is subscription_key, not a legacy compatibility mode; an already stored explicit H5 choice must survive repeat migration. Mode immutability is now confirmed; preserve the mode-neutral accepted-payment boundary rather than applying an unrelated blanket gate.
 - Current specs describe optional H5 coexisting with the old API. The requested exclusive-mode policy intentionally supersedes that contract only within the final approved scope; update the affected specs and documentation together.
 
 ## 4. Authorization log gap
@@ -54,4 +54,15 @@ Unknown/invalid credentials may have no trustworthy tenant/user reference. Log o
 - Child audit task owns safe log projection/migration/events/query UI. It can design tenant credential events independently; wrong-mode event integration follows the access-mode contract and is retested at parent integration.
 - Existing untracked private-key file, TEMPORARY_ARTIFACTS.md, reports/ and web temporary document are pre-existing and out of scope. They must not be read, staged, deleted or included in commits.
 - This planning pass generated only Trellis records. No unrelated temporary artifact needs registration or cleanup.
-- Full design.md/implement.md and dispatch context will be finalized after unresolved product choices. No task.py start, sub-agent dispatch, Go/DB tests, production or payment calls in this planning pass.
+- All original product decisions are confirmed. Design/execution/context documents are being finalized before the final review gate; no task.py start, sub-agent dispatch, Go/DB tests, production or payment calls in this planning pass.
+
+## 6. Added user report: existing group cannot be selected
+
+The user supplied a group-settings screenshot and reported that the “可得财务” group cannot be selected, asking whether a group can belong to only one merchant. This is a request to explain/diagnose current selection behavior, not approval to make groups shareable.
+
+- `web/src/features/partner-tenants/index.tsx:153`: candidate groups exclude default/auto and any group equal to ANY tenant.group, without a status condition. A disabled merchant still occupies its group.
+- `model/partner_tenant.go:38`: group has a database uniqueIndex, so this is not only frontend filtering.
+- `web/src/features/partner-tenants/index.tsx:314`: creation dialog explicitly states “A group can belong to only one partner tenant.”
+- Channel/model association is NOT the tenant-occupancy filter. A group can be configured and used by channels yet still be a valid unassigned merchant choice.
+- Screenshot alone does not prove a matching tenant record or deployment status. The user's “already bound” wording needs clarification: merchant binding vs channel binding. No production DB, secrets or authenticated site inspected.
+- Keep the existing dedicated-group uniqueness rule unless the user explicitly requests a product change. If group sharing is requested, return to planning to trace isolation/plan/routing consequences; do not simply remove the UI filter/unique index.
