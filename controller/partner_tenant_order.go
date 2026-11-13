@@ -4,10 +4,8 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -79,8 +77,14 @@ func partnerTenantCheckoutURL(order *model.PartnerTenantSubscriptionOrder) (stri
 }
 
 func partnerTenantOrderError(c *gin.Context, err error) {
+	var admission *model.PartnerTenantAuditAdmissionError
+	if errors.As(err, &admission) {
+		c.Set(model.PartnerTenantAuditReceiptContext, admission.Receipt)
+	}
 	status, code, message := http.StatusInternalServerError, "server_error", "please try again later"
 	switch {
+	case errors.Is(err, model.ErrPartnerTenantIntegrationMode):
+		status, code, message = 403, "integration_mode_mismatch", "operation is not allowed for this integration mode"
 	case errors.Is(err, model.ErrPartnerTenantIdempotencyConflict):
 		status, code, message = 409, "idempotency_conflict", "Idempotency-Key was used with a different request"
 	case errors.Is(err, model.ErrPartnerTenantPlanNotFound):
@@ -163,57 +167,7 @@ func PartnerTenantCreateSubscriptionOrder(c *gin.Context) {
 		partnerTenantOrderError(c, model.ErrPartnerTenantNotFound)
 		return
 	}
-	if c.Request.URL.RawQuery != "" {
-		writePartnerTenantAPIError(c, 400, "invalid_request", "query parameters are not accepted")
-		return
-	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2048)
-	decoder := json.NewDecoder(c.Request.Body)
-	decoder.DisallowUnknownFields()
-	var req struct {
-		ExternalUserId string `json:"external_user_id"`
-		PlanId         int    `json:"plan_id"`
-		PaymentMethod  string `json:"payment_method"`
-	}
-	if decoder.Decode(&req) != nil || decoder.Decode(&struct{}{}) != io.EOF {
-		writePartnerTenantAPIError(c, 400, "invalid_request", "request body is invalid")
-		return
-	}
-	req.ExternalUserId = strings.TrimSpace(req.ExternalUserId)
-	if !model.IsValidPartnerTenantExternalUserID(req.ExternalUserId) || req.PlanId <= 0 || req.PaymentMethod == "" || len(req.PaymentMethod) > 16 {
-		writePartnerTenantAPIError(c, 400, "invalid_request", "external_user_id, plan_id and payment_method are required")
-		return
-	}
-	hash, err := service.ValidatePartnerOAuthIdempotencyKey(c.GetHeader("Idempotency-Key"))
-	if err != nil {
-		writePartnerTenantAPIError(c, 400, "invalid_request", "Idempotency-Key must be 16-64 URL-safe characters")
-		return
-	}
-	order, created, err := createOrReplayPartnerTenantOrder(model.PartnerTenantOrderInput{TenantId: tenant.Id, ExternalUserId: req.ExternalUserId, PlanId: req.PlanId, PaymentMethod: req.PaymentMethod, MerchantId: operation_setting.EpayId, IdempotencyHash: hash})
-	if err != nil {
-		partnerTenantOrderError(c, err)
-		return
-	}
-	respondPartnerTenantCreatedOrder(c, order, created)
-}
-
-// Merchant API replay stays ahead of NEW-payment checks. H5 uses its guarded
-// model entry instead: no prelookup may bypass transaction-time authorization.
-func createOrReplayPartnerTenantOrder(in model.PartnerTenantOrderInput) (*model.PartnerTenantSubscriptionOrder, bool, error) {
-	prior, findErr := model.FindPartnerTenantOrderByIdempotency(in.TenantId, in.IdempotencyHash)
-	if findErr == nil {
-		if prior.RequestHash != model.PartnerTenantOrderRequestHash(in.ExternalUserId, in.PlanId, in.PaymentMethod) {
-			return nil, false, model.ErrPartnerTenantIdempotencyConflict
-		}
-		return prior, false, nil
-	}
-	if !errors.Is(findErr, model.ErrPartnerTenantOrderNotFound) {
-		return nil, false, findErr
-	}
-	if err := validatePartnerTenantNewCheckout(in.PaymentMethod); err != nil {
-		return nil, false, err
-	}
-	return model.CreatePartnerTenantSubscriptionOrder(in)
+	partnerTenantOrderError(c, model.ErrPartnerTenantIntegrationMode)
 }
 
 // Local predicates only: safe to call after guarded replay lookup while holding
@@ -257,7 +211,7 @@ func PartnerTenantGetSubscriptionOrder(c *gin.Context) {
 		writePartnerTenantAPIError(c, 400, "invalid_request", "request is invalid")
 		return
 	}
-	order, err := model.GetPartnerTenantSubscriptionOrder(tenant.Id, c.Param("order_no"))
+	order, err := model.GetPartnerTenantHostedOrder(tenant.Id, tenant.SecretHash, c.Param("order_no"))
 	if err == nil && order.EntryMode != model.PartnerTenantIdentityExternal {
 		err = model.ErrPartnerTenantOrderNotFound
 	}

@@ -48,7 +48,7 @@ func GetPartnerOAuthAuthorizationLogs(c *gin.Context) {
 	query := c.Request.URL.Query()
 	for key, values := range query {
 		switch key {
-		case "page", "page_size", "start", "end", "action", "success", "client_id", "target_user_id":
+		case "page", "page_size", "start", "end", "action", "success", "client_id", "target_user_id", "tenant_id":
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid filter"})
 			return
@@ -111,6 +111,13 @@ func GetPartnerOAuthAuthorizationLogs(c *gin.Context) {
 			return
 		}
 	}
+	if query.Has("tenant_id") {
+		filter.TenantId, err = strconv.ParseInt(query.Get("tenant_id"), 10, 64)
+		if err != nil || filter.TenantId <= 0 || strconv.FormatInt(filter.TenantId, 10) != query.Get("tenant_id") {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid tenant"})
+			return
+		}
+	}
 	items, total, err := model.GetPartnerOAuthAuthorizationLogs(filter, (page-1)*pageSize, pageSize)
 	if err != nil {
 		logger.LogError(c.Request.Context(), common.LogText("partner oauth authorization log read failed (request_id=%s): database error", c.GetString(common.RequestIdKey)))
@@ -118,7 +125,7 @@ func GetPartnerOAuthAuthorizationLogs(c *gin.Context) {
 		return
 	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"items": items, "total": total}})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"items": model.PartnerTenantAuthorizationLogViews(items), "total": total}})
 }
 
 func GetPartnerOAuthClients(c *gin.Context) {

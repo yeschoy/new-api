@@ -1,0 +1,29 @@
+{
+  "id": "partner-access-mode-audit",
+  "name": "partner-access-mode-audit",
+  "title": "商户接入方式互斥与订阅 Key 授权审计",
+  "description": "创建商户时显式选择唯一接入方式，对应接口后端隔离，并将免用户 ID 的订阅 Key 接入纳入安全授权日志与后台查询。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tanggod",
+  "assignee": "tanggod",
+  "createdAt": "2026-11-13",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-13-partner-access-mode",
+    "11-13-partner-subscription-authorization-audit"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

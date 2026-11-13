@@ -1,4 +1,6 @@
-# 商户套餐接入 Demo
+# 商户套餐接入 Demo（历史直接下单协议）
+
+> 本示例的直接 `POST /subscription-orders` 已在新版两种接入方式均被拒绝。以下仅保留历史本地 mock 教学；不要按旧 live 写入步骤联调本版。新接入使用默认[订阅 Key API](../../docs/partner-subscription-key-api.zh-CN.md)或明确选定的[托管 H5](../../docs/partner-hosted-h5.zh-CN.md)。本任务未重写 Demo 协议，也未执行任何生产调用。
 
 配套文档：[野菜 API · 商户套餐接入文档](../../docs/partner-tenant-integration.zh-CN.md)。
 

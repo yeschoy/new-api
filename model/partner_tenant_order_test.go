@@ -128,7 +128,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 			runPartnerTenantPurchaseSessionDatabaseTests(t, db)
 			fixture := func(t *testing.T) (*PartnerTenant, *SubscriptionPlan) {
 				t.Helper()
-				tenant, _, err := CreatePartnerTenant("test", fmt.Sprintf("tenant-%d", time.Now().UnixNano()))
+				tenant, _, err := CreatePartnerTenantWithIntegrationMode("test", fmt.Sprintf("tenant-%d", time.Now().UnixNano()), PartnerTenantIntegrationHostedH5)
 				require.NoError(t, err)
 				plan := &SubscriptionPlan{Title: "Monthly", PartnerTenantId: tenant.Id, PriceAmount: 9.99, Currency: "CNY", Enabled: true,
 					DurationUnit: SubscriptionDurationMonth, DurationValue: 1, ApplicableGroup: tenant.Group, QuotaResetPeriod: SubscriptionResetMonthly,
@@ -147,7 +147,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 			t.Run("unpaid replay conflict isolation and stable key", func(t *testing.T) {
 				tenant, p := fixture(t)
 				in := input(tenant, p, "customer-7", "first")
-				o, created, err := CreatePartnerTenantSubscriptionOrder(in)
+				o, created, err := createPartnerTenantAcceptedOrderFixture(in)
 				require.NoError(t, err)
 				require.True(t, created)
 				require.Equal(t, "9.99", o.Amount())
@@ -155,13 +155,13 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				_, err = GetPartnerTenantAccount(tenant.Id, in.ExternalUserId)
 				require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 				require.Error(t, FulfillPartnerTenantSubscriptionOrder(o.OrderNo))
-				replay, created, err := CreatePartnerTenantSubscriptionOrder(in)
+				replay, created, err := createPartnerTenantAcceptedOrderFixture(in)
 				require.NoError(t, err)
 				require.False(t, created)
 				require.Equal(t, o.OrderNo, replay.OrderNo)
 				changed := in
 				changed.ExternalUserId = "other"
-				_, _, err = CreatePartnerTenantSubscriptionOrder(changed)
+				_, _, err = createPartnerTenantAcceptedOrderFixture(changed)
 				require.ErrorIs(t, err, ErrPartnerTenantIdempotencyConflict)
 				_, err = GetPartnerTenantSubscriptionOrder(tenant.Id+100000, o.OrderNo)
 				require.ErrorIs(t, err, ErrPartnerTenantOrderNotFound)
@@ -182,7 +182,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 
 			t.Run("payment provisions missing account and renewal exactly once", func(t *testing.T) {
 				tenant, p := fixture(t)
-				first, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "new-user", "one"))
+				first, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "new-user", "one"))
 				require.NoError(t, err)
 				pay(t, first)
 				require.NoError(t, FulfillPartnerTenantSubscriptionOrder(first.OrderNo))
@@ -194,7 +194,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				require.NoError(t, db.First(&sub, stored.SubscriptionId).Error)
 				require.NoError(t, db.Model(&sub).Update("amount_used", 80).Error)
 				end := sub.EndTime
-				renewal, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "new-user", "two"))
+				renewal, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "new-user", "two"))
 				require.NoError(t, err)
 				pay(t, renewal)
 				for range 3 {
@@ -217,14 +217,14 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				tenant, p := fixture(t)
 				require.NoError(t, db.Model(p).Update("max_purchase_per_user", 1).Error)
 				p.MaxPurchasePerUser = 1
-				first, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "limited", "initial"))
+				first, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "limited", "initial"))
 				require.NoError(t, err)
 				pay(t, first)
 				require.NoError(t, FulfillPartnerTenantSubscriptionOrder(first.OrderNo))
 				stored, err := GetPartnerTenantSubscriptionOrder(tenant.Id, first.OrderNo)
 				require.NoError(t, err)
 				require.NoError(t, db.Model(&UserSubscription{}).Where("id = ?", stored.SubscriptionId).Updates(map[string]any{"end_time": common.GetTimestamp() - 1, "status": "expired"}).Error)
-				_, _, err = CreatePartnerTenantSubscriptionOrder(input(tenant, p, "limited", "over-limit"))
+				_, _, err = createPartnerTenantAcceptedOrderFixture(input(tenant, p, "limited", "over-limit"))
 				require.ErrorIs(t, err, ErrPartnerTenantPurchaseLimit)
 				var count int64
 				require.NoError(t, db.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ?", tenant.Id).Count(&count).Error)
@@ -235,13 +235,13 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				tenant, p := fixture(t)
 				require.NoError(t, db.Model(p).Update("max_purchase_per_user", 1).Error)
 				p.MaxPurchasePerUser = 1
-				first, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "renew-before-expiry", "initial"))
+				first, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "renew-before-expiry", "initial"))
 				require.NoError(t, err)
 				pay(t, first)
 				require.NoError(t, FulfillPartnerTenantSubscriptionOrder(first.OrderNo))
 				stored, err := GetPartnerTenantSubscriptionOrder(tenant.Id, first.OrderNo)
 				require.NoError(t, err)
-				renewal, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "renew-before-expiry", "renewal"))
+				renewal, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "renew-before-expiry", "renewal"))
 				require.NoError(t, err)
 				require.Equal(t, stored.SubscriptionId, renewal.RenewalSubscriptionId)
 				// Simulate natural expiry (including the expiry worker's status)
@@ -249,12 +249,12 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				expiredAt := getDBTimestampOn(db) - 10
 				require.NoError(t, db.Model(&UserSubscription{}).Where("id = ?", stored.SubscriptionId).Updates(map[string]any{"end_time": expiredAt, "status": "expired", "amount_used": 1000}).Error)
 				require.NoError(t, db.Model(renewal).Update("expires_at", expiredAt).Error)
-				replay, created, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "renew-before-expiry", "renewal"))
+				replay, created, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "renew-before-expiry", "renewal"))
 				require.NoError(t, err)
 				require.False(t, created)
 				require.Equal(t, stored.SubscriptionId, replay.RenewalSubscriptionId)
 				// A different order is NOT allowed to reclassify that history.
-				_, _, err = CreatePartnerTenantSubscriptionOrder(input(tenant, p, "renew-before-expiry", "unrelated-new"))
+				_, _, err = createPartnerTenantAcceptedOrderFixture(input(tenant, p, "renew-before-expiry", "unrelated-new"))
 				require.ErrorIs(t, err, ErrPartnerTenantPurchaseLimit)
 				pay(t, renewal)
 				require.NoError(t, FulfillPartnerTenantSubscriptionOrder(renewal.OrderNo))
@@ -275,7 +275,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				require.NoError(t, db.Model(&UserSubscription{}).Where("plan_id = ?", p.Id).Count(&count).Error)
 				require.EqualValues(t, 1, count)
 				// Explicit cancellation is not natural expiry and must not be undone.
-				cancelled, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "renew-before-expiry", "cancelled"))
+				cancelled, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "renew-before-expiry", "cancelled"))
 				require.NoError(t, err)
 				require.NoError(t, db.Model(&sub).Update("status", "cancelled").Error)
 				pay(t, cancelled)
@@ -293,7 +293,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 					wg.Add(1)
 					go func(i int) {
 						defer wg.Done()
-						_, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "unprovisioned", fmt.Sprintf("slot-%d", i)))
+						_, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "unprovisioned", fmt.Sprintf("slot-%d", i)))
 						errs <- err
 					}(i)
 				}
@@ -312,7 +312,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 				// Cashier expiry cannot release a slot still payable via late callback.
 				require.NoError(t, db.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ?", tenant.Id).Update("expires_at", common.GetTimestamp()-1).Error)
-				_, _, err = CreatePartnerTenantSubscriptionOrder(input(tenant, p, "unprovisioned", "new-after-expiry"))
+				_, _, err = createPartnerTenantAcceptedOrderFixture(input(tenant, p, "unprovisioned", "new-after-expiry"))
 				require.ErrorIs(t, err, ErrPartnerTenantPurchaseLimit)
 			})
 
@@ -326,7 +326,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
-						o, _, err := CreatePartnerTenantSubscriptionOrder(in)
+						o, _, err := createPartnerTenantAcceptedOrderFixture(in)
 						errs <- err
 						if err == nil {
 							orders <- o.OrderNo
@@ -405,7 +405,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 
 			t.Run("payment evidence and transaction reuse", func(t *testing.T) {
 				tenant, p := fixture(t)
-				order, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "one", "one"))
+				order, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "one", "one"))
 				require.NoError(t, err)
 				for _, tc := range []struct {
 					provider, pid, method, tx string
@@ -419,7 +419,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				}
 				pay(t, order)
 				require.Error(t, RecordPartnerTenantPayment(order.OrderNo, PaymentProviderEpay, order.MerchantId, order.PaymentMethod, "different", 999))
-				other, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "two", "two"))
+				other, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "two", "two"))
 				require.NoError(t, err)
 				require.Error(t, RecordPartnerTenantPayment(other.OrderNo, PaymentProviderEpay, other.MerchantId, other.PaymentMethod, "tx-"+order.OrderNo, 999))
 				fresh, err := GetPartnerTenantSubscriptionOrder(tenant.Id, other.OrderNo)
@@ -429,7 +429,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 
 			t.Run("atomic rollback preserves paid truth and restart recovery", func(t *testing.T) {
 				tenant, p := fixture(t)
-				order, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "rollback", "one"))
+				order, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "rollback", "one"))
 				require.NoError(t, err)
 				pay(t, order)
 				require.NoError(t, db.Callback().Update().Before("gorm:update").Register("tenant_test_delivery_failure", func(tx *gorm.DB) {
@@ -461,7 +461,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 
 			t.Run("late paid and frozen plan edits fail closed", func(t *testing.T) {
 				tenant, p := fixture(t)
-				order, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "late", "one"))
+				order, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "late", "one"))
 				require.NoError(t, err)
 				require.NoError(t, db.Model(order).Update("expires_at", common.GetTimestamp()-10).Error)
 				require.NoError(t, db.Model(p).Update("total_amount", 2000).Error)
@@ -481,7 +481,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 					require.NoError(t, err)
 					account, err := GetPartnerTenantAccount(tenant.Id, "blocked")
 					require.NoError(t, err)
-					order, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "blocked", "one"))
+					order, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "blocked", "one"))
 					require.NoError(t, err)
 					switch state {
 					case "tenant_disabled":
@@ -518,15 +518,15 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				tenant, p := fixture(t)
 				for _, currency := range []string{"USD", "EUR"} {
 					require.NoError(t, db.Model(p).Update("currency", currency).Error)
-					_, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "currency", currency))
+					_, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "currency", currency))
 					require.ErrorIs(t, err, ErrPartnerTenantUnsupportedCurrency)
 				}
 				require.NoError(t, db.Model(p).Updates(map[string]any{"currency": "CNY", "price_amount": 1.001}).Error)
-				_, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "cent", "cent"))
+				_, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "cent", "cent"))
 				require.Error(t, err)
 				require.NoError(t, db.Model(p).Update("price_amount", 9.99).Error)
 				foreign, _ := fixture(t)
-				_, _, err = CreatePartnerTenantSubscriptionOrder(input(foreign, p, "foreign", "foreign"))
+				_, _, err = createPartnerTenantAcceptedOrderFixture(input(foreign, p, "foreign", "foreign"))
 				require.ErrorIs(t, err, ErrPartnerTenantPlanNotFound)
 				a, err := ProvisionPartnerTenantAccount(tenant.Id, "Case", "")
 				require.NoError(t, err)
@@ -534,12 +534,12 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				require.NoError(t, err)
 				require.NotEqual(t, a.APIKey, b.APIKey)
 				for i := 0; i < 5; i++ {
-					_, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "budget", fmt.Sprint(i)))
+					_, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "budget", fmt.Sprint(i)))
 					require.NoError(t, err)
 				}
-				_, _, err = CreatePartnerTenantSubscriptionOrder(input(tenant, p, "budget", "overflow"))
+				_, _, err = createPartnerTenantAcceptedOrderFixture(input(tenant, p, "budget", "overflow"))
 				require.ErrorIs(t, err, ErrPartnerTenantOrderLimited)
-				order, _, err := CreatePartnerTenantSubscriptionOrder(input(tenant, p, "claim", "claim"))
+				order, _, err := createPartnerTenantAcceptedOrderFixture(input(tenant, p, "claim", "claim"))
 				require.NoError(t, err)
 				claim, err := ClaimPartnerTenantCheckout(order.Id)
 				require.NoError(t, err)
@@ -557,4 +557,25 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 			})
 		})
 	}
+}
+
+// Historical accepted-order fixture for mode-neutral payment/fulfillment tests.
+// This is NOT an admission API: production callers must use the guarded H5
+// session entry; the retired exported direct-order entry is separately denied.
+func createPartnerTenantAcceptedOrderFixture(in PartnerTenantOrderInput) (*PartnerTenantSubscriptionOrder, bool, error) {
+	if !validPartnerTenantOrderInput(in) {
+		return nil, false, ErrPartnerTenantOrderUnavailable
+	}
+	var order *PartnerTenantSubscriptionOrder
+	var created bool
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var tenant PartnerTenant
+		if err := lockForUpdate(tx).Where("id = ? AND status = ?", in.TenantId, PartnerTenantStatusEnabled).First(&tenant).Error; err != nil {
+			return err
+		}
+		var err error
+		order, created, err = createPartnerTenantSubscriptionOrderTx(tx, &tenant, in, nil)
+		return err
+	})
+	return order, created, err
 }

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -90,9 +91,9 @@ func TestPartnerTenantAccountIsolationAndFixedGroupCredential(t *testing.T) {
 
 	engine := gin.New()
 	SetPartnerOAuthRouter(engine)
-	tenantA, secretA, err := model.CreatePartnerTenant("Partner A", "partner-a")
+	tenantA, secretA, err := model.CreatePartnerTenantWithIntegrationMode("Partner A", "partner-a", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
-	tenantB, secretB, err := model.CreatePartnerTenant("Partner B", "partner-b")
+	tenantB, secretB, err := model.CreatePartnerTenantWithIntegrationMode("Partner B", "partner-b", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 
 	createReq := httptest.NewRequest(http.MethodPut, "/api/partner/v1/accounts", bytes.NewBufferString(`{"external_user_id":"customer-7","display_name":"Customer 7"}`))
@@ -163,7 +164,7 @@ func TestPartnerTenantProvisionAccountValidatesExternalIDCharacters(t *testing.T
 		model.DB, common.RedisEnabled = previousDB, previousRedis
 		_ = sqlDB.Close()
 	})
-	_, secret, err := model.CreatePartnerTenant("Unicode Partner", "partner-unicode")
+	_, secret, err := model.CreatePartnerTenantWithIntegrationMode("Unicode Partner", "partner-unicode", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	engine := gin.New()
 	SetPartnerTenantRouter(engine)
@@ -220,9 +221,9 @@ func TestPartnerTenantPlanCatalogOnlyReturnsItsOwnPlans(t *testing.T) {
 	if !db.Migrator().HasColumn("subscription_plans", "partner_tenant_id") {
 		require.NoError(t, db.Exec("ALTER TABLE subscription_plans ADD COLUMN partner_tenant_id integer NOT NULL DEFAULT 0").Error)
 	}
-	tenantA, secretA, err := model.CreatePartnerTenant("Partner A", "partner-a")
+	tenantA, secretA, err := model.CreatePartnerTenantWithIntegrationMode("Partner A", "partner-a", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
-	tenantB, _, err := model.CreatePartnerTenant("Partner B", "partner-b")
+	tenantB, _, err := model.CreatePartnerTenantWithIntegrationMode("Partner B", "partner-b", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	for _, plan := range []struct {
 		title    string
@@ -269,7 +270,7 @@ func TestPartnerTenantPaidDeliveryQuotaAndRemovedGrantRoute(t *testing.T) {
 	sqlDB.SetMaxOpenConns(1)
 	require.NoError(t, db.AutoMigrate(
 		&model.User{}, &model.Token{}, &model.PartnerTenant{}, &model.PartnerTenantAccount{},
-		&model.PartnerTenantSubscriptionGrant{}, &model.SubscriptionPlan{}, &model.UserSubscription{},
+		&model.PartnerTenantSubscriptionGrant{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.PartnerTenantPurchaseSession{}, &model.PartnerTenantSubscriptionOrder{},
 	))
 	model.DB = db
 	t.Cleanup(func() {
@@ -278,9 +279,9 @@ func TestPartnerTenantPaidDeliveryQuotaAndRemovedGrantRoute(t *testing.T) {
 	})
 	engine := gin.New()
 	SetPartnerOAuthRouter(engine)
-	tenantA, secretA, err := model.CreatePartnerTenant("Partner A", "partner-a")
+	tenantA, secretA, err := model.CreatePartnerTenantWithIntegrationMode("Partner A", "partner-a", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
-	tenantB, _, err := model.CreatePartnerTenant("Partner B", "partner-b")
+	tenantB, _, err := model.CreatePartnerTenantWithIntegrationMode("Partner B", "partner-b", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	planA := model.SubscriptionPlan{
 		PartnerTenantId: tenantA.Id, Title: "A monthly", PriceAmount: 10, Currency: "CNY",
@@ -323,7 +324,11 @@ func TestPartnerTenantPaidDeliveryQuotaAndRemovedGrantRoute(t *testing.T) {
 	require.NoError(t, db.Model(&model.UserSubscription{}).Count(&subscriptions).Error)
 	require.Zero(t, subscriptions)
 
-	order, _, err := model.CreatePartnerTenantSubscriptionOrder(model.PartnerTenantOrderInput{TenantId: tenantA.Id, ExternalUserId: "customer-7", PlanId: planA.Id, PaymentMethod: "alipay", MerchantId: "test-pid", IdempotencyHash: strings.Repeat("a", 64)})
+	session, _, err := model.CreatePartnerTenantPurchaseSession(tenantA.Id, tenantA.SecretHash, "customer-7", strings.Repeat("a", 64))
+	require.NoError(t, err)
+	session, err = model.ExchangePartnerTenantPurchaseSession(session.SessionId, model.PartnerTenantPurchaseLaunchCode(session), strings.Repeat("a", 64), time.Now().Unix())
+	require.NoError(t, err)
+	order, _, err := model.CreatePartnerTenantPurchaseOrder(session.SessionId, model.PartnerTenantPurchaseAccessToken(session), planA.Id, "alipay", "test-pid", nil)
 	require.NoError(t, err)
 	require.NoError(t, model.RecordPartnerTenantPayment(order.OrderNo, model.PaymentProviderEpay, "test-pid", "alipay", "test-transaction", 1000))
 	require.NoError(t, model.FulfillPartnerTenantSubscriptionOrder(order.OrderNo))

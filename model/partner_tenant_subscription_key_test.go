@@ -23,15 +23,19 @@ import (
 // package suites isolated without destructive resets or a SQLite fallback.
 func setupPartnerTenantSubscriptionKeyPQ(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN")
+	return setupPartnerTenantIsolatedPQ(t, os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN"), "pt_subkey_model_")
+}
+
+func setupPartnerTenantIsolatedPQ(t *testing.T, dsn, prefix string) *gorm.DB {
+	t.Helper()
 	if dsn == "" {
-		t.Skip("BLOCKED: task-owned TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN required; no runtime evidence")
+		t.Skip("BLOCKED: explicit task-owned PostgreSQL DSN required; no runtime evidence")
 	}
 	cfg, err := pgx.ParseConfig(dsn)
 	require.NoError(t, err)
 	base, err := gorm.Open(postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
-	schema := fmt.Sprintf("pt_subkey_model_%d", time.Now().UnixNano())
+	schema := fmt.Sprintf("%s%d", prefix, time.Now().UnixNano())
 	require.NoError(t, base.Exec("CREATE SCHEMA "+schema).Error)
 	sqlBase, err := base.DB()
 	require.NoError(t, err)
@@ -409,22 +413,28 @@ func TestPartnerTenantSubscriptionKeyPostgres(t *testing.T) {
 		require.ErrorIs(t, err, ErrPartnerTenantPlanNotFound)
 		require.NoError(t, db.Model(p).Update("enabled", true).Error)
 		ext := PartnerTenantOrderInput{TenantId: tenant.Id, ExternalUserId: "legacy-buyer", PlanId: p.Id, PaymentMethod: "alipay", MerchantId: "test-merchant", IdempotencyHash: partnerTenantHash("external")}
-		old, _, err := CreatePartnerTenantSubscriptionOrder(ext)
+		old, _, err := createPartnerTenantAcceptedOrderFixture(ext)
 		require.NoError(t, err)
 		pay(t, old)
 		require.NoError(t, FulfillPartnerTenantSubscriptionOrder(old.OrderNo))
 		_, err = ClaimPartnerTenantSubscriptionKey(tenant.Id, tenant.SecretHash, old.OrderNo)
 		require.ErrorIs(t, err, ErrPartnerTenantOrderNotFound)
-		legacy, err := ProvisionPartnerTenantAccount(tenant.Id, "legacy-buyer", "")
-		require.NoError(t, err)
-		require.NotEmpty(t, legacy.APIKey)
+		_, err = ProvisionPartnerTenantAccount(tenant.Id, "legacy-buyer", "")
+		require.ErrorIs(t, err, ErrPartnerTenantIntegrationMode)
 		_, err = FindPartnerTenantOrderByIdempotency(tenant.Id, o.IdempotencyHash)
 		require.ErrorIs(t, err, ErrPartnerTenantOrderNotFound)
-		session, _, err := CreatePartnerTenantPurchaseSession(tenant.Id, tenant.SecretHash, "legacy-buyer", partnerTenantHash("h5-session"))
+		h5Tenant, _, err := CreatePartnerTenantWithIntegrationMode("H5", fmt.Sprintf("h5-%d", time.Now().UnixNano()), PartnerTenantIntegrationHostedH5)
+		require.NoError(t, err)
+		h5Plan := *p
+		h5Plan.Id = 0
+		h5Plan.PartnerTenantId = h5Tenant.Id
+		h5Plan.ApplicableGroup = h5Tenant.Group
+		require.NoError(t, db.Create(&h5Plan).Error)
+		session, _, err := CreatePartnerTenantPurchaseSession(h5Tenant.Id, h5Tenant.SecretHash, "legacy-buyer", partnerTenantHash("h5-session"))
 		require.NoError(t, err)
 		redeemed, err := ExchangePartnerTenantPurchaseSession(session.SessionId, PartnerTenantPurchaseLaunchCode(session), strings.Repeat("a", 64), GetDBTimestamp())
 		require.NoError(t, err)
-		h5, _, err := CreatePartnerTenantPurchaseOrder(session.SessionId, PartnerTenantPurchaseAccessToken(redeemed), p.Id, "alipay", "test-merchant", nil)
+		h5, _, err := CreatePartnerTenantPurchaseOrder(session.SessionId, PartnerTenantPurchaseAccessToken(redeemed), h5Plan.Id, "alipay", "test-merchant", nil)
 		require.NoError(t, err)
 		require.Equal(t, PartnerTenantIdentityExternal, h5.EntryMode)
 		keysBefore := count(t, &PartnerTenantSubscriptionAccessKey{})

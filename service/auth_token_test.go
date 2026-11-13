@@ -168,7 +168,7 @@ func TestPartnerTenantSensitiveWriteProofBindsActionAndResource(t *testing.T) {
 	identity := AuthIdentity{UserID: 1, SessionID: "root-session", UserAuthVersion: 1, SessionVersion: 1}
 	createOperation := VerificationOperation{
 		Scope:   VerificationScopePartnerTenantSensitiveWrite,
-		Context: []byte(`{"action":"create","group":"partner-a"}`),
+		Context: []byte(`{"action":"create","group":"partner-a","integration_mode":"subscription_key"}`),
 	}
 	createBinding, err := BindVerificationOperation(createOperation)
 	require.NoError(t, err)
@@ -179,7 +179,7 @@ func TestPartnerTenantSensitiveWriteProofBindsActionAndResource(t *testing.T) {
 
 	otherGroup, err := BindVerificationOperation(VerificationOperation{
 		Scope:   VerificationScopePartnerTenantSensitiveWrite,
-		Context: []byte(`{"action":"create","group":"partner-b"}`),
+		Context: []byte(`{"action":"create","group":"partner-b","integration_mode":"subscription_key"}`),
 	})
 	require.NoError(t, err)
 	_, err = verifySecurityProof(proof, identity, otherGroup)
@@ -195,7 +195,7 @@ func TestPartnerTenantSensitiveWriteProofBindsActionAndResource(t *testing.T) {
 
 	_, err = BindVerificationOperation(VerificationOperation{
 		Scope:   VerificationScopePartnerTenantSensitiveWrite,
-		Context: []byte(`{"action":"create","group":"partner-a","tenant_id":7}`),
+		Context: []byte(`{"action":"create","group":"partner-a","integration_mode":"subscription_key","tenant_id":7}`),
 	})
 	assert.ErrorIs(t, err, ErrVerificationContextInvalid)
 }

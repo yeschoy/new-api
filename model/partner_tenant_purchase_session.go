@@ -90,6 +90,9 @@ func CreatePartnerTenantPurchaseSession(tenantID int64, secretHash, externalID, 
 		if !hmac.Equal([]byte(secretHash), []byte(tenant.SecretHash)) {
 			return ErrPartnerTenantNotFound
 		}
+		if err := RequirePartnerTenantIntegrationMode(&tenant, PartnerTenantOperationHostedH5); err != nil {
+			return &PartnerTenantAuditAdmissionError{Receipt: PartnerTenantAuditPrincipal(&tenant)}
+		}
 		prior := lockForUpdate(tx).Where("tenant_id = ? AND idempotency_hash = ?", tenantID, keyHash).Limit(1).Find(&session)
 		if prior.Error != nil {
 			return prior.Error
@@ -170,7 +173,7 @@ func PartnerTenantPurchaseAccessToken(s *PartnerTenantPurchaseSession) string {
 }
 
 func validPartnerTenantPurchaseTenant(s *PartnerTenantPurchaseSession, tenant *PartnerTenant, now int64) bool {
-	return tenant.Id == s.TenantId && tenant.Status == PartnerTenantStatusEnabled && now < s.ExpiresAt &&
+	return RequirePartnerTenantIntegrationMode(tenant, PartnerTenantOperationHostedH5) == nil && tenant.Id == s.TenantId && tenant.Status == PartnerTenantStatusEnabled && now < s.ExpiresAt &&
 		hmac.Equal([]byte(tenant.SecretHash), []byte(s.TenantSecretHash))
 }
 

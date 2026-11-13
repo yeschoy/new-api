@@ -132,7 +132,7 @@ func TestPartnerTenantOrderPurchaseLimitRejectsBeforeGateway(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, model.DB.Model(&model.UserSubscription{}).Where("id = ?", stored.SubscriptionId).Updates(map[string]any{"end_time": time.Now().Unix() - 1, "status": "expired"}).Error)
 	body := `{"external_user_id":"buyer-7","plan_id":` + strconv.Itoa(plan.Id) + `,"payment_method":"alipay"}`
-	rejected := partnerIntegrationRequest(engine, http.MethodPost, "/api/partner/v1/subscription-orders", secret, "limited-second-order-0001", body)
+	rejected := hostedTenantTestOrderRequest(t, engine, secret, "limited-second-order-0001", body)
 	require.Equal(t, http.StatusConflict, rejected.Code, rejected.Body.String())
 	require.Equal(t, "purchase_limit_reached", partnerIntegrationErrorCode(t, rejected))
 	require.Len(t, gateway.requests, 1, "known ineligibility must never contact the payment gateway")

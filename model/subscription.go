@@ -919,30 +919,7 @@ func GetPartnerTenantActiveUserSubscriptions(tenantId int64, userId int) ([]Subs
 	now := GetDBTimestamp()
 	subscriptions := make([]UserSubscription, 0)
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		var active []UserSubscription
-		if err := lockForUpdate(tx).
-			Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", now).
-			Order("end_time desc, id desc").Find(&active).Error; err != nil {
-			return err
-		}
-		for i := range active {
-			sub := active[i]
-			plan, err := getSubscriptionPlanByIdTx(tx, sub.PlanId)
-			if err != nil {
-				return err
-			}
-			if plan.PartnerTenantId != tenantId {
-				continue
-			}
-			if err := maybeResetUserSubscriptionWithPlanTx(tx, &sub, plan, now); err != nil {
-				return err
-			}
-			if err := tx.Save(&sub).Error; err != nil {
-				return err
-			}
-			subscriptions = append(subscriptions, sub)
-		}
-		return nil
+		return collectPartnerTenantActiveSubscriptionsTx(tx, tenantId, userId, now, &subscriptions)
 	})
 	if err != nil {
 		return nil, err
@@ -1644,4 +1621,31 @@ func postConsumeUserSubscriptionDeltaTx(tx *gorm.DB, userSubscriptionId int, del
 	}
 	sub.AmountUsed = newUsed
 	return tx.Save(&sub).Error
+}
+
+func collectPartnerTenantActiveSubscriptionsTx(tx *gorm.DB, tenantId int64, userId int, now int64, subscriptions *[]UserSubscription) error {
+	var active []UserSubscription
+	if err := lockForUpdate(tx).
+		Where("user_id = ? AND status = ? AND end_time > ?", userId, "active", now).
+		Order("end_time desc, id desc").Find(&active).Error; err != nil {
+		return err
+	}
+	for i := range active {
+		sub := active[i]
+		plan, err := getSubscriptionPlanByIdTx(tx, sub.PlanId)
+		if err != nil {
+			return err
+		}
+		if plan.PartnerTenantId != tenantId {
+			continue
+		}
+		if err := maybeResetUserSubscriptionWithPlanTx(tx, &sub, plan, now); err != nil {
+			return err
+		}
+		if err := tx.Save(&sub).Error; err != nil {
+			return err
+		}
+		*subscriptions = append(*subscriptions, sub)
+	}
+	return nil
 }

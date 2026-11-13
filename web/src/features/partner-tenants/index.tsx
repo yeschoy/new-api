@@ -20,11 +20,17 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from '@/components/ui/empty'
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -45,6 +51,7 @@ import {
   rotatePartnerTenantSecret,
   updatePartnerTenantStatus,
   type PartnerTenant,
+  type PartnerTenantIntegrationMode,
 } from './api'
 
 const tenantsQueryKey = ['admin', 'partner-tenants'] as const
@@ -58,6 +65,17 @@ export function PartnerTenantsManager() {
   const [createOpen, setCreateOpen] = useState(false)
   const [name, setName] = useState('')
   const [group, setGroup] = useState('')
+  const [integrationMode, setIntegrationMode] =
+    useState<PartnerTenantIntegrationMode>('subscription_key')
+
+  const changeCreateOpen = (open: boolean) => {
+    if (!open) {
+      setName('')
+      setGroup('')
+      setIntegrationMode('subscription_key')
+    }
+    setCreateOpen(open)
+  }
   const [revealedSecret, setRevealedSecret] = useState('')
   const [statusTarget, setStatusTarget] = useState<PartnerTenant | null>(null)
   const [rotateTarget, setRotateTarget] = useState<PartnerTenant | null>(null)
@@ -90,16 +108,17 @@ export function PartnerTenantsManager() {
       }
       const proof = await verification.requestVerification({
         scope: 'partner_tenant.sensitive_write',
-        context: { action: 'create', group },
+        context: { action: 'create', group, integration_mode: integrationMode },
         title: t('Verify to create a partner tenant'),
       })
       if (!proof) throw new Error('verification cancelled')
-      return createPartnerTenant({ name: cleanName, group }, proof.proof_token)
+      return createPartnerTenant(
+        { name: cleanName, group, integration_mode: integrationMode },
+        proof.proof_token
+      )
     },
     onSuccess: async (result) => {
-      setCreateOpen(false)
-      setName('')
-      setGroup('')
+      changeCreateOpen(false)
       setRevealedSecret(result.secret)
       toast.success(t('Partner tenant created'))
       await refresh()
@@ -191,6 +210,17 @@ export function PartnerTenantsManager() {
             ),
           },
           {
+            id: 'integration_mode',
+            header: t('Integration mode'),
+            cell: (tenant) => {
+              if (tenant.integration_mode === 'subscription_key') {
+                return t('Subscription Key API')
+              }
+              if (tenant.integration_mode === 'hosted_h5') return t('Hosted H5')
+              return t('Unknown')
+            },
+          },
+          {
             id: 'status',
             header: t('Status'),
             cell: (tenant) => (
@@ -254,7 +284,7 @@ export function PartnerTenantsManager() {
 
       <Dialog
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={changeCreateOpen}
         title={t('Create partner tenant')}
         description={t(
           'A tenant receives one server secret and one dedicated model group.'
@@ -265,7 +295,7 @@ export function PartnerTenantsManager() {
             <Button
               type='button'
               variant='outline'
-              onClick={() => setCreateOpen(false)}
+              onClick={() => changeCreateOpen(false)}
             >
               {t('Cancel')}
             </Button>
@@ -279,20 +309,22 @@ export function PartnerTenantsManager() {
           </>
         }
       >
-        <div className='space-y-4'>
-          <div className='space-y-1.5'>
-            <Label htmlFor='partner-tenant-name'>{t('Partner name')}</Label>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor='partner-tenant-name'>
+              {t('Partner name')}
+            </FieldLabel>
             <Input
               id='partner-tenant-name'
               value={name}
               maxLength={64}
               onChange={(event) => setName(event.target.value)}
             />
-          </div>
-          <div className='space-y-1.5'>
-            <Label htmlFor='partner-tenant-group'>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor='partner-tenant-group'>
               {t('Dedicated model group')}
-            </Label>
+            </FieldLabel>
             <Select
               items={availableGroups.map((value) => ({ value, label: value }))}
               value={group}
@@ -303,18 +335,60 @@ export function PartnerTenantsManager() {
                 <SelectValue placeholder={t('Select a dedicated group')} />
               </SelectTrigger>
               <SelectContent>
-                {availableGroups.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {availableGroups.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
-            <p className='text-muted-foreground text-sm'>
+            <FieldDescription>
               {t('A group can belong to only one partner tenant.')}
-            </p>
-          </div>
-        </div>
+            </FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor='partner-tenant-mode'>
+              {t('Integration mode')}
+            </FieldLabel>
+            <Select
+              items={[
+                { value: 'subscription_key', label: t('Subscription Key API') },
+                { value: 'hosted_h5', label: t('Hosted H5') },
+              ]}
+              value={integrationMode}
+              onValueChange={(value) => {
+                if (value === 'subscription_key' || value === 'hosted_h5') {
+                  setIntegrationMode(value)
+                }
+              }}
+              disabled={createMutation.isPending}
+            >
+              <SelectTrigger id='partner-tenant-mode'>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value='subscription_key'>
+                    {t('Subscription Key API')}
+                  </SelectItem>
+                  <SelectItem value='hosted_h5'>{t('Hosted H5')}</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <FieldDescription>
+              {integrationMode === 'subscription_key'
+                ? t(
+                    'New purchases need no buyer ID. Credentials are issued after verified payment.'
+                  )
+                : t(
+                    'Hosted purchase sessions require an external user ID from your backend.'
+                  )}{' '}
+              {t('Integration mode cannot be changed after creation.')}
+            </FieldDescription>
+          </Field>
+        </FieldGroup>
       </Dialog>
 
       <Dialog

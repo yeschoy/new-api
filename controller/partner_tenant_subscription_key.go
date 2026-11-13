@@ -24,7 +24,8 @@ func PartnerTenantSubscriptionKeyRequestPolicy() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
 		if path != "/api/partner/subscription" && !strings.HasPrefix(path, "/api/partner/v1/subscription-key-orders") && !strings.HasPrefix(path, "/api/partner/v1/subscriptions/") {
-			c.Next()
+			partnerTenantPurchasePrivacy(c)
+			recovery(c)
 			return
 		}
 		partnerTenantPurchasePrivacy(c)
@@ -160,6 +161,7 @@ func PartnerTenantGetSubscriptionKeyOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, partnerTenantOrderDTO(order, false))
 }
 func PartnerTenantClaimSubscriptionKey(c *gin.Context) {
+	c.Set(model.PartnerTenantAuditOperationContext, model.PartnerTenantAuditClaim)
 	tenant, ok := partnerTenantSubscriptionMerchant(c)
 	if !ok || !partnerTenantNoSubscriptionHeader(c) {
 		return
@@ -168,7 +170,9 @@ func PartnerTenantClaimSubscriptionKey(c *gin.Context) {
 		writePartnerTenantAPIError(c, 400, "invalid_request", "request is invalid")
 		return
 	}
-	result, err := model.ClaimPartnerTenantSubscriptionKey(tenant.Id, tenant.SecretHash, c.Param("order_no"))
+	var audit model.PartnerTenantAuditReceipt
+	result, err := model.ClaimPartnerTenantSubscriptionKeyWithAudit(tenant.Id, tenant.SecretHash, c.Param("order_no"), &audit)
+	c.Set(model.PartnerTenantAuditReceiptContext, audit)
 	if err != nil {
 		partnerTenantSubscriptionKeyError(c, err)
 		return
@@ -176,6 +180,7 @@ func PartnerTenantClaimSubscriptionKey(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 func PartnerTenantRotateSubscriptionKey(c *gin.Context) {
+	c.Set(model.PartnerTenantAuditOperationContext, model.PartnerTenantAuditRotate)
 	tenant, ok := partnerTenantSubscriptionMerchant(c)
 	if !ok || !partnerTenantNoSubscriptionHeader(c) {
 		return
@@ -192,7 +197,9 @@ func PartnerTenantRotateSubscriptionKey(c *gin.Context) {
 		writePartnerTenantAPIError(c, 400, "invalid_request", "subscription_id and expected_version are invalid")
 		return
 	}
-	result, err := model.RotatePartnerTenantSubscriptionKey(tenant.Id, tenant.SecretHash, id, req.ExpectedVersion, hash)
+	var audit model.PartnerTenantAuditReceipt
+	result, err := model.RotatePartnerTenantSubscriptionKeyWithAudit(tenant.Id, tenant.SecretHash, id, req.ExpectedVersion, hash, &audit)
+	c.Set(model.PartnerTenantAuditReceiptContext, audit)
 	if err != nil {
 		partnerTenantSubscriptionKeyError(c, err)
 		return
@@ -200,6 +207,7 @@ func PartnerTenantRotateSubscriptionKey(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 func PartnerTenantIndependentSubscription(c *gin.Context) {
+	c.Set(model.PartnerTenantAuditOperationContext, model.PartnerTenantAuditRead)
 	partnerTenantPurchasePrivacy(c)
 	if partnerTenantPurchaseHasQuery(c) {
 		writePartnerTenantAPIError(c, 400, "invalid_request", "query parameters are not accepted")
@@ -218,7 +226,9 @@ func PartnerTenantIndependentSubscription(c *gin.Context) {
 	if c.IsAborted() {
 		return
 	}
-	result, err := model.QueryPartnerTenantSubscription(strings.TrimPrefix(auth, "Bearer "))
+	var audit model.PartnerTenantAuditReceipt
+	result, err := model.QueryPartnerTenantSubscriptionWithAudit(strings.TrimPrefix(auth, "Bearer "), &audit)
+	c.Set(model.PartnerTenantAuditReceiptContext, audit)
 	if err != nil {
 		partnerTenantSubscriptionKeyError(c, err)
 		return

@@ -91,9 +91,10 @@ type PartnerOAuthClientSensitiveWriteContext struct {
 }
 
 type PartnerTenantSensitiveWriteContext struct {
-	Action   string `json:"action"`
-	Group    string `json:"group,omitempty"`
-	TenantID int64  `json:"tenant_id,omitempty"`
+	IntegrationMode string `json:"integration_mode,omitempty"`
+	Action          string `json:"action"`
+	Group           string `json:"group,omitempty"`
+	TenantID        int64  `json:"tenant_id,omitempty"`
 }
 
 type AdminUserContext struct {
@@ -245,11 +246,11 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 		context.Group = strings.TrimSpace(context.Group)
 		switch context.Action {
 		case "create":
-			if len(fields) != 2 || context.Group == "" || len(context.Group) > 64 || context.TenantID != 0 {
+			if len(fields) != 3 || context.Group == "" || len(context.Group) > 64 || context.TenantID != 0 || !model.IsValidPartnerTenantIntegrationMode(context.IntegrationMode) {
 				return VerificationBinding{}, ErrVerificationContextInvalid
 			}
 		case "rotate_secret":
-			if len(fields) != 2 || context.TenantID <= 0 || context.Group != "" {
+			if len(fields) != 2 || context.TenantID <= 0 || context.Group != "" || context.IntegrationMode != "" {
 				return VerificationBinding{}, ErrVerificationContextInvalid
 			}
 		default:

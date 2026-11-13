@@ -54,7 +54,7 @@ func TestOrdinaryUserPlanRateLimitSkipsSubscriptionQueries(t *testing.T) {
 func TestProvisionPartnerTenantAccountAcceptsUnicodeExternalID(t *testing.T) {
 	setupPartnerTenantModelTestDB(t)
 	require.NoError(t, DB.AutoMigrate(&User{}, &Token{}, &PartnerTenantAccount{}))
-	tenant, _, err := CreatePartnerTenant("Partner", "partner-unicode")
+	tenant, _, err := CreatePartnerTenantWithIntegrationMode("Partner", "partner-unicode", PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	externalID := strings.Repeat("客", 128)
 	account, err := ProvisionPartnerTenantAccount(tenant.Id, externalID, "")
@@ -71,7 +71,7 @@ func TestProvisionPartnerTenantAccountRefreshesCachedMembership(t *testing.T) {
 	member, err := isPartnerTenantUser(1)
 	require.NoError(t, err)
 	require.False(t, member)
-	tenant, _, err := CreatePartnerTenant("Partner", "partner-cache")
+	tenant, _, err := CreatePartnerTenantWithIntegrationMode("Partner", "partner-cache", PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	_, err = ProvisionPartnerTenantAccount(tenant.Id, "customer", "")
 	require.NoError(t, err)

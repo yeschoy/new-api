@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Log schema addition and independent pq LOG_DB migration/runtime contract"}
+{"file":".trellis/spec/backend/partner-subscription-key.md","reason":"Never expose secrets; use validated binding snapshots for credential events"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Post-commit lifecycle emission must not erase payment truth or duplicate delivery"}
+{"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Capability failures require generic safe response and verified identity attribution"}
+{"file":".trellis/spec/frontend/index.md","reason":"Existing log page/component/state guidance"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"One safe event projection owns writer/API/UI metadata and decimal ID format"}
+{"file":".trellis/tasks/11-13-partner-access-mode-audit/research/current-boundaries.md","reason":"Actual LOG_DB/action/filter/ClickHouse gaps and current mode dependency"}
+{"file": ".trellis/spec/backend/partner-integration-mode.md", "reason": "Actual reviewed immutable-mode admission and safe error/tenant handoff contract; runtime blocked"}

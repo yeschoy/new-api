@@ -32,7 +32,11 @@ import (
 
 func setupPartnerTenantSubscriptionKeyHTTPPQ(t *testing.T) (*gin.Engine, *model.PartnerTenant, string, *model.SubscriptionPlan) {
 	t.Helper()
-	dsn := os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN")
+	return setupPartnerTenantIsolatedHTTPPQ(t, os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN"), "pt_subkey_http_")
+}
+
+func setupPartnerTenantIsolatedHTTPPQ(t *testing.T, dsn, prefix string) (*gin.Engine, *model.PartnerTenant, string, *model.SubscriptionPlan) {
+	t.Helper()
 	if dsn == "" {
 		t.Skip("BLOCKED: task-owned PostgreSQL DSN required; no SQLite fixture or runtime evidence")
 	}
@@ -40,7 +44,7 @@ func setupPartnerTenantSubscriptionKeyHTTPPQ(t *testing.T) (*gin.Engine, *model.
 	require.NoError(t, err)
 	base, err := gorm.Open(postgres.New(postgres.Config{DSN: dsn, PreferSimpleProtocol: true}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
-	schema := fmt.Sprintf("pt_subkey_http_%d", time.Now().UnixNano())
+	schema := fmt.Sprintf("%s%d", prefix, time.Now().UnixNano())
 	require.NoError(t, base.Exec("CREATE SCHEMA "+schema).Error)
 	baseConn, err := base.DB()
 	require.NoError(t, err)
@@ -75,7 +79,9 @@ func setupPartnerTenantSubscriptionKeyHTTPPQ(t *testing.T) (*gin.Engine, *model.
 	})
 	confirmPaymentComplianceForTest(t)
 	require.NoError(t, i18n.Init())
-	require.NoError(t, db.AutoMigrate(&model.PartnerTenant{}, &model.User{}, &model.Token{}, &model.SubscriptionPlan{}, &model.UserSubscription{}))
+	require.NoError(t, model.MigratePartnerTenantIntegrationModes(db))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.SubscriptionPlan{}, &model.UserSubscription{}))
+	require.NoError(t, db.AutoMigrate(&model.PartnerTenantPurchaseSession{}))
 	require.NoError(t, model.MigratePartnerTenantSubscriptionKeys(db))
 	tenant, merchant, err := model.CreatePartnerTenant("HTTP Merchant", schema)
 	require.NoError(t, err)
@@ -154,7 +160,7 @@ func TestPartnerTenantSubscriptionKeyHTTPPostgres(t *testing.T) {
 	// Exact old merchant status cannot project a new-mode order, but the shared
 	// public cashier and verified callback must still read it successfully.
 	old := subscriptionKeyHTTPRequest(r, "GET", "/api/partner/v1/subscription-orders/"+order.OrderNo, merchant, "", "", "")
-	require.Equal(t, 404, old.Code)
+	require.Equal(t, 403, old.Code)
 	stored, err := model.GetPartnerTenantSubscriptionOrder(tenant.Id, order.OrderNo)
 	require.NoError(t, err)
 	cashier := subscriptionKeyHTTPRequest(r, "GET", "/api/partner/checkout/"+order.OrderNo, partnerTenantCashierToken(stored), "", "", "")

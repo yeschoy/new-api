@@ -23,13 +23,7 @@ func setupPartnerTenantPurchaseController(t *testing.T) (*gin.Engine, *model.Par
 	t.Helper()
 	engine, tenant, secret, plan := setupPartnerTenantOrderController(t)
 	require.NoError(t, model.DB.AutoMigrate(&model.PartnerTenantPurchaseSession{}))
-	merchant := engine.Group("/api/partner/v1", middleware.PartnerOAuthNoStore(), middleware.PartnerTenantBearer())
-	merchant.GET("/plans", PartnerTenantListPlans)
-	merchant.POST("/purchase-sessions", PartnerTenantCreatePurchaseSession)
-	merchant.GET("/purchase-sessions/:session_id", PartnerTenantGetPurchaseSession)
-	engine.POST("/api/partner/purchase-sessions/:session_id/exchange", PartnerTenantExchangePurchaseSession)
-	engine.GET("/api/partner/purchase-sessions/:session_id", PartnerTenantPublicPurchaseSession)
-	engine.POST("/api/partner/purchase-sessions/:session_id/orders", PartnerTenantPurchaseSessionCreateOrder)
+	engine.GET("/api/partner/v1/plans", middleware.PartnerTenantBearer(), PartnerTenantListPlans)
 	return engine, tenant, secret, plan
 }
 
@@ -68,7 +62,7 @@ func exchangePurchaseControllerSession(t *testing.T, engine *gin.Engine, view pa
 	return exchanged.AccessToken
 }
 
-func TestPartnerTenantPurchaseSessionHTTPFlowAndOriginalAPIParity(t *testing.T) {
+func TestPartnerTenantPurchaseSessionHTTPFlowAndIndependentSessions(t *testing.T) {
 	engine, tenant, secret, plan := setupPartnerTenantPurchaseController(t)
 	gateway := startFakeZPay(t)
 	view, launch := createPurchaseControllerSession(t, engine, secret, "purchase-intent-0001")
@@ -138,21 +132,21 @@ func TestPartnerTenantPurchaseSessionHTTPFlowAndOriginalAPIParity(t *testing.T) 
 	require.Contains(t, merchant.Body.String(), stored.OrderNo)
 	require.NotContains(t, merchant.Body.String(), "checkout_url")
 	require.NotContains(t, merchant.Body.String(), "pay_url")
-	// Merchant APIs keep their original richer DTO, 201/200 and exact replay
-	// when new payments are disabled, independently of the session hash domain.
+	// A separate H5 session keeps its own order and exact-replay semantics
+	// when new payments are disabled. The retired direct POST is not used.
 	original := createTenantTestOrder(t, engine, secret, plan, "old-api-intent-00001")
 	require.Equal(t, plan.Id, original.PlanId)
 	require.Equal(t, "buyer-7", original.ExternalUserId)
 	require.NotEqual(t, stored.OrderNo, original.OrderNo)
 	oldBody := fmt.Sprintf(`{"external_user_id":"buyer-7","plan_id":%d,"payment_method":"alipay"}`, plan.Id)
 	operation_setting.PayMethods = nil
-	oldReplay := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, "old-api-intent-00001", oldBody)
+	oldReplay := hostedTenantTestOrderRequest(t, engine, secret, "old-api-intent-00001", oldBody)
 	operation_setting.PayMethods = methods
 	require.Equal(t, 200, oldReplay.Code)
 	require.Contains(t, oldReplay.Body.String(), original.OrderNo)
-	require.Contains(t, oldReplay.Body.String(), `"external_user_id":"buyer-7"`)
+	require.NotContains(t, oldReplay.Body.String(), `"external_user_id"`)
 	// Paid exact replay also precedes NEW-payment availability and never does
-	// gateway I/O, in both entry paths. Conflicting requests still fail first.
+	// gateway I/O, for both independent H5 sessions. Conflicting requests still fail first.
 	require.NoError(t, model.RecordPartnerTenantPayment(stored.OrderNo, model.PaymentProviderEpay, stored.MerchantId, stored.PaymentMethod, "h5-paid-replay", stored.AmountCents))
 	oldStored, err := model.GetPartnerTenantSubscriptionOrder(tenant.Id, original.OrderNo)
 	require.NoError(t, err)
@@ -161,13 +155,13 @@ func TestPartnerTenantPurchaseSessionHTTPFlowAndOriginalAPIParity(t *testing.T) 
 	operation_setting.PayMethods = nil
 	paidReplay := partnerIntegrationRequest(engine, "POST", publicPath+"/orders", token, "", body)
 	paidConflict := partnerIntegrationRequest(engine, "POST", publicPath+"/orders", token, "", strings.Replace(body, "alipay", "wxpay", 1))
-	oldPaidReplay := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, "old-api-intent-00001", oldBody)
-	oldPaidConflict := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, "old-api-intent-00001", strings.Replace(oldBody, "alipay", "wxpay", 1))
+	oldPaidReplay := hostedTenantTestOrderRequest(t, engine, secret, "old-api-intent-00001", oldBody)
+	oldPaidConflict := hostedTenantTestOrderRequest(t, engine, secret, "old-api-intent-00001", strings.Replace(oldBody, "alipay", "wxpay", 1))
 	operation_setting.PayMethods = methods
 	require.Equal(t, 200, paidReplay.Code, paidReplay.Body.String())
 	require.JSONEq(t, created.Body.String(), paidReplay.Body.String())
 	require.Equal(t, 200, oldPaidReplay.Code, oldPaidReplay.Body.String())
-	require.Contains(t, oldPaidReplay.Body.String(), `"payment_status":"paid"`)
+	require.Contains(t, oldPaidReplay.Body.String(), original.OrderNo)
 	for _, conflict := range []int{paidConflict.Code, oldPaidConflict.Code} {
 		require.Equal(t, 409, conflict)
 	}
@@ -205,7 +199,9 @@ func TestPartnerTenantPurchaseStrictBodiesQueriesAndCapabilityScope(t *testing.T
 	other, otherLaunch := createPurchaseControllerSession(t, engine, secret, "scope-intent-00002")
 	otherToken := exchangePurchaseControllerSession(t, engine, other, otherLaunch)
 	require.Equal(t, 401, partnerIntegrationRequest(engine, "GET", path, otherToken, "", "").Code)
-	_, foreignSecret, err := model.CreatePartnerTenant("Other", "other-purchase")
+	// Keep the foreign tenant admitted to H5 so this asserts scoped ownership,
+	// not the earlier subscription-key integration-mode denial.
+	_, foreignSecret, err := model.CreatePartnerTenantWithIntegrationMode("Other", "other-purchase", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	require.Equal(t, 404, partnerIntegrationRequest(engine, "GET", "/api/partner/v1/purchase-sessions/"+view.SessionId, foreignSecret, "", "").Code)
 	body := fmt.Sprintf(`{"plan_id":%d,"payment_method":"alipay"}`, plan.Id)

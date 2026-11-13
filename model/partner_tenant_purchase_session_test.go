@@ -40,7 +40,7 @@ func runPartnerTenantPurchaseSessionDatabaseTests(t *testing.T, db *gorm.DB) {
 	var fixtureSequence int64
 	fixture := func(t *testing.T) *PartnerTenant {
 		t.Helper()
-		tenant, _, err := CreatePartnerTenant("Purchase", fmt.Sprintf("purchase-%s-%d", db.Dialector.Name(), common.GetTimestamp()+fixtureSequence))
+		tenant, _, err := CreatePartnerTenantWithIntegrationMode("Purchase", fmt.Sprintf("purchase-%s-%d", db.Dialector.Name(), common.GetTimestamp()+fixtureSequence), PartnerTenantIntegrationHostedH5)
 		fixtureSequence++
 		require.NoError(t, err)
 		return tenant
