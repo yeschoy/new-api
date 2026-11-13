@@ -417,3 +417,41 @@ Fixed the gallery regression: saved plans show one latest group row by default, 
 ### Next Steps
 
 - P2大整数额度展示精度仍待后续授权处理；真实浏览器/支付渠道验收及商户归属用户管理增强不在本次范围。
+
+
+## Session 14: 商户互斥接入与授权日志源码检查点
+<!-- trellis-session: v=2 fp=dcd9621e657a3824 -->
+
+**Date**: 2026-11-13
+**Task**: 商户互斥接入与授权日志源码检查点
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+按用户“提交推送”授权保存模式隔离、授权日志与相关 Trellis 记录；源码独立审阅完成，Docker 不可用导致 Go/PostgreSQL 运行验收仍阻塞，不归档或部署。
+
+### Main Changes
+
+- 默认 subscription_key 与显式 hosted_h5 互斥且创建后固定；专属分组唯一性和已接受订单支付交付边界保持不变。
+- 凭证生命周期、拒绝和每次成功查询的安全日志、后台筛选与七语言已实现；修复 SQL 凭证哈希诊断及锁内当前模式元数据问题。
+- 88 个精确批准文件已提交，私钥、既有 reports 和临时脚本/诊断未纳入；用户另已批准正常推送当前分支，禁止强推、部署和清理。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7b4b5af1a` | feat(partner): checkpoint exclusive access modes and authorization audit |
+
+### Testing
+
+- [OK] 已有 7 项商户 DOM + 12 项日志 DOM、TypeScript、定向 lint/format 与七语言覆盖检查通过；本轮提交前精确暂存范围和 git diff --cached --check 通过。
+- [OK] 9 audit + 11 mode 顶层 Go 测试只有源码；Go build/test/vet、PostgreSQL 和 ClickHouse 执行均为 0。全站前端 lint 的 151 errors / 66 warnings 基线未扩大修复。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Docker 可用后在新登记的任务专属 runner/隔离 PostgreSQL 中完成编译、迁移、持久化、权限与跨子任务端到端验收；两子任务继续 in_progress。
+- 本轮记录后正常推送 origin/feat/partner-accounts 并核对远端 SHA；临时产物按项目登记保留，仅获单独同意后清理，Trellis 记录保留。
