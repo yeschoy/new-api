@@ -14,7 +14,7 @@ See parent `research/current-boundaries.md`, section 4. Existing safe log/action
 
 - Add a clear tenant event namespace and truthful event semantics; no synthetic OAuth client/binding identifiers or external buyer IDs.
 - Associate trusted merchant, order, subscription and internally created user identifiers only where actually known. Failed unknown credentials cannot be attributed to an attacker-supplied target.
-- Cover the final approved event set across success/failure/denial paths, including the selected mode's disallowed entry attempts.
+- The user approved the complete security-event scope: paid provisioning/credential issuance, Subscription Key claims/rotations, authentication failures and wrong-mode denials, plus every successful independent subscription query. Successful expired-subscription/history queries also count even though they omit Coding API Key; log only metadata, never the returned credentials. Higher log volume from successful reads is an accepted trade-off.
 - Keep a bounded metadata-only projection: no raw pt_/sub_/sk_, headers, request/response bodies, query secrets, seeds, secret hashes, or capability URLs.
 - Extend existing admin query/list/filter capabilities and labels without weakening authorization or exposing cross-permission data through shared caches.
 - Preserve existing OAuth/server logs and current tenant security admin audit; do not replace them with misleading events.
@@ -23,7 +23,7 @@ See parent `research/current-boundaries.md`, section 4. Existing safe log/action
 
 ## Acceptance criteria
 
-- L-AC1 (parent AC2): approved subscription-key events are visible and searchable/filterable by a real tenant reference, event, result and time; OAuth-only identifiers are not required.
+- L-AC1 (parent AC2): every successful independent subscription query (active/exhausted/expired), credential issuance/claim/rotation and approved denial event has a safe record. Trusted tenant events are filterable by tenant reference, event, result and time without OAuth-only identifiers; failed unknown credentials do not invent tenant attribution.
 - L-AC2 (parent AC4): invalid log actions/reasons/identifiers and duplicate/unknown filter fields are safely rejected; no secret appears in log storage, errors or admin DTOs.
 - L-AC3 (parent AC2/AC3): credential claims and rotations have accurate success/failure results; signing/claim retries do not create duplicate business effects.
 - L-AC4 (parent AC1/AC2): wrong-mode denial from the mode child is visible with the correct merchant when authenticated, safe route template/request ID and reason, with no unintended business side effects.
@@ -32,7 +32,7 @@ See parent `research/current-boundaries.md`, section 4. Existing safe log/action
 
 ## Dependencies and integration order
 
-- Event scope and privacy/compatibility choices must be finalized in parent planning before implementation.
+- Event scope and success-read frequency are approved in parent R3; any mode-switch implications depend on resolving parent D2b before final planning approval.
 - Tenant-auth/credential-event projection can proceed independently of mode implementation after approval.
 - Wrong-mode event wiring and tests depend on `../11-13-partner-access-mode/` defining the authoritative persisted mode/denial contract first.
 - Parent integration must exercise denied API -> safe event -> admin query/filter end to end. Parent/child linkage does not by itself express this ordering.
@@ -43,7 +43,7 @@ Not a general model usage/request-body log, not a new payment reconciliation ser
 
 ## Blocking product decisions
 
-Parent must settle success-read logging frequency, exact event scope and any post-creation mode-switch implications. No legacy merchant mode is needed: the user reports no existing merchants and requires subscription_key defaults. Existing OAuth/server/account log history must nevertheless be preserved. Existing log failure-isolation semantics are current behavior, not a new user-approved reliability guarantee.
+Complete event scope, including every successful independent query, is approved. Only parent D2b (whether mode can change after creation) remains a product blocker. No legacy merchant mode is needed: the user reports no existing merchants and requires subscription_key defaults. Existing OAuth/server/account log history must nevertheless be preserved. Existing log failure-isolation semantics are current behavior, not a new user-approved reliability guarantee; make the proposed reliability guarantees explicit in the final design review.
 
 ## Artifact status
 
