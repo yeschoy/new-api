@@ -12,7 +12,7 @@ Research date: 2026-11-13. Repository baseline: `1595f89cc` on `feat/partner-acc
 
 `GET /plans` is shared. The absence of buyer IDs in the new API does not remove its tenant dedicated group or plan ownership: paid fulfillment calls the same grouped User/Token creation helper (`model/partner_tenant_subscription_key_order.go:222`, `model/partner_tenant.go:437`).
 
-Product decision D1 confirmed after the two-versus-three-options question: newly created tenants choose only Subscription Key API or hosted H5; old external API is for existing-tenant compatibility, not a third creation option. Existing tenants' exact retained permissions and mode-switch policy remain unresolved (D2). OAuth browser consent and pst_ wallet/server integration are separate systems and are not implicitly included.
+Product decisions D1 and default/no-legacy portion of D2 confirmed: newly created tenants choose only Subscription Key API or hosted H5. The user subsequently stated there are no merchants and all should default to Subscription Key; this supersedes the earlier legacy-compatibility proposal. No third/legacy mode is needed. Omitted creation mode and additive field defaults/backfill use subscription_key; unknown/explicitly empty values do not fall back. This is user-reported deployment context, not production DB evidence or authority to remove/rebind data. Post-creation mode switching remains unresolved (D2b). OAuth browser consent and pst_ wallet/server integration are separate systems and are not implicitly included.
 
 ## 2. Current tenant has no integration-mode field
 
@@ -29,7 +29,7 @@ Potential implementation constraint (not yet an approved design): bind selected 
 - `router/partner_tenant.go:32-53`: sub_ lookup, purchase-session access, cashier, notify and return have separate route groups.
 - Subscription Key and external orders share mode-neutral preparation, cashier, payment evidence and background delivery.
 - `.trellis/spec/backend/partner-subscription-key.md` and archived task `.trellis/tasks/archive/2026-11/11-12-partner-subscription-access-key/prd.md` explicitly preserve shared internal mode-neutral reads, committed paid evidence, atomic paid-only local delivery and old entry identity isolation.
-- A new-entry restriction must not be installed on gateway notification/return or shared order retrieval in a way that strands accepted/paid orders. Old data and whether mode is immutable need a product decision before designing migration/guards.
+- A new-entry restriction must not be installed on gateway notification/return or shared order retrieval in a way that strands accepted/paid orders. Although no existing merchants are reported, shared payment fixtures/data must remain intact. The default/backfill policy is subscription_key, not a legacy compatibility mode; an already stored explicit H5 choice must survive repeat migration. Whether modes can change after creation still needs a product decision.
 - Current specs describe optional H5 coexisting with the old API. The requested exclusive-mode policy intentionally supersedes that contract only within the final approved scope; update the affected specs and documentation together.
 
 ## 4. Authorization log gap
@@ -43,14 +43,14 @@ Potential implementation constraint (not yet an approved design): bind selected 
 - `web/src/features/partner-oauth-clients/authorization-log-api.ts:7`, `authorization-logs.tsx`: typed action list, labels, columns and filters need synchronized changes; localized new text requires all seven locales.
 - `controller/partner_tenant.go:309`: tenant create/secret rotate/status updates already write security ADMIN audit, not this dedicated authorization log. Preserve this audit trail rather than silently replacing it.
 
-Recommended (not yet approved) logging scope: credential/authentication denials, wrong-mode denials, paid provisioning/credential issuance, key claim and rotation; decide whether successful independent subscription reads should create events. Do not label a service-secret/subscription-key action as OAuth consent. Never invent OAuth client IDs, buyers, or user IDs for a tenant event.
+Recommended (not yet approved) logging scope: credential/authentication denials, wrong-mode denials, paid provisioning/credential issuance, key claim and rotation, plus each successful independent subscription read because it may disclose the Coding API Key. D3 remains a user decision: broader access traceability costs more log volume than recording only key changes and rejected requests. Do not label a service-secret/subscription-key action as OAuth consent. Never invent OAuth client IDs, buyers, or user IDs for a tenant event.
 
 Unknown/invalid credentials may have no trustworthy tenant/user reference. Log only known verified metadata, not a tenant inferred from attacker-supplied IDs or a secret prefix. Never persist raw pt_/sub_/sk_, Authorization/X-Subscription-Key, fragment/capability URLs, payloads, derivation seeds or secret hashes.
 
 ## 5. Scope and execution limits
 
 - Parent task owns requirement decisions and final wrong-mode-denial-to-log integration acceptance.
-- Child access-mode task owns creation, persisted exclusive-mode policy, enforcement, old-tenant compatibility, UI and docs/spec alignment.
+- Child access-mode task owns creation with subscription_key default, persisted exclusive-mode policy, enforcement, additive field default/backfill without a legacy mode, UI and docs/spec alignment.
 - Child audit task owns safe log projection/migration/events/query UI. It can design tenant credential events independently; wrong-mode event integration follows the access-mode contract and is retested at parent integration.
 - Existing untracked private-key file, TEMPORARY_ARTIFACTS.md, reports/ and web temporary document are pre-existing and out of scope. They must not be read, staged, deleted or included in commits.
 - This planning pass generated only Trellis records. No unrelated temporary artifact needs registration or cleanup.

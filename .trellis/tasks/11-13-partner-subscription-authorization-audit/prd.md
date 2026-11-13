@@ -2,7 +2,7 @@
 
 ## Goal and source requirements
 
-Child of `../11-13-partner-access-mode-audit/`. The parent PRD owns the source requirements. This child owns R3/R5, with R1/R2/R4 used as authorization and compatibility boundaries.
+Child of `../11-13-partner-access-mode-audit/`. The parent PRD owns the source requirements. This child owns R3/R5, with R1/R2/R4/R6 used as authorization and default-mode boundaries.
 
 Expose safe, tenant-correlated authorization/credential events for the new buyer-ID-free subscription-key integration in the existing admin authorization-log UI, without pretending these are OAuth consent events or asking merchants to supply user IDs.
 
@@ -43,7 +43,7 @@ Not a general model usage/request-body log, not a new payment reconciliation ser
 
 ## Blocking product decisions
 
-Parent must settle success-read logging frequency, exact event scope and legacy/mode-switch compatibility implications. Existing log failure-isolation semantics are current behavior, not a new user-approved reliability guarantee.
+Parent must settle success-read logging frequency, exact event scope and any post-creation mode-switch implications. No legacy merchant mode is needed: the user reports no existing merchants and requires subscription_key defaults. Existing OAuth/server/account log history must nevertheless be preserved. Existing log failure-isolation semantics are current behavior, not a new user-approved reliability guarantee.
 
 ## Artifact status
 
