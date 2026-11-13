@@ -151,14 +151,30 @@ func normalizeIQMarkup(n *html.Node) {
 // text is eligible; reasoning, tool arguments, attachments and URLs aren't.
 // Streaming snapshots supersede deltas to avoid duplicating Responses output.
 func IQVisibleText(body []byte, stream bool) (string, error) {
+	text, _, err := IQVisibleTextWithDiagnostics(body, stream)
+	return text, err
+}
+
+// IQVisibleTextWithDiagnostics observes the same parsing/acceptance rules as
+// IQVisibleText. Diagnostics describe only what was received, not which gateway
+// caused it; a missing completion is not proof of an upstream timeout.
+func IQVisibleTextWithDiagnostics(body []byte, stream bool) (string, IQResponseDiagnostics, error) {
+	diagnostic := IQResponseDiagnostics{ResponseBytes: len(body)}
 	if len(body) > model.IQMaxResponseBytes {
-		return "", errors.New("response exceeds 2 MiB")
+		diagnostic.endReason = "response_too_large"
+		return "", diagnostic, errors.New("response exceeds 2 MiB")
 	}
 	if !stream {
 		if !gjson.ValidBytes(body) {
-			return "", errors.New("invalid response JSON")
+			diagnostic.endReason = "invalid_json"
+			return "", diagnostic, errors.New("invalid response JSON")
 		}
-		return iqJSONText(gjson.ParseBytes(body))
+		text, err := iqJSONText(gjson.ParseBytes(body))
+		diagnostic.endReason = "completed"
+		if err != nil {
+			diagnostic.endReason = "invalid_final_response"
+		}
+		return text, diagnostic, err
 	}
 	var deltas strings.Builder
 	final := ""
@@ -171,54 +187,87 @@ func IQVisibleText(body []byte, stream bool) (string, error) {
 			continue
 		}
 		data := bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+		diagnostic.DataEvents++
 		if bytes.Equal(data, []byte("[DONE]")) {
+			diagnostic.lastEvent = "done"
+			diagnostic.DoneSeen = true
 			complete = true
 			continue
 		}
 		if !gjson.ValidBytes(data) {
+			diagnostic.lastEvent = "invalid_json"
+			diagnostic.InvalidDataEvents++
 			continue
 		}
 		v := gjson.ParseBytes(data)
 		typ := v.Get("type").String()
 		switch typ {
 		case "response.completed":
+			diagnostic.lastEvent = "response.completed"
 			finalSeen = true
 			t, e := iqJSONText(v.Get("response"))
 			if e != nil {
 				bad = true
+				diagnostic.recordFailure("invalid_final_response")
 			} else {
 				final = t
 			}
 			complete = true
-		case "response.failed", "response.incomplete", "error":
+		case "response.failed":
+			diagnostic.lastEvent = "response.failed"
+			diagnostic.recordFailure("upstream_error")
+			bad = true
+		case "response.incomplete":
+			diagnostic.lastEvent = "response.incomplete"
+			reason := v.Get("response.incomplete_details.reason").String()
+			diagnostic.recordFinishReason(reason)
+			diagnostic.TokenLimit = diagnostic.TokenLimit || reason == "max_output_tokens"
+			diagnostic.recordFailure("upstream_incomplete")
+			bad = true
+		case "error":
+			diagnostic.lastEvent = "error"
+			diagnostic.recordFailure("upstream_error")
 			bad = true
 		case "response.output_text.delta":
+			diagnostic.lastEvent = "response.output_text.delta"
 			deltas.WriteString(v.Get("delta").String())
 		case "content_block_start":
+			diagnostic.lastEvent = "content_block_start"
 			if v.Get("content_block.type").String() == "text" {
 				deltas.WriteString(v.Get("content_block.text").String())
 			}
 		case "content_block_delta":
+			diagnostic.lastEvent = "content_block_delta"
 			if v.Get("delta.type").String() == "text_delta" {
 				deltas.WriteString(v.Get("delta.text").String())
 			}
 		case "message_stop":
+			diagnostic.lastEvent = "message_stop"
 			complete = true
 		case "message_delta":
+			diagnostic.lastEvent = "message_delta"
 			reason := v.Get("delta.stop_reason").String()
+			diagnostic.recordFinishReason(reason)
 			if reason == "max_tokens" {
+				diagnostic.TokenLimit = true
+				diagnostic.recordFailure("token_limit")
 				bad = true
 			}
 		default:
+			diagnostic.lastEvent = "other"
 			if choices := v.Get("choices"); choices.IsArray() {
+				diagnostic.lastEvent = "chat_chunk"
 				for _, c := range choices.Array() {
 					if c.Get("index").Int() != 0 {
 						continue
 					}
 					reason := c.Get("finish_reason").String()
+					diagnostic.recordFinishReason(reason)
+					diagnostic.TokenLimit = diagnostic.TokenLimit || reason == "length"
 					if reason != "" {
 						complete = true
 						if reason != "stop" {
+							diagnostic.recordFailure("invalid_finish_reason")
 							bad = true
 						}
 					}
@@ -229,8 +278,13 @@ func IQVisibleText(body []byte, stream bool) (string, error) {
 				}
 			}
 			if v.Get("candidates").Exists() {
+				diagnostic.lastEvent = "gemini_chunk"
+				reason := v.Get("candidates.0.finishReason").String()
+				diagnostic.recordFinishReason(reason)
+				diagnostic.TokenLimit = diagnostic.TokenLimit || reason == "MAX_TOKENS"
 				t, e := iqJSONText(v)
 				if e != nil {
+					diagnostic.recordFailure("invalid_finish_reason")
 					bad = true
 				} else {
 					deltas.WriteString(t)
@@ -241,13 +295,27 @@ func IQVisibleText(body []byte, stream bool) (string, error) {
 			}
 		}
 	}
+	diagnostic.CompletionSeen = complete
 	if bad || !complete {
-		return "", errors.New("incomplete model output")
+		switch {
+		case diagnostic.TokenLimit:
+			diagnostic.endReason = "token_limit"
+		case diagnostic.endReason != "":
+			// Preserve the recorded failure despite a later completion marker.
+		case diagnostic.DataEvents == 0:
+			diagnostic.endReason = "no_sse_data"
+		case diagnostic.DataEvents == diagnostic.InvalidDataEvents:
+			diagnostic.endReason = "no_valid_sse_data"
+		default:
+			diagnostic.endReason = "missing_completion"
+		}
+		return "", diagnostic, errors.New("incomplete model output")
 	}
+	diagnostic.endReason = "completed"
 	if finalSeen {
-		return final, nil
+		return final, diagnostic, nil
 	}
-	return deltas.String(), nil
+	return deltas.String(), diagnostic, nil
 }
 func iqJSONText(v gjson.Result) (string, error) {
 	if v.Get("error").Exists() || (v.Get("status").Exists() && v.Get("status").String() != "completed") {

@@ -217,15 +217,18 @@ func boundIQRequest(body []byte) ([]byte, error) {
 }
 func captureIQResponse(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, userID, channelID int, price hosttypes.PriceData, started time.Time) (result testResult) {
 	defer resp.Body.Close()
+	diagnostic := service.IQResponseDiagnostics{}
 	defer func() {
 		result.iqStage = "response"
 		result.iqHTTPStatus = resp.StatusCode
+		result.iqDiagnostics = diagnostic
 	}()
 	// Retain only the numeric status, never provider bodies/headers or error DTOs.
 	if resp.StatusCode != http.StatusOK {
 		return testResult{localErr: errors.New("upstream rejected IQ request")}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, model.IQMaxResponseBytes+1))
+	diagnostic.ResponseBytes = len(body)
 	if err != nil {
 		return testResult{localErr: err}
 	}
@@ -233,7 +236,7 @@ func captureIQResponse(c *gin.Context, resp *http.Response, info *relaycommon.Re
 		return testResult{localErr: errIQResponseTooLarge}
 	}
 	stream := strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") || info.IsStream
-	text, textErr := service.IQVisibleText(body, stream)
+	text, diagnostic, textErr := service.IQVisibleTextWithDiagnostics(body, stream)
 	if textErr != nil {
 		textErr = errors.Join(errIQInvalidOutput, textErr)
 	}
@@ -295,11 +298,15 @@ func classifyIQFailure(ctx context.Context, result testResult) (status, code, me
 	}
 }
 
-func logIQFailure(r model.IQResult, channelID, httpStatus int, stage string, started time.Time) {
+func logIQFailure(r model.IQResult, channelID int, result testResult, started time.Time) {
 	// Hash the pair instead of logging administrator-controlled group/model text.
-	// Channel IDs stay in operator logs, not in the viewer-facing result metadata.
-	common.SysError(fmt.Sprintf("IQ execution failed: pair_id=%s channel_id=%d stage=%s http_status=%d error_code=%s duration_ms=%d",
-		model.IQPairID(r.Group, r.Model), channelID, stage, httpStatus, r.ErrorCode, time.Since(started).Milliseconds()))
+	// Stream classifications come from literal-only service getters, never raw
+	// provider event types, reasons, errors, headers or text. Operator-only fields
+	// must not be copied into IQResult or viewer-facing metadata.
+	d := result.iqDiagnostics
+	common.SysError(fmt.Sprintf("IQ execution failed: pair_id=%s channel_id=%d stage=%s http_status=%d error_code=%s duration_ms=%d response_bytes=%d sse_data_events=%d invalid_data_events=%d completion_seen=%t done_seen=%t token_limit=%t stream_end=%s last_event=%s finish_reason=%s",
+		model.IQPairID(r.Group, r.Model), channelID, result.iqStage, result.iqHTTPStatus, r.ErrorCode, time.Since(started).Milliseconds(),
+		d.ResponseBytes, d.DataEvents, d.InvalidDataEvents, d.CompletionSeen, d.DoneSeen, d.TokenLimit, d.EndReason(), d.LastEvent(), d.FinishReason()))
 }
 
 type iqPairExecutor func(context.Context, int, string, string, string, string) model.IQResult
@@ -331,7 +338,7 @@ func executeIQPair(ctx context.Context, userID int, group, name, prompt, reasoni
 	result := testChannelWithIQ(ctx, channel, userID, name, endpoint, true, &iqChannelTestOptions{group: group, prompt: prompt, reasoningEffort: reasoningEffort})
 	if result.localErr != nil {
 		r.Status, r.ErrorCode, r.ErrorMessage = classifyIQFailure(ctx, result)
-		logIQFailure(r, channel.Id, result.iqHTTPStatus, result.iqStage, started)
+		logIQFailure(r, channel.Id, result, started)
 		return r
 	}
 	kind, artifact, err := service.ExtractIQArtifact(result.text)
@@ -339,7 +346,8 @@ func executeIQPair(ctx context.Context, userID int, group, name, prompt, reasoni
 		r.Status = "invalid_artifact"
 		r.ErrorCode = "invalid_artifact"
 		r.ErrorMessage = "Model did not return a complete bounded HTML or SVG artifact"
-		logIQFailure(r, channel.Id, result.iqHTTPStatus, "artifact", started)
+		result.iqStage = "artifact"
+		logIQFailure(r, channel.Id, result, started)
 		return r
 	}
 	r.Status = "success"

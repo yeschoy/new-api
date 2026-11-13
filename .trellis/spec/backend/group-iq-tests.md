@@ -31,9 +31,11 @@ The controller owns orchestration to avoid a service/controller import cycle.
   `GET /api/iq-tests/targets`, `POST /api/iq-tests/run`; use channel
   read/write/operate RBAC and PAT scopes.
 - `testChannelWithIQ(..., options)` extends existing health-test conversion;
-  `testResult.iqStage` / `iqHTTPStatus` carry internal failure diagnostics into
-  `classifyIQFailure(ctx, result)` and `logIQFailure(...)` in `iq_executor.go`.
-  `ExtractIQArtifact(text)` and `IQVisibleText(body, stream)` own extraction.
+  `testResult.iqStage` / `iqHTTPStatus` / `iqDiagnostics` carry internal failure
+  diagnostics into `classifyIQFailure(ctx, result)` and `logIQFailure(...)` in
+  `iq_executor.go`. `ExtractIQArtifact(text)` owns markup extraction;
+  `IQVisibleTextWithDiagnostics(body, stream)` owns text parsing and safe stream
+  metadata. `IQVisibleText` retains its existing two-return compatibility entry.
 
 ## 3. Contracts
 
@@ -147,7 +149,8 @@ The controller owns orchestration to avoid a service/controller import cycle.
   precedence; do not guess a status or historical cause when none was recorded.
   Persist through existing error fields without a schema change. Operator logs
   contain only hashed pair_id, channel_id, prepare/request/response/artifact stage,
-  numeric http_status (0 if unavailable), allowlisted error_code and duration_ms.
+  numeric http_status (0 if unavailable), allowlisted error_code, duration_ms and
+  the bounded stream diagnostics described below.
   Never expose channel IDs to viewers. Suppress the shared HTTP transport's raw
   `do request failed` error log for IQ only, and preserve its typed transport
   cause internally until classification. The ordinary hide-error option replaces
@@ -155,6 +158,34 @@ The controller owns orchestration to avoid a service/controller import cycle.
   flatten IQ failures or classify timeouts by parsing raw messages. Ordinary
   channel/relay logs and error hiding retain their behavior. Diagnostics must not add a provider call, retry, failover,
   channel-health update or change the existing deadline/budgets.
+- IQ failure logs additionally record response_bytes, sse_data_events,
+  invalid_data_events, completion_seen, done_seen, token_limit, stream_end,
+  last_event and finish_reason. The event counters count `data:` lines handled
+  by the existing parser, not reconstructed multi-line SSE frames. Private
+  classification strings in `service.IQResponseDiagnostics` are set only from
+  literal allowlists; unknown provider types/reasons become `other`, never raw
+  strings. No raw provider error/body/header, prompt, generated text, URLs or
+  credential is retained in diagnostics. They stay in operator logs, never in
+  IQResult, consumption-log payloads or viewer DTOs; no schema change.
+  Stream outcomes distinguish completed, no_sse_data, no_valid_sse_data,
+  missing_completion, upstream_error, upstream_incomplete, token_limit,
+  invalid_finish_reason and invalid_final_response. Completion/DONE only mean a
+  marker was observed, not a successful stream; later markers never clear an
+  already observed failure/limit. Set token_limit only for the matching native
+  protocol's explicit length/max_tokens/max_output_tokens/MAX_TOKENS field,
+  not provider error-message text, an ignored candidate or a guessed duration.
+  Preserve the existing text acceptance, usage accounting and artifact checks.
+  For read errors, keep the partial byte count without parsing/promoting partial
+  output. At >2 MiB, stop reading at limit+1 and retain that count. Non-200
+  bodies remain unread with bytes=0; unparsed paths use stream_end=not_parsed.
+  The compatibility non-stream parser reports invalid_json/completed/
+  invalid_final_response; the parser's direct size guard reports response_too_large.
+  Stage=response plus missing_completion identifies failed stream validation,
+  not an HTML size error or proof of a particular gateway timeout. Stage=artifact
+  with stream_end=completed separates markup extraction from stream completion.
+  Do not reconstruct absent historical events or label every ~900s failure as a
+  proven upstream timeout. New diagnostics require deployment and a subsequent
+  authorized/originally scheduled run; they do not replay old requests.
 - Response limit 2 MiB; normalized artifact limit 1 MiB. Recognize complete
   direct/fenced HTML or SVG; prefer the whole HTML scene over nested SVG.
   Preserve inline scripts, not thinking/tool-only/file-link outputs. Extraction
@@ -278,6 +309,15 @@ The controller owns orchestration to avoid a service/controller import cycle.
   transport, response and artifact classification; operator log allowlist and
   suppression of lower-level credential-bearing URL logs. Real local mock HTTP
   calls must remain single-attempt; persisted IQ errors retain the safe code.
+  Verify literal-only stream metadata and exact byte counts for heartbeat-only,
+  missing-end, upstream-error, token-limit, unknown/malicious event and finish
+  values, invalid JSON data and completed-stream/artifact-extraction failures.
+  Partial read/size-bound paths keep counters without parsing; HTTP rejection
+  still never reads a body. Ensure extended fields cannot enter viewer DTOs.
+- `service/iq_stream_diagnostics_test.go`: native Chat/Responses/Claude/Gemini
+  completion, incomplete/error and protocol-specific token limits, including
+  later DONE/completion not erasing failure, unknown strings mapped to other,
+  ignored candidate/protocol fields, framing/bounds and compatibility behavior.
 - `service/iq_artifact_test.go`: full/fenced markup and final native text,
   incomplete/oversized output, preservation of active self-contained content.
 - `router/iq_router_test.go`: all eight anonymous denials and admin/member scopes,
