@@ -45,6 +45,7 @@ Expected owners: model/partner_tenant.go + new affected migration/policy file; m
 - [ ] Typed API request/response and read-only list column reflect mode; no edit-mode control.
 - [ ] New UI/error strings via i18n sanctioned add-missing-keys script, all seven locales then bun run i18n:sync. Register any helper scripts/reports in task ledger; user approval before cleanup.
 - [ ] Update tenant/subscription-key/H5 guides and corresponding specs to the actual two-mode policy; remove same-tenant free-mixing examples. Describe H5 support endpoints versus forbidden direct purchase.
+- [ ] 创建框分组回归：/api/group 返回的已配置非默认分组、无同名商户时可选，中文名称不被误过滤；已有同名商户（含停用）仍按当前唯一规则占用。渠道关联不参与前端筛选，不取消数据库唯一索引，不把测试通过当作已复现/修复用户截图。
 - [ ] No dependency upgrades, automatic production deployment or general frontend rewrites.
 
 ## 6. Targeted verification commands (after approval only)

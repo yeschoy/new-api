@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Affected mode-column default/backfill migration and pq verification"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Keep accepted payment/cashier/fulfillment mode neutral"}
+{"file":".trellis/spec/backend/partner-subscription-key.md","reason":"Preserve no-buyer-ID API, strict key authority and paid-only internal accounts"}
+{"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Retain H5 identity/session/nonce/expiry and one-order recovery invariants"}
+{"file":".trellis/spec/frontend/index.md","reason":"Discover current frontend guidelines and reuse existing components"}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Centralize integration-mode/admission semantics rather than copied checks"}
+{"file":".trellis/tasks/11-13-partner-access-mode-audit/research/current-boundaries.md","reason":"Route/proof/group source facts, immutable default decisions and safe scope"}

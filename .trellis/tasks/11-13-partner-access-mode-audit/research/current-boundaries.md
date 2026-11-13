@@ -22,7 +22,7 @@ Product decisions D1 and default/no-legacy portion of D2 confirmed: newly create
 - `router/partner_tenant.go:9-30`: one pt_ middleware authorizes all merchant entry routes. `middleware/partner_tenant.go:15` checks secret/status/rate limit, not entry type.
 - Public H5 and independent sub_ routes have their own credential boundaries, not the pt_ middleware. UI-only gating or guarding only merchant routes cannot prove enforcement.
 
-Potential implementation constraint (not yet an approved design): bind selected mode into sensitive-write proof context, database state, admin list/DTO, create validation, and transaction-authoritative purchase/session checks. If mode changes are allowed, fresh locked tenant checks must prevent stale/pre-body authorization from surviving a switch.
+Final proposed design binds selected mode into sensitive-write proof context, database state, admin list/DTO, create validation, and transaction-authoritative purchase/session checks. Mode switching is not provided. Existing locked operations still check fresh tenant/credential/session state rather than trusting stale pre-body snapshots. Design awaits final-summary implementation approval.
 
 ## 3. Do not reject durable payment or recovery by broad mode guards
 
@@ -54,15 +54,16 @@ Unknown/invalid credentials may have no trustworthy tenant/user reference. Log o
 - Child audit task owns safe log projection/migration/events/query UI. It can design tenant credential events independently; wrong-mode event integration follows the access-mode contract and is retested at parent integration.
 - Existing untracked private-key file, TEMPORARY_ARTIFACTS.md, reports/ and web temporary document are pre-existing and out of scope. They must not be read, staged, deleted or included in commits.
 - This planning pass generated only Trellis records. No unrelated temporary artifact needs registration or cleanup.
-- All original product decisions are confirmed. Design/execution/context documents are being finalized before the final review gate; no task.py start, sub-agent dispatch, Go/DB tests, production or payment calls in this planning pass.
+- All original product decisions are confirmed. Parent/child PRD/design/execution documents and real spec/research context manifests are complete for final review; no task.py start, sub-agent dispatch, Go/DB tests, production or payment calls in this planning pass.
 
 ## 6. Added user report: existing group cannot be selected
 
 The user supplied a group-settings screenshot and reported that the “可得财务” group cannot be selected, asking whether a group can belong to only one merchant. This is a request to explain/diagnose current selection behavior, not approval to make groups shareable.
 
-- `web/src/features/partner-tenants/index.tsx:153`: candidate groups exclude default/auto and any group equal to ANY tenant.group, without a status condition. A disabled merchant still occupies its group.
+- `web/src/features/partner-tenants/index.tsx:152`: candidate groups exclude default/auto and any group equal to ANY tenant.group, without a status condition. A disabled merchant still occupies its group.
 - `model/partner_tenant.go:38`: group has a database uniqueIndex, so this is not only frontend filtering.
 - `web/src/features/partner-tenants/index.tsx:314`: creation dialog explicitly states “A group can belong to only one partner tenant.”
-- Channel/model association is NOT the tenant-occupancy filter. A group can be configured and used by channels yet still be a valid unassigned merchant choice.
-- Screenshot alone does not prove a matching tenant record or deployment status. The user's “already bound” wording needs clarification: merchant binding vs channel binding. No production DB, secrets or authenticated site inspected.
+- `web/src/features/subscriptions/api.ts:236` getGroups calls `/api/group`; `router/api-router.go:429` registers the admin group-list route; `controller/group.go:14` returns every key from `ratio_setting.GetGroupRatioCopy()`. It does not query channels or tenant membership.
+- The merchant creation UI then applies the occupied-group filter above. Channel/model association is NOT that filter. A configured nondefault group used by channels can still be a valid unassigned merchant choice; a screenshot of unsaved/stale group settings does not prove it is in the actual API result.
+- Screenshot alone does not prove a matching tenant record or deployment status. The user's “already bound” wording has not clarified merchant binding vs channel binding; the later “continue” does not approve sharing groups. This deployed symptom remains unverified and is not a blocker for the original mode/audit scope. No production DB, secrets or authenticated site inspected. Actual diagnosis would need the current sanitized group-list/tenant-list results from the relevant environment; do not guess its cause or claim it fixed.
 - Keep the existing dedicated-group uniqueness rule unless the user explicitly requests a product change. If group sharing is requested, return to planning to trace isolation/plan/routing consequences; do not simply remove the UI filter/unique index.
