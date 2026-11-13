@@ -1,10 +1,23 @@
 # Partner Tenant API
 
-This page describes the original **external-buyer** API/H5 contract. For its request examples and errors, see the [Chinese API reference](./partner-tenant-integration.zh-CN.md). For the separate **buyer-ID-free subscription Key** integration (paid-only user creation, independent sub_ query and same-Key renewal), see the [subscription Key API reference](./partner-subscription-key-api.zh-CN.md) and [importable OpenAPI 3.0.3 document](./openapi/partner-subscription-key.openapi.json). Do not send the new request body to the old `/subscription-orders` entry. Documentation describes branch implementation, not proof of production deployment or live payment acceptance.
+Tenants have exactly one immutable `integration_mode`: **subscription_key** (default) or explicitly selected **hosted_h5**. See the [buyer-ID-free subscription Key API](./partner-subscription-key-api.zh-CN.md) and [OpenAPI](./openapi/partner-subscription-key.openapi.json) for the default integration. This page documents H5 merchant support and shared payment invariants; [Chinese support reference](./partner-tenant-integration.zh-CN.md), [H5 protocol](./partner-hosted-h5.zh-CN.md).
 
-## Contract and authentication
+## Creation and admission
 
-The merchant owns its website and user login. It may keep its own plan cards/purchase dialog and use the unchanged order API, or optionally open the platform-hosted H5 selector. Both paths can coexist without a mode switch. **The platform owns subscription orders, checkout, verified payment and delivery.** Merchants do not collect payment or report a paid flag. The old external direct-subscription-grant route is removed, with no legacy mode. This Tenant contract is separate from Partner OAuth and PartnerServer wallet recharge.
+Root-only `POST /api/partner-tenants` accepts `{name,group,integration_mode?}`. Only true field omission defaults to `subscription_key`; explicit empty/null/unknown/legacy values are invalid. The single-use security proof binds `{action:"create",group,integration_mode}` using the effective mode. Responses and management lists include stored `integration_mode`. Status updates accept only `{status}`; secret rotation accepts no body or `{}`. Extra mode fields are rejected, not silently ignored. No mode-switch endpoint exists. One dedicated group belongs to one tenant, including disabled tenants.
+
+| Surface | subscription_key | hosted_h5 |
+| --- | --- | --- |
+| Tenant catalog `GET /plans` | Allow | Allow |
+| Subscription-key order/read/claim/rotate and independent sub_ query | Allow | Deny |
+| Merchant purchase sessions and public pl_/ps_ H5 | Deny | Allow |
+| Account Key/quota and external-order status support | Deny | Allow |
+| Old direct `POST /subscription-orders`, including exact replay | Deny | Deny |
+| Shared cashier, verified payment, accepted-order delivery/recovery | Mode neutral | Mode neutral |
+
+A current authenticated pt_ wrong entry returns `403 integration_mode_mismatch`. Public H5 capabilities use generic `401 invalid_purchase_access`, including wrong mode. Model entry transactions recheck current locked tenant policy; frontend/middleware are not mutation authority. Unknown/empty persisted modes fail closed. No mode restriction is added to shared paid fulfillment/binding/notify/recovery.
+
+The platform owns orders, checkout, payment truth and delivery. Merchants do not collect payment or submit paid flags. Partner OAuth and PartnerServer wallet recharge remain separate and unchanged. Documentation describes branch code, not production deployment or live-payment acceptance.
 
 Merchant management endpoints use HTTPS and `Authorization: Bearer pt_<server-secret>`, only from the merchant backend. Derive `external_user_id` from that backend's authenticated user; never forward an arbitrary browser-supplied ID without ownership validation. A model request uses the user's `sk-` key, never `pt_`.
 
@@ -14,15 +27,15 @@ Merchant management endpoints use HTTPS and `Authorization: Bearer pt_<server-se
 - Unknown JSON fields/multiple JSON documents are rejected. Account provisioning allows up to 1 KiB; order creation allows up to 2 KiB. Order routes do not accept query parameters.
 - Error body: `{"error":{"code":"order_not_found","message":"order not found"},"request_id":"..."}`.
 
-## Endpoints
+## hosted_h5 merchant endpoints (catalog is shared)
 
 | Method and path                                       | Contract                                                                                                                                                                                                  |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /purchase-sessions`                             | Optional hosted H5: `{external_user_id}` + Idempotency-Key → `{session_id,external_user_id,created_at,launch_expires_at,expires_at,purchase_url}`; first 201, exact replay 200, buyer conflict 409.       |
+| `POST /purchase-sessions`                             | hosted_h5 only: `{external_user_id}` + Idempotency-Key → `{session_id,external_user_id,created_at,launch_expires_at,expires_at,purchase_url}`; first 201, exact replay 200, buyer conflict 409.       |
 | `GET /purchase-sessions/{session_id}`                 | Merchant reconciliation: session fields, `redeemed`, and `order:null` or the existing merchant order status DTO (no checkout capability). Available after session expiry; BFF must check buyer ownership. |
 | `GET /plans`                                          | Only this tenant's enabled plans. No user/account creation.                                                                                                                                               |
 | `PUT /accounts`                                       | `{external_user_id, display_name?}` → stable `{external_user_id, api_key, created}`; initial create 201, repeat 200. Independent of payment/entitlement.                                                  |
-| `POST /subscription-orders`                           | `{external_user_id, plan_id, payment_method}` + Idempotency-Key → platform order and cashier URL; initial 201, replay 200, conflicting body 409.                                                          |
+| `POST /subscription-orders`                           | Retired: 403 integration_mode_mismatch for both modes; use the selected entry, never this endpoint.                                                          |
 | `GET /subscription-orders/{order_no}`                 | Authenticated tenant-scoped order state; no Key, QR, payment link or checkout capability. Merchant BFF must also check its current user's ownership.                                                      |
 | `GET /accounts/{external_user_id}/subscription/quota` | Only active tenant-owned subscriptions; returns totals/used/remaining, unlimited flag and reset/expiry times.                                                                                             |
 
@@ -32,31 +45,7 @@ Plans remain one calendar month with monthly reset and the tenant's dedicated gr
 
 ## Ordering and cashier
 
-```http
-POST /api/partner/v1/subscription-orders
-Authorization: Bearer pt_<server-secret>
-Idempotency-Key: purchase_20261111_0001
-Content-Type: application/json
-
-{"external_user_id":"customer-7","plan_id":42,"payment_method":"alipay"}
-```
-
-```json
-{
-  "order_no": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
-  "external_user_id": "customer-7",
-  "plan_id": 42,
-  "plan_title": "Monthly model plan",
-  "amount": "99.00",
-  "currency": "CNY",
-  "payment_method": "alipay",
-  "payment_status": "pending",
-  "fulfillment_status": "not_ready",
-  "created_at": 1800000000,
-  "expires_at": 1800001800,
-  "checkout_url": "https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_<order-capability>"
-}
-```
+H5 orders are admitted only through an authenticated purchase session, as below. A public `POST /api/partner/purchase-sessions/{session_id}/orders` accepts `{plan_id,payment_method}` with Bearer ps_ and returns `{order_no,checkout_url}`. The BFF can read safe original order state with current pt_ after verifying external buyer ownership. Default-mode merchants instead use `POST /subscription-key-orders` with no buyer ID.
 
 Amounts are server-authoritative decimal strings backed by integer cents. The first adapter is **configured Epay methods, CNY plans only**, with positive prices exactly representable in cents. Tenant plan creation and updates accept only CNY (the default when omitted); explicit foreign currencies are rejected. Historical non-CNY catalog entries still fail checkout with `unsupported_currency`; no implicit exchange rate or data migration is applied. The admin editor requires a new positive CNY price for such entries instead of carrying over their old amount. Ordinary plan currency behavior is unchanged.
 
@@ -64,13 +53,13 @@ Open `checkout_url` after a user action. It is a sensitive, short-lived, order-o
 
 The cashier displays QR/payment links, and payment and delivery state separately. Payment channels can require a new window; the whole cashier is not an iframe storefront. Public cashier access lasts until the order's initial 30-minute deadline. After it expires, query through the authenticated merchant backend; an expired cashier does not prove that a late payment failed. Repeat create reuses the same order and deadline, not a fresh charge or refreshed expiry.
 
-## Optional standalone hosted H5
+## hosted_h5 standalone purchase
 
-See the [durable hosted-H5 guide (Chinese)](./partner-hosted-h5.zh-CN.md) for both integration paths and the browser protocol. Existing `/subscription-orders` consumers need no migration.
+See the [durable hosted-H5 guide (Chinese)](./partner-hosted-h5.zh-CN.md) for the browser protocol. Old direct-order consumers must use an approved selected entry; there is no compatibility purchase mode.
 
 The merchant BFF derives `external_user_id` from trusted login, persists a stable purchase-intent idempotency key, and calls `POST /api/partner/v1/purchase-sessions` with **only** `{external_user_id}`. These new routes reject query parameters, unknown/duplicate/case-aliased JSON fields and bodies over 2 KiB. Keep pt_ and model Keys server-side. Save `session_id` and its buyer before returning the sensitive `purchase_url` to that buyer in a non-cacheable response. Do not put capabilities in logs, analytics, arbitrary redirects, or URL queries.
 
-Open the URL standalone (current/new window or WebView, never iframe). Its `#launch=pl_...` is scrubbed before Router initialization and exchanged with a cryptographic, session-scoped client nonce. Lost exchange replies retry the same nonce; a different nonce/window cannot replay the launch. The returned ps_ stays in per-session sessionStorage/memory, not platform auth, localStorage or shared Query caches. Blocked storage limits refresh recovery. The launch deadline is fixed at creation +5 minutes and session deadline at creation +30 minutes; retries never extend either. Disabled tenants or rotated tenant credentials revoke later session requests. Order creation and replay re-read the session capability, binding, redemption/nonce, current merchant secret snapshot and fresh clock under the tenant lock in the shared order transaction, so delayed uploads and lock waits cannot preserve expired or revoked authority. Gateway preparation remains outside database transactions.
+Open the URL standalone (current/new window or WebView, never iframe). Its `#launch=pl_...` is scrubbed before Router initialization and exchanged with a cryptographic, session-scoped client nonce. Lost exchange replies retry the same nonce; a different nonce/window cannot replay the launch. The returned ps_ stays in per-session sessionStorage/memory, not platform auth, localStorage or shared Query caches. Blocked storage limits refresh recovery. The launch deadline is fixed at creation +5 minutes and session deadline at creation +30 minutes; retries never extend either. Disabled tenants or rotated tenant credentials revoke later session requests. Order creation and replay re-read the session capability, binding, redemption/nonce, current hosted_h5 mode, merchant secret snapshot and fresh clock under the tenant lock in the shared order transaction, so delayed uploads and lock waits cannot preserve expired or revoked authority. Gateway preparation remains outside database transactions.
 
 Only actual session catalog plans and payment methods are offered (positive exact-cent CNY prices, no legacy-currency relabeling). User submission freezes the original plan/method before sending. One session binds at most one order; double clicks, refresh and failed/timeout retries must reuse those original options. Conflicting options return `idempotency_conflict`, not another order. The page validates the original same-origin canonical cashier URL, then navigates there in the same tab; an existing order gets an explicit resume/view action, not another purchase form. An unexpired pending order is resumed by explicitly POSTing its server-returned `order.plan_id/payment_method` to the same session `/orders` endpoint before navigating, even after preparation returned 503 and a reload/status GET found the persisted order. A stale local draft never overrides the original order. GET remains read-only; prepared replay does not prepare/charge again, paid orders remain read-only, and expiry never creates a replacement. The original order keeps its own fixed 30-minute access deadline, independent of earlier H5 expiry.
 
@@ -112,6 +101,7 @@ Disabling a tenant stops merchant management. It does not automatically revoke a
 | 400  | `unsupported_currency`                                     | Plan cannot be paid by the CNY Epay adapter                                               |
 | 401  | `invalid_partner_secret`                                   | Invalid/rotated secret or disabled tenant                                                 |
 | 401  | `invalid_checkout_access`                                  | Invalid/expired order capability; return to merchant status                               |
+| 403  | `integration_mode_mismatch` | Operation is not permitted for this tenant integration; direct purchase is retired |
 | 403  | `account_disabled`                                         | Existing account/member/user disabled or invalid group                                    |
 | 404  | `account_not_found` / `plan_not_found` / `order_not_found` | Not found/unavailable in caller's tenant                                                  |
 | 409  | `credential_unavailable`                                   | Existing Key unusable; never silently replaced                                            |
@@ -122,3 +112,7 @@ Disabling a tenant stops merchant management. It does not automatically revoke a
 | 500  | `server_error`                                             | Server error; do not create a new purchase after an ambiguous timeout                     |
 
 Model endpoints retain their normal protocol error format. No production deployment or live-payment test is implied by this contract; see the task verification report for executed and blocked checks.
+
+## Additive migration and rollout boundary
+
+Startup calls `MigratePartnerTenantIntegrationModes` before broad AutoMigrate: varchar(24), NOT NULL, default subscription_key; missing/null/empty historical modes normalize to that default. Explicit H5 survives repeat migration; unknown nonempty values are retained but denied. Account identity_source, order entry_mode and payment facts are not relabelled/deleted. PostgreSQL runtime verification for this change is blocked by unavailable task Docker; no startup/production claim is made. Old binaries do not enforce these modes. Rollback must retain columns, accepted orders and payments; do not serve merchant admission on old nodes or assume mixed-version safety.

@@ -5,6 +5,11 @@ import { api } from '@/lib/api'
 import { createServerError } from '@/lib/server-error-message'
 
 export const AUTHORIZATION_LOG_ACTIONS = [
+  'partner_tenant.auth.denied',
+  'partner_tenant.credential.issue',
+  'partner_tenant.subscription_key.claim',
+  'partner_tenant.subscription_key.rotate',
+  'partner_tenant.subscription.read',
   'partner_oauth.consent.approve',
   'partner_oauth.consent.deny',
   'partner_oauth.token.issue',
@@ -45,6 +50,12 @@ export interface AuthorizationLog {
   request_id: string
   ip: string
   route: string
+  tenant_id?: string
+  order_no?: string
+  subscription_id?: string
+  integration_mode?: string
+  key_version?: string
+  replayed?: boolean
   status: number
 }
 
@@ -53,6 +64,7 @@ export interface AuthorizationLogFilters {
   page_size: number
   action?: string
   success?: 'true' | 'false'
+  tenant_id?: string
   client_id?: string
   target_user_id?: number
   start?: number
@@ -71,4 +83,12 @@ export async function listPartnerOAuthAuthorizationLogs(
     throw createServerError(response.data, 'Failed to load authorization logs')
   }
   return response.data.data
+}
+
+// Canonical positive signed-int64 text, without Number coercion/rounding.
+export function validAuthorizationLogTenantID(value: string): boolean {
+  return (
+    /^[1-9]\d{0,18}$/.test(value) &&
+    (value.length < 19 || value <= '9223372036854775807')
+  )
 }

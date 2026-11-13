@@ -3,7 +3,10 @@ Copyright (C) 2023-2026 QuantumNous
 */
 import { api } from '@/lib/api'
 
+export type PartnerTenantIntegrationMode = 'subscription_key' | 'hosted_h5'
+
 export interface PartnerTenant {
+  integration_mode: PartnerTenantIntegrationMode
   id: number
   name: string
   group: string
@@ -29,7 +32,11 @@ export async function listPartnerTenants(): Promise<PartnerTenant[]> {
 }
 
 export async function createPartnerTenant(
-  input: { name: string; group: string },
+  input: {
+    name: string
+    group: string
+    integration_mode: PartnerTenantIntegrationMode
+  },
   proofToken: string
 ): Promise<{ tenant: PartnerTenant; secret: string }> {
   const res = await api.post('/api/partner-tenants', input, {

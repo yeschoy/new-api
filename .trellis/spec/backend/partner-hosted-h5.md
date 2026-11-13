@@ -2,7 +2,7 @@
 
 ## 1. Scope / Trigger
 
-Read before changing the standalone Tenant purchase selector, its purchase-session model/capabilities, public bootstrap, or the new merchant session APIs. This is optional alongside existing merchant-owned UI/API; no exclusive tenant mode, iframe, OAuth login, wallet credit, return-URL or webhook is implied. Read [paid checkout](partner-tenant-checkout.md) for the reused order/payment/fulfillment invariants.
+Read before changing the standalone Tenant purchase selector, its purchase-session model/capabilities, public bootstrap, or the new merchant session APIs. Only explicitly hosted_h5 tenants may create/consume these sessions. Read [Integration Modes](partner-integration-mode.md) for immutable mode, default subscription_key, route/model admission and migration. Direct POST subscription-orders is denied for both modes; H5 support APIs do not grant direct purchase. No iframe, OAuth login, wallet credit, return-URL or webhook is implied. Read [paid checkout](partner-tenant-checkout.md) for the reused order/payment/fulfillment invariants.
 
 Implementation and static/frontend/browser-mock checks exist; Go/database runtime acceptance remains blocked. Do not equate these checks with a deployment-ready migration or payment test.
 
@@ -12,15 +12,15 @@ Implementation and static/frontend/browser-mock checks exist; Go/database runtim
 - Public: `POST /api/partner/purchase-sessions/:session_id/exchange` with `{launch_code,client_nonce}`; `GET /api/partner/purchase-sessions/:session_id`; `POST .../:session_id/orders` with `{plan_id,payment_method}`. GET/order POST use Bearer ps_. No query credentials/cookie identity.
 - Document: `/partner/purchase?session_id=PPS...#launch=pl_...`; the existing cashier remains `/partner/checkout?order_no=PTO...#token=pc_...`.
 - `PartnerTenantPurchaseSession`: unique exact-case `PPS` + 32 random alphanumeric ID, tenant/buyer and secret-hash snapshot, tenant/idempotency uniqueness, fixed launch/session deadlines, nonce hash/redemption time. Additive migration registered in `model/main.go`.
-- `CreatePartnerTenantPurchaseOrder(sessionID, token, planID, method, merchantID, validateNew)` owns H5 mutation-time authorization, then calls the same transaction-scoped order core as the old API. `validateNew` reads local config only; never external I/O.
+- `CreatePartnerTenantPurchaseOrder(sessionID, token, planID, method, merchantID, validateNew)` owns H5 mutation-time authorization, then calls the retained unexported external order core. The retired public direct wrapper always rejects. `validateNew` reads local config only; never external I/O.
 
 ## 3. Contracts
 
 - Merchant creation returns 201, exact replay 200, changed buyer same key 409. Launch lifetime is 5 minutes, absolute session lifetime 30 minutes from creation; replays/reloads/exchange do not extend them. Session creation does not provision accounts or grants.
 - Separate HMAC purposes/prefixes pl_/ps_/pc_. ps_ binds session, persisted nonce hash, fixed deadline and tenant-secret snapshot. Stable shared CryptoSecret is required across replicas/restarts. Disabled tenant/rotated secret revokes subsequent H5 requests, not already-issued order access or durable payment truth.
 - Exchange uses tenant -> session locks. Persist random 32-byte nonce as lowercase hex before browser exchange; same launch/nonce recovers a lost response, foreign nonce fails. Keep launch only until successful exchange and ps_ only in per-session sessionStorage/memory, not localStorage/auth/Query caches.
-- New order AND exact H5 replay validate current session/token/binding/secret/deadline after acquiring tenant -> session locks in the actual order transaction. Use a fresh strict DB clock (PostgreSQL clock_timestamp) and current application clock, not request-arrival time. Pre-body or pre-lock checks alone permit delayed-body/lock-wait expiry or rotation bypass.
-- One session maps to one original order through `SHA256("partner-tenant-h5-order:v1\0" + session_id)` and the existing tenant/hash order uniqueness. Do not add a separately written order pointer or duplicate payment/fulfillment logic. Preserve old API fast replay/error/DTO behavior.
+- New order AND exact H5 replay validate current hosted_h5 mode/session/token/binding/secret/deadline after acquiring tenant -> session locks in the actual order transaction. Use a fresh strict DB clock (PostgreSQL clock_timestamp) and current application clock, not request-arrival time. Pre-body or pre-lock checks alone permit delayed-body/lock-wait expiry or rotation bypass.
+- One session maps to one original order through `SHA256("partner-tenant-h5-order:v1\0" + session_id)` and the existing tenant/hash order uniqueness. Do not add a separately written order pointer or duplicate payment/fulfillment logic. Retired direct POST rejects even fast/exact replay before gateway work; only guarded H5 may use the shared order core.
 - Catalog is an explicit tenant-scoped payable CNY projection with exact decimal money. NEW public H5 `plans[].total_amount` is canonical nonnegative decimal STRING through `9223372036854775807`; unlimited iff `"0"`. Never round int64 quotas via JS Number or change legacy numeric DTOs/billing limits. Shared expected-output fixture: `controller/testdata/partner_purchase_quota_plans.json`.
 - Public order projection omits buyer/Key/gateway details. Merchant session status includes buyer for BFF ownership validation and read-only order state, no checkout/payment links; reconciliation survives browser expiry/secret rotation with CURRENT pt_.
 - Pending existing order resume is an explicit original POST using server order plan/method, then validated same-origin canonical checkout URL. This retries failed gateway preparation after refresh; a direct link to the read-only cashier can strand an unprepared order. GET never prepares payment; paid order view is read-only; no automatic second purchase on expiry/failure.
@@ -44,7 +44,7 @@ Implementation and static/frontend/browser-mock checks exist; Go/database runtim
 ## 5. Good / Base / Bad Cases
 
 - Good: BFF binds logged-in user, stores an intent/session, H5 selects a tenant plan, transient gateway failure survives refresh, explicit resume prepares exactly one original order, existing cashier handles payment/delivery.
-- Base: merchant skips H5 and uses its unchanged API/UI; the same tenant may use both paths.
+- Base: a subscription_key tenant uses its selected API, not H5. H5 tenant uses sessions and retains external account/status/quota support; no tenant can mix purchase entries.
 - Bad: replay unguarded because an order exists; authorize before a slow body and trust it later; assume checkout_url means gateway preparation completed; emit numeric int64 to a safe-integer-only client; grant on browser return.
 
 ## 6. Tests Required

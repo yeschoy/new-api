@@ -2,7 +2,7 @@
 
 ## 1. Scope / Trigger
 
-Read before changing the separate `subscription_key` order entry, internal account identity, query/renewal/rotation credentials or their payment/DTO boundaries. The first actual targeted Docker PostgreSQL 15.19 set passed affected fresh/upgrade/repeat migration, local payment/persistence and critical concurrency assertions (4 top-level tests + 7 model subtests). Independent trellis-check reviewed the complete task diff and matching runtime source without finding an in-scope business-code blocker; no runtime rerun was needed. Prior setup failure/worker timeout remain recorded in the task verification. This is not full application startup, production migration/real payment or deployment verification. Read alongside [paid checkout](partner-tenant-checkout.md) and [hosted H5](partner-hosted-h5.md); their external buyer identity remains required only for their original entries. No frontend/shared-plan authorization or ordinary billing redesign.
+Read before changing the separate `subscription_key` order entry, internal account identity, query/renewal/rotation credentials or their payment/DTO boundaries. The first actual targeted Docker PostgreSQL 15.19 set passed affected fresh/upgrade/repeat migration, local payment/persistence and critical concurrency assertions (4 top-level tests + 7 model subtests). Independent trellis-check reviewed the complete task diff and matching runtime source without finding an in-scope business-code blocker; no runtime rerun was needed. Prior setup failure/worker timeout remain recorded in the task verification. This is not full application startup, production migration/real payment or deployment verification. Read alongside [paid checkout](partner-tenant-checkout.md) and [hosted H5](partner-hosted-h5.md); hosted_h5 still requires external buyer identity; the default subscription_key tenant cannot use those external auxiliary/session entries. See [Integration Modes](partner-integration-mode.md) for immutable creation/default and actual admission. The retired direct POST subscription-orders is denied for both modes; shared payment/accepted-order delivery remains neutral. This new mode change has no Go/pq runtime evidence yet (task Docker unavailable); earlier subscription-key pq results do not validate it. No frontend/shared-plan authorization or ordinary billing redesign.
 
 ## 2. Signatures / API boundaries
 
@@ -64,7 +64,7 @@ Errors use plain JSON `{error:{code,message},request_id}` without raw internal e
 ## 5. Good / Base / Bad Cases
 
 - Good: pt_ creates a buyer-ID-free intent, verified payment commits, atomic delivery creates one internal User/Token/Account/Subscription/sub_; merchant claims it and the buyer queries with only sub_. A later paid renewal reuses that exact relationship and both keys unless the query key was explicitly rotated.
-- Base: existing external API/H5 keep their identity/DTO contracts and mint no sub_; an expired linked subscription remains queryable with historical quota and no api_key.
+- Base: explicitly hosted_h5 session/support APIs keep their external identity/DTO contracts and mint no sub_; an expired linked subscription remains queryable with historical quota and no api_key.
 - Bad: treating the idempotency key as a buyer identity, letting external fallback/backfill claim an internal account, repairing credentials in GET, using a pre-lock key/clock, recreating a cancelled renewal target, or rolling back paid evidence with local delivery.
 
 ## 6. Tests Required / Focused Evidence

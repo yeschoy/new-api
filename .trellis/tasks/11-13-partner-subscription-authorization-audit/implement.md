@@ -3,11 +3,11 @@
 ## 1. Approval and dependencies
 
 - [x] R3/R5 event scope and immutable default modes confirmed by user; final-structure PRD/design written.
-- [ ] Parent final-summary approval received after its presentation.
-- [ ] Access-mode child implemented/checked first and actual enum/error/admission contract inspected.
-- [ ] Only then load trellis-before-dev, activate this child with task.py start and implement sequentially.
+- [x] Parent final summary after 181c99e1b was approved by the user's subsequent “开始”; scope includes this audit child.
+- [x] Access-mode implementation and independent trellis-check handoff inspected: source-review-ready, no confirmed remaining business-source blocker; runtime remains blocked by unavailable Docker. Actual enum/error/safe attribution contracts are in ../11-13-partner-access-mode/quality-review.md.
+- [x] Saved predecessor audit-handoff-fingerprint.json (60 reviewed/current tracked and new mode-source files), validated manifests (8 implement / 7 check), then activated this child in_progress. Implement sequentially and preserve predecessor changes without commit/rollback.
 
-No business implementation, runtime resources or agent launch during planning. If later delegating under applicable authorization, prompt first line is `Active task: <task.py current path>`; one checkout writer only. Parent remains integration owner, not a parallel writer.
+Proceed with source/frontend/static checks while Docker is unavailable; keep mandatory Go/pq acceptance blocked, do not substitute host Go/SQLite or claim full acceptance. Parent permits this source-level dependency handoff, not predecessor completion or production readiness. If later delegating under applicable authorization, prompt first line is `Active task: <task.py current path>`; one checkout writer only. Parent remains integration owner, not a parallel writer.
 
 ## 2. Preflight and resources
 
@@ -73,8 +73,9 @@ Run each meaningful targeted test set after relevant changes, not repetitive ful
 
 ## 7. Review and parent handoff
 
-- [ ] Review every success and reject path, especially recorder-before-policy ordering, post-commit emission, hidden safe metadata, unknown tenant attribution and non-HTTP status display.
-- [ ] Record actual runtime/static results and engine gaps in verification.md; state LOG_DB outage/crash can lose best-effort events.
-- [ ] Update actual specs only once behavior exists, then final-check changes; explicit business/docs/Trellis file staging and commit, no unrelated files, push/deployment or cleanup.
+- [x] Independent source review inspected recorder ordering/postcommit/metadata/ownership/status. Fixed silent sub_ locator and current locked H5-principal handoff; added necessary lifecycle/rate/ownership/race and actual production permission-gate regression source. No confirmed remaining source blocker; Go/pq acceptance is NOT implied.
+- [x] Actual frontend/static results, all Go/pq=0, engine gaps and best-effort loss boundary recorded in verification.md and quality-review reports. Final follow-up report is quality-review.66ef7ddd.md.
+- [ ] Save a combined source checkpoint with predecessor mode shared changes. User confirmed the commit plan and normal current-branch push with “提交推送”; do not archive or claim runtime acceptance.
+- [ ] Update actual specs only once behavior exists, then final-check changes; explicit business/docs/Trellis file staging and commit, normal authorized branch push only, no unrelated files, force-push/deployment or cleanup.
 - [ ] Parent integration reuses real router/controller/log API to test denied request -> correct log row -> allowed admin filter; also one issued key -> repeated successful queries -> one record per access, and existing OAuth event still readable.
 - [ ] Retain log schema/data/paid facts on rollback; no drop/reset/remint. Resource cleanup needs user consent; Trellis records stay.

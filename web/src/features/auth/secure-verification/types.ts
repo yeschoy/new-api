@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { PartnerTenantIntegrationMode } from '@/features/partner-tenants/api'
 import type { AuthBundle } from '@/stores/auth-store'
 
 export type VerificationMethod =
@@ -113,7 +114,11 @@ export type VerificationOperation =
   | {
       scope: 'partner_tenant.sensitive_write'
       context:
-        | { action: 'create'; group: string }
+        | {
+            action: 'create'
+            group: string
+            integration_mode: PartnerTenantIntegrationMode
+          }
         | { action: 'rotate_secret'; tenant_id: number }
     }
   | {

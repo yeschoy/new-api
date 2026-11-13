@@ -33,13 +33,14 @@ var partnerTenantMembershipCache = hot.NewHotCache[int, bool](hot.LRU, 10000).
 	Build()
 
 type PartnerTenant struct {
-	Id         int64  `json:"id" gorm:"primaryKey"`
-	Name       string `json:"name" gorm:"type:varchar(64);not null"`
-	Group      string `json:"group" gorm:"type:varchar(64);not null;uniqueIndex"`
-	SecretHash string `json:"-" gorm:"type:char(64);not null;uniqueIndex"`
-	Status     int    `json:"status" gorm:"not null;default:1"`
-	CreatedAt  int64  `json:"created_at" gorm:"type:bigint"`
-	UpdatedAt  int64  `json:"updated_at" gorm:"type:bigint"`
+	IntegrationMode string `json:"integration_mode" gorm:"type:varchar(24);not null;default:subscription_key"`
+	Id              int64  `json:"id" gorm:"primaryKey"`
+	Name            string `json:"name" gorm:"type:varchar(64);not null"`
+	Group           string `json:"group" gorm:"type:varchar(64);not null;uniqueIndex"`
+	SecretHash      string `json:"-" gorm:"type:char(64);not null;uniqueIndex"`
+	Status          int    `json:"status" gorm:"not null;default:1"`
+	CreatedAt       int64  `json:"created_at" gorm:"type:bigint"`
+	UpdatedAt       int64  `json:"updated_at" gorm:"type:bigint"`
 }
 
 func (PartnerTenant) TableName() string { return "partner_tenants" }
@@ -118,6 +119,13 @@ func GetPartnerUserPlanRateLimit(userID int, group string) (int, error) {
 }
 
 func CreatePartnerTenant(name, group string) (*PartnerTenant, string, error) {
+	return CreatePartnerTenantWithIntegrationMode(name, group, PartnerTenantIntegrationSubscriptionKey)
+}
+
+func CreatePartnerTenantWithIntegrationMode(name, group, mode string) (*PartnerTenant, string, error) {
+	if !IsValidPartnerTenantIntegrationMode(mode) {
+		return nil, "", ErrPartnerTenantIntegrationMode
+	}
 	secretPart, err := common.GenerateRandomCharsKey(48)
 	if err != nil {
 		return nil, "", err
@@ -125,12 +133,13 @@ func CreatePartnerTenant(name, group string) (*PartnerTenant, string, error) {
 	secret := "pt_" + secretPart
 	now := common.GetTimestamp()
 	tenant := &PartnerTenant{
-		Name:       name,
-		Group:      group,
-		SecretHash: HashPartnerOAuthSecret(secret),
-		Status:     PartnerTenantStatusEnabled,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		IntegrationMode: mode,
+		Name:            name,
+		Group:           group,
+		SecretHash:      HashPartnerOAuthSecret(secret),
+		Status:          PartnerTenantStatusEnabled,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if err := DB.Create(tenant).Error; err != nil {
 		return nil, "", err
@@ -141,7 +150,8 @@ func CreatePartnerTenant(name, group string) (*PartnerTenant, string, error) {
 func FindPartnerTenantBySecret(secret string) (*PartnerTenant, error) {
 	hash := HashPartnerOAuthSecret(secret)
 	var tenant PartnerTenant
-	if err := DB.Where("secret_hash = ?", hash).First(&tenant).Error; err != nil {
+	// Authentication diagnostics must not interpolate the credential hash.
+	if err := partnerTenantSecretDB(DB).Where("secret_hash = ?", hash).First(&tenant).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPartnerTenantNotFound
 		}
@@ -228,6 +238,17 @@ func IsValidPartnerTenantExternalUserID(externalUserID string) bool {
 }
 
 func ProvisionPartnerTenantAccount(tenantId int64, externalUserId, displayName string) (*PartnerTenantProvisionedAccount, error) {
+	return provisionPartnerTenantHostedAccount(tenantId, "", externalUserId, displayName)
+}
+
+func ProvisionPartnerTenantHostedAccount(tenantId int64, secretHash, externalUserId, displayName string) (*PartnerTenantProvisionedAccount, error) {
+	if secretHash == "" {
+		return nil, ErrPartnerTenantNotFound
+	}
+	return provisionPartnerTenantHostedAccount(tenantId, secretHash, externalUserId, displayName)
+}
+
+func provisionPartnerTenantHostedAccount(tenantId int64, secretHash, externalUserId, displayName string) (*PartnerTenantProvisionedAccount, error) {
 	externalUserId = strings.TrimSpace(externalUserId)
 	if tenantId <= 0 || !IsValidPartnerTenantExternalUserID(externalUserId) {
 		return nil, errors.New("invalid partner tenant account")
@@ -241,6 +262,12 @@ func ProvisionPartnerTenantAccount(tenantId int64, externalUserId, displayName s
 				return ErrPartnerTenantNotFound
 			}
 			return err
+		}
+		if secretHash != "" && !hmac.Equal([]byte(secretHash), []byte(tenant.SecretHash)) {
+			return ErrPartnerTenantNotFound
+		}
+		if err := RequirePartnerTenantIntegrationMode(&tenant, PartnerTenantOperationHostedH5); err != nil {
+			return &PartnerTenantAuditAdmissionError{Receipt: PartnerTenantAuditPrincipal(&tenant)}
 		}
 		var err error
 		result, accountUserID, err = provisionPartnerTenantAccountTx(tx, &tenant, externalUserId, displayName)

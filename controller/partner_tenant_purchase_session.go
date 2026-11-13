@@ -95,6 +95,12 @@ func partnerTenantPurchaseHasQuery(c *gin.Context) bool {
 // Strict bounded objects: refuse unknown, duplicate and case-aliased fields as
 // well as concatenated JSON. Never permit browser identity/price overrides.
 func decodePartnerTenantPurchaseBody(c *gin.Context, dst any, fields ...string) bool {
+	return decodePartnerTenantObjectBody(c, dst, fields, nil)
+}
+
+// A single parser owns strict field presence across merchant and public writes.
+func decodePartnerTenantObjectBody(c *gin.Context, dst any, required, optional []string) bool {
+	fields := append(append([]string(nil), required...), optional...)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2048)
 	decoder := json.NewDecoder(c.Request.Body)
 	start, err := decoder.Token()
@@ -131,8 +137,13 @@ func decodePartnerTenantPurchaseBody(c *gin.Context, dst any, fields ...string) 
 		values[key] = value
 	}
 	end, err := decoder.Token()
-	if err != nil || end != json.Delim('}') || decoder.Decode(&struct{}{}) != io.EOF || len(values) != len(fields) {
+	if err != nil || end != json.Delim('}') || decoder.Decode(&struct{}{}) != io.EOF {
 		return false
+	}
+	for _, field := range required {
+		if _, present := values[field]; !present {
+			return false
+		}
 	}
 	body, err := json.Marshal(values)
 	return err == nil && json.Unmarshal(body, dst) == nil
@@ -205,7 +216,7 @@ func PartnerTenantGetPurchaseSession(c *gin.Context) {
 		writePartnerTenantAPIError(c, 400, "invalid_request", "request is invalid")
 		return
 	}
-	session, err := model.GetPartnerTenantPurchaseSession(tenant.Id, c.Param("session_id"))
+	session, err := model.GetPartnerTenantHostedPurchaseSession(tenant.Id, tenant.SecretHash, c.Param("session_id"))
 	if err != nil {
 		partnerTenantPurchaseError(c, err)
 		return

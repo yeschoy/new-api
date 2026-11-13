@@ -7,6 +7,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
@@ -55,7 +56,7 @@ func partnerOAuthRateTake(c *gin.Context, mark, subject string, max int, windowS
 	if common.RedisEnabled {
 		allowed, _, ttlSeconds, err := redisFixedWindowTake(c.Request.Context(), redisIPRateLimitKey(mark, subject), max, windowSeconds)
 		if err != nil {
-			logger.LogError(c.Request.Context(), "partner oauth rate limit failed: "+err.Error())
+			logger.LogError(c.Request.Context(), "partner oauth rate limit failed: backend unavailable")
 			c.Status(http.StatusInternalServerError)
 			c.Abort()
 			return false
@@ -170,6 +171,7 @@ func PartnerOAuthPrincipal(c *gin.Context) *service.PartnerOAuthAccessPrincipal 
 }
 
 func writePartnerIntegrationError(c *gin.Context, status int, code, message, www string) {
+	model.SetPartnerTenantAuditReason(c, code)
 	if www != "" {
 		c.Header("WWW-Authenticate", www)
 	}

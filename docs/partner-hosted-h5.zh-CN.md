@@ -1,15 +1,14 @@
-# 商户可选托管 H5 购买接入
+# 商户托管 H5 购买接入
 
 本文说明当前分支的实现合同，不代表已经部署或通过真实支付、数据库迁移验收。既有接口详见 [Partner Tenant API](./partner-tenant-api.md) 和 [中文接入指南](./partner-tenant-integration.zh-CN.md)。本文不替换该指南。
 
-## 两条路径可同时使用
+## 创建时选择单一接入方式
 
-| 路径                         | 商户负责                                                                                         | 平台负责                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| 自建 UI / 原 API（保持不变） | 用户登录、套餐卡片和选择；后端调用 `/api/partner/v1/subscription-orders`，持久化每次购买的幂等键 | 订单、CNY 权威金额、独立收银台、支付验签、自动开户和套餐交付                            |
-| 可选托管 H5                  | 用户登录；可信后端创建并保存购买会话，将 `purchase_url` 交给该用户；后端跟踪结果                 | 本商户可售套餐与实际可用支付方式、一次购买、同窗口进入原收银台，以及同一套支付/交付逻辑 |
+平台管理员创建商户时，默认 `subscription_key`（订阅 Key API，新购不传用户 ID）；只有明确选择 `hosted_h5` 才可使用本文的购买会话。接入方式创建后固定，不能通过状态更新或密钥轮换更改，也没有历史兼容模式。
 
-不需要配置互斥的 API/H5 模式。原套餐、账号、下单、查单和额度 API 仍可使用。托管 H5 是独立 URL，可在当前窗口、新窗口或 App WebView 打开；**不支持 iframe**，不使用 postMessage，不接受任意 `return_url`，也不自动返回商户。支付渠道可能要求外部浏览器或新窗口，不能保证任意 WebView 都可完成第三方支付。
+H5 **仍需要**商户后端提供 `external_user_id`。H5 商户可以查询本商户套餐、创建/查询购买会话，并使用查单、账户 Key 和额度辅助接口；不能调用订阅 Key 订单/领取/轮换接口。旧 `POST /api/partner/v1/subscription-orders` 在两种模式均返回 `403 integration_mode_mismatch`，不能绕过会话直接购买。订阅 Key 商户不能创建、兑换或消费 H5 会话；商户鉴权失配返回 403，公开能力失配统一为 `401 invalid_purchase_access`，不披露商户信息。
+
+托管 H5 是独立 URL，可在当前窗口、新窗口或 App WebView 打开；**不支持 iframe**，不使用 postMessage，不接受任意 `return_url`，也不自动返回商户。支付渠道可能要求外部浏览器或新窗口，不能保证任意 WebView 都可完成第三方支付。
 
 ## 商户 BFF：登录与密钥边界
 
@@ -55,7 +54,7 @@ Content-Type: application/json
 
 H5 只显示真实会话 API 返回的本商户可购 CNY 套餐和当前支付方式；无套餐/渠道就显示空态，不提供示例支付渠道或历史外币换算。价格是精确两位小数字符串；有限额度明确显示“内部额度单位”，不冒称 token、人民币或现金余额。仅新增公开 H5 目录的 `plans[].total_amount` 使用 canonical 非负十进制**字符串**，范围为 `"0"`–`"9223372036854775807"`（signed int64 最大值）；`quota_unlimited` 为 true 当且仅当值为 `"0"`。`"9007199254740992"` 等超过 JS safe integer 的值合法，客户端必须用字符串/BigInt 校验与精确展示，不能转 Number 舍入。旧商户套餐/额度 DTO 的数值合同及计费限额不变。
 
-每个会话最多形成一笔订单。只有用户提交才下单，不在加载、刷新或状态查询时自动下单。首次提交前保存原 `plan_id/payment_method`；双击受保护，失败/超时后锁定原选项，只能重试原购买或查询状态。后端使用会话固定的内部幂等身份；同入口换套餐或渠道返回冲突，不生成第二笔订单。下单/重放在同一订单事务的 tenant 锁内重新读取会话，并以新鲜时钟核验能力、兑换/nonce、租户绑定及当前密钥快照；慢 body 或锁等待不能越过过期/撤销。网关网络调用始终位于数据库事务之外。
+每个会话最多形成一笔订单。只有用户提交才下单，不在加载、刷新或状态查询时自动下单。首次提交前保存原 `plan_id/payment_method`；双击受保护，失败/超时后锁定原选项，只能重试原购买或查询状态。后端使用会话固定的内部幂等身份；同入口换套餐或渠道返回冲突，不生成第二笔订单。下单/重放在同一订单事务的 tenant 锁内重新读取会话，并以新鲜时钟核验能力、兑换/nonce、租户绑定、当前 hosted_h5 接入方式及当前密钥快照；慢 body 或锁等待不能越过过期/撤销。网关网络调用始终位于数据库事务之外。
 
 成功后校验原始、同源、canonical `/partner/checkout` 链接，再在同一窗口进入原收银台。已有订单不再展示新购买表单。对于未过期 pending 订单，用户显式继续时先将服务端 `order.plan_id/payment_method` 原样 POST 到同一会话 `/orders`，完成可能失败的网关准备后再跳转；不能受冲突的本地草稿覆盖，也不能直接进入没有付款链接的只读收银台。即使准备曾返回 503，刷新/查状态 GET 发现已持久化订单，仍按此流程恢复，GET 本身不准备支付。已准备的精确重放不重复准备/收费；已付款订单仅查看，过期不隐式重买。订单的金额、快照、截止时间和付款渠道以原订单为准；即使当前目录/渠道变更，精确重试仍恢复原订单。
 
@@ -89,7 +88,7 @@ BFF 必须核验 `external_user_id` 是当前用户，再向该用户返回最�
 | `GET`                                                 | `Authorization: Bearer ps_...`                             | `{session_id,expires_at,merchant_name,plans,payment_methods,order}`，不含买家或 Key |
 | `POST /orders`                                        | ps_，仅 `{plan_id,payment_method}`                         | 首次 201/精确重放 200，`{order_no,checkout_url}`                                    |
 
-公开 `order` 为 `null` 或 `{order_no,plan_id,payment_method,payment_status,fulfillment_status,expires_at,checkout_url?}`；原订单能力到期后省略链接。错误沿用 `{error:{code,message},request_id}`。`401 invalid_purchase_access` 统一涵盖无效、过期、撤销或重放；页面应回商户查单，不要求登录平台。冲突、不可购、网络或支付服务暂不可用不等于“没有订单”，重试须保留原购买意图。
+公开 `order` 为 `null` 或 `{order_no,plan_id,payment_method,payment_status,fulfillment_status,expires_at,checkout_url?}`；原订单能力到期后省略链接。错误沿用 `{error:{code,message},request_id}`。`401 invalid_purchase_access` 统一涵盖无效、过期、撤销、接入方式失配或重放；页面应回商户查单，不要求登录平台。冲突、不可购、网络或支付服务暂不可用不等于“没有订单”，重试须保留原购买意图。
 
 Go HTML 路由与静态部署均需保留 no-store/no-referrer、DENY / `frame-ancestors 'none'`。`web/scripts/vercel-config.mjs` 是共享静态配置生成器；编码字符/分隔符和尾斜杠别名也应受保护。早期 HTML 禁止分析脚本，页面跳过平台登录刷新、setup、状态、品牌和奖励效果；不要由 CDN 再注入第三方分析。普通页面认证行为不变。
 

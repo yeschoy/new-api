@@ -28,8 +28,8 @@ func setupPartnerTenantOrderController(t *testing.T) (*gin.Engine, *model.Partne
 	previous := operation_setting.CustomCallbackAddress
 	operation_setting.CustomCallbackAddress = "https://platform.example"
 	t.Cleanup(func() { operation_setting.CustomCallbackAddress = previous })
-	require.NoError(t, model.DB.AutoMigrate(&model.PartnerTenant{}, &model.PartnerTenantAccount{}, &model.PartnerTenantSubscriptionOrder{}, &model.SubscriptionPlan{}, &model.UserSubscription{}))
-	tenant, secret, err := model.CreatePartnerTenant("Test", "tenant-order")
+	require.NoError(t, model.DB.AutoMigrate(&model.PartnerTenant{}, &model.PartnerTenantAccount{}, &model.PartnerTenantSubscriptionOrder{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.PartnerTenantPurchaseSession{}))
+	tenant, secret, err := model.CreatePartnerTenantWithIntegrationMode("Test", "tenant-order", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	plan := &model.SubscriptionPlan{PartnerTenantId: tenant.Id, Title: "Monthly model", PriceAmount: 9.99, Currency: "CNY", Enabled: true, DurationUnit: "month", DurationValue: 1,
 		ApplicableGroup: tenant.Group, TotalAmount: 1000, QuotaResetPeriod: "monthly", AllowWalletOverflow: common.GetPointer(false)}
@@ -38,6 +38,11 @@ func setupPartnerTenantOrderController(t *testing.T) (*gin.Engine, *model.Partne
 	partner.POST("/subscription-orders", PartnerTenantCreateSubscriptionOrder)
 	partner.GET("/subscription-orders/:order_no", PartnerTenantGetSubscriptionOrder)
 	partner.PUT("/accounts", PartnerTenantProvisionAccount)
+	partner.POST("/purchase-sessions", PartnerTenantCreatePurchaseSession)
+	partner.GET("/purchase-sessions/:session_id", PartnerTenantGetPurchaseSession)
+	engine.POST("/api/partner/purchase-sessions/:session_id/exchange", PartnerTenantExchangePurchaseSession)
+	engine.GET("/api/partner/purchase-sessions/:session_id", PartnerTenantPublicPurchaseSession)
+	engine.POST("/api/partner/purchase-sessions/:session_id/orders", PartnerTenantPurchaseSessionCreateOrder)
 	engine.GET("/api/partner/checkout/:order_no", PartnerTenantCashier)
 	engine.GET("/api/partner/subscription/epay/notify", PartnerTenantEpayNotify)
 	engine.POST("/api/partner/subscription/epay/notify", PartnerTenantEpayNotify)
@@ -47,10 +52,17 @@ func setupPartnerTenantOrderController(t *testing.T) (*gin.Engine, *model.Partne
 func createTenantTestOrder(t *testing.T, engine *gin.Engine, secret string, plan *model.SubscriptionPlan, key string) partnerTenantOrderView {
 	t.Helper()
 	body := `{"external_user_id":"buyer-7","plan_id":` + strconv.Itoa(plan.Id) + `,"payment_method":"alipay"}`
-	response := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, key, body)
+	response := hostedTenantTestOrderRequest(t, engine, secret, key, body)
 	require.Equal(t, 201, response.Code, response.Body.String())
-	var order partnerTenantOrderView
-	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &order))
+	var result struct {
+		OrderNo     string `json:"order_no"`
+		CheckoutURL string `json:"checkout_url"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+	stored, err := model.GetPartnerTenantSubscriptionOrder(0, result.OrderNo)
+	require.NoError(t, err)
+	order := partnerTenantOrderDTO(stored, false)
+	order.CheckoutURL = result.CheckoutURL
 	return order
 }
 func tenantSignedNotification(t *testing.T, orderNo string, changes map[string]string) string {
@@ -95,7 +107,7 @@ func TestPartnerTenantOrderCheckoutAndPublicScope(t *testing.T) {
 	require.NoError(t, model.DB.Model(&model.PartnerTenantAccount{}).Count(&accounts).Error)
 	require.Zero(t, accounts)
 	body := `{"external_user_id":"buyer-7","plan_id":` + strconv.Itoa(plan.Id) + `,"payment_method":"alipay"}`
-	replay := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, "tenant-order-000001", body)
+	replay := hostedTenantTestOrderRequest(t, engine, secret, "tenant-order-000001", body)
 	require.Equal(t, 200, replay.Code, replay.Body.String())
 	require.Len(t, gateway.requests, 1)
 	var replayOrder partnerTenantOrderView
@@ -104,7 +116,7 @@ func TestPartnerTenantOrderCheckoutAndPublicScope(t *testing.T) {
 	// A prepared order remains replayable while NEW payment methods are off.
 	methods := operation_setting.PayMethods
 	operation_setting.PayMethods = nil
-	offReplay := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, "tenant-order-000001", body)
+	offReplay := hostedTenantTestOrderRequest(t, engine, secret, "tenant-order-000001", body)
 	operation_setting.PayMethods = methods
 	require.Equal(t, 200, offReplay.Code, offReplay.Body.String())
 	status := partnerIntegrationRequest(engine, "GET", "/api/partner/v1/subscription-orders/"+order.OrderNo, secret, "", "")
@@ -123,7 +135,7 @@ func TestPartnerTenantOrderCheckoutAndPublicScope(t *testing.T) {
 		invalid := partnerIntegrationRequest(engine, "GET", "/api/partner/checkout/"+order.OrderNo, credential, "", "")
 		require.Equal(t, 401, invalid.Code)
 	}
-	foreign, foreignSecret, err := model.CreatePartnerTenant("Other", "tenant-other")
+	foreign, foreignSecret, err := model.CreatePartnerTenantWithIntegrationMode("Other", "tenant-other", model.PartnerTenantIntegrationHostedH5)
 	require.NoError(t, err)
 	require.NotEqual(t, tenant.Id, foreign.Id)
 	require.Equal(t, 404, partnerIntegrationRequest(engine, "GET", "/api/partner/v1/subscription-orders/"+order.OrderNo, foreignSecret, "", "").Code)
@@ -199,7 +211,7 @@ func TestPartnerTenantGatewayRetryAndRequestValidation(t *testing.T) {
 	key := "tenant-retry-000001"
 	body := `{"external_user_id":"buyer-7","plan_id":` + strconv.Itoa(plan.Id) + `,"payment_method":"alipay"}`
 	gateway.reply = func(w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) }
-	failed := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, key, body)
+	failed := hostedTenantTestOrderRequest(t, engine, secret, key, body)
 	require.Equal(t, 503, failed.Code)
 	require.NotContains(t, failed.Body.String(), "merchant-secret")
 	var orders []model.PartnerTenantSubscriptionOrder
@@ -209,16 +221,16 @@ func TestPartnerTenantGatewayRetryAndRequestValidation(t *testing.T) {
 	gateway.reply = func(w http.ResponseWriter) {
 		_, _ = io.WriteString(w, `{"code":1,"payurl":"https://gateway.example/pay"}`)
 	}
-	replay := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, key, body)
+	replay := hostedTenantTestOrderRequest(t, engine, secret, key, body)
 	require.Equal(t, 200, replay.Code, replay.Body.String())
 	require.Contains(t, replay.Body.String(), orders[0].OrderNo)
-	conflict := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, key, strings.Replace(body, "buyer-7", "buyer-8", 1))
+	conflict := hostedTenantTestOrderRequest(t, engine, secret, key, strings.Replace(body, "buyer-7", "buyer-8", 1))
 	require.Equal(t, 409, conflict.Code)
-	for _, invalid := range []string{strings.TrimSuffix(body, "}") + `,"paid":true}`, strings.TrimSuffix(body, "}") + `,"amount":"0.01"}`, `{"external_user_id":"","plan_id":1,"payment_method":"alipay"}`, body + body} {
-		require.Equal(t, 400, partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, "tenant-invalid-00001", invalid).Code)
-	}
+	direct := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, key, body)
+	require.Equal(t, 403, direct.Code, direct.Body.String())
+	require.Contains(t, direct.Body.String(), "integration_mode_mismatch")
 	require.NoError(t, model.DB.Model(plan).Update("currency", "USD").Error)
-	currency := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/subscription-orders", secret, "tenant-currency-0001", body)
+	currency := hostedTenantTestOrderRequest(t, engine, secret, "tenant-currency-0001", body)
 	require.Equal(t, 400, currency.Code)
 	require.Contains(t, currency.Body.String(), "unsupported_currency")
 }
@@ -261,4 +273,29 @@ func TestPartnerEpaySharedTransportBoundsAndNoRedirect(t *testing.T) {
 	checkout, err := partnerEpayMapiPurchase(fields)
 	require.NoError(t, err)
 	require.Equal(t, "weixin://test", checkout.QRCode)
+}
+
+// Explicit H5 purchase helper replaces the retired direct-purchase test entry.
+// The external buyer is bound at session creation; orders always use ps_ and
+// the actual public session order route (not an unguarded internal bypass).
+func hostedTenantTestOrderRequest(t *testing.T, engine *gin.Engine, secret, key, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	var input struct {
+		ExternalUserId string `json:"external_user_id"`
+		PlanId         int    `json:"plan_id"`
+		PaymentMethod  string `json:"payment_method"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(body), &input))
+	sessionBody, _ := json.Marshal(map[string]string{"external_user_id": input.ExternalUserId})
+	created := partnerIntegrationRequest(engine, "POST", "/api/partner/v1/purchase-sessions", secret, key, string(sessionBody))
+	if created.Code != 200 && created.Code != 201 {
+		return created
+	}
+	var session partnerTenantPurchaseSessionView
+	require.NoError(t, json.Unmarshal(created.Body.Bytes(), &session))
+	stored, err := model.GetPartnerTenantPurchaseSession(0, session.SessionId)
+	require.NoError(t, err)
+	token := exchangePurchaseControllerSession(t, engine, session, model.PartnerTenantPurchaseLaunchCode(stored))
+	orderBody, _ := json.Marshal(map[string]any{"plan_id": input.PlanId, "payment_method": input.PaymentMethod})
+	return partnerIntegrationRequest(engine, "POST", "/api/partner/purchase-sessions/"+session.SessionId+"/orders", token, "", string(orderBody))
 }

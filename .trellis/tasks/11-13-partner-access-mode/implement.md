@@ -4,11 +4,12 @@
 
 - [x] Parent product choices confirmed: two modes, subscription_key default/no legacy, complete credential audit, immutable after creation.
 - [x] Final-structure PRD and design cover route/proof/data/migration boundaries; context manifests are curated before start.
-- [ ] Parent final summary is presented, then a later user message explicitly approves implementation.
-- [ ] Only after that approval load trellis-before-dev and step 1.4/2.1, run `task.py start .trellis/tasks/11-13-partner-access-mode` and implement this child first.
-- [ ] Complete standalone check/commit, then activate audit child; parent end-to-end M-AC5 finishes after audit integration.
+- [x] Parent final summary presented after planning commit 181c99e1b; user subsequently replied “开始”, explicitly approving implementation.
+- [x] Loaded trellis-before-dev and step 2.1; ran `task.py start .trellis/tasks/11-13-partner-access-mode`, status now in_progress. Implement this child first.
+- [x] Independent full-source check completed; one H5 fixture and historical evidence wording corrected. Docker blocks Go/pq acceptance; explicit parent decision allowed sequential audit source work after reviewed handoff, without declaring this child completed.
+- [ ] Save reviewed mode+audit shared delta in a single local unaccepted checkpoint after user confirms the commit plan; runtime M-AC1-6 and parent M-AC5 integration gates remain open.
 
-No business code, runtime tests, new resources or implementation sub-agent is authorized by this planning pass. Do not create a parent implementation worker. If delegation is later permitted by applicable instructions, query task.py current and put `Active task: <actual path>` as dispatch prompt line 1; only one writer in the checkout, no extra fanout.
+The reviewed implementation, necessary isolated tests and task-owned resources are now approved; production/real payments/destructive cleanup/extra fanout remain out of scope. Do not create a parent implementation worker. If delegation is later permitted by applicable instructions, query task.py current and put `Active task: <actual path>` as dispatch prompt line 1; only one writer in the checkout, no extra fanout.
 
 ## 2. Baseline and affected files
 

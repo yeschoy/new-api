@@ -6,10 +6,10 @@
 - [x] Parent and both children have converged PRD/design/implementation documents and explicit ownership/dependencies.
 - [x] Source research covers current routes/transactions/proof/log store/UI plus group-list source and existing unique-group rule.
 - [x] Real spec/research entries curated into implement.jsonl/check.jsonl for all three tasks; validate before final review.
-- [ ] Present final parent summary to user; a later explicit approval authorizes implementation. The current “continue” resumes planning, not an undisplayed final design.
-- [ ] After that approval, load development guidance and activate access-mode child first, NOT this parent as the default business implementation target.
+- [x] Presented final summary after planning commit 181c99e1b; user subsequently explicitly replied “开始”, approving the reviewed implementation scope and disclosed risk boundary.
+- [x] Loaded development guidance and activated access-mode child first (in_progress), NOT this parent as the default business implementation target.
 
-No implementation/task.py start/sub-agent/runtime resource launch in this planning pass. If later task routing calls for an authorized implementation/check agent, query current task and start every dispatch with `Active task: <actual current path>`. No extra review fanout and no concurrent checkout writers.
+The earlier planning-only restriction has ended for the approved scope. Execute children sequentially; no production, real payment, destructive cleanup or extra fanout is authorized. If later task routing calls for an authorized implementation/check agent, query current task and start every dispatch with `Active task: <actual current path>`. No extra review fanout and no concurrent checkout writers.
 
 ## 2. Source task map and execution order
 
@@ -19,7 +19,7 @@ No implementation/task.py start/sub-agent/runtime resource launch in this planni
 | 2 | ../11-13-partner-subscription-authorization-audit/ | Safe LOG_DB metadata/events/migrations, one event per requested operation, existing admin UI/filter. | L-AC1-6 and mode-denial wiring. |
 | 3 | This parent | Source requirement cross-check and integration evidence, no parallel business rewrite. | AC1-6, including HTTP denial -> log -> admin filter and unchanged paid/key lifecycle. |
 
-The parent/child hierarchy does not enforce ordering automatically. Do not start the audit implementation before inspecting the mode contract; do not archive the parent while cross-child acceptance is pending.
+The parent/child hierarchy does not enforce ordering automatically. Do not start audit implementation before inspecting the mode contract; do not archive the parent while cross-child acceptance is pending. Execution update: mode implementation has passed independent source review after one fixture/doc correction, but Docker blocks all Go/pq acceptance. Parent permits audit source implementation to follow that reviewed contract without committing/archiving the mode child; preserve the predecessor fingerprint and later run necessary runtime/integration gates before full acceptance.
 
 ## 3. Preflight and resource discipline
 
@@ -79,11 +79,13 @@ Save exact source baseline, commands/results/matching tests/skips and known gaps
 ## 6. Finish and rollback
 
 - [ ] Final quality review against full parent/child scope, actual spec update only once code behavior exists, no unrelated abstractions/cleanup.
-- [ ] Explicit scoped Git staging/commit for product code/docs and related Trellis files; exact force-add only for ignored task/spec paths. No private key/temp outputs, dependency cache churn, push or deploy.
+- [ ] Explicit scoped Git staging/commit for product code/docs and related Trellis files; exact force-add only for ignored task/spec paths. User subsequently authorized “提交推送”: normal push of the current branch is allowed. No private key/temp outputs, dependency cache churn, force-push or deploy.
 - [ ] Child completion/archival only after own and cross-child gate ownership is clear; parent final acceptance after both deliverables. Record journal as applicable.
 - [ ] Rollback is additive-data preserving: retain mode/log columns, orders, paid evidence and issued relationships. Old nodes do not enforce admission; do not claim safe mixed-version rollback or solve failure with drop/reset/remint.
 - [ ] Report completion and verification gaps truthfully. Cleanup of this task's temporary resources requires user's consent; Trellis records are retained.
 
-## 7. Final review status
+## 7. Current checkpoint status
 
-All original product decisions settled. The group screenshot is a separate unreproduced diagnostic with source evidence only; no requirement to make groups shareable. Complete and validate artifacts/context, present final summary, then wait for approval. All three task statuses remain planning until the subsequent approval/start gate.
+All original product decisions settled and final summary approved by the subsequent user message “开始”. Both child source implementations and sequential independent reviews are complete; confirmed source/fixture/document defects were fixed. Parent verification.md consolidates actual frontend/static evidence and explicit Go/pq=0 gaps. Runtime integration acceptance is still blocked by unavailable Docker. Do not check the unexecuted runtime/AC/archive gates just because code is saved in Git.
+
+The mode and audit deltas overlap model/router/locales; the user confirmed the single source checkpoint commit and current-branch push with “提交推送”, with a commit body stating no Go/pq execution. Keep both children in_progress; no force-push/deploy/archive. The group screenshot remains an unreproduced environment diagnostic; group uniqueness is unchanged. Actual permission-gate regression is now present as test source, not as a passing runtime result.

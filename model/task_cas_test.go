@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	// The isolated subscription-key suite owns its PostgreSQL fixture. Do not
 	// initialize SQLite (or a shared schema) before that suite starts.
 	flag.Parse()
-	if os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "SubscriptionKey") {
+	if os.Getenv("TEST_PARTNER_ACCESS_AUDIT_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "AccessMode") || strings.Contains(flag.Lookup("test.run").Value.String(), "AuthorizationAudit") || os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "SubscriptionKey") {
 		os.Exit(m.Run())
 	}
 

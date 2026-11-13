@@ -23,6 +23,10 @@ import { Route as LogsRoute } from '@/routes/_authenticated/partner-oauth-client
 import { useAuthStore } from '@/stores/auth-store'
 import { createTestAuthBundle } from '@/test-utils/auth-bundle'
 
+import {
+  AUTHORIZATION_LOG_ACTIONS,
+  validAuthorizationLogTenantID,
+} from '../authorization-log-api'
 import { PartnerOAuthAuthorizationLogs } from '../authorization-logs'
 
 const originalAdapter = api.defaults.adapter
@@ -351,6 +355,96 @@ describe('partner OAuth authorization logs', () => {
     expect(screen.getByText('Access denied')).toBeVisible()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(requests).toHaveLength(0)
+    client.clear()
+  })
+})
+
+describe('tenant credential authorization audit', () => {
+  it('validates canonical signed-int64 IDs without rounding', () => {
+    for (const id of ['1', '9007199254740993', '9223372036854775807']) {
+      expect(validAuthorizationLogTenantID(id)).toBe(true)
+    }
+    for (const id of [
+      '',
+      '0',
+      '01',
+      '-1',
+      '+1',
+      '1.0',
+      '1e3',
+      ' 1',
+      '9223372036854775808',
+    ]) {
+      expect(validAuthorizationLogTenantID(id)).toBe(false)
+    }
+    expect(
+      AUTHORIZATION_LOG_ACTIONS.filter((action) =>
+        action.startsWith('partner_tenant.')
+      )
+    ).toHaveLength(5)
+  })
+
+  it('sends exact tenant text, resets it and rejects overflowing filters', async () => {
+    const { client } = renderLogs()
+    await screen.findByText('No authorization logs found')
+    const user = userEvent.setup()
+    const tenant = screen.getByRole('textbox', { name: 'Tenant ID' })
+    await user.type(tenant, '9223372036854775807')
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() =>
+      expect(requests.at(-1)).toMatchObject({
+        tenant_id: '9223372036854775807',
+      })
+    )
+    await user.clear(tenant)
+    await user.type(tenant, '9223372036854775808')
+    expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Reset' }))
+    expect(tenant).toHaveValue('')
+    await waitFor(() =>
+      expect(requests.at(-1)).toEqual({ page: 1, page_size: 20 })
+    )
+    client.clear()
+  })
+
+  it('renders lifecycle status as absent and keeps exact metadata text', async () => {
+    response = {
+      success: true,
+      data: {
+        total: 1,
+        items: [
+          {
+            event_id: 'tenant-issue',
+            created_at: 1735689600,
+            action: 'partner_tenant.credential.issue',
+            success: true,
+            reason: '',
+            actor_user_id: 0,
+            target_user_id: 12,
+            client_id: '',
+            binding_id: '',
+            request_id: 'background-issue',
+            ip: '',
+            route: '',
+            status: 0,
+            tenant_id: '9223372036854775807',
+            subscription_id: '9007199254740993',
+            order_no: `PTO${'A'.repeat(32)}`,
+            integration_mode: 'subscription_key',
+            key_version: '9223372036854775806',
+            replayed: false,
+          },
+        ],
+      },
+    }
+    const { client } = renderLogs()
+    expect(
+      await screen.findByText('Subscription credential issued')
+    ).toBeVisible()
+    expect(screen.getByText('9223372036854775807')).toBeVisible()
+    expect(screen.getByText('9007199254740993')).toBeVisible()
+    expect(screen.getByText('9223372036854775806')).toBeVisible()
+    expect(screen.queryByRole('cell', { name: '0' })).not.toBeInTheDocument()
     client.clear()
   })
 })

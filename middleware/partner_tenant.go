@@ -35,6 +35,7 @@ func PartnerTenantBearer() gin.HandlerFunc {
 			writePartnerIntegrationError(c, http.StatusUnauthorized, "invalid_partner_secret", "partner authentication failed", `Bearer realm="partner", error="invalid_token"`)
 			return
 		}
+		c.Set(model.PartnerTenantAuditReceiptContext, model.PartnerTenantAuditPrincipal(tenant))
 		if !partnerOAuthRateTake(c, "PT-TENANT", strconv.FormatInt(tenant.Id, 10), 1200, 60, partnerOAuthRateStyleIntegration) {
 			return
 		}
@@ -50,4 +51,17 @@ func PartnerTenantFromContext(c *gin.Context) *model.PartnerTenant {
 	}
 	tenant, _ := value.(*model.PartnerTenant)
 	return tenant
+}
+
+// Early admission is not mutation authority: model entries recheck under the
+// current Tenant lock. Context contains only a credential-verified tenant;
+// the audit child may project its ID/mode, never its SecretHash/raw bearer.
+func PartnerTenantAdmission(operation model.PartnerTenantOperation) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if err := model.RequirePartnerTenantIntegrationMode(PartnerTenantFromContext(c), operation); err != nil {
+			writePartnerIntegrationError(c, http.StatusForbidden, "integration_mode_mismatch", "operation is not allowed for this integration mode", "")
+			return
+		}
+		c.Next()
+	}
 }

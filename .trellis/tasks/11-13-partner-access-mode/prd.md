@@ -45,4 +45,4 @@
 
 ## Planning status
 
-PRD 已收敛，无未决产品问题。design.md / implement.md 定义技术方案及验收步骤；等待父任务最终摘要后的明确实施批准，状态保持 planning。
+PRD 已收敛，无未决产品问题。父任务最终摘要展示后，用户明确答复“开始”，批准按 design.md / implement.md 实施；本子任务已成功激活为 in_progress。

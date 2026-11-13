@@ -31,6 +31,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import {
   AUTHORIZATION_LOG_ACTIONS,
   listPartnerOAuthAuthorizationLogs,
+  validAuthorizationLogTenantID,
   type AuthorizationLog,
   type AuthorizationLogFilters,
 } from './authorization-log-api'
@@ -57,6 +58,7 @@ export function PartnerOAuthAuthorizationLogs() {
     action: '',
     success: '',
     clientId: '',
+    tenantId: '',
     targetUserId: '',
     start: undefined as number | undefined,
     end: undefined as number | undefined,
@@ -70,11 +72,14 @@ export function PartnerOAuthAuthorizationLogs() {
     !!draft.targetUserId &&
     (!/^[1-9]\d*$/.test(draft.targetUserId.trim()) ||
       !Number.isSafeInteger(Number(draft.targetUserId.trim())))
+  const invalidTenant =
+    !!draft.tenantId && !validAuthorizationLogTenantID(draft.tenantId.trim())
   const invalidRange =
     draft.start !== undefined &&
     draft.end !== undefined &&
     draft.start > draft.end
-  const invalidFilters = invalidClient || invalidUser || invalidRange
+  const invalidFilters =
+    invalidClient || invalidUser || invalidTenant || invalidRange
   const query = useQuery({
     queryKey: [
       'admin',
@@ -92,6 +97,11 @@ export function PartnerOAuthAuthorizationLogs() {
   })
   const actionNames = useMemo<Record<string, string>>(
     () => ({
+      'partner_tenant.auth.denied': t('Tenant authentication denied'),
+      'partner_tenant.credential.issue': t('Subscription credential issued'),
+      'partner_tenant.subscription_key.claim': t('Subscription key claimed'),
+      'partner_tenant.subscription_key.rotate': t('Subscription key rotated'),
+      'partner_tenant.subscription.read': t('Subscription accessed'),
       'partner_oauth.consent.approve': t('Consent approved'),
       'partner_oauth.consent.deny': t('Consent denied'),
       'partner_oauth.token.issue': t('Token issued'),
@@ -210,7 +220,60 @@ export function PartnerOAuthAuthorizationLogs() {
         ),
         meta: { label: t('Route') },
       },
-      { accessorKey: 'status', header: 'HTTP', meta: { label: 'HTTP' } },
+      {
+        accessorKey: 'tenant_id',
+        header: t('Tenant ID'),
+        cell: ({ row }) => row.original.tenant_id || '—',
+        meta: { label: t('Tenant ID') },
+      },
+      {
+        accessorKey: 'order_no',
+        header: t('Order number'),
+        cell: ({ row }) => (
+          <TruncatedCell className='max-w-40 font-mono'>
+            {row.original.order_no || '—'}
+          </TruncatedCell>
+        ),
+        meta: { label: t('Order number') },
+      },
+      {
+        accessorKey: 'subscription_id',
+        header: t('Subscription ID'),
+        cell: ({ row }) => row.original.subscription_id || '—',
+        meta: { label: t('Subscription ID') },
+      },
+      {
+        accessorKey: 'integration_mode',
+        header: t('Integration mode'),
+        cell: ({ row }) => {
+          if (row.original.integration_mode === 'subscription_key') {
+            return t('Subscription Key API')
+          }
+          if (row.original.integration_mode === 'hosted_h5') {
+            return t('Hosted H5')
+          }
+          return '—'
+        },
+        meta: { label: t('Integration mode') },
+      },
+      {
+        accessorKey: 'key_version',
+        header: t('Key version'),
+        cell: ({ row }) => row.original.key_version || '—',
+        meta: { label: t('Key version') },
+      },
+      {
+        accessorKey: 'replayed',
+        header: t('Rotation replay'),
+        cell: ({ row }) => (row.original.replayed ? t('Yes') : '—'),
+        meta: { label: t('Rotation replay') },
+      },
+      {
+        accessorKey: 'status',
+        header: 'HTTP',
+        cell: ({ row }) => row.original.status || '—',
+        meta: { label: 'HTTP' },
+      },
     ],
     [actionNames, locale, t]
   )
@@ -313,6 +376,19 @@ export function PartnerOAuthAuthorizationLogs() {
                     }
                   />
                   <Input
+                    aria-label={t('Tenant ID')}
+                    placeholder={t('Tenant ID')}
+                    inputMode='numeric'
+                    value={draft.tenantId}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        tenantId: event.target.value,
+                      }))
+                    }
+                    aria-invalid={invalidTenant}
+                  />
+                  <Input
                     aria-label={t('Client ID')}
                     placeholder={t('Client ID')}
                     value={draft.clientId}
@@ -364,6 +440,7 @@ export function PartnerOAuthAuthorizationLogs() {
                         success: (draft.success ||
                           undefined) as AuthorizationLogFilters['success'],
                         client_id: draft.clientId.trim() || undefined,
+                        tenant_id: draft.tenantId.trim() || undefined,
                         target_user_id: draft.targetUserId
                           ? Number(draft.targetUserId.trim())
                           : undefined,
@@ -385,6 +462,7 @@ export function PartnerOAuthAuthorizationLogs() {
                         action: '',
                         success: '',
                         clientId: '',
+                        tenantId: '',
                         targetUserId: '',
                         start: undefined,
                         end: undefined,
@@ -401,7 +479,9 @@ export function PartnerOAuthAuthorizationLogs() {
                 {invalidFilters && (
                   <Alert variant='destructive'>
                     <AlertDescription>
-                      {t('Check the client ID, target user ID and time range.')}
+                      {t(
+                        'Check the tenant ID, client ID, target user ID and time range.'
+                      )}
                     </AlertDescription>
                   </Alert>
                 )}

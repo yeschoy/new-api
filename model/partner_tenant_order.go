@@ -132,27 +132,12 @@ func validPartnerTenantOrderInput(in PartnerTenantOrderInput) bool {
 }
 
 func CreatePartnerTenantSubscriptionOrder(in PartnerTenantOrderInput) (*PartnerTenantSubscriptionOrder, bool, error) {
-	if !validPartnerTenantOrderInput(in) {
-		return nil, false, ErrPartnerTenantOrderUnavailable
-	}
-	var order *PartnerTenantSubscriptionOrder
-	created := false
-	err := DB.Transaction(func(tx *gorm.DB) error {
-		var tenant PartnerTenant
-		if err := lockForUpdate(tx).Where("id = ? AND status = ?", in.TenantId, PartnerTenantStatusEnabled).First(&tenant).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrPartnerTenantNotFound
-			}
-			return err
-		}
-		var err error
-		order, created, err = createPartnerTenantSubscriptionOrderTx(tx, &tenant, in, nil)
-		return err
-	})
-	return order, created, err
+	// Retained exported signature rejects the retired direct purchase entry.
+	// H5 alone calls the unexported core after locked capability authorization.
+	return nil, false, ErrPartnerTenantIntegrationMode
 }
 
-// Both entries own the tenant lock in this transaction. The optional callback
+// The guarded H5 entry owns the tenant lock in this transaction. The optional callback
 // checks only local NEW-payment configuration, after exact replay; it must never
 // perform network I/O. Merchant validation and replay ordering remain unchanged.
 func createPartnerTenantSubscriptionOrderTx(tx *gorm.DB, tenant *PartnerTenant, in PartnerTenantOrderInput, validateNew func() error) (*PartnerTenantSubscriptionOrder, bool, error) {
@@ -366,6 +351,7 @@ func FulfillPartnerTenantSubscriptionOrder(orderNo string) error {
 		return err
 	}
 	var userID int
+	var audit PartnerTenantAuditReceipt
 	err = DB.Transaction(func(tx *gorm.DB) error {
 		// Every operation that needs both locks uses tenant -> order -> account.
 		var tenant PartnerTenant
@@ -391,7 +377,7 @@ func FulfillPartnerTenantSubscriptionOrder(orderNo string) error {
 		}
 		if order.EntryMode == PartnerTenantIdentitySubscriptionKey {
 			var err error
-			userID, err = fulfillPartnerTenantSubscriptionKeyOrderTx(tx, &tenant, &order)
+			userID, err = fulfillPartnerTenantSubscriptionKeyOrderTx(tx, &tenant, &order, &audit)
 			return err
 		}
 		if order.EntryMode != PartnerTenantIdentityExternal {
@@ -425,6 +411,9 @@ func FulfillPartnerTenantSubscriptionOrder(orderNo string) error {
 			"fulfillment_status": "failed_retryable", "delivery_error": "delivery_unavailable", "delivery_attempts": gorm.Expr("delivery_attempts + 1"), "next_delivery_at": common.GetTimestamp() + 60,
 		}).Error
 		return err
+	}
+	if audit.TenantId > 0 {
+		RecordPartnerTenantAudit(nil, PartnerTenantAuditIssue, 0, true, "", audit)
 	}
 	if userID > 0 {
 		partnerTenantMembershipCache.Set(userID, true)

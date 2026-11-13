@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -19,8 +20,9 @@ import (
 )
 
 type createPartnerTenantRequest struct {
-	Name  string `json:"name"`
-	Group string `json:"group"`
+	Name            string          `json:"name"`
+	Group           string          `json:"group"`
+	IntegrationMode json.RawMessage `json:"integration_mode"`
 }
 
 func AdminListPartnerTenants(c *gin.Context) {
@@ -34,9 +36,16 @@ func AdminListPartnerTenants(c *gin.Context) {
 
 func AdminCreatePartnerTenant(c *gin.Context) {
 	var req createPartnerTenantRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if !decodePartnerTenantAdminBody(c, &req) {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
+	}
+	mode := model.PartnerTenantIntegrationSubscriptionKey
+	if req.IntegrationMode != nil {
+		if json.Unmarshal(req.IntegrationMode, &mode) != nil || string(req.IntegrationMode) == "null" || !model.IsValidPartnerTenantIntegrationMode(mode) {
+			common.ApiErrorT(c, "Invalid integration mode")
+			return
+		}
 	}
 	req.Name = strings.TrimSpace(req.Name)
 	req.Group = strings.TrimSpace(req.Group)
@@ -49,8 +58,9 @@ func AdminCreatePartnerTenant(c *gin.Context) {
 		return
 	}
 	proofContext, err := json.Marshal(service.PartnerTenantSensitiveWriteContext{
-		Action: "create",
-		Group:  req.Group,
+		Action:          "create",
+		Group:           req.Group,
+		IntegrationMode: mode,
 	})
 	if err != nil {
 		common.ApiError(c, err)
@@ -62,12 +72,12 @@ func AdminCreatePartnerTenant(c *gin.Context) {
 	}) == nil {
 		return
 	}
-	tenant, secret, err := model.CreatePartnerTenant(req.Name, req.Group)
+	tenant, secret, err := model.CreatePartnerTenantWithIntegrationMode(req.Name, req.Group, mode)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	recordPartnerTenantAdminAudit(c, "partner_tenant.create", tenant.Id, []string{"name", "group", "secret"})
+	recordPartnerTenantAdminAudit(c, "partner_tenant.create", tenant.Id, []string{"name", "group", "integration_mode", "secret"})
 	c.Header("Cache-Control", "no-store")
 	c.Header("Pragma", "no-cache")
 	c.JSON(http.StatusOK, gin.H{
@@ -85,6 +95,18 @@ func AdminRotatePartnerTenantSecret(c *gin.Context) {
 	if err != nil || id <= 0 {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
+	}
+	if c.Request.Body != nil {
+		body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, 2048))
+		if err != nil {
+			common.ApiErrorT(c, "Invalid parameters")
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+		if len(bytes.TrimSpace(body)) > 0 && !decodePartnerTenantAdminBody(c, &struct{}{}) {
+			common.ApiErrorT(c, "Invalid parameters")
+			return
+		}
 	}
 	proofContext, err := json.Marshal(service.PartnerTenantSensitiveWriteContext{
 		Action:   "rotate_secret",
@@ -126,7 +148,7 @@ func AdminUpdatePartnerTenantStatus(c *gin.Context) {
 		return
 	}
 	var req updatePartnerTenantStatusRequest
-	if err := c.ShouldBindJSON(&req); err != nil || req.Status == nil || (*req.Status != model.PartnerTenantStatusEnabled && *req.Status != model.PartnerTenantStatusDisabled) {
+	if !decodePartnerTenantAdminBody(c, &req) || req.Status == nil || (*req.Status != model.PartnerTenantStatusEnabled && *req.Status != model.PartnerTenantStatusDisabled) {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
@@ -170,18 +192,13 @@ func PartnerTenantSubscriptionQuota(c *gin.Context) {
 		writePartnerTenantAPIError(c, http.StatusBadRequest, "invalid_request", "external_user_id is invalid")
 		return
 	}
-	account, err := model.GetPartnerTenantAccount(tenant.Id, externalUserID)
+	summaries, err := model.GetPartnerTenantHostedQuota(tenant.Id, tenant.SecretHash, externalUserID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		writePartnerTenantAPIError(c, http.StatusNotFound, "account_not_found", "account not found")
 		return
 	}
 	if err != nil {
-		writePartnerTenantAPIError(c, http.StatusInternalServerError, "server_error", "please try again later")
-		return
-	}
-	summaries, err := model.GetPartnerTenantActiveUserSubscriptions(tenant.Id, account.UserId)
-	if err != nil {
-		writePartnerTenantAPIError(c, http.StatusInternalServerError, "server_error", "please try again later")
+		partnerTenantOrderError(c, err)
 		return
 	}
 	items := make([]partnerTenantSubscriptionQuota, 0, len(summaries))
@@ -267,7 +284,11 @@ func PartnerTenantProvisionAccount(c *gin.Context) {
 		writePartnerTenantAPIError(c, http.StatusBadRequest, "invalid_request", "external_user_id or display_name is invalid")
 		return
 	}
-	account, err := model.ProvisionPartnerTenantAccount(tenant.Id, req.ExternalUserId, req.DisplayName)
+	account, err := model.ProvisionPartnerTenantHostedAccount(tenant.Id, tenant.SecretHash, req.ExternalUserId, req.DisplayName)
+	if errors.Is(err, model.ErrPartnerTenantIntegrationMode) {
+		partnerTenantOrderError(c, err)
+		return
+	}
 	if errors.Is(err, model.ErrPartnerTenantNotFound) {
 		writePartnerTenantAPIError(c, http.StatusUnauthorized, "invalid_partner_secret", "partner authentication failed")
 		return
@@ -296,6 +317,7 @@ func PartnerTenantProvisionAccount(c *gin.Context) {
 }
 
 func writePartnerTenantAPIError(c *gin.Context, status int, code, message string) {
+	model.SetPartnerTenantAuditReason(c, code)
 	requestID := c.GetString(common.RequestIdKey)
 	c.Header("X-Request-Id", requestID)
 	c.Header("Cache-Control", "no-store")
@@ -321,4 +343,17 @@ func recordPartnerTenantAdminAudit(c *gin.Context, action string, tenantID int64
 		Other:     model.AuditOther{Op: &model.AuditOperation{Action: action, Params: params}},
 	})
 	markAuditLogged(c)
+}
+
+// Creation alone permits omission of integration_mode. The shared canonical
+// object decoder rejects explicit null, aliases, duplicates and unknown fields.
+func decodePartnerTenantAdminBody(c *gin.Context, dst any) bool {
+	switch dst.(type) {
+	case *createPartnerTenantRequest:
+		return decodePartnerTenantObjectBody(c, dst, []string{"name", "group"}, []string{"integration_mode"})
+	case *updatePartnerTenantStatusRequest:
+		return decodePartnerTenantObjectBody(c, dst, []string{"status"}, nil)
+	default:
+		return decodePartnerTenantObjectBody(c, dst, nil, nil)
+	}
 }

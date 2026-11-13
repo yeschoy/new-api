@@ -4,3 +4,4 @@
 {"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Do not turn unverified public capability metadata into trusted merchant IDs"}
 {"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Review action/reason/tenant filters and session-authorized admin rendering together"}
 {"file":".trellis/tasks/11-13-partner-access-mode-audit/research/current-boundaries.md","reason":"Audit current recorder ordering, migration gaps, safe attribution and scope"}
+{"file": ".trellis/spec/backend/partner-integration-mode.md", "reason": "Review log attribution against actual mode policy while preserving accepted-payment neutrality"}
