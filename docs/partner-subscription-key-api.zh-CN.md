@@ -2,11 +2,19 @@
 
 本接口供商户使用开发者密钥创建订阅订单，用户付款后领取独立订阅 Key，并以此查询订阅、额度和 Coding API Key。**新购不传 `external_user_id`，只有可信付款成功后的完整交付才新增平台用户；续费复用原用户和凭证。**
 
-- 实现基线：`58616beef`；文档按当前分支实际 controller/model/router 编写。
+- 接入方式更新基线：`181c99e1b` 后的本次实现；文档按当前分支实际 controller/model/router 编写。
 - OpenAPI 3.0.3：[partner-subscription-key.openapi.json](./openapi/partner-subscription-key.openapi.json)，可导入 Apifox、Swagger Editor 等支持 OpenAPI 的工具。
 - 示例地址：`https://platform.example`，使用前替换为实际已部署且配置正确的 HTTPS 平台域名。
 - 成功返回直接业务 JSON，**没有 `{success,data}` 包装**；错误格式见[错误码](#10-错误格式与错误码)。
-- 任务专属 Docker PostgreSQL 15.19 必要定向测试及独立代码审阅已通过；这不表示已部署、完整应用启动、生产迁移或真实支付验收完成。
+- 历史订阅 Key 基线 `58616beef` 的任务专属 Docker PostgreSQL 15.19 定向测试及独立代码审阅已通过；该证据不覆盖本次接入方式变更，本次 Go 构建/测试和 pq 运行验证仍阻塞，也不表示部署、完整应用启动、生产迁移或真实支付验收完成。
+
+## 0. 商户接入方式前提
+
+本接口仅供 `integration_mode=subscription_key` 商户。创建表单默认及后端真正省略字段均为此模式；显式空/null/未知值拒绝。接入方式创建后固定，管理列表展示实际模式，无切换接口；状态更新/密钥轮换不能附带修改。
+
+本模式不能使用 H5 会话或 external_user_id 账户/额度/旧查单辅助接口。H5 商户不能使用订阅 Key 订单/领取/轮换/查询链路；当前合法商户错误入口返回 `403 integration_mode_mismatch`。旧 `POST /api/partner/v1/subscription-orders` 在两模式均拒绝，包括精确重放。共享收银台、可信回调和已接受订单交付保持模式中立，不删除付款或重写身份。
+
+原订阅 Key 基线的 pq 证据不覆盖本次模式变更：当前 Docker daemon 不可用，本次 Go 构建/迁移/运行回归尚未执行；不可据此宣称已部署或数据库验收完成。
 
 ## 1. 接入流程与鉴权
 
@@ -352,6 +360,7 @@ Content-Type: application/json
 | 400 | `unsupported_currency` | 套餐不满足CNY支付，不能自行做汇率换算 |
 | 401 | `invalid_partner_secret` | 商户密钥错误/已换钥/商户停用；核对后端配置 |
 | 401 | `invalid_subscription_key` | sub_错误/旧版本/不匹配用途或续费商户；不降级为新购 |
+| 403 | `integration_mode_mismatch` | 不符合创建时选定的接入方式；不能改传用户 ID 绕过 |
 | 403 | `account_disabled` | 商户或关联账户/User禁用等状态问题；不能补建绕过 |
 | 404 | `plan_not_found` | 当前商户范围内套餐不可用 |
 | 404 | `order_not_found` | 不存在、其他商户或错误接入模式的订单 |
@@ -418,7 +427,7 @@ curl --silent --show-error --request POST "$BASE_URL/api/partner/v1/subscription
 - `sub_` 能读取Coding Key。反向代理、应用日志、分析/错误上报必须禁记 Authorization、X-Subscription-Key及凭证响应。收银台URL带短期capability，同样不能进入分析日志/公共缓存。
 - 配置稳定且跨节点一致的 `SESSION_SECRET` / `CRYPTO_SECRET`。根秘密与存储哈希不一致时查询/领取失败，不自动重签；恢复原配置，或由合法商户显式轮换查询Key。此功能不提供KMS或自动根秘密轮换。
 - 新接口按Tenant锁后当前pt_/sub_和严格数据库时间授权；旧凭证、错组、禁用、损坏关系不能用“重试”绕过。
-- 原 `/api/partner/v1/subscription-orders` 和可选H5仍按其原 `external_user_id` 契约，不要把本文件请求体发送到旧接口。原订单不自动补签sub_，新的内部账户也不能被旧external身份接口认领。
+- H5 仅对明确 hosted_h5 商户开放，仍要求 external_user_id；旧直接 POST subscription-orders 在两模式均拒绝。原订单不自动补签 sub_，新的内部账户也不能被 external 身份辅助接口认领。
 - 没有新增买家登录页面、商户webhook、跨套餐换购、自动退款或Coding Key轮换。匿名不同新购意图分别开户，不能识别同一个买家；旧模式/后台管理员另行改授权益不在本模式隔离保证内。
 - 回滚保留新列/表、所有订单/paid事实和权益；旧二进制不能安全处理新模式已付未交付订单，需关闭新入口并协调恢复，不能直接删除记录。
 - 验证详情：[归档任务 verification.md](../.trellis/tasks/archive/2026-11/11-12-partner-subscription-access-key/verification.md)。必要定向pq通过不代表全量启动、生产迁移、真实网关/付款或部署已验收；未运行无关全量测试。

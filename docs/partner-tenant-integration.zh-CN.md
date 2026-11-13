@@ -1,6 +1,8 @@
 # 野菜 API · 商户接入
 
-商户负责用户登录与套餐展示；野菜 API 负责收银、付款确认和套餐交付。
+管理员创建商户时固定一种接入方式：默认 **订阅 Key API**（`subscription_key`），新购不传用户 ID，详见[订阅 Key API](./partner-subscription-key-api.zh-CN.md)；明确选择 **托管 H5**（`hosted_h5`）后才可使用购买会话。
+
+本文说明 H5 商户的后端身份、查单、Key 和额度辅助接口。不能混用两种购买入口，不能创建后切换。平台负责收银、付款确认和交付；已接受订单/已有付款的交付不因新入口策略而中断。
 
 ## 基本配置
 
@@ -15,7 +17,7 @@
 ## 接入流程
 
 ```text
-查询套餐 → 创建订单 → 用户打开收银台付款 → 查询订单确认交付 → 获取用户 Key → 调用模型
+商户登录 → 后端创建购买会话 → 用户打开 H5 选择套餐 → 进入收银台付款 → 后端查会话/订单 → 获取用户 Key
 ```
 
 首次付款交付会自动开户，不必提前创建账号。
@@ -50,41 +52,19 @@ GET /plans
 - `requests_per_minute` 为每用户套餐 RPM，`0` 不设套餐级限制，系统限制仍有效。
 - 无可用套餐返回 `{"plans":[]}`。
 
-### 2. 创建订单
+### 2. 通过托管 H5 购买
 
 ```http
-POST /subscription-orders
+POST /purchase-sessions
 Idempotency-Key: purchase_20261111_0001
+Content-Type: application/json
+
+{"external_user_id":"customer-1001"}
 ```
 
-```json
-{"external_user_id":"customer-1001","plan_id":42,"payment_method":"alipay"}
-```
+首次 HTTP 201、相同购买意图重放 200，同键换用户 409。商户后端保存会话、用户归属和固定幂等键，再将响应中的敏感 `purchase_url` 交给对应用户。用户在平台 H5 选购，由会话能力下单并进入收银台；不要把 `pt_` 放进浏览器。
 
-三个字段均必填：用户 ID、套餐 ID、平台已启用的支付方式。**不提交金额或“已付款”标记。**
-
-首次 HTTP 201，原请求重试 HTTP 200：
-
-```json
-{
-  "order_no": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV",
-  "external_user_id": "customer-1001",
-  "plan_id": 42,
-  "plan_title": "标准月套餐",
-  "amount": "99.00",
-  "currency": "CNY",
-  "payment_method": "alipay",
-  "payment_status": "pending",
-  "fulfillment_status": "not_ready",
-  "created_at": 1800000000,
-  "expires_at": 1800001800,
-  "checkout_url": "https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_<订单令牌>"
-}
-```
-
-**重试规则**：幂等键为 16–64 位字母、数字、`-`、`_`。每笔购买保存一个固定键；超时或失败后使用**原参数、原键**重试。同键改参数返回 409，不要盲目换键重复下单。
-
-用户点击后，新窗口打开返回的 `checkout_url`（建议 `rel="noopener noreferrer"`），无需登录野菜账号。不保证支持 iframe；链接含敏感订单令牌，不改写、不记录日志或埋点。初始有效期 30 分钟，重试不延长；过期后通过商户后端查单，不能据此认定渠道已关单。
+完整期限、兑换、一次下单和原单恢复协议见[托管 H5 指南](./partner-hosted-h5.zh-CN.md)。**旧 `POST /subscription-orders` 在两种模式均拒绝（403 `integration_mode_mismatch`），包括原订单精确重放；不是 H5 的备用下单入口。** 有已接受订单时仍可查单、访问未过期原收银台能力，可信付款仍可履约。
 
 ### 3. 查询订单
 
@@ -92,7 +72,7 @@ Idempotency-Key: purchase_20261111_0001
 GET /subscription-orders/{order_no}
 ```
 
-返回与创建订单相同的业务字段，但不含 `checkout_url`、付款链接或用户 Key；交付后可有 `subscription_id`。商户后端须核对返回的 `external_user_id` 属于当前登录用户。
+返回原订单的金额、付款/交付状态、期限等业务字段，但不含 `checkout_url`、付款链接或用户 Key；交付后可有 `subscription_id`。商户后端须核对返回的 `external_user_id` 属于当前登录用户。
 
 | 字段 | 值 | 含义 |
 | --- | --- | --- |
@@ -181,6 +161,7 @@ Content-Type: application/json
 | --- | --- | --- |
 | 400 | `invalid_request` / `unsupported_currency` | 检查参数；非 CNY 套餐联系平台重新定价 |
 | 401 | `invalid_partner_secret` | 检查密钥或联系平台 |
+| 403 | `integration_mode_mismatch` | 使用创建时选定的接入方式；旧直接下单不可用 |
 | 403 / 409 | `account_disabled` / `credential_unavailable` | 账号或 Key 不可用，联系平台 |
 | 404 | `account_not_found` / `plan_not_found` / `order_not_found` | 资源不存在或不属于本商户 |
 | 409 | `idempotency_conflict` / `purchase_limit_reached` | 恢复原购买参数，或核查购买上限 |
@@ -191,4 +172,4 @@ Content-Type: application/json
 
 ---
 
-[运行接入 Demo](../examples/partner-tenant-demo/README.md) · [详细接口与边界说明](./partner-tenant-api.md)
+旧直接下单 Demo 仅供历史本地 mock 参考，不适用于本版真实购买。 · [详细接口与边界说明](./partner-tenant-api.md)

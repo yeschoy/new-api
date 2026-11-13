@@ -3,12 +3,16 @@ package model
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"regexp"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // PartnerOauthAuthorizationLog contains only allowlisted metadata, never OAuth
@@ -16,22 +20,29 @@ import (
 // The spelling Oauth preserves GORM's prefixed partner_oauth_authorization_logs
 // naming without a hardcoded TableName override.
 type PartnerOauthAuthorizationLog struct {
-	EventId      string `json:"event_id" gorm:"type:varchar(64);primaryKey"`
-	CreatedAt    int64  `json:"created_at" gorm:"type:bigint;index"`
-	Action       string `json:"action" gorm:"type:varchar(64);index"`
-	Success      bool   `json:"success"`
-	Reason       string `json:"reason" gorm:"type:varchar(32)"`
-	ActorUserId  int    `json:"actor_user_id"`
-	TargetUserId int    `json:"target_user_id" gorm:"index"`
-	ClientId     string `json:"client_id" gorm:"type:varchar(64);index"`
-	BindingId    string `json:"binding_id" gorm:"type:varchar(64)"`
-	RequestId    string `json:"request_id" gorm:"type:varchar(64)"`
-	Ip           string `json:"ip" gorm:"type:varchar(64)"`
-	Route        string `json:"route" gorm:"type:varchar(128)"`
-	Status       int    `json:"status"`
+	EventId         string `json:"event_id" gorm:"type:varchar(64);primaryKey"`
+	CreatedAt       int64  `json:"created_at" gorm:"type:bigint;index"`
+	Action          string `json:"action" gorm:"type:varchar(64);index"`
+	Success         bool   `json:"success"`
+	Reason          string `json:"reason" gorm:"type:varchar(32)"`
+	ActorUserId     int    `json:"actor_user_id"`
+	TargetUserId    int    `json:"target_user_id" gorm:"index"`
+	ClientId        string `json:"client_id" gorm:"type:varchar(64);index"`
+	BindingId       string `json:"binding_id" gorm:"type:varchar(64)"`
+	RequestId       string `json:"request_id" gorm:"type:varchar(64)"`
+	Ip              string `json:"ip" gorm:"type:varchar(64)"`
+	Route           string `json:"route" gorm:"type:varchar(128)"`
+	Status          int    `json:"status"`
+	TenantId        int64  `json:"-" gorm:"type:bigint;not null;default:0;index:idx_pt_auth_tenant"`
+	OrderNo         string `json:"order_no" gorm:"type:varchar(35);not null;default:''"`
+	SubscriptionId  int64  `json:"-" gorm:"type:bigint;not null;default:0"`
+	IntegrationMode string `json:"integration_mode" gorm:"type:varchar(24);not null;default:''"`
+	KeyVersion      int64  `json:"-" gorm:"type:bigint;not null;default:0"`
+	Replayed        bool   `json:"replayed" gorm:"not null;default:false"`
 }
 
 type PartnerOauthAuthorizationLogFilter struct {
+	TenantId     int64
 	Action       string
 	Success      *bool
 	ClientId     string
@@ -40,13 +51,14 @@ type PartnerOauthAuthorizationLogFilter struct {
 	End          int64
 }
 
-// 13 columns per row keeps a batch far below every dialect's bind-parameter limit.
+// 19 columns per row keeps a batch far below every dialect's bind-parameter limit.
 const partnerOAuthLogBatchSize = 500
 
 var (
-	partnerOAuthLogClientID  = regexp.MustCompile(`^pc_[0-9a-f]{32}$`)
-	partnerOAuthLogBindingID = regexp.MustCompile(`^bnd_[0-9a-f]{32}$`)
-	partnerOAuthLogRequestID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+	partnerTenantAuditOrderNo = regexp.MustCompile(`^PTO[a-zA-Z0-9]{32}$`)
+	partnerOAuthLogClientID   = regexp.MustCompile(`^pc_[0-9a-f]{32}$`)
+	partnerOAuthLogBindingID  = regexp.MustCompile(`^bnd_[0-9a-f]{32}$`)
+	partnerOAuthLogRequestID  = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 )
 
 func ValidPartnerOAuthLogClientID(id string) bool {
@@ -59,7 +71,7 @@ func ValidPartnerOAuthLogBindingID(id string) bool {
 
 func ValidPartnerOAuthLogAction(action string) bool {
 	switch action {
-	case "partner_oauth.consent.approve", "partner_oauth.consent.deny",
+	case PartnerTenantAuditDenied, PartnerTenantAuditIssue, PartnerTenantAuditClaim, PartnerTenantAuditRotate, PartnerTenantAuditRead, "partner_oauth.consent.approve", "partner_oauth.consent.deny",
 		"partner_oauth.token.issue", "partner_oauth.code.replay_detected",
 		"partner_oauth.refresh.reuse_detected", "partner_oauth.binding.revoke",
 		"partner_oauth.binding.admin_revoke", "partner_oauth.binding.client_delete",
@@ -118,10 +130,11 @@ func RecordPartnerOAuthAuthorizationLogs(c *gin.Context, entries []PartnerOauthA
 		if entry.CreatedAt == 0 {
 			entry.CreatedAt = common.GetTimestamp()
 		}
-		if !ValidPartnerOAuthLogAction(entry.Action) || !ValidPartnerOAuthLogReason(entry.Reason) ||
+		if !ValidPartnerOAuthLogAction(entry.Action) || !validPartnerTenantAuditMetadata(entry) ||
+			(!strings.HasPrefix(entry.Action, "partner_tenant.") && !ValidPartnerOAuthLogReason(entry.Reason)) ||
 			(entry.ClientId != "" && !ValidPartnerOAuthLogClientID(entry.ClientId)) ||
 			(entry.BindingId != "" && !ValidPartnerOAuthLogBindingID(entry.BindingId)) ||
-			entry.ActorUserId < 0 || entry.TargetUserId < 0 || entry.Status < 100 || entry.Status > 599 ||
+			entry.ActorUserId < 0 || entry.TargetUserId < 0 || (entry.Status < 100 && !(entry.Status == 0 && c == nil && entry.Action == PartnerTenantAuditIssue)) || entry.Status > 599 ||
 			len(entry.Ip) > 64 || len(entry.Route) > 128 ||
 			(c != nil && entry.Route == "") {
 			logger.LogError(ctx, common.LogText("partner oauth authorization log rejected (request_id=%s): invalid metadata", requestID))
@@ -138,9 +151,9 @@ func RecordPartnerOAuthAuthorizationLogs(c *gin.Context, entries []PartnerOauthA
 	}
 	var err error
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
-		err = LOG_DB.Table("partner_oauth_authorization_logs").CreateInBatches(&valid, partnerOAuthLogBatchSize).Error
+		err = LOG_DB.Session(&gorm.Session{Logger: gormlogger.Default.LogMode(gormlogger.Silent)}).Table("partner_oauth_authorization_logs").CreateInBatches(&valid, partnerOAuthLogBatchSize).Error
 	} else {
-		err = LOG_DB.CreateInBatches(&valid, partnerOAuthLogBatchSize).Error
+		err = LOG_DB.Session(&gorm.Session{Logger: gormlogger.Default.LogMode(gormlogger.Silent)}).CreateInBatches(&valid, partnerOAuthLogBatchSize).Error
 	}
 	if err != nil {
 		logger.LogError(ctx, common.LogText("partner oauth authorization log write failed (request_id=%s): database error", requestID))
@@ -151,7 +164,10 @@ func GetPartnerOAuthAuthorizationLogs(filter PartnerOauthAuthorizationLogFilter,
 	if LOG_DB == nil {
 		return nil, 0, errors.New("log database unavailable")
 	}
-	query := LOG_DB.Model(&PartnerOauthAuthorizationLog{})
+	query := LOG_DB.Session(&gorm.Session{Logger: gormlogger.Default.LogMode(gormlogger.Silent)}).Model(&PartnerOauthAuthorizationLog{})
+	if filter.TenantId > 0 {
+		query = query.Where("tenant_id = ?", filter.TenantId)
+	}
 	if filter.Action != "" {
 		query = query.Where("action = ?", filter.Action)
 	}
@@ -183,11 +199,33 @@ func MigratePartnerOAuthAuthorizationLogs() error {
 	if !common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		return LOG_DB.AutoMigrate(&PartnerOauthAuthorizationLog{})
 	}
-	return LOG_DB.Exec(`CREATE TABLE IF NOT EXISTS partner_oauth_authorization_logs (
+	if err := LOG_DB.Exec(`CREATE TABLE IF NOT EXISTS partner_oauth_authorization_logs (
 		event_id String, created_at Int64, action String, success UInt8, reason String,
 		actor_user_id Int64, target_user_id Int64, client_id String, binding_id String,
-		request_id String, ip String, route String, status Int32
+		request_id String, ip String, route String, status Int32,
+ tenant_id Int64 DEFAULT 0, order_no String DEFAULT '', subscription_id Int64 DEFAULT 0, integration_mode String DEFAULT '', key_version Int64 DEFAULT 0, replayed UInt8 DEFAULT 0
 	) ENGINE = MergeTree()
 	PARTITION BY toYYYYMM(toDateTime(created_at))
-	ORDER BY (created_at, event_id)`).Error
+	ORDER BY (created_at, event_id)`).Error; err != nil {
+		return err
+	}
+	for _, statement := range partnerTenantAuthorizationClickHouseUpgradeStatements() {
+		if err := LOG_DB.Exec(statement).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ADD is required even when CREATE found an existing MergeTree table.
+func partnerTenantAuthorizationClickHouseColumns() []string {
+	return []string{"tenant_id Int64 DEFAULT 0", "order_no String DEFAULT ''", "subscription_id Int64 DEFAULT 0", "integration_mode String DEFAULT ''", "key_version Int64 DEFAULT 0", "replayed UInt8 DEFAULT 0"}
+}
+
+func partnerTenantAuthorizationClickHouseUpgradeStatements() []string {
+	statements := make([]string, 0, 6)
+	for _, column := range partnerTenantAuthorizationClickHouseColumns() {
+		statements = append(statements, fmt.Sprintf("ALTER TABLE partner_oauth_authorization_logs ADD COLUMN IF NOT EXISTS %s", column))
+	}
+	return statements
 }

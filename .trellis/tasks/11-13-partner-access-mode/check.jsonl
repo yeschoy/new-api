@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify actual startup helper, pq fresh/upgrade/repeat and H5 preservation"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Reject purchase bypass without blocking durable paid recovery"}
+{"file":".trellis/spec/backend/partner-subscription-key.md","reason":"Review admitted/denied API operations and unchanged paid-only identities/renewal"}
+{"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Review H5 public and mutation-time authorization, nonce and time limits"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Proof mode, stored mode, route policy and UI agree; no mode-switch bypass"}
+{"file":".trellis/tasks/11-13-partner-access-mode-audit/research/current-boundaries.md","reason":"Check current group uniqueness without claiming unreproduced deployed defect fixed"}

@@ -38,7 +38,7 @@ func CreatePartnerTenantSubscriptionKeyOrder(in PartnerTenantSubscriptionKeyOrde
 	var order PartnerTenantSubscriptionOrder
 	created := false
 	err = partnerTenantSecretDB(DB).Transaction(func(tx *gorm.DB) error {
-		tenant, err := lockPartnerTenantCurrentSecret(tx, in.TenantId, in.TenantSecretHash)
+		tenant, err := lockPartnerTenantAdmission(tx, in.TenantId, in.TenantSecretHash, PartnerTenantOperationSubscriptionKey)
 		if err != nil {
 			return err
 		}
@@ -153,7 +153,7 @@ func CreatePartnerTenantSubscriptionKeyOrder(in PartnerTenantSubscriptionKeyOrde
 func GetPartnerTenantSubscriptionKeyOrder(tenantID int64, secretHash, orderNo string) (*PartnerTenantSubscriptionOrder, error) {
 	var order PartnerTenantSubscriptionOrder
 	err := partnerTenantSecretDB(DB).Transaction(func(tx *gorm.DB) error {
-		if _, err := lockPartnerTenantCurrentSecret(tx, tenantID, secretHash); err != nil {
+		if _, err := lockPartnerTenantAdmission(tx, tenantID, secretHash, PartnerTenantOperationSubscriptionKey); err != nil {
 			return err
 		}
 		if err := lockForUpdate(tx).Where("tenant_id = ? AND entry_mode = ? AND order_no = ?", tenantID, PartnerTenantIdentitySubscriptionKey, orderNo).First(&order).Error; err != nil {
@@ -171,7 +171,7 @@ func GetPartnerTenantSubscriptionKeyOrder(tenantID int64, secretHash, orderNo st
 }
 
 // Caller holds Tenant -> Order. Verified payment was committed separately.
-func fulfillPartnerTenantSubscriptionKeyOrderTx(tx *gorm.DB, tenant *PartnerTenant, order *PartnerTenantSubscriptionOrder) (int, error) {
+func fulfillPartnerTenantSubscriptionKeyOrderTx(tx *gorm.DB, tenant *PartnerTenant, order *PartnerTenantSubscriptionOrder, audit *PartnerTenantAuditReceipt) (int, error) {
 	tx = partnerTenantSecretDB(tx)
 	if order.PaymentStatus != "paid" || order.ExternalUserId != "" {
 		return 0, ErrPartnerTenantPaymentEvidence
@@ -243,6 +243,13 @@ func fulfillPartnerTenantSubscriptionKeyOrderTx(tx *gorm.DB, tenant *PartnerTena
 		}
 		if err := tx.Create(k).Error; err != nil {
 			return 0, err
+		}
+		if audit != nil {
+			*audit = PartnerTenantAuditPrincipal(tenant)
+			audit.OrderNo = order.OrderNo
+			audit.SubscriptionId = int64(subscription.Id)
+			audit.TargetUserId = account.UserId
+			audit.KeyVersion = k.KeyVersion
 		}
 	}
 	now, err := getDBTimestampOnStrict(tx)

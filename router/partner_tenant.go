@@ -3,37 +3,39 @@ package router
 import (
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 )
 
 func SetPartnerTenantRouter(router *gin.Engine) {
 	partner := router.Group("/api/partner/v1")
 	partner.Use(
-		controller.PartnerTenantSubscriptionKeyRequestPolicy(),
 		middleware.RouteTag("api"),
 		middleware.PartnerOAuthRequestID(),
 		middleware.PartnerOAuthNoStore(),
+		middleware.PartnerTenantAuthorizationAudit(),
+		controller.PartnerTenantSubscriptionKeyRequestPolicy(),
 		middleware.PartnerOAuthRateLimit("PT-INT", 3000, 60, "integration"),
 		middleware.PartnerTenantBearer(),
 	)
 	{
-		partner.POST("/subscription-key-orders", controller.PartnerTenantCreateSubscriptionKeyOrder)
-		partner.GET("/subscription-key-orders/:order_no", controller.PartnerTenantGetSubscriptionKeyOrder)
-		partner.GET("/subscription-key-orders/:order_no/subscription-key", controller.PartnerTenantClaimSubscriptionKey)
-		partner.POST("/subscriptions/:subscription_id/key/rotate", controller.PartnerTenantRotateSubscriptionKey)
-		partner.GET("/plans", controller.PartnerTenantListPlans)
-		partner.POST("/purchase-sessions", controller.PartnerTenantCreatePurchaseSession)
-		partner.GET("/purchase-sessions/:session_id", controller.PartnerTenantGetPurchaseSession)
-		partner.PUT("/accounts", controller.PartnerTenantProvisionAccount)
-		partner.POST("/subscription-orders", controller.PartnerTenantCreateSubscriptionOrder)
-		partner.GET("/subscription-orders/:order_no", controller.PartnerTenantGetSubscriptionOrder)
-		partner.GET("/accounts/:external_user_id/subscription/quota", controller.PartnerTenantSubscriptionQuota)
+		partner.POST("/subscription-key-orders", middleware.PartnerTenantAdmission(model.PartnerTenantOperationSubscriptionKey), controller.PartnerTenantCreateSubscriptionKeyOrder)
+		partner.GET("/subscription-key-orders/:order_no", middleware.PartnerTenantAdmission(model.PartnerTenantOperationSubscriptionKey), controller.PartnerTenantGetSubscriptionKeyOrder)
+		partner.GET("/subscription-key-orders/:order_no/subscription-key", middleware.PartnerTenantAdmission(model.PartnerTenantOperationSubscriptionKey), controller.PartnerTenantClaimSubscriptionKey)
+		partner.POST("/subscriptions/:subscription_id/key/rotate", middleware.PartnerTenantAdmission(model.PartnerTenantOperationSubscriptionKey), controller.PartnerTenantRotateSubscriptionKey)
+		partner.GET("/plans", middleware.PartnerTenantAdmission(model.PartnerTenantOperationCatalog), controller.PartnerTenantListPlans)
+		partner.POST("/purchase-sessions", middleware.PartnerTenantAdmission(model.PartnerTenantOperationHostedH5), controller.PartnerTenantCreatePurchaseSession)
+		partner.GET("/purchase-sessions/:session_id", middleware.PartnerTenantAdmission(model.PartnerTenantOperationHostedH5), controller.PartnerTenantGetPurchaseSession)
+		partner.PUT("/accounts", middleware.PartnerTenantAdmission(model.PartnerTenantOperationHostedH5), controller.PartnerTenantProvisionAccount)
+		partner.POST("/subscription-orders", middleware.PartnerTenantAdmission(model.PartnerTenantOperationDirectOrder), controller.PartnerTenantCreateSubscriptionOrder)
+		partner.GET("/subscription-orders/:order_no", middleware.PartnerTenantAdmission(model.PartnerTenantOperationHostedH5), controller.PartnerTenantGetSubscriptionOrder)
+		partner.GET("/accounts/:external_user_id/subscription/quota", middleware.PartnerTenantAdmission(model.PartnerTenantOperationHostedH5), controller.PartnerTenantSubscriptionQuota)
 	}
 	independent := router.Group("/api/partner/subscription")
-	independent.Use(controller.PartnerTenantSubscriptionKeyRequestPolicy(), middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), middleware.PartnerOAuthRateLimit("PT-SUBSCRIPTION", 120, 60, "integration"))
+	independent.Use(middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), middleware.PartnerTenantAuthorizationAudit(), controller.PartnerTenantSubscriptionKeyRequestPolicy(), middleware.PartnerOAuthRateLimit("PT-SUBSCRIPTION", 120, 60, "integration"))
 	independent.GET("", controller.PartnerTenantIndependentSubscription)
 	purchase := router.Group("/api/partner/purchase-sessions")
-	purchase.Use(middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), func(c *gin.Context) {
+	purchase.Use(middleware.RouteTag("api"), middleware.PartnerOAuthRequestID(), middleware.PartnerOAuthNoStore(), middleware.PartnerTenantAuthorizationAudit(), controller.PartnerTenantSubscriptionKeyRequestPolicy(), func(c *gin.Context) {
 		c.Header("Referrer-Policy", "no-referrer")
 		c.Next()
 	}, middleware.PartnerOAuthRateLimit("PT-PURCHASE", 120, 60, "integration"))

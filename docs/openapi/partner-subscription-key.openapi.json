@@ -3,7 +3,7 @@
   "info": {
     "title": "商户订阅 Key API",
     "version": "1.0.0",
-    "description": "对应实现 58616beef。商户 pt_ 无买家 ID 下单，返回平台付款 URL；首次可信付款后的完整交付才开户。续费在相同 POST 用 X-Subscription-Key 指定原订阅。买家独立查询只需 sub_，不需商户密钥或 Cookie。成功直接返回业务 JSON，无 success/data 包装。此文件不是生产部署或真实支付验收证明；请将示例服务器替换为实际已部署的 HTTPS 地址。不要导入真实秘密或默认执行付款请求。"
+    "description": "仅供创建时选定且固定为 subscription_key 的商户；hosted_h5 错误入口返回403 integration_mode_mismatch。旧直接 POST subscription-orders 两模式均拒绝；本次模式变更 pq/runtime 尚未验证。商户 pt_ 无买家 ID 下单，返回平台付款 URL；首次可信付款后的完整交付才开户。续费在相同 POST 用 X-Subscription-Key 指定原订阅。买家独立查询只需 sub_，不需商户密钥或 Cookie。成功直接返回业务 JSON，无 success/data 包装。此文件不是生产部署或真实支付验收证明；请将示例服务器替换为实际已部署的 HTTPS 地址。不要导入真实秘密或默认执行付款请求。"
   },
   "servers": [
     {"url": "https://platform.example", "description": "占位地址，替换为实际已部署的 HTTPS 平台域名"}
@@ -28,6 +28,7 @@
           },
           "400": {"$ref": "#/components/responses/IntegrationError"},
           "401": {"$ref": "#/components/responses/IntegrationError"},
+          "403": {"$ref": "#/components/responses/IntegrationError"},
           "429": {"$ref": "#/components/responses/IntegrationError"},
           "500": {"$ref": "#/components/responses/IntegrationError"}
         }
@@ -78,6 +79,7 @@
           },
           "400": {"$ref": "#/components/responses/IntegrationError"},
           "401": {"$ref": "#/components/responses/IntegrationError"},
+          "403": {"$ref": "#/components/responses/IntegrationError"},
           "404": {"$ref": "#/components/responses/IntegrationError"},
           "429": {"$ref": "#/components/responses/IntegrationError"},
           "500": {"$ref": "#/components/responses/IntegrationError"}
@@ -188,7 +190,7 @@
         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreatedOrderResponse"}, "example": {"order_no": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV", "plan_id": 42, "plan_title": "Monthly plan", "amount": "9.99", "currency": "CNY", "payment_method": "alipay", "payment_status": "pending", "fulfillment_status": "not_ready", "created_at": 1800000000, "expires_at": 1800001800, "checkout_url": "https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_REPLACE_WITH_ORDER_CAPABILITY"}}}
       },
       "IntegrationError": {
-        "description": "统一错误结构，依据HTTP状态和error.code处理。可能代码：400 invalid_request/unsupported_currency；401 invalid_partner_secret/invalid_subscription_key；403 account_disabled；404 plan_not_found/order_not_found/subscription_not_found/subscription_key_not_found；409 subscription_key_not_ready/credential_unavailable/idempotency_conflict/subscription_key_changed；429 rate_limited；503 payment_unavailable/subscription_key_unavailable；500 server_error。各接口只返回其适用代码，message不作为稳定枚举。",
+        "description": "统一错误结构，依据HTTP状态和error.code处理。可能代码：400 invalid_request/unsupported_currency；401 invalid_partner_secret/invalid_subscription_key；403 account_disabled/integration_mode_mismatch；404 plan_not_found/order_not_found/subscription_not_found/subscription_key_not_found；409 subscription_key_not_ready/credential_unavailable/idempotency_conflict/subscription_key_changed；429 rate_limited；503 payment_unavailable/subscription_key_unavailable；500 server_error。各接口只返回其适用代码，message不作为稳定枚举。",
         "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}, "Retry-After": {"$ref": "#/components/headers/RetryAfter"}},
         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/APIError"}}}
       }

@@ -116,7 +116,7 @@ func findPartnerTenantSubscriptionKey(key string) (*PartnerTenantSubscriptionAcc
 		return nil, ErrPartnerTenantSubscriptionKeyInvalid
 	}
 	var k PartnerTenantSubscriptionAccessKey
-	if err := DB.Where("secret_hash = ?", partnerTenantHash(key)).First(&k).Error; err != nil {
+	if err := partnerTenantSecretDB(DB).Where("secret_hash = ?", partnerTenantHash(key)).First(&k).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPartnerTenantSubscriptionKeyInvalid
 		}
@@ -139,6 +139,7 @@ func lockPartnerTenantCurrentSecret(tx *gorm.DB, tenantID int64, secretHash stri
 }
 
 type partnerTenantSubscriptionBinding struct {
+	orderNo      string
 	account      PartnerTenantAccount
 	token        *Token
 	subscription UserSubscription
@@ -193,6 +194,7 @@ func lockPartnerTenantSubscriptionBindingTx(tx *gorm.DB, tenant *PartnerTenant, 
 	if anchor.EntryMode != PartnerTenantIdentitySubscriptionKey || anchor.ExternalUserId != "" || anchor.PlanId != s.PlanId || anchor.TenantId != tenant.Id || anchor.AccountId != a.Id || anchor.SubscriptionId != s.Id || anchor.RenewalSubscriptionId != 0 || anchor.PaymentStatus != "paid" || anchor.FulfillmentStatus != "fulfilled" || a.ExternalUserIdHash != partnerTenantHash("partner-tenant-subscription-account:v1\x00"+anchor.OrderNo) {
 		return nil, ErrPartnerTenantSubscriptionKeyNotFound
 	}
+	b.orderNo = anchor.OrderNo
 	if bearer != "" && !hmac.Equal([]byte(partnerTenantHash(bearer)), []byte(k.SecretHash)) {
 		return nil, ErrPartnerTenantSubscriptionKeyInvalid
 	}
@@ -243,9 +245,23 @@ func partnerTenantSubscriptionKeyResult(b *partnerTenantSubscriptionBinding) (*P
 }
 
 func ClaimPartnerTenantSubscriptionKey(tenantID int64, secretHash, orderNo string) (*PartnerTenantSubscriptionKeyResult, error) {
+	return ClaimPartnerTenantSubscriptionKeyWithAudit(tenantID, secretHash, orderNo, nil)
+}
+
+// WithAudit captures only already verified, lock-held metadata; never re-queries a bearer.
+func ClaimPartnerTenantSubscriptionKeyWithAudit(tenantID int64, secretHash, orderNo string, audit *PartnerTenantAuditReceipt) (*PartnerTenantSubscriptionKeyResult, error) {
+	if audit != nil {
+		*audit = PartnerTenantAuditReceipt{}
+	}
 	var result *PartnerTenantSubscriptionKeyResult
 	err := partnerTenantSecretDB(DB).Transaction(func(tx *gorm.DB) error {
 		t, err := lockPartnerTenantCurrentSecret(tx, tenantID, secretHash)
+		if err == nil {
+			if audit != nil {
+				*audit = PartnerTenantAuditPrincipal(t)
+			}
+			err = RequirePartnerTenantIntegrationMode(t, PartnerTenantOperationSubscriptionKey)
+		}
 		if err != nil {
 			return err
 		}
@@ -259,12 +275,19 @@ func ClaimPartnerTenantSubscriptionKey(tenantID int64, secretHash, orderNo strin
 		if o.OrderNo != orderNo {
 			return ErrPartnerTenantOrderNotFound
 		}
+		if audit != nil {
+			audit.OrderNo = o.OrderNo
+		}
 		if o.PaymentStatus != "paid" || o.FulfillmentStatus != "fulfilled" {
 			return ErrPartnerTenantSubscriptionKeyNotReady
 		}
 		b, err := lockPartnerTenantSubscriptionBindingTx(tx, t, o.AccountId, o.SubscriptionId, "", false, nil)
 		if err != nil {
 			return err
+		}
+		if audit != nil {
+			*audit = partnerTenantBindingReceipt(t, b)
+			audit.OrderNo = o.OrderNo
 		}
 		result, err = partnerTenantSubscriptionKeyResult(b)
 		if err == nil {
@@ -276,12 +299,26 @@ func ClaimPartnerTenantSubscriptionKey(tenantID int64, secretHash, orderNo strin
 }
 
 func RotatePartnerTenantSubscriptionKey(tenantID int64, secretHash string, subscriptionID int, expectedVersion int64, idempotencyHash string) (*PartnerTenantSubscriptionKeyResult, error) {
+	return RotatePartnerTenantSubscriptionKeyWithAudit(tenantID, secretHash, subscriptionID, expectedVersion, idempotencyHash, nil)
+}
+
+// WithAudit captures only already verified, lock-held metadata; never re-queries a bearer.
+func RotatePartnerTenantSubscriptionKeyWithAudit(tenantID int64, secretHash string, subscriptionID int, expectedVersion int64, idempotencyHash string, audit *PartnerTenantAuditReceipt) (*PartnerTenantSubscriptionKeyResult, error) {
+	if audit != nil {
+		*audit = PartnerTenantAuditReceipt{}
+	}
 	if expectedVersion < 1 || subscriptionID < 1 || !validPartnerTenantPurchaseHex(idempotencyHash) {
 		return nil, ErrPartnerTenantSubscriptionKeyChanged
 	}
 	var result *PartnerTenantSubscriptionKeyResult
 	err := partnerTenantSecretDB(DB).Transaction(func(tx *gorm.DB) error {
 		t, err := lockPartnerTenantCurrentSecret(tx, tenantID, secretHash)
+		if err == nil {
+			if audit != nil {
+				*audit = PartnerTenantAuditPrincipal(t)
+			}
+			err = RequirePartnerTenantIntegrationMode(t, PartnerTenantOperationSubscriptionKey)
+		}
 		if err != nil {
 			return err
 		}
@@ -295,6 +332,9 @@ func RotatePartnerTenantSubscriptionKey(tenantID int64, secretHash string, subsc
 		b, err := lockPartnerTenantSubscriptionBindingTx(tx, t, locator.AccountId, subscriptionID, "", true, nil)
 		if err != nil {
 			return err
+		}
+		if audit != nil {
+			*audit = partnerTenantBindingReceipt(t, b)
 		}
 		hash := partnerTenantHash("partner-tenant-subscription-rotation:v1\x00" + idempotencyHash)
 		request := partnerTenantHash(fmt.Sprintf("%d\x00%d", subscriptionID, expectedVersion))
@@ -318,6 +358,10 @@ func RotatePartnerTenantSubscriptionKey(tenantID int64, secretHash string, subsc
 				return ErrPartnerTenantSubscriptionKeyChanged
 			}
 			result, err = partnerTenantSubscriptionKeyResult(b)
+			if err == nil && audit != nil {
+				audit.KeyVersion = b.key.KeyVersion
+				audit.Replayed = true
+			}
 			return err
 		}
 		if b.key.KeyVersion != expectedVersion || expectedVersion == math.MaxInt64 {
@@ -336,8 +380,15 @@ func RotatePartnerTenantSubscriptionKey(tenantID int64, secretHash string, subsc
 			return err
 		}
 		result, err = partnerTenantSubscriptionKeyResult(b)
+		if err == nil && audit != nil {
+			audit.KeyVersion = b.key.KeyVersion
+		}
 		return err
 	})
+	if err != nil && audit != nil {
+		audit.Replayed = false
+		audit.KeyVersion = 0
+	}
 	return result, err
 }
 
@@ -364,6 +415,14 @@ type PartnerTenantIndependentSubscription struct {
 }
 
 func QueryPartnerTenantSubscription(key string) (*PartnerTenantIndependentSubscription, error) {
+	return QueryPartnerTenantSubscriptionWithAudit(key, nil)
+}
+
+// WithAudit captures only already verified, lock-held metadata; never re-queries a bearer.
+func QueryPartnerTenantSubscriptionWithAudit(key string, audit *PartnerTenantAuditReceipt) (*PartnerTenantIndependentSubscription, error) {
+	if audit != nil {
+		*audit = PartnerTenantAuditReceipt{}
+	}
 	locator, err := findPartnerTenantSubscriptionKey(key)
 	if err != nil {
 		return nil, err
@@ -379,6 +438,12 @@ func QueryPartnerTenantSubscription(key string) (*PartnerTenantIndependentSubscr
 		}
 		b, err := lockPartnerTenantSubscriptionBindingTx(tx, &t, locator.AccountId, locator.UserSubscriptionId, key, false, nil)
 		if err != nil {
+			return err
+		}
+		if audit != nil {
+			*audit = partnerTenantBindingReceipt(&t, b)
+		}
+		if err := RequirePartnerTenantIntegrationMode(&t, PartnerTenantOperationSubscriptionKey); err != nil {
 			return err
 		}
 		s := &b.subscription

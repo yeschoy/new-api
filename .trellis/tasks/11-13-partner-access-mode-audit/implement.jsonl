@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"PostgreSQL-first additive migration and truthful runtime evidence"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Preserve mode-neutral payment truth, cashier and accepted-order recovery"}
+{"file":".trellis/spec/backend/partner-subscription-key.md","reason":"Buyer-ID-free identities, current locked credentials and paid-only delivery"}
+{"file":".trellis/spec/backend/partner-hosted-h5.md","reason":"Existing H5 external identity/session safety; approved admission policy supersedes free mixing"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Mode/proof/API/event/UI contract ownership and end-to-end integration"}
+{"file":".trellis/tasks/11-13-partner-access-mode-audit/research/current-boundaries.md","reason":"Actual route/log/group-source evidence and scope constraints"}
