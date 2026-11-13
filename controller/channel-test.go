@@ -37,12 +37,13 @@ import (
 )
 
 type testResult struct {
-	context      *gin.Context
-	localErr     error
-	newAPIError  *types.NewAPIError
-	text         string
-	iqStage      string
-	iqHTTPStatus int
+	context       *gin.Context
+	localErr      error
+	newAPIError   *types.NewAPIError
+	text          string
+	iqStage       string
+	iqHTTPStatus  int
+	iqDiagnostics service.IQResponseDiagnostics
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) string {

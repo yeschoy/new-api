@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -48,6 +49,8 @@ func TestIQResponseDiagnosticsNeverReadProviderErrorBodies(t *testing.T) {
 			require.Equal(t, status, result.iqHTTPStatus)
 			require.Equal(t, "response", result.iqStage)
 			require.Zero(t, body.reads)
+			require.Zero(t, result.iqDiagnostics.ResponseBytes)
+			require.Equal(t, "not_parsed", result.iqDiagnostics.EndReason())
 			require.True(t, body.closed)
 			require.NotContains(t, result.localErr.Error(), "secret")
 		})
@@ -60,6 +63,88 @@ func TestIQResponseDiagnosticsNeverReadProviderErrorBodies(t *testing.T) {
 	_, code, message := classifyIQFailure(context.Background(), result)
 	require.Equal(t, "response_read_failed", code)
 	require.NotContains(t, message, "secret")
+}
+
+func TestIQResponseDiagnosticsReadFailuresAndLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body io.Reader
+		size int
+	}{
+		{"partial-read", io.MultiReader(strings.NewReader("private-partial-body"), &iqDiagnosticBody{err: io.ErrUnexpectedEOF}), len("private-partial-body")},
+		{"response-limit", strings.NewReader(strings.Repeat("x", model.IQMaxResponseBytes+100)), model.IQMaxResponseBytes + 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := captureIQResponse(nil, &http.Response{StatusCode: 200, Body: io.NopCloser(tc.body)}, nil, 0, 0, hosttypes.PriceData{}, time.Now())
+			require.Error(t, result.localErr)
+			require.Equal(t, tc.size, result.iqDiagnostics.ResponseBytes)
+			require.Zero(t, result.iqDiagnostics.DataEvents)
+			require.Equal(t, "not_parsed", result.iqDiagnostics.EndReason(), "do not pretend partially read or oversized responses completed parsing")
+			require.False(t, result.iqDiagnostics.CompletionSeen)
+			require.Empty(t, result.text)
+		})
+	}
+}
+
+func TestIQStreamFailureDiagnosticsLogs(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, expected, stage string
+	}{
+		{"heartbeat", ": heartbeat\n\n", "sse_data_events=0 invalid_data_events=0 completion_seen=false done_seen=false token_limit=false stream_end=no_sse_data last_event=none finish_reason=none", "response"},
+		{"missing-end", "data: {\"choices\":[{\"delta\":{\"content\":\"<svg>private-artwork</svg>\"}}]}\n\n", "completion_seen=false done_seen=false token_limit=false stream_end=missing_completion last_event=chat_chunk finish_reason=none", "response"},
+		{"upstream-error", "data: {\"type\":\"error\",\"error\":{\"message\":\"secret-key https://provider.invalid\"}}\n\ndata: [DONE]\n\n", "completion_seen=true done_seen=true token_limit=false stream_end=upstream_error last_event=done finish_reason=none", "response"},
+		{"token-limit", "data: {\"choices\":[{\"finish_reason\":\"length\"}]}\n\ndata: [DONE]\n\n", "completion_seen=true done_seen=true token_limit=true stream_end=token_limit last_event=done finish_reason=length", "response"},
+		{"unknown-reason", "data: {\"choices\":[{\"finish_reason\":\"secret-key\\nAuthorization: private\"}]}\n\n", "stream_end=invalid_finish_reason last_event=chat_chunk finish_reason=other", "response"},
+		{"unknown-event", "data: {\"type\":\"secret-key\\nAuthorization: private\"}\n\n", "stream_end=missing_completion last_event=other finish_reason=none", "response"},
+		{"bad-json", "data: secret-key\n\n", "sse_data_events=1 invalid_data_events=1 completion_seen=false done_seen=false token_limit=false stream_end=no_valid_sse_data", "response"},
+		{"artifact-extraction", "data: {\"choices\":[{\"delta\":{\"content\":\"private-artwork-link\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n", "completion_seen=true done_seen=true token_limit=false stream_end=completed last_event=done finish_reason=stop", "artifact"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, _ := setupIQController(t)
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				_, _ = io.Copy(io.Discard, r.Body)
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.Header().Set("X-Provider-Secret", "secret-header")
+				fmt.Fprint(w, tc.body)
+			}))
+			defer server.Close()
+			ch := &model.Channel{Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled, Key: "secret-channel-key", BaseURL: &server.URL, Models: "gpt-4o", Group: "public"}
+			require.NoError(t, model.DB.Create(ch).Error)
+			require.NoError(t, ch.AddAbilities(nil))
+			var logs bytes.Buffer
+			common.LogWriterMu.Lock()
+			previous := gin.DefaultErrorWriter
+			gin.DefaultErrorWriter = &logs
+			common.LogWriterMu.Unlock()
+			t.Cleanup(func() {
+				common.LogWriterMu.Lock()
+				gin.DefaultErrorWriter = previous
+				common.LogWriterMu.Unlock()
+			})
+			result := executeIQPair(context.Background(), root.Id, "public", "gpt-4o", "secret-prompt", "")
+			require.Equal(t, "invalid_artifact", result.Status)
+			require.Equal(t, "invalid_artifact", result.ErrorCode)
+			require.Empty(t, result.Artifact)
+			require.EqualValues(t, 1, calls.Load(), "diagnostics must not replay or retry")
+			common.LogWriterMu.Lock()
+			output := logs.String()
+			common.LogWriterMu.Unlock()
+			require.Equal(t, 1, strings.Count(output, "IQ execution failed:"))
+			require.Contains(t, output, "stage="+tc.stage+" http_status=200 error_code=invalid_artifact")
+			require.Contains(t, output, fmt.Sprintf("response_bytes=%d ", len(tc.body)))
+			require.Contains(t, output, tc.expected)
+			for _, secret := range []string{"secret-", "private", "provider.invalid", "Authorization", "<svg>", server.URL} {
+				require.NotContains(t, output, secret)
+			}
+			public, err := json.Marshal(result)
+			require.NoError(t, err)
+			for _, field := range []string{"response_bytes", "last_event", "channel_id", "finish_reason", "stream_end"} {
+				require.NotContains(t, string(public), field, "diagnostics must remain operator-only")
+			}
+		})
+	}
 }
 
 func TestIQFailureClassificationIsSanitized(t *testing.T) {
