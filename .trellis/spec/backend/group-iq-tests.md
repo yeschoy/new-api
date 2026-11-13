@@ -113,13 +113,25 @@ The controller owns orchestration to avoid a service/controller import cycle.
   explicit effort, restore converted reasoning controls after channel parameter
   overrides and retain matching usage metadata. Empty effort leaves channel
   defaults intact. Do not hard-code Claude/Gemini budgets or broaden IQ limits.
+- Every IQ request is streaming, regardless of channel type. Enforce it at the
+  shared IQ test boundary before relay-info/adapter conversion, then again on the
+  final wire body after parameter overrides. OpenAI Chat/Responses and Claude
+  require `stream:true`; Gemini uses `:streamGenerateContent?alt=sse`, never a
+  JSON `stream` field. Detect the converted body protocol, not the entry endpoint,
+  including advanced-custom Gemini-to-Chat and Chat/Responses-to-Gemini routes.
+  Native advanced-custom Gemini routes must select the SSE URL too. Force SSE
+  `Accept` after header overrides; no non-streaming fallback or extra request.
+  Collect the complete bounded stream before artifact extraction, retaining final
+  snapshots without duplicate deltas and native usage. Ordinary channel tests
+  retain the caller's stream/non-stream choice.
 - A batch has two workers, a 25-minute pair deadline (`iqPairTimeout`), a
   16,384-token wire limit, one retry=0 group selector, and at most one
   non-replayable outbound POST per pair. Never enumerate channels, fail over,
   retry or replay started work. Derive timeout messages from the same constant;
   preserve earlier parent cancellation/deadlines. Deployment HTTP limits must
-  allow this budget: `RELAY_TIMEOUT` and, for non-streaming output,
-  `RELAY_RESPONSE_HEADER_TIMEOUT` must be 0 (disabled) or at least 1500 seconds.
+  allow this budget: `RELAY_TIMEOUT` and `RELAY_RESPONSE_HEADER_TIMEOUT` must be
+  0 (disabled) or at least 1500 seconds; streaming does not guarantee early
+  response headers from every upstream.
 - Propagate the deadline to the final HTTP request, clear `GetBody` and
   idempotency keys, and retain upstream redirects rather than following them.
 - Set `ContextKeyUsingGroup` before relay-info generation. Use the root/system
@@ -245,6 +257,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   adaptive/manual Claude and level/budget Gemini against local HTTP mocks;
   verify explicit effort survives channel overrides, model modifiers win, empty
   effort retains defaults, usage metadata agrees, and one request is sent.
+  All fixtures return native SSE and assert streaming survives `stream:false`
+  and JSON Accept overrides, Gemini uses its SSE URL without an invalid body
+  field, complete artifacts are not duplicated, and usage logs mark streaming.
   Assert the executor receives a 25-minute deadline without waiting for it,
   preserves earlier parent deadlines, cancels completed pair contexts, and
   reports the same configured limit on timeout without retrying. Test saved-plan
@@ -254,6 +269,10 @@ The controller owns orchestration to avoid a service/controller import cycle.
   group names in viewer group_order metadata. Saving retention returns the new
   count, immediately purges old artifact IDs (404), preserves retained IDs (200),
   validates bounds, and a results GET never prunes data.
+- `controller/iq_stream_test.go`: enforce streaming even when an IQ caller passes
+  false, without changing ordinary tests; final-body override protection; advanced
+  custom cross-protocol and native Gemini SSE URLs; incomplete/token-limited
+  streams fail without an artifact, retry, or non-streaming fallback.
 - `controller/iq_diagnostics_test.go`: 3xx/401/429/5xx numeric status without
   reading error bodies; wrapped timeout and raw-error sanitization, preparation,
   transport, response and artifact classification; operator log allowlist and
@@ -263,7 +282,9 @@ The controller owns orchestration to avoid a service/controller import cycle.
   incomplete/oversized output, preservation of active self-contained content.
 - `router/iq_router_test.go`: all eight anonymous denials and admin/member scopes,
   including DELETE and group-order PUT channel-write/PAT-scope enforcement.
-- `relay/channel/iq_request_test.go`: deadline propagation and no redirect replay.
+- `relay/channel/iq_request_test.go`: deadline propagation, SSE Accept enforcement
+  after overrides, and no redirect replay. Advanced-custom adapter tests cover
+  native Gemini stream/non-stream URL selection without losing query parameters.
 - SQLite test users need distinct nonempty `AffCode` values; initialize dialect
   column names and explicit model prices before invoking real model helpers.
   Do not mistake missing test bootstrap for a production behavior defect.

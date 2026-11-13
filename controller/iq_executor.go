@@ -94,7 +94,9 @@ func iqEndpoint(channel *model.Channel, name string) string {
 	}
 	return ""
 }
-func buildIQRequest(name, endpoint, prompt string, stream bool) dto.Request {
+func buildIQRequest(name, endpoint, prompt string) dto.Request {
+	// IQ generation always streams, independently of the selected channel type.
+	stream := true
 	limit := uint(model.IQOutputTokens)
 	switch constant.EndpointType(endpoint) {
 	case constant.EndpointTypeOpenAIResponse:
@@ -164,14 +166,14 @@ func restoreIQInput(body, original []byte) ([]byte, error) {
 	return body, nil
 }
 
-func boundIQRequest(body []byte, endpoint string) ([]byte, error) {
+func boundIQRequest(body []byte) ([]byte, error) {
 	key := "max_tokens"
 	// Advanced-custom converters can change the wire protocol. Bound its actual
 	// body, not just the originally requested endpoint.
+	gemini := gjson.GetBytes(body, "contents").Exists()
 	switch {
-	case gjson.GetBytes(body, "contents").Exists():
+	case gemini:
 		key = "generationConfig.maxOutputTokens"
-		endpoint = string(constant.EndpointTypeGemini)
 	case gjson.GetBytes(body, "input").Exists():
 		key = "max_output_tokens"
 	case gjson.GetBytes(body, "messages").Exists():
@@ -182,11 +184,23 @@ func boundIQRequest(body []byte, endpoint string) ([]byte, error) {
 		return nil, errors.New("unsupported IQ wire format")
 	}
 
+	// Enforce streaming after conversion and channel overrides. Gemini selects
+	// SSE through its URL action and must not receive an OpenAI stream field.
+	var err error
+	if gemini {
+		body, err = sjson.DeleteBytes(body, "stream")
+	} else {
+		body, err = sjson.SetBytes(body, "stream", true)
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	// One candidate, no model tools or n-sampling. Channel overrides cannot expand cost.
 	for _, k := range []string{"tools", "tool_choice", "parallel_tool_calls", "n", "functions", "function_call", "audio", "modalities", "generationConfig.imageConfig", "generationConfig.speechConfig"} {
 		body, _ = sjson.DeleteBytes(body, k)
 	}
-	if endpoint == string(constant.EndpointTypeGemini) {
+	if gemini {
 		body, _ = sjson.DeleteBytes(body, "generationConfig.candidateCount")
 		body, _ = sjson.SetBytes(body, "generationConfig.responseModalities", []string{"TEXT"})
 	}
@@ -314,7 +328,7 @@ func executeIQPair(ctx context.Context, userID int, group, name, prompt, reasoni
 		return r
 	}
 	started := time.Now()
-	result := testChannelWithIQ(ctx, channel, userID, name, endpoint, channel.Type == constant.ChannelTypeCodex, &iqChannelTestOptions{group: group, prompt: prompt, reasoningEffort: reasoningEffort})
+	result := testChannelWithIQ(ctx, channel, userID, name, endpoint, true, &iqChannelTestOptions{group: group, prompt: prompt, reasoningEffort: reasoningEffort})
 	if result.localErr != nil {
 		r.Status, r.ErrorCode, r.ErrorMessage = classifyIQFailure(ctx, result)
 		logIQFailure(r, channel.Id, result.iqHTTPStatus, result.iqStage, started)

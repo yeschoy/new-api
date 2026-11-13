@@ -470,6 +470,8 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		// built its request without propagating the incoming context.
 		req = req.WithContext(c.Request.Context())
 		req.GetBody = nil
+		// IQ always consumes SSE, even when channel header overrides prefer JSON.
+		req.Header.Set("Accept", "text/event-stream")
 		req.Header.Del("Idempotency-Key")
 		req.Header.Del("X-Idempotency-Key")
 	}

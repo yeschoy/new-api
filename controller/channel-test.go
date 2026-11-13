@@ -87,6 +87,9 @@ type iqChannelTestOptions struct {
 
 func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool, iq *iqChannelTestOptions) (result testResult) {
 	if iq != nil {
+		// IQ is always streaming; the caller's mode only applies to ordinary tests.
+		// Set this before building the synthetic path (including Gemini's action).
+		isStream = true
 		defer func() {
 			if result.localErr != nil && result.iqStage == "" {
 				result.iqStage = "prepare"
@@ -257,7 +260,7 @@ func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID i
 
 	request := buildTestRequest(testModel, endpointType, channel, isStream)
 	if iq != nil {
-		request = buildIQRequest(testModel, endpointType, iq.prompt, isStream)
+		request = buildIQRequest(testModel, endpointType, iq.prompt)
 	}
 
 	info, err := relaycommon.GenRelayInfo(c, relayFormat, request, nil)
@@ -490,10 +493,11 @@ func testChannelWithIQ(ctx context.Context, channel *model.Channel, testUserID i
 			}
 			info.SetReasoningEffort(iqReasoningEffort)
 		}
-		jsonData, err = boundIQRequest(jsonData, endpointType)
+		jsonData, err = boundIQRequest(jsonData)
 		if err != nil {
 			return testResult{localErr: err}
 		}
+		info.IsStream = true
 	}
 	requestBody := bytes.NewBuffer(jsonData)
 	c.Request.Body = io.NopCloser(bytes.NewBuffer(jsonData))
