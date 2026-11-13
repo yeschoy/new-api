@@ -286,6 +286,37 @@ func TestAdaptorSwitchesGeminiGenerateContentURLForStream(t *testing.T) {
 	assert.Equal(t, "sk-test", parsedURL.Query().Get("key"))
 }
 
+func TestAdaptorNativeGeminiStreamingURL(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(fmt.Sprintf("stream=%t", stream), func(t *testing.T) {
+			adaptor := &Adaptor{}
+			info := advancedCustomRelayInfo(&dto.AdvancedCustomConfig{Routes: []dto.AdvancedCustomRoute{{
+				IncomingPath: "/v1beta/models/{model}:generateContent",
+				UpstreamPath: "/v1beta/models/{model}:generateContent?existing=1",
+				Converter:    relayconvert.ConverterNone,
+			}}})
+			info.RelayFormat = types.RelayFormatGemini
+			info.IsStream = stream
+			info.RequestURLPath = "/v1beta/models/gemini-2.5-flash:generateContent"
+			if stream {
+				info.RequestURLPath = "/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+			}
+			requestURL, err := adaptor.GetRequestURL(info)
+			require.NoError(t, err)
+			parsed, err := url.Parse(requestURL)
+			require.NoError(t, err)
+			assert.Equal(t, "1", parsed.Query().Get("existing"))
+			if stream {
+				assert.Contains(t, parsed.Path, ":streamGenerateContent")
+				assert.Equal(t, "sse", parsed.Query().Get("alt"))
+			} else {
+				assert.Contains(t, parsed.Path, ":generateContent")
+				assert.Empty(t, parsed.Query().Get("alt"))
+			}
+		})
+	}
+}
+
 func TestAdaptorMatchesGeminiIncomingPathTemplate(t *testing.T) {
 	tests := []struct {
 		name            string

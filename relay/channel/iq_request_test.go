@@ -19,8 +19,12 @@ import (
 func TestIQRequestDeadlineAndNoRedirectReplay(t *testing.T) {
 	service.InitHttpClient()
 	var calls atomic.Int32
+	var wrongAccept atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.Header.Get("Accept") != "text/event-stream" {
+			wrongAccept.Store(true)
+		}
 		_, _ = io.Copy(io.Discard, r.Body)
 		if r.URL.Path == "/redirect" {
 			w.Header().Set("Location", "/unexpected")
@@ -38,6 +42,7 @@ func TestIQRequestDeadlineAndNoRedirectReplay(t *testing.T) {
 		req, err := http.NewRequest("POST", server.URL+path, bytes.NewBufferString("request"))
 		require.NoError(t, err)
 		require.NotNil(t, req.GetBody)
+		req.Header.Set("Accept", "application/json")
 		resp, err := doRequest(c, req, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}})
 		if path == "/redirect" {
 			require.NoError(t, err)
@@ -51,4 +56,5 @@ func TestIQRequestDeadlineAndNoRedirectReplay(t *testing.T) {
 		cancel()
 	}
 	require.EqualValues(t, 2, calls.Load())
+	require.False(t, wrongAccept.Load(), "IQ must retain SSE Accept after channel overrides")
 }

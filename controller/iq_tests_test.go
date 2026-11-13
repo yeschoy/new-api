@@ -251,7 +251,7 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		body, _ := io.ReadAll(r.Body)
-		if gjson.GetBytes(body, "messages.0.content").String() != prompt || gjson.GetBytes(body, "max_tokens").Int() != model.IQOutputTokens || gjson.GetBytes(body, "reasoning_effort").String() != "high" {
+		if gjson.GetBytes(body, "messages.0.content").String() != prompt || gjson.GetBytes(body, "max_tokens").Int() != model.IQOutputTokens || gjson.GetBytes(body, "reasoning_effort").String() != "high" || !gjson.GetBytes(body, "stream").Bool() {
 			wrong.Store(true)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -260,7 +260,8 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 			fmt.Fprint(w, `{"error":{"message":"secret-provider-key"}}`)
 			return
 		}
-		fmt.Fprint(w, `{"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"<html><body><canvas></canvas><script>const x = 1;</script><svg></svg></body></html>"}}],"usage":{"prompt_tokens":10,"completion_tokens":20}}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"<html><body><canvas></canvas><script>const x = 1;</script><svg></svg></body></html>\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20}}\n\ndata: [DONE]\n\n")
 	}))
 	defer server.Close()
 	for i := 0; i < 3; i++ {
@@ -314,6 +315,9 @@ func TestIQSingleRoutingAttemptFundingAndGalleryAccess(t *testing.T) {
 	var log model.Log
 	require.NoError(t, model.DB.Where("token_name = ?", "IQ test").First(&log).Error)
 	require.Equal(t, "public", log.Group, "selected group must precede relay-info generation")
+	require.True(t, log.IsStream)
+	require.Equal(t, 10, log.PromptTokens)
+	require.Equal(t, 20, log.CompletionTokens)
 	c, w := iqContext(viewer, "/api/iq-tests/results", "")
 	GetIQResults(c)
 	require.Equal(t, 200, w.Code)
@@ -423,18 +427,21 @@ func TestIQPairTimeoutResult(t *testing.T) {
 func TestIQNativeRequestsAndOutputBounds(t *testing.T) {
 	protected, err := restoreIQInput([]byte(`{"messages":[{"role":"user","content":"overridden"}],"tools":[{}],"n":4}`), []byte(`{"messages":[{"role":"user","content":"exact"}]}`))
 	require.NoError(t, err)
-	protected, err = boundIQRequest(protected, string(constant.EndpointTypeOpenAI))
+	protected, err = boundIQRequest(protected)
 	require.NoError(t, err)
 	require.Equal(t, "exact", gjson.GetBytes(protected, "messages.0.content").String())
 	require.False(t, gjson.GetBytes(protected, "tools").Exists())
 	require.False(t, gjson.GetBytes(protected, "n").Exists())
 
 	for _, endpoint := range []constant.EndpointType{constant.EndpointTypeOpenAI, constant.EndpointTypeOpenAIResponse, constant.EndpointTypeAnthropic, constant.EndpointTypeGemini} {
-		request := buildIQRequest("model", string(endpoint), "exact", false)
+		request := buildIQRequest("model", string(endpoint), "exact")
 		body, err := common.Marshal(request)
 		require.NoError(t, err)
 		require.Contains(t, string(body), "exact")
-		bounded, err := boundIQRequest(body, string(endpoint))
+		if endpoint != constant.EndpointTypeGemini {
+			require.True(t, gjson.GetBytes(body, "stream").Bool(), "every IQ request must stream")
+		}
+		bounded, err := boundIQRequest(body)
 		require.NoError(t, err)
 		require.Contains(t, string(bounded), "16384")
 	}
@@ -465,22 +472,20 @@ func TestIQReasoningEffortWireRequests(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root, _ := setupIQController(t)
-			bodies := make(chan []byte, 1)
+			type wireRequest struct {
+				body                []byte
+				path, query, accept string
+			}
+			requests := make(chan wireRequest, 1)
 			var calls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls.Add(1)
 				body, _ := io.ReadAll(r.Body)
 				select {
-				case bodies <- body:
+				case requests <- wireRequest{body, r.URL.Path, r.URL.Query().Get("alt"), r.Header.Get("Accept")}:
 				default:
 				}
-				if tc.channelType == constant.ChannelTypeCodex {
-					w.Header().Set("Content-Type", "text/event-stream")
-					fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"<svg></svg>\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"<svg></svg>\"}]}]}}\n\n")
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				fmt.Fprint(w, `{"choices":[{"message":{"content":"<svg></svg>"}}]}`)
+				writeIQTestStream(w, r.URL.Path)
 			}))
 			defer server.Close()
 			mapping, err := common.Marshal(map[string]string{"gpt-4o": tc.upstream})
@@ -497,7 +502,9 @@ func TestIQReasoningEffortWireRequests(t *testing.T) {
 					override = `{"reasoning_effort":"low","reasoning":{"effort":"low"}}`
 				}
 			}
-			ch := &model.Channel{Type: tc.channelType, Status: common.ChannelStatusEnabled, Key: "mock", BaseURL: &server.URL, Models: "gpt-4o", Group: "public", ModelMapping: &mappingJSON, ParamOverride: &override}
+			override = strings.TrimSuffix(override, "}") + `,"stream":false}`
+			headerOverride := `{"Accept":"application/json"}`
+			ch := &model.Channel{Type: tc.channelType, Status: common.ChannelStatusEnabled, Key: "mock", BaseURL: &server.URL, Models: "gpt-4o", Group: "public", ModelMapping: &mappingJSON, ParamOverride: &override, HeaderOverride: &headerOverride}
 			if tc.channelType == constant.ChannelTypeCodex {
 				ch.Key = `{"access_token":"mock","account_id":"mock-account"}`
 			}
@@ -507,7 +514,17 @@ func TestIQReasoningEffortWireRequests(t *testing.T) {
 			defer cancel()
 			result := executeIQPair(ctx, root.Id, "public", "gpt-4o", "exact", tc.effort)
 			require.Equal(t, "success", result.Status, result.ErrorMessage)
-			body := <-bodies
+			wire := <-requests
+			body := wire.body
+			require.Equal(t, "text/event-stream", wire.accept, "header overrides must not disable IQ streaming")
+			if tc.channelType == constant.ChannelTypeGemini {
+				require.Contains(t, wire.path, ":streamGenerateContent")
+				require.Equal(t, "sse", wire.query)
+				require.False(t, gjson.GetBytes(body, "stream").Exists(), "Gemini streams via its URL, not a JSON field")
+			} else {
+				require.True(t, gjson.GetBytes(body, "stream").Bool(), "parameter overrides must not disable IQ streaming")
+			}
+			require.Equal(t, model.IQText("<svg></svg>"), result.Artifact, "stream deltas and final snapshots must not duplicate output")
 			require.Equal(t, tc.want, gjson.GetBytes(body, tc.path).String(), string(body))
 			require.EqualValues(t, model.IQOutputTokens, gjson.GetBytes(body, tc.tokenPath).Int())
 			if tc.channelType != constant.ChannelTypeOpenAI && tc.effort != "" {
@@ -526,6 +543,9 @@ func TestIQReasoningEffortWireRequests(t *testing.T) {
 				wantEffort = "low"
 			}
 			require.Equal(t, wantEffort, gjson.Get(log.Other, "reasoning_effort").String(), "usage metadata must match the final reasoning controls")
+			require.True(t, log.IsStream)
+			require.Equal(t, 10, log.PromptTokens)
+			require.Equal(t, 20, log.CompletionTokens)
 		})
 	}
 }
