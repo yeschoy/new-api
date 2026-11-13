@@ -1,0 +1,57 @@
+# Current boundaries and planning risks
+
+Research date: 2026-11-13. Repository baseline: `1595f89cc` on `feat/partner-accounts`. Source inspection only; no runtime/deployment/payment validation or product-code changes.
+
+## 1. Three existing purchase entries, not merely two UI choices
+
+| Entry | Merchant input / identity | Source evidence |
+| --- | --- | --- |
+| Subscription Key API | `POST /api/partner/v1/subscription-key-orders`, strict `{plan_id,payment_method}`; optional X-Subscription-Key for renewal. No external buyer ID. | `controller/partner_tenant_subscription_key.go:114`, `model/partner_tenant_subscription_key_order.go:23` |
+| External identity API | `PUT /accounts`, `POST /subscription-orders`, account quota/status routes, external_user_id required. | `router/partner_tenant.go:27`, `.trellis/spec/backend/partner-tenant-checkout.md` |
+| Hosted H5 | Merchant creates purchase session with external_user_id, browser redeems pl_ -> ps_, then selects/creates an order. | `router/partner_tenant.go:25`, `controller/partner_tenant_purchase_session.go:141`, `.trellis/spec/backend/partner-hosted-h5.md` |
+
+`GET /plans` is shared. The absence of buyer IDs in the new API does not remove its tenant dedicated group or plan ownership: paid fulfillment calls the same grouped User/Token creation helper (`model/partner_tenant_subscription_key_order.go:222`, `model/partner_tenant.go:437`).
+
+Product decision still needed: expose only new subscription-key API and hosted H5 to newly created tenants (keep old external API for legacy tenants), or offer external API as a third explicit mutually exclusive choice. OAuth browser consent and pst_ wallet/server integration are separate systems and are not implicitly included.
+
+## 2. Current tenant has no integration-mode field
+
+- `model/partner_tenant.go:35`: tenant has name/group/secret hash/status/timestamps, no mode.
+- `controller/partner_tenant.go:21`, `:35`: create input only name/group, security proof context binds action/group.
+- `web/src/features/partner-tenants/api.ts:31` and `index.tsx:97`: frontend likewise sends only name/group.
+- `router/partner_tenant.go:9-30`: one pt_ middleware authorizes all merchant entry routes. `middleware/partner_tenant.go:15` checks secret/status/rate limit, not entry type.
+- Public H5 and independent sub_ routes have their own credential boundaries, not the pt_ middleware. UI-only gating or guarding only merchant routes cannot prove enforcement.
+
+Potential implementation constraint (not yet an approved design): bind selected mode into sensitive-write proof context, database state, admin list/DTO, create validation, and transaction-authoritative purchase/session checks. If mode changes are allowed, fresh locked tenant checks must prevent stale/pre-body authorization from surviving a switch.
+
+## 3. Do not reject durable payment or recovery by broad mode guards
+
+- `router/partner_tenant.go:32-53`: sub_ lookup, purchase-session access, cashier, notify and return have separate route groups.
+- Subscription Key and external orders share mode-neutral preparation, cashier, payment evidence and background delivery.
+- `.trellis/spec/backend/partner-subscription-key.md` and archived task `.trellis/tasks/archive/2026-11/11-12-partner-subscription-access-key/prd.md` explicitly preserve shared internal mode-neutral reads, committed paid evidence, atomic paid-only local delivery and old entry identity isolation.
+- A new-entry restriction must not be installed on gateway notification/return or shared order retrieval in a way that strands accepted/paid orders. Old data and whether mode is immutable need a product decision before designing migration/guards.
+- Current specs describe optional H5 coexisting with the old API. The requested exclusive-mode policy intentionally supersedes that contract only within the final approved scope; update the affected specs and documentation together.
+
+## 4. Authorization log gap
+
+- `model/partner_oauth_authorization_log.go:18`: current dedicated log has OAuth client/binding and actor/target user fields, no tenant/order/subscription references.
+- `:60`: action allowlist contains OAuth / partner_server / partner_account events, but no partner_tenant subscription-key events.
+- `:97`: safe metadata writer validates fields; uses LOG_DB, sanitized request ID/IP and Gin route template. Logging failure does not change the business authorization result and does not dump database errors.
+- `:150`: filters support action/result/client/target user/time only.
+- `:182`: non-ClickHouse uses AutoMigrate; ClickHouse currently uses CREATE TABLE IF NOT EXISTS only. Adding fields requires an explicit existing-table migration for that log backend, or an explicitly reviewed compatibility/defer decision; do not silently break existing ClickHouse logs.
+- `controller/partner_oauth_client.go:47`: read endpoint rejects unknown/duplicate query filter keys; a tenant filter must be allowlisted and validated server-side as well as added in frontend.
+- `web/src/features/partner-oauth-clients/authorization-log-api.ts:7`, `authorization-logs.tsx`: typed action list, labels, columns and filters need synchronized changes; localized new text requires all seven locales.
+- `controller/partner_tenant.go:309`: tenant create/secret rotate/status updates already write security ADMIN audit, not this dedicated authorization log. Preserve this audit trail rather than silently replacing it.
+
+Recommended (not yet approved) logging scope: credential/authentication denials, wrong-mode denials, paid provisioning/credential issuance, key claim and rotation; decide whether successful independent subscription reads should create events. Do not label a service-secret/subscription-key action as OAuth consent. Never invent OAuth client IDs, buyers, or user IDs for a tenant event.
+
+Unknown/invalid credentials may have no trustworthy tenant/user reference. Log only known verified metadata, not a tenant inferred from attacker-supplied IDs or a secret prefix. Never persist raw pt_/sub_/sk_, Authorization/X-Subscription-Key, fragment/capability URLs, payloads, derivation seeds or secret hashes.
+
+## 5. Scope and execution limits
+
+- Parent task owns requirement decisions and final wrong-mode-denial-to-log integration acceptance.
+- Child access-mode task owns creation, persisted exclusive-mode policy, enforcement, old-tenant compatibility, UI and docs/spec alignment.
+- Child audit task owns safe log projection/migration/events/query UI. It can design tenant credential events independently; wrong-mode event integration follows the access-mode contract and is retested at parent integration.
+- Existing untracked private-key file, TEMPORARY_ARTIFACTS.md, reports/ and web temporary document are pre-existing and out of scope. They must not be read, staged, deleted or included in commits.
+- This planning pass generated only Trellis records. No unrelated temporary artifact needs registration or cleanup.
+- Full design.md/implement.md and dispatch context will be finalized after unresolved product choices. No task.py start, sub-agent dispatch, Go/DB tests, production or payment calls in this planning pass.
