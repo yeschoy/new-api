@@ -130,7 +130,7 @@ Content-Type: application/json
   "payment_status":"pending",
   "fulfillment_status":"not_ready",
   "created_at":1800000000,
-  "expires_at":1800001800,
+  "expires_at":1800000300,
   "checkout_url":"https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_REPLACE_WITH_ORDER_CAPABILITY"
 }
 ```
@@ -145,7 +145,7 @@ Content-Type: application/json
 | `payment_method` | string | 原支付方式 |
 | `payment_status` | string | 见[状态与重试](#9-支付交付状态与重试) |
 | `fulfillment_status` | string | 支付与本地交付状态分开 |
-| `created_at` / `expires_at` | integer | 创建时间、初始收银台到期时间 |
+| `created_at` / `expires_at` | integer | Unix 秒；新订单收银台到期时间为创建后 5 分钟，重放不延长，历史订单保留原到期时间 |
 | `checkout_url` | string | 成功的创建/重放 POST 返回；商户只读 GET 不返回 |
 | `subscription_id` | integer | 有实际关联订阅时返回；未交付时一般省略 |
 
@@ -173,7 +173,7 @@ Authorization: Bearer <pt_merchant-secret>
   "payment_status":"paid",
   "fulfillment_status":"fulfilled",
   "created_at":1800000000,
-  "expires_at":1800001800,
+  "expires_at":1800000300,
   "subscription_id":123
 }
 ```
@@ -257,6 +257,8 @@ Authorization: Bearer <sub_64-lowercase-hex>
 
 所有额度为**精确十进制字符串**，不要转 JavaScript Number；可使用字符串或 BigInt。活跃但耗尽仍可能返回正常 Coding Key，同时 `quota_usable=false`，实际调用仍由订阅计费拒绝；Token 的 unlimited 设置不是订阅无限额度。
 
+**额度单位是平台内部 quota，不是人民币、美元金额，也不是 Token 数。** `quota_total`、`quota_used`、`quota_remaining`、历史余额和目录 `total_amount` 使用同一计量单位。金额展示应使用十进制运算：基础 USD 等值 = quota ÷ 平台公开 `GET /api/status` 的 `data.quota_per_unit`；如需人民币展示，再乘当前 `data.usd_exchange_rate`，并明确标注币种。不要把原始 quota 直接加上货币符号，也不要把它当作输入/输出 Token 数。例如在 `quota_per_unit=500000` 时，`"15000000"` 表示基础 USD 等值 `30`；若站点采用 CNY 展示且当前汇率为 `1`，界面展示为 `¥30.00`。不限量时应显示“不限量”，不能将 `quota_remaining="0"` 换算成余额为零；套餐售价与获赠的计费额度是两个概念。
+
 ### 到期/取消响应
 
 ```json
@@ -319,6 +321,8 @@ Content-Type: application/json
 **不轮换 Coding Key、不改变权益，不能撤回已授权请求、已发出的响应或买家已保存的 Coding Key。** 订阅 Key 本身没有重置权限。根秘密异常不会自动重签，详见运维约束。
 
 ## 9. 支付、交付状态与重试
+
+新订单的初始收银台付款窗口为 **5 分钟（300 秒）**。此期限不是幂等键 TTL：同键同参数仍关联原订单，即使窗口已过也不会自动新建或延长期限；已有订单保留落库时的原 `expires_at`。窗口到期不等于网关关单，真实迟付仍按可信通知核验。需要重新购买时，先核对原单，再由用户明确发起新购买意图和新幂等键。
 
 | 字段 | 值 | 接入方处理 |
 | --- | --- | --- |

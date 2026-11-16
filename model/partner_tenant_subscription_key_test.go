@@ -135,6 +135,40 @@ func TestPartnerTenantSubscriptionKeyPostgres(t *testing.T) {
 		require.NoError(t, err)
 		return o, k
 	}
+	t.Run("five minute checkout preserves replay and legacy deadlines", func(t *testing.T) {
+		tenant, p := fixture(t)
+		in := input(tenant, p, "checkout-window")
+		o, created, err := CreatePartnerTenantSubscriptionKeyOrder(in, nil)
+		require.NoError(t, err)
+		require.True(t, created)
+		require.EqualValues(t, 300, o.ExpiresAt-o.CreatedAt)
+		rejectNew := func() error { return errors.New("replay must not validate a new checkout") }
+		replay, created, err := CreatePartnerTenantSubscriptionKeyOrder(in, rejectNew)
+		require.NoError(t, err)
+		require.False(t, created)
+		require.Equal(t, o.Id, replay.Id)
+		require.Equal(t, o.ExpiresAt, replay.ExpiresAt)
+
+		// A persisted pre-change deadline remains authoritative even after it
+		// expires; the same key cannot create a replacement or refresh expiry.
+		legacyCreated := GetDBTimestamp() - 3600
+		legacyExpiry := legacyCreated + 30*60
+		require.NoError(t, db.Model(o).Updates(map[string]any{"created_at": legacyCreated, "expires_at": legacyExpiry}).Error)
+		replay, created, err = CreatePartnerTenantSubscriptionKeyOrder(in, rejectNew)
+		require.NoError(t, err)
+		require.False(t, created)
+		require.Equal(t, o.Id, replay.Id)
+		require.Equal(t, legacyCreated, replay.CreatedAt)
+		require.Equal(t, legacyExpiry, replay.ExpiresAt)
+		require.Equal(t, "expired", replay.VisiblePaymentStatus(GetDBTimestamp()))
+		changed := in
+		changed.PaymentMethod = "wxpay"
+		_, _, err = CreatePartnerTenantSubscriptionKeyOrder(changed, nil)
+		require.ErrorIs(t, err, ErrPartnerTenantIdempotencyConflict)
+		var orders int64
+		require.NoError(t, db.Model(&PartnerTenantSubscriptionOrder{}).Where("tenant_id = ?", tenant.Id).Count(&orders).Error)
+		require.EqualValues(t, 1, orders)
+	})
 	t.Run("paid-only atomic rollback recovery independent identities and external isolation", func(t *testing.T) {
 		tenant, p := fixture(t)
 		in := input(tenant, p, "atomic")

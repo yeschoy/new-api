@@ -187,7 +187,7 @@
       "CreatedOrder": {
         "description": "新订单201，原参数同幂等重放200；包含平台checkout_url，未返回长期Key",
         "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Referrer-Policy": {"$ref": "#/components/headers/NoReferrer"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
-        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreatedOrderResponse"}, "example": {"order_no": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV", "plan_id": 42, "plan_title": "Monthly plan", "amount": "9.99", "currency": "CNY", "payment_method": "alipay", "payment_status": "pending", "fulfillment_status": "not_ready", "created_at": 1800000000, "expires_at": 1800001800, "checkout_url": "https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_REPLACE_WITH_ORDER_CAPABILITY"}}}
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreatedOrderResponse"}, "example": {"order_no": "PTO0123456789ABCDEFGHIJKLMNOPQRSTUV", "plan_id": 42, "plan_title": "Monthly plan", "amount": "9.99", "currency": "CNY", "payment_method": "alipay", "payment_status": "pending", "fulfillment_status": "not_ready", "created_at": 1800000000, "expires_at": 1800000300, "checkout_url": "https://platform.example/partner/checkout?order_no=PTO0123456789ABCDEFGHIJKLMNOPQRSTUV#token=pc_REPLACE_WITH_ORDER_CAPABILITY"}}}
       },
       "IntegrationError": {
         "description": "统一错误结构，依据HTTP状态和error.code处理。可能代码：400 invalid_request/unsupported_currency；401 invalid_partner_secret/invalid_subscription_key；403 account_disabled/integration_mode_mismatch；404 plan_not_found/order_not_found/subscription_not_found/subscription_key_not_found；409 subscription_key_not_ready/credential_unavailable/idempotency_conflict/subscription_key_changed；429 rate_limited；503 payment_unavailable/subscription_key_unavailable；500 server_error。各接口只返回其适用代码，message不作为稳定枚举。",
@@ -197,7 +197,7 @@
     },
     "schemas": {
       "SubscriptionKey": {"type": "string", "minLength": 68, "maxLength": 68, "pattern": "^sub_[0-9a-f]{64}$", "description": "高敏查询Key；不能用于模型调用，禁止URL/日志/公共缓存传输"},
-      "QuotaAmount": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$", "maxLength": 19, "description": "精确非负int64十进制字符串，实际最大9223372036854775807；不要转JavaScript Number", "example": "9007199254740993"},
+      "QuotaAmount": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$", "maxLength": 19, "description": "平台内部quota单位的精确非负int64十进制字符串，不是金额或Token数；实际最大9223372036854775807，不要转JavaScript Number。基础USD等值=quota除以/api/status的data.quota_per_unit；CNY展示再乘data.usd_exchange_rate；total=0时应按unlimited标志展示而非余额0", "example": "9007199254740993"},
       "CreateOrderRequest": {
         "type": "object", "additionalProperties": false, "required": ["plan_id", "payment_method"],
         "properties": {
@@ -222,7 +222,7 @@
           "currency": {"type": "string", "description": "目录原币种；历史非CNY仍可能列出但不可走本Epay支付，不自动换算"},
           "duration_unit": {"type": "string"},
           "duration_value": {"type": "integer"},
-          "total_amount": {"type": "integer", "format": "int64", "description": "原有数字协议，0表示不限量；大值需无损解析"},
+          "total_amount": {"type": "integer", "format": "int64", "description": "内部quota单位，非金额/Token数，与quota_total同单位；原有数字协议，0表示不限量，大值需无损解析"},
           "quota_reset_period": {"type": "string"},
           "requests_per_minute": {"type": "integer"},
           "enabled": {"type": "boolean"}
@@ -243,7 +243,7 @@
           "payment_status": {"type": "string", "enum": ["pending", "paid", "failed", "expired"], "description": "expired是未付超时投影，不代表网关已取消；failed是协议保留状态"},
           "fulfillment_status": {"type": "string", "enum": ["not_ready", "pending", "fulfilled", "failed_retryable"], "description": "paid且fulfilled才可领钥；paid未交付不能重复收款"},
           "created_at": {"type": "integer", "format": "int64", "description": "Unix秒"},
-          "expires_at": {"type": "integer", "format": "int64", "description": "初始收银台deadline，创建+30分钟；原意图重放不延长"},
+          "expires_at": {"type": "integer", "format": "int64", "description": "新订单初始收银台deadline，创建+5分钟（300秒）；原意图重放不延长，已有订单保留原期限；幂等绑定不随付款窗口释放"},
           "subscription_id": {"type": "integer", "format": "int64", "minimum": 1, "description": "实际交付关联存在时出现，未交付省略"}
         }
       },

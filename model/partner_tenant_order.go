@@ -14,7 +14,9 @@ import (
 	"gorm.io/gorm"
 )
 
-const PartnerTenantOrderLifetime = int64(30 * 60)
+// New orders get a five-minute cashier window. Persisted deadlines and
+// idempotency bindings are retained unchanged, including after expiry.
+const PartnerTenantOrderLifetime = int64(5 * 60)
 const PartnerTenantCheckoutClaimSeconds = int64(15)
 
 var (

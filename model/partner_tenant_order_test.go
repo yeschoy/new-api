@@ -17,6 +17,16 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestPartnerTenantCheckoutWindow(t *testing.T) {
+	require.EqualValues(t, 300, PartnerTenantOrderLifetime)
+	order := &PartnerTenantSubscriptionOrder{CreatedAt: 1800000000, ExpiresAt: 1800000000 + PartnerTenantOrderLifetime, PaymentStatus: "pending"}
+	require.Equal(t, "pending", order.VisiblePaymentStatus(order.CreatedAt+299))
+	require.Equal(t, "expired", order.VisiblePaymentStatus(order.CreatedAt+300))
+	require.Equal(t, "pending", order.PaymentStatus, "expiry is a projection, not gateway cancellation")
+	order.PaymentStatus = "paid"
+	require.Equal(t, "paid", order.VisiblePaymentStatus(order.ExpiresAt+1), "late verified payments remain paid")
+}
+
 func TestPartnerTenantMoneyBoundary(t *testing.T) {
 	for _, p := range []float64{0, -1, math.NaN(), math.Inf(1), 1.001, 100000000} {
 		_, err := PartnerTenantPlanCents(p)
@@ -151,6 +161,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, created)
 				require.Equal(t, "9.99", o.Amount())
+				require.EqualValues(t, 300, o.ExpiresAt-o.CreatedAt)
 				require.NotEqual(t, in.IdempotencyHash, o.OrderNo)
 				_, err = GetPartnerTenantAccount(tenant.Id, in.ExternalUserId)
 				require.ErrorIs(t, err, gorm.ErrRecordNotFound)
@@ -159,6 +170,7 @@ func TestPartnerTenantPaidOrderDatabaseMatrix(t *testing.T) {
 				require.NoError(t, err)
 				require.False(t, created)
 				require.Equal(t, o.OrderNo, replay.OrderNo)
+				require.Equal(t, o.ExpiresAt, replay.ExpiresAt)
 				changed := in
 				changed.ExternalUserId = "other"
 				_, _, err = createPartnerTenantAcceptedOrderFixture(changed)

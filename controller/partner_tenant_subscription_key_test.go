@@ -139,6 +139,7 @@ func TestPartnerTenantSubscriptionKeyHTTPPostgres(t *testing.T) {
 	require.Equal(t, "no-referrer", response.Header().Get("Referrer-Policy"))
 	var order partnerTenantOrderView
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &order))
+	require.EqualValues(t, 300, order.ExpiresAt-order.CreatedAt)
 	require.Contains(t, order.CheckoutURL, "https://platform.example/partner/checkout?order_no=")
 	require.EqualValues(t, 0, countUsers())
 	for _, field := range []string{"external_user_id", "account_id", "user_id", "api_key", "subscription_key", "seed"} {
@@ -156,6 +157,10 @@ func TestPartnerTenantSubscriptionKeyHTTPPostgres(t *testing.T) {
 	require.Zero(t, countUsers())
 	replay := create("subscription-http-0001", "")
 	require.Equal(t, 200, replay.Code)
+	var replayed partnerTenantOrderView
+	require.NoError(t, json.Unmarshal(replay.Body.Bytes(), &replayed))
+	require.Equal(t, order.OrderNo, replayed.OrderNo)
+	require.Equal(t, order.ExpiresAt, replayed.ExpiresAt)
 	require.Len(t, gateway.requests, 1)
 	// Exact old merchant status cannot project a new-mode order, but the shared
 	// public cashier and verified callback must still read it successfully.
