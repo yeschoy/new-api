@@ -7,6 +7,8 @@
 - [ ] 完整规划摘要展示 Goal / Scope / Non-goals / AC / Decisions / Risks；取得用户随后明确批准并记录批准对应的版本。
 - [ ] 读取 trellis-before-dev、目标层 specs；前端实现还需 shadcn-ui、vercel-react-best-practices，新增文案必须 i18n-translate。
 - [ ] 复核 git baseline、四任务父子关系和 implement/check 清单；保留既有私钥/报告/Demo/临时清单，不读取秘密、不 blanket stage。
+- [ ] 读取 `research/planning-review.md` 和前组 `../11-13-partner-access-mode-audit/verification.md`。前组模式/授权审计只有源码与前端证据，Go/pq 尚未验证；在新建运行资源前核对 Docker 当前可用性，不把历史不可用当作当前实测，也不自行启动/重启引擎。
+- [ ] 为受本组变更影响的前组模式/审计套件及既有日志/额度/用户测试建立回归清单，检查 TestMain/fixture 的 DSN、schema、全局状态及删除风险；不能只运行新增前缀套件。
 - [ ] 仅 start 当前实际交付子任务；父任务不作为默认实现目标。若派发子代理必须先满足工具授权，prompt 第一行是 task.py current 得到的 Active task 路径；同 cwd 不并发写入。
 
 ## 1. 顺序与依赖
@@ -16,6 +18,8 @@
 3. [ ] `usage-logs`：完成新表、两种迁移、三入口分流、管理员读取和所有 self/token 兼容；随后接入 CNY、页面、导航与七语言。
 4. [ ] `user-classification`：只消费已交付 owner/options，补 list/search 共用过滤、count、列及 UI，不改 OAuth 合作方协议。
 5. [ ] 回到父级做全交付集成检查。不提前归档仍有跨交付或运行阻塞的子任务。
+
+保留三个子任务，不另建基础设施/个人兼容任务。日志内部按 A（owner/options）、B（迁移/读者）、C（写者）、D（金额/UI）记录交付。用户分类只依赖 A，不以日志 UI 完成为前置。每次切换 start 的子任务前，保存实际共享签名、修改文件所有权、已执行验证及阻塞项；A 的 source-ready 不等于日志任务完成。
 
 ## 2. 验证命令与证据
 
@@ -47,6 +51,7 @@ git diff --check
 ## 4. 检查、提交与交付
 
 - [ ] 每轮实现后按 trellis-check 做目标验证及全差异复核；缺 Docker/pq 不能声称迁移/完整验收通过，不生产兜底。
+- [ ] 分开报告前组模式/授权审计、本组三个子任务及既有回归的实际执行数、skip、失败和基线；前组受影响运行门禁未通过时，不宣称新旧链路完整验收。新发现的旧问题记回原任务，禁止静默扩大本组范围。
 - [ ] 将真正验证的契约写入对应 spec，区分源码/静态/DOM/真实 pq/浏览器证据；planning 提案不能冒充已实现 spec。
 - [ ] 按明确路径提交业务代码、测试、文档及 Trellis 记录；当前 .trellis 被忽略，新规划文件须精确路径 force-add，绝不加入 runtime/secret/reports 等无关内容。
 - [ ] 资源创建前登记 TEMPORARY_ARTIFACTS.md；结束只汇报实际产物/运行状态。清理等待用户同意，Trellis 记录永不清理。npm/pnpm 缓存/日志保持 ignore。

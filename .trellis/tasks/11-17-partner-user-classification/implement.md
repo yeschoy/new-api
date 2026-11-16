@@ -5,6 +5,7 @@
 ## 顺序
 
 - [ ] 读取父任务 PRD/design/共享 research、现有 User list/search/controller/API/schema/table/route 和旧 OAuth 测试；核对日志 child 实际交付的 safe owner/options。
+- [ ] 保存 owner/options A 阶段签名和验证证据，不将其 source-ready 当作日志整体完成；本任务无需等待日志 UI 或 CNY。建立既有 user/OAuth list/search、权限与前端 partner-column 受影响回归清单，审核 fixture 后记录实际命令/执行数，不只测新增分类前缀。
 - [ ] 新分类/ID typed parser 和共用模型过滤；GetAllUsers/SearchUsers 在 count/rows 分页前应用同条件，保留排序/状态/组/角色/关键词/OAuth。
 - [ ] 按页批量附加 user_category、partner_tenant_id/name，不持久化新角色，不把 owner 查询失败当普通。
 - [ ] users API/schema/URL/columns/toolbar 使用独立 Tenant 维度；选择普通清商户、选择商户切类别；先重置分页再新查询。

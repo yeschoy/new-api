@@ -37,6 +37,8 @@ PostgreSQL 新表不添加自动删日志行为，原默认清理只管原范围
 
 best-effort 风险：进程在业务提交后、日志写前退出或 LOG_DB 故障可漏记。告警只含受控原因与 request/event/user 关联，不打印原错误 SQL、正文、Other、token 字符串或秘密；新日志 I/O 使用 silent GORM 会话防 DEBUG 插值泄漏。未引入 outbox。
 
+原 RecordConsumeLog 会记录完整 params，RecordErrorLog 会记录 content，三入口还有直接 err.Error() 输出；不能只新增安全 helper 而保留 Tenant/未知归属的这些旁路。目标分支使用安全关联日志，既有 LogOther 角色投影仅是读取脱敏，不是存储净化。秘密标记测试同时观察应用 logger 与 GORM DEBUG；不改变非目标路径的无关诊断策略。
+
 ## 4. 管理员查询与统计
 
 新端点：
@@ -54,6 +56,10 @@ best-effort 风险：进程在业务提交后、日志写前退出或 LOG_DB 故
 
 新 DTO 的 ID/quota（及大额聚合）使用十进制字符串，前端不 Number 解析。返回安全快照与 role-shaped other，不返回持久化模型全字段。消费/Token 只聚合 consume；统计分别给过滤记录数和 request_id 折叠后的请求/成功/失败，避免把重试行数叫成最终请求数。真实费用消费与响应失败可并存，不凭错误状态清零 quota。
 
+最终 outcome 先按 compareRequestOutcomes 选择，再复用现有 summary 的失败分类（error、violation fee 或 stream_status=error）；不能仅以 consume 判定成功。空 request_id 每行独立；requests=succeeded+failed，quota/Token 累加与请求去重分别处理。时间/商户/模型/账号/type 等过滤先应用，再在所选范围内折叠，不借窗口外或被过滤行改写当前筛选结果。
+
+实施前冻结 list/stat/options 的安全 response schema 与参数表并同步 API 文档/契约测试：沿用项目分页 envelope，说明 total/记录数/请求数区别、字符串聚合字段、nullable CNY、错误码及范围；options 约定 q/p/page_size/选中 ID 补取、上限及 id/name-only。list/count/stat 共用过滤，UI 不凭 mock 发明另一套字段。
+
 新页不复制原 RPM/TPM 卡片的独立 60 秒窗口；首版只做筛选范围内金额、请求和 Token 合计。原默认列表/stat/export 只读 logs，保留旧商户历史。新表 stats 先精确汇总 raw quota，再调用统一 CNY 转换；无有效转换时展示不可用而不是 ¥0。
 
 ## 5. 个人/API Key 联合读取
@@ -66,6 +72,8 @@ best-effort 风险：进程在业务提交后、日志写前退出或 LOG_DB 故
 - 请求结果/汇总继续使用 compareRequestOutcomes（consume 优先、时间/原 id/确定性事实），只在完全相同事实时加内部来源 tie-breaker；空 request_id 是不同事件。不能先改 display id 再比较。
 - 汇总继续区分 wallet/subscription quota，不将订阅计为现金节省；现有窗口/时区/导出开关/锁/NDJSON 尾部结果/取消保持。
 - export 从联合排序流读取，逐行 user 投影并编号，不把全窗口缓存在内存；跨表同 id 不能挤掉另一行。user/token 输出不带新 admin/root owner/诊断字段。
+- 实施前列出联合投影逐列类型/别名及驱动策略（特别是 ClickHouse id=0、新 Int64 quota 对旧 Int32、is_stream/group/只读 channel_name），统一适配现有 logs 前缀过滤；不能把 union SQL 直接塞入仍固定 Model(&Log{}) 的 streamLogs。pq 实跑 list/count/summary/export，CH 做 SQL/类型契约检查并披露未运行，MySQL/SQLite 保持现有支持不扩大运行矩阵。
+- 非 Tenant/只有旧行用户不得丢失原排序/过滤/脱敏/导出结果；不能因当前 owner 映射不存在就跳过其历史新表记录。数据来源由已鉴权 ownership 决定，不由当前套餐/归属决定。
 
 ## 6. 页面与复用
 

@@ -33,6 +33,8 @@ Owner lookup failure is not nonmembership: do not mix an unknown event into defa
 
 Request outcome and charged consumption are different aggregates. Retry-folded requests retain compareRequestOutcomes; all actual consume facts retain their charges. Existing raw logs are not deduplicated by request_id. No new uniqueness constraint on request_id: retries/task facts can legitimately share it.
 
+统计口径补充：consume 优先仅选择最终 outcome，不代表该 outcome 成功。复用既有 summary 对 violation fee/stream_status=error 的失败分类；筛选先于所选范围内请求折叠，空 request_id 每行独立，requests=succeeded+failed。消费/Token 原始求和与 outcome 计数不混用。
+
 ## 4. Storage and read identity
 
 New table: partner_tenant_usage_logs in LOG_DB, with local primary key, separate event_id, safe Tenant/account/name snapshot and explicit copies of usage Log fields. Do not embed Log GORM index tags: PostgreSQL index names must not collide with logs (e.g. idx_created_at_id). Use prefixed short new index names, TEXT for content/other, int64 quota/ownership values. No FK/cross-database join with main DB.
@@ -59,6 +61,10 @@ No historical migration, hiding or recount. New SQL table has no added automatic
 
 Coordinated rollout must include all API and background writers; no fabricated single cutover timestamp across mixed versions. Rollback retains new table/data and a reader capable of accessing it. An old binary alone cannot prove personal read continuity; never copy/delete records to fake rollback completeness.
 
+补充安全输出边界：原三个 usage writer 的应用 logger 还会打印完整 params/content/raw error。Tenant/未知归属分支须改为受控关联输出，不能只令新 helper 的 GORM silent；读取角色投影不能阻止秘密已进入应用日志。新端点实施前冻结分页/统计/options 的安全 schema 与文档，前端按同一契约接入。
+
 ## 7. Validation boundary
 
 All Go tests and database engines run only in task-owned Docker; isolated PostgreSQL is the migration acceptance target. Do not run host go test, restart Docker, use production, or substitute SQLite/build/vet for missing pq evidence. No resource has been created in planning. Record later exact resources in TEMPORARY_ARTIFACTS.md; cleanup needs approval and excludes Trellis records.
+
+续接检查见 `planning-review.md`：必须列出受影响既有日志/额度/用户回归及前组模式/审计运行缺口，审核 TestMain/fixture 后执行；新增命名前缀不代表旧回归通过。双表 union 须有逐列类型/别名/驱动策略，pq 实跑与 CH SQL 契约检查分开报告。

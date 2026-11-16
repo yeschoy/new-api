@@ -5,3 +5,4 @@
 {"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Preserve catalog numeric quota, real price currency and payment rules"}
 {"file":".trellis/tasks/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Source evidence for independent/H5/catalog DTOs and preference-driven helper limitations"}
 {"file":".trellis/tasks/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Shared additive quota_cny shape, six-place explicit rounding and config failure behavior"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/planning-review.md","reason":"Prior mode/audit runtime gaps and affected old quota/credential regressions"}

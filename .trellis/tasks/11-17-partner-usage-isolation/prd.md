@@ -9,6 +9,7 @@
 - 用户已同意创建父任务及三个子任务，并逐项确认以下产品边界。
 - 当前仍为 `planning`。本轮“好”确认的是历史过渡，不是最终规划实施授权；须向用户展示完整规划摘要并获后续明确批准，才可 start 子任务。
 - 本阶段仅修改规划记录；不访问生产 API/数据库或秘密，不下单/付款/调用模型，不改生产配置/数据，不部署或推送。
+- 续接复核：用户要求检查已有多任务拆分及上轮缺口，授权本轮调整规划，未授权 start。保留父任务 + 三个子任务；执行/安全/回归缺口见 `research/planning-review.md`，须评审本次修订后的完整摘要。
 
 ## 背景与证据
 
@@ -17,6 +18,7 @@
 - 日志写入口为 `model/log.go:279,340,427`；失败可能早于订阅选择，不能用 billing_source=subscription 代替商户归属。默认统计见 `model/log.go:738`、`web/src/features/usage-logs/components/common-logs-stats.tsx:69-93`。
 - 共享/独立 LOG_DB 启动路径见 `model/main.go:236,443`；个人请求/汇总见 `model/log.go:620`、`model/log_summary.go:35`；全站小时聚合独立位于 `model/usedata.go:102`。
 - 源码核对见 `research/current-boundaries.md`；跨子任务契约见 `research/contract-decisions.md`。前次五分钟订单修改已提交 `03008c73a`，不重新实现或扩大该支付范围。
+- 前组 `11-13-partner-access-mode-audit/verification.md` 仍为 source-review-ready / runtime-blocked，两个实现子任务尚未归档。该既有运行缺口必须独立披露，不能随本组规划完成被视为已验收。
 
 ## 已确认需求
 

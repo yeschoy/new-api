@@ -4,3 +4,4 @@
 {"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Check no actual currency/price/billing mutation"}
 {"file":".trellis/tasks/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Check actual quota snapshot and DTO insertion points"}
 {"file":".trellis/tasks/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Check precision/rounding, null unlimited, unavailable config and one shared converter"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/planning-review.md","reason":"Check legacy quotas and credential audit regressions beyond newly named converter suites"}

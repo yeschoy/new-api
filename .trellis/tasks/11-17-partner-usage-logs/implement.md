@@ -8,20 +8,25 @@
 - [ ] 增加单用户及批量 safe owner、request-local 快照、无秘密商户 options；禁止额外全局负缓存。owner 查询失败不得按普通用户写回默认表。
 - [ ] 两个 scope 明确的 options 入口复用同一安全投影；增加真实路由/PAT/字段白名单回归。
 - [ ] 冻结共享签名/字段/错误语义，登记供用户分类消费。测试只在 owned Docker，未有 runtime 不宣称 owner 全验收。
+- [ ] A 阶段交接写入 verification.md：owner/options 实际签名、字段/权限、文件所有权、测试执行数与阻塞项；仅表示可被其他子任务消费，不勾选整个日志交付完成。
 
 ## B. 表与读取先行
 
 - [ ] 新表显式字段/TEXT/64位/短前缀索引/event_id，不复用 Log index tags。覆盖默认 LOG_DB=DB 与独立日志库初始化，迁移幂等且不搬历史。
 - [ ] ClickHouse 显式 DDL/TTL 保持现有驱动支持；SQL 新表不新增清理，默认清理范围不变。
 - [ ] 新表分页/count/stat 使用同一过滤；新 ID/quota 字符串，admin/root 脱敏与安全错误。
+- [ ] 冻结 list/stat/options 的 response schema、分页/字符串聚合、nullable CNY、过滤与 bounded options 参数；同步新端点 API 文档和契约测试。outcome 选择与失败分类分离，覆盖收费失败/流失败，requests=succeeded+failed。
 - [ ] 逐个适配 self list/stat/requests/summary/export/token-recent。ownership 下推两个分支后再 union/count/排序/分页；默认 admin list/stat/export 不 union。
 - [ ] 回归同本地 ID、空 request_id、失败重试成功、consume 与异常费用、时区/窗口、流式导出取消和既有开关。
+- [ ] 列出双表逐列投影/类型/别名与各驱动策略；pq 实跑联合流，CH 检查类型与生成 SQL；现有 logs 前缀过滤和固定 Model 的流读取须显式适配。普通旧表用户保持原行为，历史新表读取不受当前 owner 查询过滤。
+- [ ] B 阶段迁移/兼容 reader 通过后才允许进入 C 切写；记录 fresh/upgrade/repeat、同库/分库与 reader 实际证据。
 
 ## C. 切写与全站统计
 
 - [ ] 仅消费/错误专用入口分流；通用 createLog 及非目标类型不重定向。
 - [ ] 真实调用覆盖 text/audio/websocket/task 正向消费和可记录 error；抑制/legacy funding 禁止路径不扩权。
 - [ ] 归属与 LOG_DB 故障安全告警、不回默认表、不阻塞既有已结算扣费；LogQuotaData/全站计数仍一次。
+- [ ] 核对三 writer 原整对象 params/content/raw error 输出，Tenant/未知归属不能绕过安全告警；秘密标记覆盖应用 logger 与 GORM DEBUG，不只验证角色读取投影。
 - [ ] 预置旧商户行、写入新商户/普通订阅行，证明默认旧历史保留、新行单表隔离、自身连续可查。
 
 ## D. 前端与金额集成
@@ -40,6 +45,8 @@ go test -mod=readonly ./model ./controller ./router ./middleware ./service -run 
 ```
 
 测试名/DSN 是计划接口，须先实现并确认实际选中用例、无缺 DSN skip；测试夹具应隔离 schema、留存证据、不 DROP 旧资源。覆盖 fresh/repeat/default/separate LOG_DB、实际 DDL/持久化/目标 EXPLAIN、真实 SetApiRouter 鉴权、writer 与各 reader。其他 driver 只保持现有兼容并披露未运行项，不扩泛化数据库矩阵。
+
+另建立受影响既有回归清单：`model/log_format_test.go`、`model/log_other_test.go`、`model/log_outcome_test.go`、`model/clickhouse_log_test.go`、`controller/log_export_test.go`、`controller/log_summary_test.go`、`controller/relay_error_log_test.go` 及相关 service/任务计数测试。先检查 TestMain/fixture，必要时把目标断言接入安全自包含 pq suite；登记实际命令/选中数，不盲跑旧 SQLite/清表夹具。新前缀命令通过不等于旧回归通过；新迁移/共享响应还须按父计划运行受影响前组模式/授权审计断言。
 
 在 web 使用现有依赖：
 

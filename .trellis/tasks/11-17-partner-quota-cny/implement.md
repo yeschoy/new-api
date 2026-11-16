@@ -35,6 +35,7 @@ go test -mod=readonly ./service ./model ./controller -run '^TestPartnerTenantQuo
 设计中的自包含 DSN 为 `TEST_PARTNER_QUOTA_CNY_POSTGRES_DSN`；新增匹配 TestMain 分支避免误触 legacy SQLite，显式空隔离 PostgreSQL/唯一留存 schema。必须实际执行授权读取/兼容测试，缺 DSN skip 不是通过。纯 converter 测试也在同一受控 Docker，不用宿主机测试兜底。
 
 - [ ] JSON 解析、所有本地 OpenAPI refs/schema 和 Markdown 示例/链接验证；不调用真实 API/秘密查询。
+- [ ] 核对 `model/partner_tenant_subscription_key_test.go`、`controller/partner_tenant_subscription_key_test.go`、H5/quota/catalog 相关旧测试和前组模式/授权审计断言；检查 TestMain/DSN/fixture 后在 owned Docker/pq 运行或迁入安全自包含夹具。尤其每次额度查询仍有原审计事件、终态 Key 规则不变；记录实际选择器/执行数，不以新增 converter suite 代表全部旧回归。
 - [ ] 必要 consumer 单测（日志 child 集成时执行），无额外依赖/lockfile。
 - [ ] trellis-check 覆盖完整差异，A-C1–A-C5 有实际证据。build/vet 不代替 Go/pq runtime；Docker 不可用精确报阻塞。
 - [ ] 把经验证金额协议写入相关 spec，精确路径提交代码/测试/文档/Trellis；生产配置、私钥/报告/临时产物不进入提交。
