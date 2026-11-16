@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Read model/controller package conventions before user-query changes"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Actual pq EXISTS/count/pagination validation in isolated Docker"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Tenant membership independent of plan/status; no account/role/billing mutation"}
+{"file":".trellis/spec/frontend/index.md","reason":"Preserve users feature, table and route conventions"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Session/viewer-safe state, query/cache and UI regression expectations"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Existing PartnerAccount/OAuth fields are separate from Tenant ownership"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Shared safe owner/options, admin read gates and no false ordinary on lookup failure"}

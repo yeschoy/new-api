@@ -1,0 +1,28 @@
+{
+  "id": "partner-usage-logs",
+  "name": "partner-usage-logs",
+  "title": "商户模型日志独立存储与后台用量页",
+  "description": "新增商户模型用量独立表、写入分流、管理员查询统计与页面，历史日志不搬迁并保持计费不变",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tanggod",
+  "assignee": "tanggod",
+  "createdAt": "2026-11-17",
+  "completedAt": null,
+  "branch": "feat/partner-accounts",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-17-partner-usage-isolation",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "planning_stage": "final_review_pending"
+  }
+}

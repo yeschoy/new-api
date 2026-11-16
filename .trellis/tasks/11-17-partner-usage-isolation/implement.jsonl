@@ -1,0 +1,9 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend entry points and package pre-development contracts"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"PostgreSQL-first migration acceptance and isolated Docker evidence"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Tenant membership, subscription-only billing and unchanged payment boundaries"}
+{"file":".trellis/spec/backend/partner-subscription-key.md","reason":"Locked quota snapshots, precise strings and existing credential rules"}
+{"file":".trellis/spec/backend/partner-authorization-audit.md","reason":"Safe independent LOG_DB writes; usage is separate from credential audit"}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend package conventions and cross-layer UI references"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Personal reports, historical facts, route/viewer state and UI regression contracts"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Source-grounded writer, reader, migration and authorization census"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Shared final-review owner, read matrix, CNY precision and transition contracts"}

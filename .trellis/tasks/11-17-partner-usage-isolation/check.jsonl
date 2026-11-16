@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Real isolated PostgreSQL DDL/persistence required; no static-only acceptance"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Review unchanged billing/payment truth and Tenant identity"}
+{"file":".trellis/spec/backend/partner-subscription-key.md","reason":"Review quota precision, terminal states and authorization invariants"}
+{"file":".trellis/spec/backend/partner-authorization-audit.md","reason":"Check best-effort/redaction without altering separate credential audit"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Review viewer-scoped UI/cache and existing self-report semantics"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Check all actual writers/readers and both LOG_DB lifecycle branches"}
+{"file":".trellis/tasks/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Cross-child acceptance: single-write, own-query continuity, history, safe owner and CNY"}

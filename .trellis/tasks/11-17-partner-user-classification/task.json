@@ -1,0 +1,28 @@
+{
+  "id": "partner-user-classification",
+  "name": "partner-user-classification",
+  "title": "用户列表商户归属与分类筛选",
+  "description": "用户列表增加真实Tenant归属、全部普通商户分类与商户筛选，不改变用户角色权限",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "tanggod",
+  "assignee": "tanggod",
+  "createdAt": "2026-11-17",
+  "completedAt": null,
+  "branch": "feat/partner-accounts",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-17-partner-usage-isolation",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "planning_stage": "final_review_pending"
+  }
+}
