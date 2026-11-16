@@ -38,6 +38,12 @@ func TestMain(m *testing.M) {
 	if os.Getenv("TEST_PARTNER_USAGE_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "PartnerTenantUsage") {
 		os.Exit(m.Run())
 	}
+	// The fixed-CNY quota projection suite in this package is a pure converter
+	// (no database, no i18n); its HTTP fixtures own isolated PostgreSQL schemas
+	// in package controller. It neither needs nor may trigger the SQLite bootstrap.
+	if os.Getenv("TEST_PARTNER_QUOTA_CNY_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "PartnerTenantQuotaCNY") {
+		os.Exit(m.Run())
+	}
 	if os.Getenv("TEST_PARTNER_ACCESS_AUDIT_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "AccessMode") || strings.Contains(flag.Lookup("test.run").Value.String(), "AuthorizationAudit") {
 		os.Exit(m.Run())
 	}

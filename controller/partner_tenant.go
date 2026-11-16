@@ -179,6 +179,8 @@ type partnerTenantSubscriptionQuota struct {
 	QuotaRemain    int64  `json:"quota_remaining"`
 	QuotaUnlimited bool   `json:"quota_unlimited"`
 	NextReset      int64  `json:"next_reset_time"`
+	// Additive CNY display equivalent; the int64 fields above are unchanged.
+	QuotaCNY service.PartnerTenantSubscriptionQuotaCNY `json:"quota_cny"`
 }
 
 func PartnerTenantSubscriptionQuota(c *gin.Context) {
@@ -201,6 +203,9 @@ func PartnerTenantSubscriptionQuota(c *gin.Context) {
 		partnerTenantOrderError(c, err)
 		return
 	}
+	// One conversion snapshot for the whole response, read after the authorized
+	// quota transaction has committed.
+	quotaCNYConfig := service.CurrentPartnerTenantQuotaCNYConfig()
 	items := make([]partnerTenantSubscriptionQuota, 0, len(summaries))
 	for _, summary := range summaries {
 		if summary.Subscription == nil {
@@ -218,7 +223,7 @@ func PartnerTenantSubscriptionQuota(c *gin.Context) {
 		if summary.Subscription.AmountTotal > 0 {
 			quotaRemain = max(summary.Subscription.AmountTotal-summary.Subscription.AmountUsed, 0)
 		}
-		items = append(items, partnerTenantSubscriptionQuota{
+		item := partnerTenantSubscriptionQuota{
 			PlanID:         plan.Id,
 			PlanTitle:      plan.Title,
 			StartTime:      summary.Subscription.StartTime,
@@ -229,7 +234,9 @@ func PartnerTenantSubscriptionQuota(c *gin.Context) {
 			QuotaRemain:    quotaRemain,
 			QuotaUnlimited: summary.Subscription.AmountTotal == 0,
 			NextReset:      summary.Subscription.NextResetTime,
-		})
+		}
+		item.QuotaCNY = partnerTenantHostedQuotaCNY(c, quotaCNYConfig, &item)
+		items = append(items, item)
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"external_user_id": externalUserID,
@@ -252,7 +259,7 @@ func PartnerTenantListPlans(c *gin.Context) {
 	for i := range plans {
 		plans[i].NormalizeDefaults()
 	}
-	c.JSON(http.StatusOK, gin.H{"plans": plans})
+	c.JSON(http.StatusOK, gin.H{"plans": newPartnerTenantCatalogPlanViews(c, plans)})
 }
 
 type provisionPartnerTenantAccountRequest struct {

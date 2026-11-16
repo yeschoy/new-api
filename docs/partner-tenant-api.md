@@ -33,15 +33,94 @@ Merchant management endpoints use HTTPS and `Authorization: Bearer pt_<server-se
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST /purchase-sessions`                             | hosted_h5 only: `{external_user_id}` + Idempotency-Key → `{session_id,external_user_id,created_at,launch_expires_at,expires_at,purchase_url}`; first 201, exact replay 200, buyer conflict 409.       |
 | `GET /purchase-sessions/{session_id}`                 | Merchant reconciliation: session fields, `redeemed`, and `order:null` or the existing merchant order status DTO (no checkout capability). Available after session expiry; BFF must check buyer ownership. |
-| `GET /plans`                                          | Only this tenant's enabled plans. No user/account creation.                                                                                                                                               |
+| `GET /plans`                                          | Only this tenant's enabled plans. No user/account creation. Each plan also carries the additive `quota_cny` object (total only); see below. |
 | `PUT /accounts`                                       | `{external_user_id, display_name?}` → stable `{external_user_id, api_key, created}`; initial create 201, repeat 200. Independent of payment/entitlement.                                                  |
 | `POST /subscription-orders`                           | Retired: 403 integration_mode_mismatch for both modes; use the selected entry, never this endpoint.                                                          |
 | `GET /subscription-orders/{order_no}`                 | Authenticated tenant-scoped order state; no Key, QR, payment link or checkout capability. Merchant BFF must also check its current user's ownership.                                                      |
-| `GET /accounts/{external_user_id}/subscription/quota` | Only active tenant-owned subscriptions; returns totals/used/remaining, unlimited flag and reset/expiry times.                                                                                             |
+| `GET /accounts/{external_user_id}/subscription/quota` | Only active tenant-owned subscriptions; returns totals/used/remaining, unlimited flag and reset/expiry times. Each item also carries the additive `quota_cny` object; see below. |
 
 `PUT /accounts` can create an empty account and a fixed-group model Key before purchase; it does not grant quota. Disabled/deleted/wrong-group users and unavailable/expired/revoked credentials fail closed rather than being replaced. First fulfillment can provision an account if the merchant never called this operation.
 
 Plans remain one calendar month with monthly reset and the tenant's dedicated group. `total_amount:0` means unlimited: check `quota_unlimited`, not a zero remaining amount. The highest applicable nonzero plan RPM applies, not the sum; system/group limits also apply. Multi-node shared RPM enforcement requires shared Redis.
+
+### Fixed CNY quota display (`quota_cny`, additive)
+
+Quota is an internal metering unit: it is not money and not a token count. Three different things must not be confused:
+
+- **Purchase price**: `price_amount` + `currency` in the catalog; the amount actually charged is the order's `amount`.
+- **Quota**: `total_amount` / `quota_total` / `quota_used` / `quota_remaining`, in internal quota units. These fields keep their names, values and JSON types (int64 JSON **numbers** on these two endpoints).
+- **`quota_cny`**: the CNY display equivalent of that quota under the platform's **current** conversion configuration. It is not a wallet balance, not a price and not a historical cash debit, and it takes no part in billing, period reset, renewal or Key issuance.
+
+`quota_cny` is added to each `subscriptions[]` item of `GET /accounts/{external_user_id}/subscription/quota` and to each `plans[]` item of `GET /plans`. Example quota item (configuration `quota_per_unit=500000`, rate `1`):
+
+```json
+{
+  "plan_id": 42,
+  "plan_title": "Monthly plan",
+  "start_time": 1800000000,
+  "end_time": 1802678400,
+  "status": "active",
+  "quota_total": 15000000,
+  "quota_used": 16008,
+  "quota_remaining": 14983992,
+  "quota_unlimited": false,
+  "next_reset_time": 1801440000,
+  "quota_cny": {
+    "currency": "CNY",
+    "available": true,
+    "total": "30.000000",
+    "used": "0.032016",
+    "remaining": "29.967984",
+    "unlimited": false,
+    "usable": true,
+    "quota_per_unit": "500000",
+    "usd_to_cny_rate": "1",
+    "scale": 6,
+    "rounding": "half_away_from_zero"
+  }
+}
+```
+
+Catalog plans carry the total only. There is no `used`, `remaining`, `usable` or `historical_remaining`, because a plan has no usage or entitlement:
+
+```json
+{
+  "currency": "CNY",
+  "available": true,
+  "total": "30.000000",
+  "unlimited": false,
+  "quota_per_unit": "500000",
+  "usd_to_cny_rate": "1",
+  "scale": 6,
+  "rounding": "half_away_from_zero"
+}
+```
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `currency` | string | Always `"CNY"`, whatever the site displays (USD, CNY, custom or tokens). |
+| `available` | boolean | Whether the conversion can be displayed. It is **not** whether the subscription is usable. When false every amount is `null` and `reason` is present. |
+| `reason` | string, optional | Only when `available` is false: `invalid_conversion_config` (a conversion factor is not finite and positive) or `invalid_quota` (the stored quota fact is invalid). |
+| `total` | string or null | Period total. `null` when unlimited. |
+| `used` | string or null | Quota items only. Stays the true used amount even when it exceeds the total. |
+| `remaining` | string or null | Quota items only. Usable remaining, never negative; `null` when unlimited. |
+| `unlimited` | boolean | Same fact as `quota_unlimited` / `total_amount == 0`. |
+| `usable` | boolean | Quota items only. The entitlement fact: active and (unlimited or a positive raw remaining quota). It is never derived from an amount being greater than zero. It is a subscription-level quota fact: this endpoint does not check whether the account's platform user or model Key is currently enabled, so `usable: true` does not guarantee that a model call will succeed. |
+| `quota_per_unit`, `usd_to_cny_rate` | string or null | Decimal text of the factors used for this response; `null` for a factor whose configuration is invalid. |
+| `scale` | integer | Always `6`. |
+| `rounding` | string | Always `"half_away_from_zero"`. |
+
+Rules:
+
+- `amount = quota × usd_to_cny_rate ÷ quota_per_unit`. Quota enters as an exact integer (never through floating point); the product is exact and only the single final division is rounded, to six places, with exact halves going away from zero. Amounts are fixed-point strings with exactly six fractional digits, never JSON numbers and never in scientific notation.
+- Six places is a **display projection, not a lossless ledger**. `total`, `used` and `remaining` are rounded independently and may differ by one last-place unit; do not recompute a ledger from them. Reconcile with the raw quota fields.
+- A small positive quota can display as `"0.000000"`. Decide whether quota is left from the raw fields and `usable`, and show "below the smallest display unit" rather than "free" or "zero".
+- Unlimited is `total: null` (and `remaining: null`), never `"0.000000"`. Do not treat `null` as a zero limit.
+- The configuration is read once per response at query time, so every item of one response uses the same factors. It is not an exchange-rate snapshot taken at purchase time.
+- If the conversion configuration is invalid the endpoint still returns 200 with all original fields unchanged; only `quota_cny` reports `available: false` with `null` amounts. The platform never substitutes a default rate, a site display multiplier or zero. Fall back to showing raw quota.
+- The hosted quota endpoint remains active-only, so its items never carry `historical_remaining`.
+
+Compatibility: the field is purely additive. A third-party decoder that rejects unknown fields must be updated before it consumes these responses, and a client talking to an older or rolled-back platform must tolerate the field being absent. Adding `quota_cny` does not change or "fix" the legacy numeric contract: `total_amount` and the `quota_*` fields above remain int64 JSON numbers that need lossless parsing beyond the JavaScript safe-integer range. Go/PostgreSQL runtime verification of this addition has not been executed yet.
 
 ## Ordering and cashier
 

@@ -233,5 +233,7 @@ func PartnerTenantIndependentSubscription(c *gin.Context) {
 		partnerTenantSubscriptionKeyError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, result)
+	// Additive display only, built from the snapshot the query above already
+	// authorized and committed; no second bearer or subscription lookup.
+	c.JSON(http.StatusOK, newPartnerTenantIndependentSubscriptionView(c, result))
 }

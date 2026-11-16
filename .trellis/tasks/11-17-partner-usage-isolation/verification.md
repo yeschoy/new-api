@@ -46,12 +46,21 @@ Go 测试执行数：**0**（宿主机禁止 `go test`，Docker 不可用）。s
 | --- | --- | --- | --- |
 | usage-logs A（安全 owner / 批量 owner / 安全 options / 两个入口） | **source-ready / runtime-blocked** | 实现 + 一轮独立 trellis-check；主会话独立复核：`gofmt -l` 无输出、离线 `go build` rc=0、离线 `go vet` rc=0（含 10 个 `TestPartnerTenantUsage*` 测试源码的类型检查）、`git diff --check` rc=0、无暂存、lockfile 未变 | **Go 测试执行 0**；pq 上的实际 SQL、真实路由鉴权/PAT 矩阵、路由注册不 panic 均未运行 |
 | usage-logs B / C / D | 未开始 | — | C（切写）在 B 的迁移与兼容 reader 经 pq 验证前不得启用 |
-| quota-cny | 未开始 | — | — |
+| quota-cny（转换器、三个入口 additive `quota_cny`、文档/OpenAPI、15 个测试源码） | **source-ready / runtime-blocked** | 实现代理中途结束、未交接（仅返回一句话，记录为事实）；随后一轮独立 trellis-check 补齐审阅与记录。主会话独立复核（06:08 CST）：`gofmt -l` 无输出、离线 `go build` rc=0、离线 `go vet` rc=0、`git diff --check` rc=0、无暂存、`model/` 仅测试文件变化；主会话自行以拒绝重复键方式解析 OpenAPI，103 处本地 `$ref` 全部可解析；主会话读源码确认嵌入类型无自定义 `MarshalJSON`、`DivRound`（decimal.go:641-670）为半入远离零。检查代理**执行**了测试 oracle 的精确有理数复算（60 个期望 0 不一致）与文档检查（最终 rc=0） | **Go 测试执行 0**（15 个 `TestPartnerTenantQuotaCNY*`：service 9 / controller 4 / model 2，仅类型检查）。A-C1/A-C2/A-C3/A-C5 无运行证据；仅 A-C4（文档）有执行证据 |
 | user-classification | 未开始 | — | 仅依赖 A 契约 |
 
 A 阶段冻结的共享签名见 `../11-17-partner-usage-logs/verification.md`“A 阶段交接”；审阅记录见 `../11-17-partner-usage-logs/quality-review.stage-a.md`。A 的 source-ready 只表示其他子任务可以消费该契约，不是 usage-logs 的验收。
 
 Docker 复测：04:16、04:53 CST 均不可连接。
+
+### quota-cny 的一项语义决定（F1，已按已批准契约处理，需向用户披露）
+
+- 独立查询 `GET /api/partner/subscription` 的 `quota_cny.usable` 复制模型已有的 `quota_usable` 事实。
+- 托管 H5 额度入口的旧 DTO 没有 usable 字段。`quota_cny.usable` 由该入口**已有的**原始事实计算：`active && (unlimited || remaining > 0)`，不是由金额推断，也没有新增读取。
+- 两个入口公式相同、前置条件不同：独立查询在用户被禁用、模型 Key 被禁用/过期、分组变更或存量 used 为负时直接返回 403/409，不输出布尔值；H5 入口历来只校验商户密钥、模式与账号启用，这些状态下仍返回 200，此时 `usable` 只表示“额度层面可用”，不保证模型调用一定成功。这一差异是两个入口既有的鉴权范围差异，不是本次引入的。
+- 主会话决定：保持已批准契约（H5 item 含 `usable`、H5 不扩大读取），文档已如实写明其适用范围。改为“H5 不输出 usable”或“H5 增加用户/Key 校验读取”都属于契约/范围变更，未做；若用户希望调整，需先更新规划。
+
+Docker 复测：05:55、06:08 CST 仍不可连接。
 
 ## 3b. 读取方普查补充（规划 census 之外，新发现）
 

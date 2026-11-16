@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "商户订阅 Key API",
-    "version": "1.0.0",
-    "description": "仅供创建时选定且固定为 subscription_key 的商户；hosted_h5 错误入口返回403 integration_mode_mismatch。旧直接 POST subscription-orders 两模式均拒绝；本次模式变更 pq/runtime 尚未验证。商户 pt_ 无买家 ID 下单，返回平台付款 URL；首次可信付款后的完整交付才开户。续费在相同 POST 用 X-Subscription-Key 指定原订阅。买家独立查询只需 sub_，不需商户密钥或 Cookie。成功直接返回业务 JSON，无 success/data 包装。此文件不是生产部署或真实支付验收证明；请将示例服务器替换为实际已部署的 HTTPS 地址。不要导入真实秘密或默认执行付款请求。"
+    "version": "1.1.0",
+    "description": "仅供创建时选定且固定为 subscription_key 的商户；hosted_h5 错误入口返回403 integration_mode_mismatch。旧直接 POST subscription-orders 两模式均拒绝；本次模式变更 pq/runtime 尚未验证。商户 pt_ 无买家 ID 下单，返回平台付款 URL；首次可信付款后的完整交付才开户。续费在相同 POST 用 X-Subscription-Key 指定原订阅。买家独立查询只需 sub_，不需商户密钥或 Cookie。成功直接返回业务 JSON，无 success/data 包装。1.1.0 起独立订阅响应与目录每个套餐兼容新增 quota_cny（固定人民币额度展示等值，原字段名称/值/类型不变）；严格拒绝未知字段的客户端需先升级解码器；该新增字段的 Go/PostgreSQL 运行验证尚未执行。此文件不是生产部署或真实支付验收证明；请将示例服务器替换为实际已部署的 HTTPS 地址。不要导入真实秘密或默认执行付款请求。"
   },
   "servers": [
     {"url": "https://platform.example", "description": "占位地址，替换为实际已部署的 HTTPS 平台域名"}
@@ -18,7 +18,7 @@
         "tags": ["Merchant"],
         "operationId": "listPartnerSubscriptionKeyPlans",
         "summary": "查询本商户启用套餐",
-        "description": "复用已有目录，返回完整 SubscriptionPlan；本 schema 描述常用字段并允许额外字段。price_amount/total_amount 保留旧数字协议，不能当作新的字符串额度 DTO；大整数应无损解析。历史非CNY或其他不可支付配置仍可能出现在目录，实际下单会校验。",
+        "description": "复用已有目录，返回完整 SubscriptionPlan；本 schema 描述常用字段并允许额外字段。price_amount/total_amount 保留旧数字协议，不能当作新的字符串额度 DTO；大整数应无损解析。历史非CNY或其他不可支付配置仍可能出现在目录，实际下单会校验。每个套餐兼容新增 quota_cny：仅含总额度的人民币展示等值（total/unlimited/available 与换算元数据），目录没有已用/剩余/可用性。quota_cny 不是售价：售价仍是 price_amount + currency，实际应付以订单 amount 为准；新增字段也没有修复 total_amount 作为大整数 JSON number 的解析要求。",
         "security": [{"MerchantBearer": []}],
         "responses": {
           "200": {
@@ -116,15 +116,17 @@
         "tags": ["Subscription"],
         "operationId": "getIndependentPartnerSubscription",
         "summary": "买家仅凭 sub_ 查询单订阅、额度与 Coding Key",
-        "description": "仅Authorization: Bearer sub_...；不要发送pt_、Cookie、商户ID或X-Subscription-Key。不接受query（包括空?）、URL/JSON/x-api-key替代鉴权。Key本身定位唯一订阅。所有quota均精确十进制字符串；自然到期/取消返回历史统计、不重置新周期、不返回api_key，当前remaining为0且不可消费。活跃但耗尽仍可能返回正常Coding Key、quota_usable=false，实际模型消费由订阅funding拒绝。禁用/错组/损坏/不可用Token失败关闭，不补发。sub_不能调用Coding。",
+        "description": "仅Authorization: Bearer sub_...；不要发送pt_、Cookie、商户ID或X-Subscription-Key。不接受query（包括空?）、URL/JSON/x-api-key替代鉴权。Key本身定位唯一订阅。所有quota均精确十进制字符串；自然到期/取消返回历史统计、不重置新周期、不返回api_key，当前remaining为0且不可消费。活跃但耗尽仍可能返回正常Coding Key、quota_usable=false，实际模型消费由订阅funding拒绝。禁用/错组/损坏/不可用Token失败关闭，不补发。sub_不能调用Coding。响应顶层兼容新增 quota_cny：同一已授权额度快照按当前配置换算的固定人民币展示等值（六位小数字符串或 null），不是钱包余额、套餐售价或历史扣款；原 quota 与 api_key 规则不变，换算配置无效时 quota_cny.available=false 而本接口仍返回200。",
         "security": [{"SubscriptionBearer": []}],
         "responses": {
           "200": {
             "description": "单份订阅；api_key只在关联订阅有效且凭证正常时存在",
             "headers": {"Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Referrer-Policy": {"$ref": "#/components/headers/NoReferrer"}, "X-Request-Id": {"$ref": "#/components/headers/RequestId"}},
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IndependentSubscription"}, "examples": {
-              "active": {"summary": "有效订阅（Key为占位示例）", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "active", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "9223372036854775807", "quota_used": "9007199254740993", "quota_remaining": "9214364837600034814", "quota_unlimited": false, "quota_usable": true, "next_reset_time": 1801440000}, "api_key": "sk-REPLACE_WITH_ACTUAL_MODEL_KEY"}},
-              "expired": {"summary": "到期历史，不含api_key", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "expired", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "5000000", "quota_used": "250", "quota_remaining": "0", "quota_unlimited": false, "quota_usable": false, "next_reset_time": 1802678400, "historical_quota_remaining": "4999750"}}}
+              "active": {"summary": "有效订阅（Key为占位示例；quota_cny 按示例配置 quota_per_unit=500000、汇率1 换算）", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "active", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "9223372036854775807", "quota_used": "9007199254740993", "quota_remaining": "9214364837600034814", "quota_unlimited": false, "quota_usable": true, "next_reset_time": 1801440000}, "api_key": "sk-REPLACE_WITH_ACTUAL_MODEL_KEY", "quota_cny": {"currency": "CNY", "available": true, "total": "18446744073709.551614", "used": "18014398509.481986", "remaining": "18428729675200.069628", "unlimited": false, "usable": true, "quota_per_unit": "500000", "usd_to_cny_rate": "1", "scale": 6, "rounding": "half_away_from_zero"}}},
+              "expired": {"summary": "到期历史，不含api_key；可用余额为0，历史余额不可消费", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "expired", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "5000000", "quota_used": "250", "quota_remaining": "0", "quota_unlimited": false, "quota_usable": false, "next_reset_time": 1802678400, "historical_quota_remaining": "4999750"}, "quota_cny": {"currency": "CNY", "available": true, "total": "10.000000", "used": "0.000500", "remaining": "0.000000", "historical_remaining": "9.999500", "unlimited": false, "usable": false, "quota_per_unit": "500000", "usd_to_cny_rate": "1", "scale": 6, "rounding": "half_away_from_zero"}}},
+              "unlimited": {"summary": "有效不限量：total/remaining 为 null，不是零额度", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "active", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "0", "quota_used": "16008", "quota_remaining": "0", "quota_unlimited": true, "quota_usable": true, "next_reset_time": 1801440000}, "api_key": "sk-REPLACE_WITH_ACTUAL_MODEL_KEY", "quota_cny": {"currency": "CNY", "available": true, "total": null, "used": "0.032016", "remaining": null, "unlimited": true, "usable": true, "quota_per_unit": "500000", "usd_to_cny_rate": "1", "scale": 6, "rounding": "half_away_from_zero"}}},
+              "conversion_unavailable": {"summary": "换算配置无效：业务响应照常成功，金额全部为 null", "value": {"subscription": {"id": 123, "plan_id": 42, "plan_title": "Monthly plan", "status": "active", "start_time": 1800000000, "end_time": 1802678400, "requests_per_minute": 60}, "quota": {"quota_total": "15000000", "quota_used": "16008", "quota_remaining": "14983992", "quota_unlimited": false, "quota_usable": true, "next_reset_time": 1801440000}, "api_key": "sk-REPLACE_WITH_ACTUAL_MODEL_KEY", "quota_cny": {"currency": "CNY", "available": false, "reason": "invalid_conversion_config", "total": null, "used": null, "remaining": null, "unlimited": false, "usable": true, "quota_per_unit": "500000", "usd_to_cny_rate": null, "scale": 6, "rounding": "half_away_from_zero"}}}
             }}}
           },
           "400": {"$ref": "#/components/responses/IntegrationError"},
@@ -197,7 +199,47 @@
     },
     "schemas": {
       "SubscriptionKey": {"type": "string", "minLength": 68, "maxLength": 68, "pattern": "^sub_[0-9a-f]{64}$", "description": "高敏查询Key；不能用于模型调用，禁止URL/日志/公共缓存传输"},
-      "QuotaAmount": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$", "maxLength": 19, "description": "平台内部quota单位的精确非负int64十进制字符串，不是金额或Token数；实际最大9223372036854775807，不要转JavaScript Number。基础USD等值=quota除以/api/status的data.quota_per_unit；CNY展示再乘data.usd_exchange_rate；total=0时应按unlimited标志展示而非余额0", "example": "9007199254740993"},
+      "QuotaAmount": {"type": "string", "pattern": "^(0|[1-9][0-9]{0,18})$", "maxLength": 19, "description": "平台内部quota单位的精确非负int64十进制字符串，不是金额或Token数；实际最大9223372036854775807，不要转JavaScript Number。基础USD等值=quota除以/api/status的data.quota_per_unit；CNY展示再乘data.usd_exchange_rate；total=0时应按unlimited标志展示而非余额0。服务端已在 quota_cny 中给出按当前配置换算的人民币展示等值，原 quota 字段保持不变且仍是精确事实", "example": "9007199254740993"},
+      "CNYAmount": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.[0-9]{6}$", "description": "人民币展示等值：恰好六位小数的定点十进制字符串，不使用科学计数法，不是 JSON number。amount = quota × usd_to_cny_rate ÷ quota_per_unit，先精确相乘，仅最后一次除法舍入到六位（half_away_from_zero）。这是展示投影而非无损账本：正的极小 quota 可能显示为 0.000000，请以原 quota 判断是否为零", "example": "30.000000"},
+      "NullableCNYAmount": {"type": "string", "nullable": true, "pattern": "^(0|[1-9][0-9]*)\\.[0-9]{6}$", "description": "同 CNYAmount；null 表示不限量没有有限数值，或换算不可用（available=false）。null 不是 0", "example": "30.000000"},
+      "QuotaCNYFactor": {"type": "string", "nullable": true, "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$", "description": "本次响应使用的换算因子的十进制文本（不含指数）；该因子配置无效时为 null", "example": "500000"},
+      "QuotaCNYReason": {"type": "string", "enum": ["invalid_conversion_config", "invalid_quota"], "description": "仅 available=false 时出现的有界原因：换算配置（quota_per_unit 或汇率）非正/非有限，或存量 quota 事实非法。不含任何内部错误文本"},
+      "SubscriptionQuotaCNY": {
+        "type": "object", "additionalProperties": false,
+        "required": ["currency", "available", "total", "used", "remaining", "unlimited", "usable", "quota_per_unit", "usd_to_cny_rate", "scale", "rounding"],
+        "description": "单份订阅额度的固定人民币展示等值，来自与 quota 相同的已授权快照和本次响应读取一次的换算配置；不随站点展示币种（USD/CNY/CUSTOM/TOKENS）偏好变化。它不是钱包余额、套餐售价或历史现金扣款，不参与计费。total/used/remaining 各自独立舍入，可能相差一个末位单位，不得用它们重算账本。",
+        "properties": {
+          "currency": {"type": "string", "enum": ["CNY"]},
+          "available": {"type": "boolean", "description": "换算是否可展示；与订阅是否可用无关（见 usable）。false 时三个金额均为 null 且带 reason"},
+          "reason": {"$ref": "#/components/schemas/QuotaCNYReason"},
+          "total": {"allOf": [{"$ref": "#/components/schemas/NullableCNYAmount"}], "description": "周期总额度等值；不限量为 null"},
+          "used": {"allOf": [{"$ref": "#/components/schemas/NullableCNYAmount"}], "description": "已用额度等值；used 大于 total 时仍是真实已用"},
+          "remaining": {"allOf": [{"$ref": "#/components/schemas/NullableCNYAmount"}], "description": "当前可用余额等值，不为负；有效不限量为 null；到期/取消固定 0.000000"},
+          "historical_remaining": {"allOf": [{"$ref": "#/components/schemas/CNYAmount"}], "description": "可省略。仅到期/取消的有限额度订阅出现，对应 historical_quota_remaining，不可消费"},
+          "unlimited": {"type": "boolean", "description": "与 quota_unlimited 相同的事实；到期/取消后仍保留"},
+          "usable": {"type": "boolean", "description": "与 quota_usable 相同的权益事实，不由金额是否大于0推断"},
+          "quota_per_unit": {"allOf": [{"$ref": "#/components/schemas/QuotaCNYFactor"}]},
+          "usd_to_cny_rate": {"allOf": [{"$ref": "#/components/schemas/QuotaCNYFactor"}]},
+          "scale": {"type": "integer", "enum": [6], "description": "金额小数位数"},
+          "rounding": {"type": "string", "enum": ["half_away_from_zero"]}
+        }
+      },
+      "CatalogQuotaCNY": {
+        "type": "object", "additionalProperties": false,
+        "required": ["currency", "available", "total", "unlimited", "quota_per_unit", "usd_to_cny_rate", "scale", "rounding"],
+        "description": "套餐周期总额度（total_amount）的固定人民币展示等值。目录没有使用情况：不存在 used、remaining、usable、historical_remaining。不是售价（售价见 price_amount/currency 与订单 amount）。",
+        "properties": {
+          "currency": {"type": "string", "enum": ["CNY"]},
+          "available": {"type": "boolean", "description": "换算是否可展示；false 时 total 为 null 且带 reason"},
+          "reason": {"$ref": "#/components/schemas/QuotaCNYReason"},
+          "total": {"allOf": [{"$ref": "#/components/schemas/NullableCNYAmount"}], "description": "总额度等值；total_amount 为 0（不限量）时为 null"},
+          "unlimited": {"type": "boolean", "description": "total_amount 为 0"},
+          "quota_per_unit": {"allOf": [{"$ref": "#/components/schemas/QuotaCNYFactor"}]},
+          "usd_to_cny_rate": {"allOf": [{"$ref": "#/components/schemas/QuotaCNYFactor"}]},
+          "scale": {"type": "integer", "enum": [6]},
+          "rounding": {"type": "string", "enum": ["half_away_from_zero"]}
+        }
+      },
       "CreateOrderRequest": {
         "type": "object", "additionalProperties": false, "required": ["plan_id", "payment_method"],
         "properties": {
@@ -225,7 +267,8 @@
           "total_amount": {"type": "integer", "format": "int64", "description": "内部quota单位，非金额/Token数，与quota_total同单位；原有数字协议，0表示不限量，大值需无损解析"},
           "quota_reset_period": {"type": "string"},
           "requests_per_minute": {"type": "integer"},
-          "enabled": {"type": "boolean"}
+          "enabled": {"type": "boolean"},
+          "quota_cny": {"allOf": [{"$ref": "#/components/schemas/CatalogQuotaCNY"}], "description": "兼容新增（1.1.0）。本版本服务端总会返回；对接旧部署或回滚后的服务端时可能缺失，客户端应容忍缺失并回退到 total_amount 展示"}
         }
       },
       "PlansResponse": {"type": "object", "additionalProperties": false, "required": ["plans"], "properties": {"plans": {"type": "array", "items": {"$ref": "#/components/schemas/Plan"}}}},
@@ -303,7 +346,8 @@
         "properties": {
           "subscription": {"$ref": "#/components/schemas/SubscriptionInfo"},
           "quota": {"$ref": "#/components/schemas/QuotaInfo"},
-          "api_key": {"type": "string", "description": "关联订阅有效且凭证正常时返回的真实sk-模型Key；过期/取消字段完全省略。活跃但额度耗尽仍可能返回Key，不承诺能消费。"}
+          "api_key": {"type": "string", "description": "关联订阅有效且凭证正常时返回的真实sk-模型Key；过期/取消字段完全省略。活跃但额度耗尽仍可能返回Key，不承诺能消费。"},
+          "quota_cny": {"allOf": [{"$ref": "#/components/schemas/SubscriptionQuotaCNY"}], "description": "兼容新增（1.1.0）。本版本服务端总会返回；对接旧部署或回滚后的服务端时可能缺失，客户端应容忍缺失并回退到 quota 展示。不含也不依赖 api_key"}
         }
       },
       "APIError": {

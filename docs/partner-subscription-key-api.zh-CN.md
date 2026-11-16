@@ -88,8 +88,29 @@ Authorization: Bearer <pt_merchant-secret>
 | `quota_reset_period` | string | 商户套餐为 `monthly` |
 | `requests_per_minute` | integer | 套餐 RPM 设置；系统/分组限制仍适用 |
 | `enabled` | boolean | 启用状态 |
+| `quota_cny` | object（兼容新增） | `total_amount` 的固定人民币**额度展示等值**，仅含总额度；不是售价。见下方说明 |
 
-> `/plans` 的数字字段保持旧协议。大于 JavaScript 安全整数范围的数字应使用无损 JSON 解析；下方独立订阅查询的额度全部为精确十进制字符串。
+> `/plans` 的数字字段保持旧协议。大于 JavaScript 安全整数范围的数字应使用无损 JSON 解析；下方独立订阅查询的额度全部为精确十进制字符串。新增 `quota_cny` **没有**改变或修复 `total_amount` 作为大整数 JSON number 的解析要求。
+
+目录每个套餐新增的 `quota_cny`（示例配置 `quota_per_unit=500000`、汇率 `1`；`total_amount=15000000`）：
+
+```json
+{
+  "currency": "CNY",
+  "available": true,
+  "total": "30.000000",
+  "unlimited": false,
+  "quota_per_unit": "500000",
+  "usd_to_cny_rate": "1",
+  "scale": 6,
+  "rounding": "half_away_from_zero"
+}
+```
+
+- 目录只有总额度：**没有** `used`、`remaining`、`usable`、`historical_remaining`，平台不会为套餐虚构使用情况或权益。
+- `total_amount=0`（不限量）时 `unlimited=true`、`total=null`，不是 `"0.000000"`。
+- 三个概念不要混用：**售价**是 `price_amount` + `currency`（实际应付以订单 `amount` 为准）；**额度**是 `total_amount`（内部 quota 单位）；**`quota_cny`** 只是该额度按当前配置换算的人民币展示等值。历史非 CNY 套餐的 `currency` 仍如实返回，与 `quota_cny.currency` 无关。
+- 字段含义、舍入、`available=false` 与兼容性说明与第 6 节「`quota_cny`」相同。
 
 平台 root 在现有「套餐管理」创建套餐时选择单一 Partner tenant，配置 CNY 精确分价、一个日历月/月度重置、额度和 RPM。同一商户可有多份专属套餐，归属不可编辑。目录可见不等于可付款：历史非 CNY 或配置不合法的套餐仍可能下单失败，不能自行换算币种。
 
@@ -235,7 +256,20 @@ Authorization: Bearer <sub_64-lowercase-hex>
     "quota_usable":true,
     "next_reset_time":1801440000
   },
-  "api_key":"sk-REPLACE_WITH_ACTUAL_MODEL_KEY"
+  "api_key":"sk-REPLACE_WITH_ACTUAL_MODEL_KEY",
+  "quota_cny": {
+    "currency":"CNY",
+    "available":true,
+    "total":"18446744073709.551614",
+    "used":"18014398509.481986",
+    "remaining":"18428729675200.069628",
+    "unlimited":false,
+    "usable":true,
+    "quota_per_unit":"500000",
+    "usd_to_cny_rate":"1",
+    "scale":6,
+    "rounding":"half_away_from_zero"
+  }
 }
 ```
 
@@ -254,19 +288,85 @@ Authorization: Bearer <sub_64-lowercase-hex>
 | `quota.next_reset_time` | integer | 下一周期重置时间，0表示无已设定重置时间；终态不代表还会继续重置 |
 | `quota.historical_quota_remaining` | string，可省略 | 非活跃订阅的历史余额，**不可消费** |
 | `api_key` | string，可省略 | 正常有效订阅的实际 Coding Key；过期/取消时字段完全省略，而不是 null/空字符串 |
+| `quota_cny` | object（兼容新增） | 同一额度快照的固定人民币展示等值，见下方「`quota_cny`」；原 `quota` 与 `api_key` 规则不变 |
 
 所有额度为**精确十进制字符串**，不要转 JavaScript Number；可使用字符串或 BigInt。活跃但耗尽仍可能返回正常 Coding Key，同时 `quota_usable=false`，实际调用仍由订阅计费拒绝；Token 的 unlimited 设置不是订阅无限额度。
 
-**额度单位是平台内部 quota，不是人民币、美元金额，也不是 Token 数。** `quota_total`、`quota_used`、`quota_remaining`、历史余额和目录 `total_amount` 使用同一计量单位。金额展示应使用十进制运算：基础 USD 等值 = quota ÷ 平台公开 `GET /api/status` 的 `data.quota_per_unit`；如需人民币展示，再乘当前 `data.usd_exchange_rate`，并明确标注币种。不要把原始 quota 直接加上货币符号，也不要把它当作输入/输出 Token 数。例如在 `quota_per_unit=500000` 时，`"15000000"` 表示基础 USD 等值 `30`；若站点采用 CNY 展示且当前汇率为 `1`，界面展示为 `¥30.00`。不限量时应显示“不限量”，不能将 `quota_remaining="0"` 换算成余额为零；套餐售价与获赠的计费额度是两个概念。
+**额度单位是平台内部 quota，不是人民币、美元金额，也不是 Token 数。** `quota_total`、`quota_used`、`quota_remaining`、历史余额和目录 `total_amount` 使用同一计量单位。金额展示应使用十进制运算：基础 USD 等值 = quota ÷ 平台公开 `GET /api/status` 的 `data.quota_per_unit`；如需人民币展示，再乘当前 `data.usd_exchange_rate`，并明确标注币种。不要把原始 quota 直接加上货币符号，也不要把它当作输入/输出 Token 数。例如在 `quota_per_unit=500000` 时，`"15000000"` 表示基础 USD 等值 `30`；若站点采用 CNY 展示且当前汇率为 `1`，界面展示为 `¥30.00`。不限量时应显示“不限量”，不能将 `quota_remaining="0"` 换算成余额为零；套餐售价与获赠的计费额度是两个概念。服务端现已在 `quota_cny` 中直接给出人民币展示等值，商户无需自行换算；需要更高精度时仍可用原 quota 与 `quota_cny` 的换算元数据自行计算。
+
+### `quota_cny`：固定人民币额度等值（兼容新增）
+
+`quota_cny` 是把**同一份已授权额度快照**按**当前**平台配置换算出的人民币展示等值。它不是钱包余额、不是套餐售价、也不是历史上实际扣过的现金；不参与计费、周期重置、续费或 Key 发放，原 `quota` 各字段仍是唯一的精确事实。
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `currency` | string | 固定 `"CNY"`；不随站点展示偏好（USD/CNY/自定义/TOKENS）变化 |
+| `available` | boolean | **换算能否展示**，不代表订阅是否可用。`false` 时三个金额均为 `null` 并带 `reason` |
+| `reason` | string，可省略 | 仅 `available=false` 时出现：`invalid_conversion_config`（换算配置非正或非有限）或 `invalid_quota`（存量额度事实非法） |
+| `total` | string 或 null | 周期总额度等值；不限量为 `null` |
+| `used` | string 或 null | 已用额度等值；`used` 大于 `total` 时仍如实显示已用 |
+| `remaining` | string 或 null | 当前**可用**余额等值，不为负；有效不限量为 `null`；到期/取消固定 `"0.000000"` |
+| `historical_remaining` | string，可省略 | 仅到期/取消的**有限额度**订阅出现，对应 `historical_quota_remaining`，**不可消费** |
+| `unlimited` | boolean | 与 `quota_unlimited` 相同；到期/取消后仍保留 |
+| `usable` | boolean | 与 `quota_usable` 相同的权益事实，**不是**由金额是否大于 0 推断 |
+| `quota_per_unit` / `usd_to_cny_rate` | string 或 null | 本次响应使用的换算因子（十进制文本）；该因子配置无效时为 `null` |
+| `scale` | integer | 固定 `6`，金额小数位数 |
+| `rounding` | string | 固定 `"half_away_from_zero"` |
+
+换算与精度：
+
+- `金额 = quota × usd_to_cny_rate ÷ quota_per_unit`。quota 以精确整数参与运算，不经浮点数；先精确相乘，**只在最后一次除法**舍入到六位小数，恰好半个最小单位时向远离零方向进位。
+- 金额是恰好六位小数的定点字符串（如 `"30.000000"`），不是 JSON number，不使用科学计数法。
+- 六位小数是**展示投影，不是无损账本**。`total`、`used`、`remaining` 各自独立舍入，三者之间可能相差一个末位单位；**不要用它们相减、相加重算账本**，对账请使用原 `quota` 字段。
+- 正的极小额度可能显示为 `"0.000000"`（例如汇率很低时）。此时原 quota 仍大于 0，界面应显示“小于最小显示单位”而不是“免费/零”。是否还有额度以 `quota_usable` / `usable` 和原 quota 为准。
+- 换算使用**查询时**的配置，每次响应只读取一次；配置变更后同一额度的等值会随之变化。它不是购买时的汇率快照。
+
+各状态下的取值：
+
+| 状态 | `total` | `used` | `remaining` | `historical_remaining` | `unlimited` | `usable` |
+| --- | --- | --- | --- | --- | --- | --- |
+| 有效、有限额度 | 金额 | 金额 | 金额（耗尽为 `"0.000000"`） | 省略 | false | 同 `quota_usable` |
+| 有效、不限量 | `null` | 金额 | `null` | 省略 | true | 同 `quota_usable` |
+| 到期/取消、有限额度 | 金额 | 金额 | `"0.000000"` | 金额（不可消费） | false | false |
+| 到期/取消、不限量 | `null` | 金额 | `"0.000000"` | 省略 | true | false |
+| 换算不可用 | `null` | `null` | `null` | 省略 | 原事实 | 原事实 |
+
+不限量时 `total`/`remaining` 为 `null`，**不是** `"0.000000"`：不要把 `null` 当成零额度。到期/取消的不限量订阅仍为 `unlimited=true`，不要因为 `remaining` 为零就显示“额度已耗尽”。
+
+换算配置无效时业务响应照常返回 200，原字段不受影响，仅 `quota_cny` 标记不可用：
+
+```json
+{
+  "currency":"CNY",
+  "available":false,
+  "reason":"invalid_conversion_config",
+  "total":null,
+  "used":null,
+  "remaining":null,
+  "unlimited":false,
+  "usable":true,
+  "quota_per_unit":"500000",
+  "usd_to_cny_rate":null,
+  "scale":6,
+  "rounding":"half_away_from_zero"
+}
+```
+
+平台不会用默认汇率、站点自定义倍率或 0 代替不可用的金额；此时请回退展示原 quota。
+
+兼容性：`quota_cny` 是**新增字段**，原有字段的名称、取值与 JSON 类型都没有变化。对响应做严格校验、拒绝未知字段的第三方解码器需要先升级再对接；对接旧版本或回滚后的平台时该字段可能不存在，客户端应容忍缺失并回退到原 quota 展示。
 
 ### 到期/取消响应
 
 ```json
 {
   "subscription":{"id":123,"plan_id":42,"plan_title":"Monthly plan","status":"expired","start_time":1800000000,"end_time":1802678400,"requests_per_minute":60},
-  "quota":{"quota_total":"5000000","quota_used":"250","quota_remaining":"0","quota_unlimited":false,"quota_usable":false,"next_reset_time":1802678400,"historical_quota_remaining":"4999750"}
+  "quota":{"quota_total":"5000000","quota_used":"250","quota_remaining":"0","quota_unlimited":false,"quota_usable":false,"next_reset_time":1802678400,"historical_quota_remaining":"4999750"},
+  "quota_cny":{"currency":"CNY","available":true,"total":"10.000000","used":"0.000500","remaining":"0.000000","historical_remaining":"9.999500","unlimited":false,"usable":false,"quota_per_unit":"500000","usd_to_cny_rate":"1","scale":6,"rounding":"half_away_from_zero"}
 }
 ```
+
+到期/取消后 `quota_cny.remaining` 是可用余额（固定为零），`historical_remaining` 仅用于展示历史，不能消费。
 
 历史查询不会重置新周期；其他订阅不能替此订阅放行取钥。禁用商户/账户/User、错组、删除/禁用/过期 Token 或损坏绑定均拒绝，不自动补发凭证。`sub_` 不能直接调用 Coding；模型接口仍使用返回的 `api_key`。
 

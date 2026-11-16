@@ -2,14 +2,16 @@
 
 状态：父任务规划已于 2026-11-17 获用户批准实施；进度与真实证据见 `verification.md`，未勾选项即未完成。本任务可独立于日志表实现，输出契约是日志页金额集成的前置。
 
+勾选说明（trellis-check，2026-11-17）：实现子代理没有留下最终报告，也没有勾选任何项；以下勾选由检查会话在审阅完整差异后做出，**只表示源码级完成**。标注“运行待验证”的项没有任何 Go/PostgreSQL 运行证据（Go 测试执行数 0，Docker daemon 不可连接）。**任务未完成。** 审阅发现见 `quality-review.md`。
+
 ## 顺序
 
-- [ ] 读取目标 specs、父共享 research，确认当前独立/H5/catalog 原 JSON 和安全边界；先写纯转换及兼容快照的回归断言。
-- [ ] 在 service 建立单一 explicit-CNY converter、规范配置快照及 display DTO。quota 精确输入，精确乘后一次六位除法舍入；元数据与非法配置降级完整。
-- [ ] 独立 GET 仅在原查询成功后追加安全 display wrapper；不改锁/审计/周期重置/APIKey 决策、不二次查 bearer。
-- [ ] H5 每 item/catalog plan additive wrapper，保持其原数值类型、active-only/模式和价格币种；目录无虚构 used/remaining。
-- [ ] 提供日志 child 的已验证调用签名及 >int64 聚合 decimal 输入途径，不复制转换逻辑。
-- [ ] 同步各 API 文档/OpenAPI；示例区分现金售价、quota 和额度等值，说明 nullable/unlimited/terminal/invalid config、六位舍入与严格客户端 additive 兼容风险。
+- [x] 读取目标 specs、父共享 research，确认当前独立/H5/catalog 原 JSON 和安全边界；先写纯转换及兼容快照的回归断言。—— 源码级：15 个 `TestPartnerTenantQuotaCNY*` 测试已写入（service 9 / controller 4 / model 2），仅通过类型检查，测试预期经独立 oracle 复算 0 错误；实现代理的读取过程无记录，检查会话已读取全部 spec/research 并核对三入口原 JSON。**运行待验证。**
+- [x] 在 service 建立单一 explicit-CNY converter、规范配置快照及 display DTO。quota 精确输入，精确乘后一次六位除法舍入；元数据与非法配置降级完整。—— 源码级（`service/partner_tenant_quota_cny.go`，离线 build/vet rc=0）。**运行待验证。**
+- [x] 独立 GET 仅在原查询成功后追加安全 display wrapper；不改锁/审计/周期重置/APIKey 决策、不二次查 bearer。—— 源码级（`model/` 业务代码无改动）。**运行待验证**（审计事件数、凭证表读取次数、Key 可见性的断言未执行）。
+- [x] H5 每 item/catalog plan additive wrapper，保持其原数值类型、active-only/模式和价格币种；目录无虚构 used/remaining。—— 源码级。**运行待验证。** H5 `usable` 的语义范围有一项待决策（`quality-review.md` F1）。
+- [x] 提供日志 child 的已验证调用签名及 >int64 聚合 decimal 输入途径，不复制转换逻辑。—— 签名已冻结并记录于 `verification.md` §3（`CurrentPartnerTenantQuotaCNYConfig` / `Metadata` / `AmountDecimal` / `AmountString` / `AmountInt64`）；此处“已验证”目前只有类型检查与 oracle 复算。**运行待验证。**
+- [x] 同步各 API 文档/OpenAPI；示例区分现金售价、quota 和额度等值，说明 nullable/unlimited/terminal/invalid config、六位舍入与严格客户端 additive 兼容风险。—— 已完成；文档检查已实际执行 rc=0（`verification.md` §8）。文档所描述的服务端行为本身**运行待验证**，文档内已如实注明。
 
 ## 边界测试
 
@@ -34,11 +36,11 @@ go test -mod=readonly ./service ./model ./controller -run '^TestPartnerTenantQuo
 
 设计中的自包含 DSN 为 `TEST_PARTNER_QUOTA_CNY_POSTGRES_DSN`；新增匹配 TestMain 分支避免误触 legacy SQLite，显式空隔离 PostgreSQL/唯一留存 schema。必须实际执行授权读取/兼容测试，缺 DSN skip 不是通过。纯 converter 测试也在同一受控 Docker，不用宿主机测试兜底。
 
-- [ ] JSON 解析、所有本地 OpenAPI refs/schema 和 Markdown 示例/链接验证；不调用真实 API/秘密查询。
-- [ ] 核对 `model/partner_tenant_subscription_key_test.go`、`controller/partner_tenant_subscription_key_test.go`、H5/quota/catalog 相关旧测试和前组模式/授权审计断言；检查 TestMain/DSN/fixture 后在 owned Docker/pq 运行或迁入安全自包含夹具。尤其每次额度查询仍有原审计事件、终态 Key 规则不变；记录实际选择器/执行数，不以新增 converter suite 代表全部旧回归。
-- [ ] 必要 consumer 单测（日志 child 集成时执行），无额外依赖/lockfile。
-- [ ] trellis-check 覆盖完整差异，A-C1–A-C5 有实际证据。build/vet 不代替 Go/pq runtime；Docker 不可用精确报阻塞。
-- [ ] 把经验证金额协议写入相关 spec，精确路径提交代码/测试/文档/Trellis；生产配置、私钥/报告/临时产物不进入提交。
+- [x] JSON 解析、所有本地 OpenAPI refs/schema 和 Markdown 示例/链接验证；不调用真实 API/秘密查询。—— 已由检查会话实际执行（`python3` 标准库，脚本经 stdin，rc=0，`verification.md` §8）：拒绝重复键解析、103 处本地 `$ref` 全部可解析、schema 与 Go 结构逐字段一致、4 个 OpenAPI 示例按 schema 校验、16 个 Markdown json 块可解析、21 个示例金额与公式一致、新增相对链接存在。未做 OpenAPI 元 schema 认证。
+- [ ] 核对 `model/partner_tenant_subscription_key_test.go`、`controller/partner_tenant_subscription_key_test.go`、H5/quota/catalog 相关旧测试和前组模式/授权审计断言；检查 TestMain/DSN/fixture 后在 owned Docker/pq 运行或迁入安全自包含夹具。尤其每次额度查询仍有原审计事件、终态 Key 规则不变；记录实际选择器/执行数，不以新增 converter suite 代表全部旧回归。—— **未完成**：源码普查与 TestMain/DSN/fixture 审计已做（`verification.md` §7、§9，结论是既有断言不会被 additive 字段破坏、无需修改），但 owned Docker/pq 执行数为 0。
+- [ ] 必要 consumer 单测（日志 child 集成时执行），无额外依赖/lockfile。—— 未到该阶段；目前没有 consumer。`go.mod`/`go.sum`/lockfile 无改动。
+- [ ] trellis-check 覆盖完整差异，A-C1–A-C5 有实际证据。build/vet 不代替 Go/pq runtime；Docker 不可用精确报阻塞。—— **未完成**：trellis-check 已覆盖完整差异（`quality-review.md`），但 A-C1/A-C2/A-C3/A-C5 只有源码推理、类型检查与 oracle 复算，没有 Go/pq 运行证据；只有 A-C4（文档）有执行证据。阻塞原因：2026-11-17 05:55 CST `docker version` rc=1，daemon 不可连接，且代理不得启动引擎。
+- [ ] 把经验证金额协议写入相关 spec，精确路径提交代码/测试/文档/Trellis；生产配置、私钥/报告/临时产物不进入提交。—— 未做：协议尚无运行证据；提交由主会话执行，检查会话未暂存/提交。
 
 ## 回滚/停止
 

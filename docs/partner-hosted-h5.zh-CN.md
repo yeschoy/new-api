@@ -78,6 +78,89 @@ BFF 必须核验 `external_user_id` 是当前用户，再向该用户返回最�
 - 关窗不停止后台交付；重复通知/恢复不重复续期。通知完全丢失时仍需运营/支付服务商对账。
 - 本版**没有商户 webhook、自动返回商户、任意 return URL 或原生 WebView 支付桥承诺**。商户应通过已保存的会话主动查询或在用户返回商户时查询。
 
+### 额度与套餐目录的人民币等值（`quota_cny`，兼容新增）
+
+商户后端使用的两个 `pt_` 接口各自兼容新增了 `quota_cny`，用于直接向买家展示人民币额度，不必再把内部 quota 当作金额或 Token 数：
+
+- `GET /api/partner/v1/accounts/{external_user_id}/subscription/quota`：每个 `subscriptions[]` 项新增 `quota_cny`（总额、已用、可用剩余）。
+- `GET /api/partner/v1/plans`：每个 `plans[]` 项新增 `quota_cny`（**仅总额**，目录没有已用/剩余/可用性）。
+
+额度查询项示例（示例配置 `quota_per_unit=500000`、汇率 `1`）：
+
+```json
+{
+  "plan_id": 42,
+  "plan_title": "Monthly plan",
+  "start_time": 1800000000,
+  "end_time": 1802678400,
+  "status": "active",
+  "quota_total": 15000000,
+  "quota_used": 16008,
+  "quota_remaining": 14983992,
+  "quota_unlimited": false,
+  "next_reset_time": 1801440000,
+  "quota_cny": {
+    "currency": "CNY",
+    "available": true,
+    "total": "30.000000",
+    "used": "0.032016",
+    "remaining": "29.967984",
+    "unlimited": false,
+    "usable": true,
+    "quota_per_unit": "500000",
+    "usd_to_cny_rate": "1",
+    "scale": 6,
+    "rounding": "half_away_from_zero"
+  }
+}
+```
+
+不限量套餐的额度项：`quota_total`/`quota_remaining` 仍是原来的数字 `0`，而 `quota_cny` 用 `null` 表达“没有有限上限”：
+
+```json
+{
+  "currency": "CNY",
+  "available": true,
+  "total": null,
+  "used": "0.032016",
+  "remaining": null,
+  "unlimited": true,
+  "usable": true,
+  "quota_per_unit": "500000",
+  "usd_to_cny_rate": "1",
+  "scale": 6,
+  "rounding": "half_away_from_zero"
+}
+```
+
+目录套餐的 `quota_cny`（`total_amount=15000000`）：
+
+```json
+{
+  "currency": "CNY",
+  "available": true,
+  "total": "30.000000",
+  "unlimited": false,
+  "quota_per_unit": "500000",
+  "usd_to_cny_rate": "1",
+  "scale": 6,
+  "rounding": "half_away_from_zero"
+}
+```
+
+接入要点：
+
+- **售价、额度、额度等值是三件事**：售价是套餐 `price_amount` + `currency`（实际应付以订单 `amount` 为准）；额度是 `total_amount` / `quota_*`（内部 quota 单位）；`quota_cny` 只是额度按**当前**配置换算的人民币展示等值，不是钱包余额、售价或历史扣款，不参与计费。
+- `available` 只表示换算能否展示；订阅是否可用看 `usable`（来自原有权益事实：有效且不限量或原 quota 仍有剩余），不要用金额是否大于 0 推断。`usable` 只是订阅层面的额度事实：额度接口不检查该账号的平台用户或模型 Key 当前是否被禁用/过期，`usable=true` 不保证模型调用一定成功。
+- 金额是恰好六位小数的字符串或 `null`，不是 JSON number。`金额 = quota × usd_to_cny_rate ÷ quota_per_unit`，只在最后一次除法舍入，半个单位向远离零方向进位。六位小数是展示投影而非无损账本：`total`、`used`、`remaining` 各自舍入，可能相差一个末位单位，不要用它们重算账本；正的极小额度可能显示为 `"0.000000"`，应提示“小于最小显示单位”而不是“免费”。
+- 不限量时 `total`（及额度项的 `remaining`）为 `null`，不是 `"0.000000"`。
+- 换算配置无效时接口仍返回 200、原字段不变，`quota_cny.available=false`、金额全为 `null`、`reason="invalid_conversion_config"`；平台不会用默认汇率或 0 顶替，此时请回退展示原 quota。
+- 额度接口仍只返回有效订阅，因此不会出现 `historical_remaining`；身份来源、接入方式准入和返回范围都没有变化。
+- **兼容性**：原有字段的名称、取值和 JSON 类型不变（这两个接口的额度仍是 int64 JSON number，超过 JavaScript 安全整数范围时仍需无损解析，新增 `quota_cny` 并未修复这一点）。严格拒绝未知字段的解码器需先升级；对接旧版本或回滚后的平台时字段可能缺失，应容忍并回退。
+- 买家浏览器使用的公开 H5 会话目录（`ps_`，见下节）**未新增** `quota_cny`，其 `plans[].total_amount` 字符串协议不变。
+
+字段定义与状态表见 [Partner Tenant API](partner-tenant-api.md) 的「Fixed CNY quota display」一节。该新增字段的 Go/PostgreSQL 运行验证尚未执行。
+
 ## 公开 H5 协议与部署保护
 
 以下接口仅供页面使用，均禁止 query、cookie 身份依赖和宽松 CORS，响应 no-store/no-referrer：
