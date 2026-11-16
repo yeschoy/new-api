@@ -112,8 +112,8 @@ func GetPartnerOAuthAuthorizationLogs(c *gin.Context) {
 		}
 	}
 	if query.Has("tenant_id") {
-		filter.TenantId, err = strconv.ParseInt(query.Get("tenant_id"), 10, 64)
-		if err != nil || filter.TenantId <= 0 || strconv.FormatInt(filter.TenantId, 10) != query.Get("tenant_id") {
+		var ok bool
+		if filter.TenantId, ok = parseCanonicalPositiveInt64(query.Get("tenant_id")); !ok {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid tenant"})
 			return
 		}

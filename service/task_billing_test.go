@@ -33,6 +33,11 @@ func TestMain(m *testing.M) {
 	// The access-mode suite owns its fixtures (or is pure policy binding).
 	// Never bootstrap SQLite before the explicitly selected task-owned pq suite.
 	flag.Parse()
+	// The merchant usage suite likewise owns isolated PostgreSQL schemas; it
+	// must never run on top of the SQLite bootstrap below.
+	if os.Getenv("TEST_PARTNER_USAGE_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "PartnerTenantUsage") {
+		os.Exit(m.Run())
+	}
 	if os.Getenv("TEST_PARTNER_ACCESS_AUDIT_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "AccessMode") || strings.Contains(flag.Lookup("test.run").Value.String(), "AuthorizationAudit") {
 		os.Exit(m.Run())
 	}

@@ -1,6 +1,6 @@
 # 用户分类执行计划
 
-状态：未实施。最终完整摘要获后续批准之后才 start；日志 child 的 owner/options 是明确前置，CNY 无前置关系。
+状态：父任务规划已于 2026-11-17 获用户批准实施；进度与真实证据见 `verification.md`，未勾选项即未完成。日志 child 的 owner/options 是明确前置，CNY 无前置关系。
 
 ## 顺序
 

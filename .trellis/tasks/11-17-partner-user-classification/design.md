@@ -1,6 +1,6 @@
 # 用户列表 Tenant 分类设计
 
-状态：最终评审稿，未实施。需求 V1–V6，跨页 owner 语义以父 `research/contract-decisions.md` 为准。
+状态：最终评审稿，已随父任务于 2026-11-17 获批实施；进度见 `verification.md`。需求 V1–V6，跨页 owner 语义以父 `research/contract-decisions.md` 为准。
 
 ## 1. 依赖与边界
 

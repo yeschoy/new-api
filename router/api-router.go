@@ -169,6 +169,8 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
 				adminRoute.GET("/search", controller.SearchUsers)
+				// Safe merchant filter options (id/name only); same read gate as the user list.
+				adminRoute.GET("/tenant-options", controller.GetPartnerTenantOptions)
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
 				adminRoute.DELETE("/:id/oauth/bindings/:provider_id", controller.UnbindCustomOAuthByAdmin)
 				adminRoute.GET("/:id/partner-oauth/bindings", controller.GetUserPartnerOAuthBindingsByAdmin)
@@ -388,6 +390,9 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)
 		logRoute.GET("/stat", middleware.AdminAuth(), controller.GetLogsStat)
+		// Safe merchant filter options (id/name only). The root-only /api/partner-tenants
+		// management API is a different surface and is not reused here.
+		logRoute.GET("/partner-tenants/options", middleware.AdminAuth(), controller.GetPartnerTenantOptions)
 		logRoute.GET("/self/stat", middleware.UserAuth(), controller.GetLogsSelfStat)
 		logRoute.GET("/self/summary", middleware.UserAuth(), controller.GetUserLogSummary)
 		logRoute.GET("/self/requests", middleware.UserAuth(), controller.GetUserRequestLogs)

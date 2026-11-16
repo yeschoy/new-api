@@ -1,14 +1,16 @@
 # 商户日志执行与验证计划
 
-状态：未实施。遵守父 implement 的后续批准门禁；子任务实际 start 后才写业务代码/创建运行资源。
+状态：父任务规划已于 2026-11-17 获用户批准实施；本子任务已 start。阶段进度与真实证据见 `verification.md`，未勾选项即未完成。
 
 ## A. 先交付共享 owner 契约
 
-- [ ] 读取父 PRD/design/共享 research 和 model/log.go、三写入口、LOG_DB 初始化/现有脱敏/真实路由；复核 writer census，没有遗漏新增调用。
-- [ ] 增加单用户及批量 safe owner、request-local 快照、无秘密商户 options；禁止额外全局负缓存。owner 查询失败不得按普通用户写回默认表。
-- [ ] 两个 scope 明确的 options 入口复用同一安全投影；增加真实路由/PAT/字段白名单回归。
-- [ ] 冻结共享签名/字段/错误语义，登记供用户分类消费。测试只在 owned Docker，未有 runtime 不宣称 owner 全验收。
-- [ ] A 阶段交接写入 verification.md：owner/options 实际签名、字段/权限、文件所有权、测试执行数与阻塞项；仅表示可被其他子任务消费，不勾选整个日志交付完成。
+> A 阶段状态（2026-11-17）：**source-ready / runtime-blocked**。下列勾选仅表示源码与测试源码已写完并通过离线 `gofmt` / `go build` / `go vet`（vet 只做类型检查）；**Go 测试执行数为 0，PostgreSQL / 真实路由运行验证待补**（Docker daemon 不可用）。实际签名、权限矩阵、偏差与阻塞项见 `verification.md`“A 阶段交接”。A 的 source-ready 不等于日志任务完成。
+
+- [x] 读取父 PRD/design/共享 research 和 model/log.go、三写入口、LOG_DB 初始化/现有脱敏/真实路由；复核 writer census，没有遗漏新增调用。（已读；census 复核发现的额外写入口/读取方记入 verification A.10，留给 B/C 阶段处理。）
+- [x] 增加单用户及批量 safe owner、request-local 快照、无秘密商户 options；禁止额外全局负缓存。owner 查询失败不得按普通用户写回默认表。（源码完成：原语三态返回、失败不会被报成非成员；“不写回默认表”的 writer 行为属于 C 阶段，尚未实现。运行验证待补。）
+- [x] 两个 scope 明确的 options 入口复用同一安全投影；增加真实路由/PAT/字段白名单回归。（源码与回归测试源码完成；回归**未执行**。）
+- [x] 冻结共享签名/字段/错误语义，登记供用户分类消费。测试只在 owned Docker，未有 runtime 不宣称 owner 全验收。（签名已冻结并登记于 verification A.1–A.3；未宣称验收。）
+- [x] A 阶段交接写入 verification.md：owner/options 实际签名、字段/权限、文件所有权、测试执行数与阻塞项；仅表示可被其他子任务消费，不勾选整个日志交付完成。（已写入；测试执行数 0。）
 
 ## B. 表与读取先行
 

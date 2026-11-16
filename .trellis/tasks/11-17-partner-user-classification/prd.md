@@ -2,7 +2,7 @@
 
 ## 目标与归属
 
-父任务 `../11-17-partner-usage-isolation/`，承接 R4/R6；AC2/AC4/AC8。在现有管理员用户列表识别真实 Tenant 用户，不新增角色/权限。状态 planning，待完整规划的后续实施批准。
+父任务 `../11-17-partner-usage-isolation/`，承接 R4/R6；AC2/AC4/AC8。在现有管理员用户列表识别真实 Tenant 用户，不新增角色/权限。完整规划已于 2026-11-17 续接会话获用户实施批准（见父 prd“授权与阶段”）；实际 start 时点见 `verification.md`。
 
 ## 需求
 

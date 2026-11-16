@@ -1,10 +1,10 @@
 # 总体执行与集成门禁
 
-状态：待用户批准最新完整规划；以下全部未执行。当前及三个子任务保持 planning。
+状态：最新完整规划已获用户批准（2026-11-17 续接会话，对应规划提交 `e61eb6533` + `b1929bdda`）。实施进度与真实证据见本目录 `verification.md` 及各子任务 `verification.md`；未勾选项即未完成。
 
 ## 0. 进入执行前
 
-- [ ] 完整规划摘要展示 Goal / Scope / Non-goals / AC / Decisions / Risks；取得用户随后明确批准并记录批准对应的版本。
+- [x] 完整规划摘要展示 Goal / Scope / Non-goals / AC / Decisions / Risks；取得用户随后明确批准并记录批准对应的版本。（2026-11-17 续接会话批准 `e61eb6533` + `b1929bdda`；记录于 prd“授权与阶段”。）
 - [ ] 读取 trellis-before-dev、目标层 specs；前端实现还需 shadcn-ui、vercel-react-best-practices，新增文案必须 i18n-translate。
 - [ ] 复核 git baseline、四任务父子关系和 implement/check 清单；保留既有私钥/报告/Demo/临时清单，不读取秘密、不 blanket stage。
 - [ ] 读取 `research/planning-review.md` 和前组 `../11-13-partner-access-mode-audit/verification.md`。前组模式/授权审计只有源码与前端证据，Go/pq 尚未验证；在新建运行资源前核对 Docker 当前可用性，不把历史不可用当作当前实测，也不自行启动/重启引擎。

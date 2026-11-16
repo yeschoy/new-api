@@ -1,6 +1,6 @@
 # 固定 CNY 额度投影设计
 
-状态：最终评审稿，未实施。产品依据 C1–C5/父 R3；跨交付契约见父 `research/contract-decisions.md`。
+状态：最终评审稿，已随父任务于 2026-11-17 获批实施；进度见 `verification.md`。产品依据 C1–C5/父 R3；跨交付契约见父 `research/contract-decisions.md`。
 
 ## 1. 归属与分层
 

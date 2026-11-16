@@ -2,7 +2,7 @@
 
 ## 目标与归属
 
-父任务 `../11-17-partner-usage-isolation/`，承接 R3/AC3。使商户可直接显示人民币额度，不再把内部 quota 当作金额/Token。当前 planning，待完整规划的后续实施批准。
+父任务 `../11-17-partner-usage-isolation/`，承接 R3/AC3。使商户可直接显示人民币额度，不再把内部 quota 当作金额/Token。完整规划已于 2026-11-17 续接会话获用户实施批准（见父 prd“授权与阶段”）；实际 start 时点见 `verification.md`。
 
 ## 需求
 

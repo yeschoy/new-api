@@ -113,6 +113,61 @@ Disabling a tenant stops merchant management. It does not automatically revoke a
 
 Model endpoints retain their normal protocol error format. No production deployment or live-payment test is implied by this contract; see the task verification report for executed and blocked checks.
 
+## Administrator read-only merchant options
+
+Two dashboard endpoints return one shared, safe projection of merchants (tenants) for administrator filters. They are read-only, use the dashboard `{success,message,data}` envelope, and are separate from both the merchant `pt_` API and the root-only management API (`/api/partner-tenants`), whose access rules and response shape are unchanged.
+
+| Method and path | Used by | Session role | Personal access token scope |
+| --- | --- | --- | --- |
+| `GET /api/log/partner-tenants/options` | Merchant usage-log filters | Administrator or root | `log:read` |
+| `GET /api/user/tenant-options` | User-list merchant filter | Administrator or root | `user:read` |
+
+Each entry requires its own explicit scope: a token with only `log:read` cannot call the user entry and a token with only `user:read` cannot call the log entry. A token never widens its owner's role, so an ordinary user's token is rejected whatever scopes it lists. Desktop-client sessions cannot reach these routes. Merchant sub-accounts are ordinary dashboard users and are rejected like any other non-administrator.
+
+These scope rules apply to scoped personal access tokens. A legacy (unscoped) dashboard access token is not scope-checked on any non-session dashboard route until the deployment's legacy-token retirement deadline; while it is still accepted, an administrator's or root's legacy token reaches both entries exactly as it already reaches the administrator log and user lists. It remains limited by its owner's role. This is the existing dashboard rule, not a behavior added by these endpoints.
+
+Query parameters (all optional; each may appear at most once; unknown parameters are rejected):
+
+| Parameter | Contract |
+| --- | --- |
+| `q` | Case-insensitive literal substring of the merchant name. At most 64 Unicode code points, valid UTF-8, no control characters; surrounding spaces are trimmed; empty means no filter. `%` and `_` match themselves. Only the name is searchable. Case folding of non-ASCII letters follows the database collation. |
+| `p` | Page number, canonical decimal `1`–`1000000`. Default `1`. |
+| `page_size` | Canonical decimal `1`–`100`. Default `20`. There is no unbounded listing. |
+| `selected_id` | Canonical decimal positive signed 64-bit merchant ID (`1`–`9223372036854775807`). Resolves that one merchant by ID even when it is not on the returned page or does not match `q`. |
+
+"Canonical decimal" means digits only: no sign, leading zero, space, fraction, exponent or hexadecimal form.
+
+```json
+{
+  "success": true,
+  "message": "",
+  "data": {
+    "page": 1,
+    "page_size": 20,
+    "total": 37,
+    "items": [{ "id": "9007199254740993", "name": "Example Merchant" }],
+    "selected": { "id": "12", "name": "Another Merchant" }
+  }
+}
+```
+
+- `items` are ordered newest first (descending ID) and `total` counts every merchant matching `q`, not only the returned page.
+- An option is exactly `id` and `name`. `id` is a decimal **string**; clients must not convert it to a JavaScript Number. `name` is the merchant's current name.
+- Disabled merchants are included: an option identifies records, it does not grant access. The dedicated group, integration mode, status, timestamps, secrets, buyer identities and model keys are never returned.
+- `selected` is `null` when `selected_id` is omitted or no such merchant exists; an unknown ID is not an error.
+- Successful responses send `Cache-Control: no-store`.
+
+| HTTP | Code / message | Meaning |
+| ---- | -------------- | ------- |
+| 400 | `Invalid parameters` | Unknown or repeated parameter, malformed query encoding, non-canonical or out-of-range `p` / `page_size` / `selected_id`, or an invalid `q`. Nothing is silently ignored and no query is executed. |
+| 401 | `AUTH_UNAUTHORIZED` (and the other dashboard authentication codes) | Missing, invalid or expired credential. |
+| 403 | `AUTH_INSUFFICIENT_PRIVILEGE` | The caller is not an administrator or root. |
+| 403 | `AUTH_DESKTOP_SCOPE_DENIED` | A desktop-client session called the route. |
+| 403 | `ACCESS_TOKEN_SCOPE_DENIED` | The personal access token lacks this entry's scope. |
+| 503 | `Database error, please contact the administrator` | The options could not be read. No database detail is returned; retry later. |
+
+Authentication is evaluated before parameter validation. These two endpoints are documented from branch code; their PostgreSQL and real-route runtime tests have not been executed yet (see the usage-logs task verification record), so no deployment claim is made. The merchant usage-log list and statistics endpoints are specified separately when they are delivered.
+
 ## Additive migration and rollout boundary
 
 Startup calls `MigratePartnerTenantIntegrationModes` before broad AutoMigrate: varchar(24), NOT NULL, default subscription_key; missing/null/empty historical modes normalize to that default. Explicit H5 survives repeat migration; unknown nonempty values are retained but denied. Account identity_source, order entry_mode and payment facts are not relabelled/deleted. PostgreSQL runtime verification for this change is blocked by unavailable task Docker; no startup/production claim is made. Old binaries do not enforce these modes. Rollback must retain columns, accepted orders and payments; do not serve merchant admission on old nodes or assume mixed-version safety.

@@ -1,6 +1,6 @@
 # 独立商户用量：技术设计
 
-状态：最终评审稿，仍 planning。产品要求/验收见本任务 prd；跨子任务契约以父 `research/contract-decisions.md` 为准。
+状态：最终评审稿，已随父任务于 2026-11-17 获批实施。产品要求/验收见本任务 prd；跨子任务契约以父 `research/contract-decisions.md` 为准。
 
 ## 1. 安全归属契约（本任务拥有）
 
