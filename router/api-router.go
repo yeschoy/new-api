@@ -393,6 +393,10 @@ func SetApiRouter(router *gin.Engine) {
 		// Safe merchant filter options (id/name only). The root-only /api/partner-tenants
 		// management API is a different surface and is not reused here.
 		logRoute.GET("/partner-tenants/options", middleware.AdminAuth(), controller.GetPartnerTenantOptions)
+		// Dedicated merchant usage table only: these never read or union logs, and
+		// the default list/stat/export above never read the dedicated table.
+		logRoute.GET("/partner-tenants", middleware.AdminAuth(), controller.GetPartnerTenantUsageLogs)
+		logRoute.GET("/partner-tenants/stat", middleware.AdminAuth(), controller.GetPartnerTenantUsageLogStat)
 		logRoute.GET("/self/stat", middleware.UserAuth(), controller.GetLogsSelfStat)
 		logRoute.GET("/self/summary", middleware.UserAuth(), controller.GetUserLogSummary)
 		logRoute.GET("/self/requests", middleware.UserAuth(), controller.GetUserRequestLogs)

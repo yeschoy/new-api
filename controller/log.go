@@ -292,7 +292,9 @@ func GetLogsSelfStat(c *gin.Context) {
 	modelName := c.Query("model_name")
 	channel, _ := strconv.Atoi(c.Query("channel"))
 	group := c.Query("group")
-	quotaNum, err := model.SumUsedQuota(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel, group)
+	// Legacy sum exactly as before, plus the caller's own rows in the dedicated
+	// Tenant usage table. Ownership is the authenticated user ID only.
+	quotaNum, err := model.SumUserUsedQuota(c.GetInt("id"), username, logType, startTimestamp, endTimestamp, modelName, tokenName, channel, group)
 	if err != nil {
 		common.ApiError(c, err)
 		return

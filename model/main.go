@@ -242,7 +242,10 @@ func InitLogDB() (err error) {
 			if err := MigrateAuditLogs(); err != nil {
 				return err
 			}
-			return MigratePartnerOAuthAuthorizationLogs()
+			if err := MigratePartnerOAuthAuthorizationLogs(); err != nil {
+				return err
+			}
+			return MigratePartnerTenantUsageLogs()
 		}
 		return
 	}
@@ -445,6 +448,10 @@ func migrateLOGDB() error {
 		return err
 	}
 	if err := MigratePartnerOAuthAuthorizationLogs(); err != nil {
+		return err
+	}
+	// Runs for every log driver, before the ClickHouse branch returns.
+	if err := MigratePartnerTenantUsageLogs(); err != nil {
 		return err
 	}
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {

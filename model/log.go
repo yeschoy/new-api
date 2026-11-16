@@ -137,6 +137,22 @@ func FormatRootLogs(logs []*Log) {
 }
 
 func GetLogByTokenId(tokenId int) (logs []*Log, err error) {
+	// Rows of this authenticated token may also live in the dedicated Tenant
+	// usage table. Without any, the single-table path below runs unchanged.
+	dedicated, err := dedicatedLogOwnerHasRows(context.Background(), ownedLogTokenColumn, tokenId)
+	if err != nil {
+		common.SysError("failed to probe dedicated token logs")
+		return nil, common.NewMessage("Failed to query logs")
+	}
+	if dedicated {
+		logs, err = queryOwnedLogUnion(context.Background(), ownedLogTokenColumn, tokenId, LogFilter{}, 0, common.MaxRecentItems)
+		if err != nil {
+			common.SysError("failed to query token logs across log tables")
+			return nil, common.NewMessage("Failed to query logs")
+		}
+		formatUserLogs(logs, 0)
+		return logs, nil
+	}
 	order := "id desc"
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		order = clickHouseLogOrder("")
@@ -598,6 +614,27 @@ func GetUserLogs(userId int, filter LogFilter, startIdx int, num int) (logs []*L
 	if err != nil {
 		return nil, 0, err
 	}
+	// Rows of this authenticated user may also live in the dedicated Tenant
+	// usage table. Without any, the single-table path below runs unchanged.
+	dedicated, err := dedicatedLogOwnerHasRows(context.Background(), ownedLogUserColumn, userId)
+	if err != nil {
+		common.SysError("failed to probe dedicated user logs")
+		return nil, 0, common.NewMessage("Failed to query logs")
+	}
+	if dedicated {
+		if total, err = countOwnedLogUnion(context.Background(), ownedLogUserColumn, userId, filter); err == nil {
+			logs, err = queryOwnedLogUnion(context.Background(), ownedLogUserColumn, userId, filter, startIdx, num)
+		}
+		if err != nil {
+			if !errors.Is(err, errOwnedLogRead) {
+				return nil, 0, err
+			}
+			common.SysError("failed to query user logs across log tables")
+			return nil, 0, common.NewMessage("Failed to query logs")
+		}
+		formatUserLogs(logs, startIdx)
+		return logs, total, nil
+	}
 	err = tx.Model(&Log{}).Limit(logSearchCountLimit).Count(&total).Error
 	if err != nil {
 		common.SysError(common.LogText("failed to count user logs: %s", err.Error()))
@@ -618,6 +655,31 @@ func GetUserLogs(userId int, filter LogFilter, startIdx int, num int) (logs []*L
 }
 
 func GetUserRequestLogs(ctx context.Context, userId int, startTimestamp int64, endTimestamp int64, startIdx int, num int) (logs []*Log, total int64, err error) {
+	// Rows of this authenticated user may also live in the dedicated Tenant
+	// usage table. Without any, the single-table path below runs unchanged.
+	dedicated, err := dedicatedLogOwnerHasRows(ctx, ownedLogUserColumn, userId)
+	if err != nil {
+		common.SysError("failed to probe dedicated user request logs")
+		return nil, 0, errors.New("查询日志失败")
+	}
+	if dedicated {
+		outcomes, err := queryOwnedRequestOutcomes(ctx, userId, startTimestamp, endTimestamp)
+		if err != nil {
+			common.SysError("failed to search user request logs across log tables")
+			return nil, 0, errors.New("查询日志失败")
+		}
+		total = int64(len(outcomes))
+		if startIdx >= len(outcomes) {
+			return []*Log{}, total, nil
+		}
+		endIdx := startIdx + num
+		if endIdx > len(outcomes) {
+			endIdx = len(outcomes)
+		}
+		logs = outcomes[startIdx:endIdx]
+		formatUserLogs(logs, startIdx)
+		return logs, total, nil
+	}
 	tx := LOG_DB.WithContext(ctx).Where("logs.user_id = ?", userId).
 		Where("logs.type IN ?", []int{LogTypeConsume, LogTypeError}).
 		Where("logs.created_at >= ? AND logs.created_at <= ?", startTimestamp, endTimestamp)
@@ -699,6 +761,24 @@ func StreamUserLogs(ctx context.Context, userId int, filter LogFilter, fn func(*
 		return err
 	}
 	count := 0
+	// Rows of this authenticated user may also live in the dedicated Tenant
+	// usage table. Without any, the single-table stream below runs unchanged.
+	dedicated, err := dedicatedLogOwnerHasRows(ctx, ownedLogUserColumn, userId)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		return err
+	}
+	if dedicated {
+		return streamOwnedLogUnion(ctx, ownedLogUserColumn, userId, filter, func(log *Log) error {
+			count++
+			log.Id = count
+			log.ChannelName = ""
+			log.Other = formatLogOtherJSON(log.Other, logOtherVisibilityUser)
+			return fn(log)
+		})
+	}
 	return streamLogs(tx, "logs.id desc", func(log *Log) error {
 		count++
 		log.Id = count

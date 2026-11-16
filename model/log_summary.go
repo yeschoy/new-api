@@ -30,30 +30,81 @@ type UserLogSummary struct {
 	Daily []DailyLogSummary `json:"daily"`
 }
 
+// logViolationFeeMarked reports whether a log's other carries any violation-fee
+// marker. Shared by every reader that classifies request outcomes.
+func logViolationFeeMarked(fee bool, code string, marker string) bool {
+	return fee || code != "" || marker != ""
+}
+
+// logOutcomeFailed is the single failure classification of a settled request
+// fact: an error row, a violation fee, or a stream that ended in error. A
+// charged consume row can therefore still be a failed outcome.
+func logOutcomeFailed(logType int, isStream bool, violation bool, streamStatus string) bool {
+	return logType == LogTypeError || violation || (isStream && streamStatus == "error")
+}
+
 // GetUserLogSummary scans the complete bounded window without transferring raw
 // logs to the client or relying on database-specific JSON/date functions.
 func GetUserLogSummary(ctx context.Context, userID int, start, end int64, timezoneOffset int) (*UserLogSummary, error) {
-	query := LOG_DB.WithContext(ctx).Model(&Log{}).
-		Select("id", "request_id", "created_at", "type", "quota", "prompt_tokens", "completion_tokens", "is_stream", "other").
-		Where("user_id = ? AND created_at >= ? AND created_at <= ? AND type IN ?", userID, start, end, []int{LogTypeConsume, LogTypeError}).
-		Order("request_id ASC, created_at ASC, id ASC")
-	rows, err := query.Rows()
+	// Rows of this authenticated user may also live in the dedicated Tenant
+	// usage table. Without any, the single-table query below runs unchanged.
+	dedicated, err := dedicatedLogOwnerHasRows(ctx, ownedLogUserColumn, userID)
 	if err != nil {
-		return nil, err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		common.SysError("failed to probe dedicated user log summary")
+		return nil, common.NewMessage("Failed to query logs")
 	}
-	defer rows.Close()
+	if dedicated {
+		summary, err := foldUserLogSummary(timezoneOffset, func(yield func(*ownedLogRow)) error {
+			return streamOwnedLogSummaryRows(ctx, userID, start, end, yield)
+		})
+		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			common.SysError("failed to summarize user logs across log tables")
+			return nil, common.NewMessage("Failed to query logs")
+		}
+		return summary, nil
+	}
+	return foldUserLogSummary(timezoneOffset, func(yield func(*ownedLogRow)) error {
+		query := LOG_DB.WithContext(ctx).Model(&Log{}).
+			Select("id", "request_id", "created_at", "type", "quota", "prompt_tokens", "completion_tokens", "is_stream", "other").
+			Where("user_id = ? AND created_at >= ? AND created_at <= ? AND type IN ?", userID, start, end, []int{LogTypeConsume, LogTypeError}).
+			Order("request_id ASC, created_at ASC, id ASC")
+		rows, err := query.Rows()
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			// Single-table rows carry no source marker or event identity.
+			var row ownedLogRow
+			if err := LOG_DB.ScanRows(rows, &row.Log); err != nil {
+				return err
+			}
+			yield(&row)
+		}
+		return rows.Err()
+	})
+}
+
+// foldUserLogSummary is the one accumulation loop of the usage summary. source
+// yields rows ordered by request_id, created_at, id (then source marker and
+// event identity), so the rows of one request are adjacent. Each row is its
+// own allocation and is retained as the current request outcome.
+func foldUserLogSummary(timezoneOffset int, source func(yield func(*ownedLogRow)) error) (*UserLogSummary, error) {
 	result := &UserLogSummary{Daily: []DailyLogSummary{}}
 	days := make(map[string]*DailyLogSummary)
 	location := time.FixedZone("report", timezoneOffset*60)
 	// Keep only the current request outcome; ordered rows make retries adjacent.
-	var previousLog *Log
+	var previousRow *ownedLogRow
 	var previousDay *DailyLogSummary
 	var previousFailed bool
-	for rows.Next() {
-		var log Log
-		if err := LOG_DB.ScanRows(rows, &log); err != nil {
-			return nil, err
-		}
+	err := source(func(row *ownedLogRow) {
+		log := &row.Log
 		var other struct {
 			GroupRatio           *float64 `json:"group_ratio"`
 			UserGroupRatio       *float64 `json:"user_group_ratio"`
@@ -69,8 +120,8 @@ func GetUserLogSummary(ctx context.Context, userID int, start, end int64, timezo
 			} `json:"stream_status"`
 		}
 		validOther := common.UnmarshalJsonStr(log.Other, &other) == nil
-		violation := other.ViolationFee || other.ViolationFeeCode != "" || other.ViolationFeeMarker != ""
-		failed := log.Type == LogTypeError || violation || (log.IsStream && other.StreamStatus.Status == "error")
+		violation := logViolationFeeMarked(other.ViolationFee, other.ViolationFeeCode, other.ViolationFeeMarker)
+		failed := logOutcomeFailed(log.Type, log.IsStream, violation, other.StreamStatus.Status)
 		var saved float64
 		comparable := false
 		if validOther && log.Type == LogTypeConsume && other.BillingSource != "subscription" &&
@@ -97,8 +148,11 @@ func GetUserLogSummary(ctx context.Context, userID int, start, end int64, timezo
 			day = &DailyLogSummary{Date: date}
 			days[date] = day
 		}
-		sameRequest := log.RequestId != "" && previousLog != nil && log.RequestId == previousLog.RequestId
-		replaceOutcome := !sameRequest || compareRequestOutcomes(&log, previousLog) > 0
+		sameRequest := log.RequestId != "" && previousRow != nil && log.RequestId == previousRow.RequestId
+		// compareRequestOutcomes decides; the private source marker and event
+		// identity only order rows it reports as completely equal, and are
+		// always equal between two single-table rows.
+		replaceOutcome := !sameRequest || compareOwnedRequestOutcomes(row, previousRow) > 0
 		if sameRequest && replaceOutcome {
 			for _, totals := range []*LogSummaryTotals{&result.LogSummaryTotals, &previousDay.LogSummaryTotals} {
 				totals.Requests--
@@ -118,7 +172,7 @@ func GetUserLogSummary(ctx context.Context, userID int, start, end int64, timezo
 					totals.Succeeded++
 				}
 			}
-			previousLog, previousDay = &log, day
+			previousRow, previousDay = row, day
 			previousFailed = failed
 		}
 		for _, totals := range []*LogSummaryTotals{&result.LogSummaryTotals, &day.LogSummaryTotals} {
@@ -143,8 +197,8 @@ func GetUserLogSummary(ctx context.Context, userID int, start, end int64, timezo
 				totals.ComparableRequests++
 			}
 		}
-	}
-	if err := rows.Err(); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
 	for _, day := range days {

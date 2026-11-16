@@ -14,6 +14,14 @@
 
 ## B. 表与读取先行
 
+> B1a 步骤状态（2026-11-17）：**source-ready / runtime pending**。新表模型、幂等迁移 helper（已接入共享与独立 LOG_DB 两条初始化路径，含 ClickHouse 显式 DDL/TTL）、一个**无生产调用方**的插入函数及 7 个测试源码已写完并通过离线 gofmt / build / vet；**Go 测试执行数 0**，pq 实际迁移/持久化未验证。下列各项均**未**勾选：管理员 list/stat、self/API-Key reader、union、切写尚未开始。详见 `verification.md`“B 阶段 — B1a 表与迁移”。
+
+> B1b 步骤状态（2026-11-17）：**source-ready / runtime pending**。新表的管理员读取侧已写完：单一类型化 filter（list / count / stat 共用一个 builder）、`GET /api/log/partner-tenants` 与 `/stat`（`AdminAuth` + PAT `log:read`）、冻结的响应 schema 已写入 `docs/partner-tenant-api.md`、10 个测试源码；离线 gofmt / build / vet 通过，**Go 测试执行数 0**。writer 仍无生产调用方，默认管理员 reader 未改。下列各项仍**不**勾选：第 3、4 项只有源码与文档、无运行证据且有未写出的用例；self/API-Key reader、union、切写、前端未开始。偏差与缺口见 `verification.md`“B 阶段 — B1b 管理员查询与统计”。
+
+> B2a 步骤状态（2026-11-17）：**source-ready / runtime pending**。自身/Key 读取的双表基础设施（按已鉴权 `user_id` / `token_id` 的 `UNION ALL` 投影，先探测、无新表行则原单表路径原样执行）与 `GetUserLogs`、`StreamUserLogs`、`GetLogByTokenId`、self 统计（`SumUserUsedQuota`）已写完；11 个测试源码；离线 gofmt / build / vet 通过，**Go 测试执行数 0**。writer 仍无生产调用方，默认管理员 reader 未改。下列第 5–7 项仍**不**勾选：`GetUserRequestLogs` / `GetUserLogSummary`（B2b）未开始，且无任何运行证据。未写出的用例与需确认事项见 `verification.md`“B 阶段 — B2a 自身/Key 双表读取”。
+
+> B2b 步骤状态（2026-11-17）：**source-ready / runtime pending**。（1）探测加固：独立表不存在 = 成功判定（走原单表路径），表存在但探测失败 / 存在性检查失败才是读取失败；只缓存阳性并绑定当前 `LOG_DB` handle；B2a 改过的 4 个既有 controller 测试文件已还原为与 `HEAD` 字节相同。（2）`GetUserRequestLogs`、`GetUserLogSummary` 的双表路径已写完，汇总的折叠/累加循环新旧路径共用一份。7 个新测试源码（并删除 1 个被取代的 B2a 用例）；离线 gofmt / build / vet 通过，**Go 测试执行数 0**。writer 仍无生产调用方，默认管理员 reader 与 `compareRequestOutcomes` 未改。下列第 5–7 项仍**不**勾选：六个 self reader 源码齐备但无任何运行证据，且有未写出的用例。详见 `verification.md`“B 阶段 — B2b 请求结果/汇总与探测加固”。
+
 - [ ] 新表显式字段/TEXT/64位/短前缀索引/event_id，不复用 Log index tags。覆盖默认 LOG_DB=DB 与独立日志库初始化，迁移幂等且不搬历史。
 - [ ] ClickHouse 显式 DDL/TTL 保持现有驱动支持；SQL 新表不新增清理，默认清理范围不变。
 - [ ] 新表分页/count/stat 使用同一过滤；新 ID/quota 字符串，admin/root 脱敏与安全错误。

@@ -45,7 +45,9 @@ Go 测试执行数：**0**（宿主机禁止 `go test`，Docker 不可用）。s
 | 交付 | 状态 | 证据 | 未完成 |
 | --- | --- | --- | --- |
 | usage-logs A（安全 owner / 批量 owner / 安全 options / 两个入口） | **source-ready / runtime-blocked** | 实现 + 一轮独立 trellis-check；主会话独立复核：`gofmt -l` 无输出、离线 `go build` rc=0、离线 `go vet` rc=0（含 10 个 `TestPartnerTenantUsage*` 测试源码的类型检查）、`git diff --check` rc=0、无暂存、lockfile 未变 | **Go 测试执行 0**；pq 上的实际 SQL、真实路由鉴权/PAT 矩阵、路由注册不 panic 均未运行 |
-| usage-logs B / C / D | 未开始 | — | C（切写）在 B 的迁移与兼容 reader 经 pq 验证前不得启用 |
+| usage-logs B（独立表与索引、共享/独立 LOG_DB 迁移接线、ClickHouse 显式 DDL/TTL、管理员 list/stat、六个自身/Key reader 的双表兼容读取、探测状态机） | **source-ready / runtime-blocked** | 分四步实现（B1a 表与迁移、B1b 管理员查询与统计、B2a 列表/导出/Key 最近记录/自身统计、B2b 请求结果/汇总与探测加固），两轮独立 trellis-check（`quality-review.stage-b1.md`、`quality-review.stage-b2.md`）。主会话每步独立复核并在最终状态（07:57 CST）执行：`gofmt -l` 全部新增/修改 Go 文件无输出；离线 `go build` 五包 + `./relay/...` rc=0；离线 `go vet` 五包 rc=0；`git diff --check` rc=0。门禁核对：`insertPartnerTenantUsageLog` 无任何生产调用方（writer 未启用）；`model/log.go` 仅新增行、`model/log_outcome.go`/`model/usedata.go` 无 diff；默认管理员 reader 未改；B2a 曾改动的四个既有测试夹具已还原为与 HEAD 一致 | **Go 测试执行 0**（B 阶段 39 个 `TestPartnerTenantUsage*` 源码，连同 A 的 10 个共 49 个，均仅类型检查）。pq 上的 fresh/upgrade/repeat、共享/独立 LOG_DB 迁移、实际 DDL/索引/持久化、union 类型解析与分页、探测状态机的 `HasTable` 实际行为、真实路由鉴权、EXPLAIN 全部未运行；ClickHouse/MySQL/SQLite 双表路径无运行证据 |
+| usage-logs C（三入口写入分流） | **未开始 — 被安全门禁阻塞** | — | 规划与用户要求：迁移和兼容 reader 经 pq 验证通过前不得启用新 writer。Docker 不可用，B 无运行证据，故 C 不实施、不接线 |
+| usage-logs D（金额集成、管理员页面、导航、七语言） | 未开始 | — | 依赖已冻结的 B1b 接口契约与 quota-cny 转换器（均为 source-ready） |
 | quota-cny（转换器、三个入口 additive `quota_cny`、文档/OpenAPI、15 个测试源码） | **source-ready / runtime-blocked** | 实现代理中途结束、未交接（仅返回一句话，记录为事实）；随后一轮独立 trellis-check 补齐审阅与记录。主会话独立复核（06:08 CST）：`gofmt -l` 无输出、离线 `go build` rc=0、离线 `go vet` rc=0、`git diff --check` rc=0、无暂存、`model/` 仅测试文件变化；主会话自行以拒绝重复键方式解析 OpenAPI，103 处本地 `$ref` 全部可解析；主会话读源码确认嵌入类型无自定义 `MarshalJSON`、`DivRound`（decimal.go:641-670）为半入远离零。检查代理**执行**了测试 oracle 的精确有理数复算（60 个期望 0 不一致）与文档检查（最终 rc=0） | **Go 测试执行 0**（15 个 `TestPartnerTenantQuotaCNY*`：service 9 / controller 4 / model 2，仅类型检查）。A-C1/A-C2/A-C3/A-C5 无运行证据；仅 A-C4（文档）有执行证据 |
 | user-classification | 未开始 | — | 仅依赖 A 契约 |
 
@@ -60,7 +62,7 @@ Docker 复测：04:16、04:53 CST 均不可连接。
 - 两个入口公式相同、前置条件不同：独立查询在用户被禁用、模型 Key 被禁用/过期、分组变更或存量 used 为负时直接返回 403/409，不输出布尔值；H5 入口历来只校验商户密钥、模式与账号启用，这些状态下仍返回 200，此时 `usable` 只表示“额度层面可用”，不保证模型调用一定成功。这一差异是两个入口既有的鉴权范围差异，不是本次引入的。
 - 主会话决定：保持已批准契约（H5 item 含 `usable`、H5 不扩大读取），文档已如实写明其适用范围。改为“H5 不输出 usable”或“H5 增加用户/Key 校验读取”都属于契约/范围变更，未做；若用户希望调整，需先更新规划。
 
-Docker 复测：05:55、06:08 CST 仍不可连接。
+Docker 复测：05:55、06:08、06:43、07:17、07:57 CST 仍不可连接。
 
 ## 3b. 读取方普查补充（规划 census 之外，新发现）
 
@@ -70,6 +72,14 @@ Docker 复测：05:55、06:08 CST 仍不可连接。
 - `model/partner_account.go:1068`（`ListPartnerAccountUsage`，Partner Server 子账号用量 API）：属于另一套 PartnerAccount 身份。
 
 处理：二者都不在已批准的 union 读取矩阵内，按“默认管理员读取不 union 新表”的已批准原则**保持不改**。切写之后，Tenant 用户的新消费不会出现在这两个读取方里。Tenant 成员为 subscription-only、不走钱包充值返现，Partner Server 子账号与 Tenant 账号是两套各自建号的身份，实际重叠概率很低，但这是**已知限制，需在最终报告中向用户披露**；若用户要求纳入，属于范围变更，需先更新规划。
+
+### usage-logs B 阶段的已知限制与主会话决定（详见子任务 verification.md 的两节“复核后的主会话决定”）
+
+- 新增索引 `idx_ptul_time (created_at, id)` 支撑不选商户的管理员默认列表；超长时间窗口的 400 复用既有“不得超过 N 天”消息；迁移成功后预置“表已存在”缓存。
+- 探测状态机：独立表“确认不存在”是成功判定（走原单表路径），“表存在但探测失败”和“存在性检查失败”是读取失败，绝不当作无行。目的：从节点先于主节点升级时，全体用户的自身日志读取不至于报错。
+- 成员（独立表里已有行的用户）的自身列表/请求结果顺序由 `id desc` 变为全局时间序；普通用户不变。
+- 统计端点为受最大日志范围约束的流式整窗扫描，无行数/超时上限；成员的双表列表无分支 top-N 下推；MySQL 两表 collation 不同可能使成员的 union 报错。三者均无运行证据，列为发布注意事项。
+- 缺失用例：`/api/log/token` 真实路由伪造参数、商户子账号会话被新端点拒绝、探测/union 路径的应用 logger 与 DEBUG GORM 秘密标记负向用例、取消请求不写错误日志的 HTTP 断言、ClickHouse 整句生成 SQL 契约、EXPLAIN。
 
 ## 3c. 需披露的过程偏差
 

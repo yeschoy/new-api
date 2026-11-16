@@ -245,7 +245,186 @@ Query parameters (all optional; each may appear at most once; unknown parameters
 | 403 | `ACCESS_TOKEN_SCOPE_DENIED` | The personal access token lacks this entry's scope. |
 | 503 | `Database error, please contact the administrator` | The options could not be read. No database detail is returned; retry later. |
 
-Authentication is evaluated before parameter validation. These two endpoints are documented from branch code; their PostgreSQL and real-route runtime tests have not been executed yet (see the usage-logs task verification record), so no deployment claim is made. The merchant usage-log list and statistics endpoints are specified separately when they are delivered.
+Authentication is evaluated before parameter validation. These two endpoints are documented from branch code; their PostgreSQL and real-route runtime tests have not been executed yet (see the usage-logs task verification record), so no deployment claim is made. The merchant usage-log list and statistics endpoints are specified in the next section.
+
+## Administrator merchant usage logs
+
+> **Scope of this surface.** These endpoints read ONLY the dedicated merchant usage table, which receives records written after merchant usage logging is cut over to it. Merchant records written before the cut-over stay in the default log table, remain visible on the default administrator log page (`GET /api/log/`) and are **not** migrated, copied or hidden. An empty or short result here therefore does not mean a merchant had no earlier usage, and the earliest record here is not a global cut-over time. The default administrator list, statistics and export never include records of the dedicated table. On this branch the writer that fills the dedicated table is not enabled yet.
+
+| Method and path | Purpose | Session role | Personal access token scope |
+| --- | --- | --- | --- |
+| `GET /api/log/partner-tenants` | Paged records | Administrator or root | `log:read` |
+| `GET /api/log/partner-tenants/stat` | Aggregates for the same filter | Administrator or root | `log:read` |
+
+Authentication, token scope, legacy-token and desktop-session rules are those of the options endpoint above. Anonymous callers and ordinary users (including merchant sub-accounts) are rejected. Both endpoints use the dashboard `{success,message,data}` envelope and always send `Cache-Control: no-store`. The root-only management API (`/api/partner-tenants`) is unchanged.
+
+### Filter parameters (both endpoints)
+
+All parameters are optional and may appear at most once. An unknown, repeated, malformed, non-canonical or out-of-range parameter is rejected with HTTP 400 before any query; nothing is silently ignored. "Canonical decimal" is defined in the options section.
+
+| Parameter | Contract |
+| --- | --- |
+| `tenant_id` | Canonical decimal positive signed 64-bit merchant ID. An empty value is invalid. |
+| `user_id` | Canonical decimal positive signed 64-bit user ID. An empty value is invalid. |
+| `username` | Exact match. Valid UTF-8, no control characters, at most 191 bytes. Empty means no filter. |
+| `model_name` | Exact match. Same text rules, at most 255 bytes. |
+| `request_id` | Exact match. Same text rules, at most 64 bytes. |
+| `type` | `consume` or `error`. Omitted selects both. Any other value, including empty, is invalid. |
+| `start_timestamp`, `end_timestamp` | Canonical decimal non-negative Unix seconds, inclusive. `0` is the same as omitted. When both are given, `start_timestamp` must not exceed `end_timestamp`. |
+
+**Bounded window.** The window is always bounded, for administrators and root alike, by the deployment's maximum log time range (the same rule and setting as the ordinary user log search), because the statistics scan the whole window. An omitted `start_timestamp` reaches back that maximum range from the end (or from now, if the end is later than now); a wider explicit range is rejected with HTTP 400 and the existing message `The time range cannot exceed {{days}} days` (the body carries `days`, the configured limit). An omitted `end_timestamp` is the server's current time. Both responses report the effective window as `start_timestamp` / `end_timestamp`. Send both bounds explicitly when a list page and the statistics must describe the same set.
+
+The list additionally accepts:
+
+| Parameter | Contract |
+| --- | --- |
+| `p` | Canonical decimal `1`–`1000000`. Default `1`. |
+| `page_size` | Canonical decimal `1`–`100`. Default: the deployment's default page size (10 unless reconfigured). |
+
+`p` and `page_size` are unknown parameters on the statistics endpoint and are rejected there.
+
+### `GET /api/log/partner-tenants`
+
+```json
+{
+  "success": true,
+  "message": "",
+  "data": {
+    "page": 1,
+    "page_size": 10,
+    "total": 4,
+    "start_timestamp": 1794800000,
+    "end_timestamp": 1794886400,
+    "items": [
+      {
+        "id": "9007199254740993",
+        "event_id": "ptu_0123456789abcdef0123456789abcdef",
+        "created_at": 1794880000,
+        "type": 2,
+        "tenant_id": "12",
+        "tenant_name": "Example Merchant",
+        "account_id": "345",
+        "identity_source": "subscription_key",
+        "user_id": "6789",
+        "username": "pt_u_6789",
+        "token_id": "4321",
+        "token_name": "default",
+        "model_name": "example-model",
+        "channel_id": "7",
+        "channel_name": "Example Channel",
+        "group": "merchant-12",
+        "ip": "",
+        "request_id": "20261117093320000000001abcdefgh",
+        "upstream_request_id": "",
+        "subscription_id": "",
+        "quota": "250000",
+        "quota_cny": "3.650000",
+        "prompt_tokens": "1200",
+        "completion_tokens": "800",
+        "use_time": 3,
+        "is_stream": true,
+        "content": "",
+        "other": "{\"billing_source\":\"subscription\"}"
+      }
+    ]
+  }
+}
+```
+
+The example shows the first of the four matching items; the other three are omitted for brevity.
+
+`total` is the number of matching **records** (rows) for the filter, across all pages; it is a JSON number. Records are ordered newest first by `created_at`, then by local `id`, both descending (on ClickHouse, where `id` is always `0`, by `event_id`). The count and the page are produced by the same filter.
+
+| Field | JSON type | Meaning |
+| --- | --- | --- |
+| `id` | string (decimal) | Local row ID in the dedicated table. Not comparable with IDs of the default log table. |
+| `event_id` | string | Immutable, random, non-secret event identifier. |
+| `created_at` | number | Unix seconds. |
+| `type` | number | `2` = consume, `5` = error — the same codes as the default logs. |
+| `tenant_id`, `account_id` | string (decimal) | Merchant and merchant-account IDs frozen in the record. |
+| `tenant_name` | string | Merchant name **as frozen when the record was written**, not the current name. |
+| `identity_source` | string | `external` or `subscription_key`. |
+| `user_id`, `token_id`, `channel_id` | string (decimal) | Internal IDs. `"0"` when not known. |
+| `username`, `token_name`, `model_name`, `group`, `ip` | string | Usage facts as recorded. `ip` follows the existing recording switch. |
+| `channel_name` | string | Current channel name looked up by ID; empty when unknown. |
+| `request_id`, `upstream_request_id` | string | Request correlation. Retries of one request share a `request_id`. |
+| `subscription_id` | string (decimal) | Only when it was a known fact at write time; otherwise the empty string. |
+| `quota` | string (decimal) | Raw charged quota units of this record. `"0"` for error records. |
+| `quota_cny` | string or `null` | Six-place fixed-point CNY display equivalent of `quota` at the current configuration; `null` when the conversion is unavailable. |
+| `prompt_tokens`, `completion_tokens` | string (decimal) | Token counts. |
+| `use_time` | number | Seconds. |
+| `is_stream` | boolean | |
+| `content` | string | Recorded message, as on the default logs. |
+| `other` | string | JSON text of the recorded metadata, projected for the caller's role exactly like the default logs: administrators do not receive root-only diagnostics, root does. |
+
+Every ID, quota and token field is a decimal string: do not convert it to a JavaScript Number. The response never contains merchant secrets, buyer identifiers, credential hashes or model-key strings.
+
+### `GET /api/log/partner-tenants/stat`
+
+```json
+{
+  "success": true,
+  "message": "",
+  "data": {
+    "record_count": "4",
+    "request_count": "3",
+    "succeeded_count": "2",
+    "failed_count": "1",
+    "quota": "750000",
+    "prompt_tokens": "3600",
+    "completion_tokens": "2400",
+    "tokens": "6000",
+    "quota_cny": {
+      "currency": "CNY",
+      "available": true,
+      "quota_per_unit": "500000",
+      "usd_to_cny_rate": "7.3",
+      "scale": 6,
+      "rounding": "half_away_from_zero",
+      "amount": "10.950000"
+    },
+    "start_timestamp": 1794800000,
+    "end_timestamp": 1794886400
+  }
+}
+```
+
+(Here 750000 × 7.3 ÷ 500000 = 10.95, and 4 records fold into 3 requests because two records share one `request_id`.)
+
+| Field | JSON type | Meaning |
+| --- | --- | --- |
+| `record_count` | string (decimal) | Rows matching the filter, consume and error. Equals the list's `total` for the same filter and window. |
+| `request_count` | string (decimal) | Request outcomes after folding. Always `succeeded_count + failed_count`. |
+| `succeeded_count`, `failed_count` | string (decimal) | Outcomes by the failure classification below. |
+| `quota` | string (decimal) | Exact sum of raw `quota` over **consume** rows. May exceed the signed 64-bit range. |
+| `prompt_tokens`, `completion_tokens`, `tokens` | string (decimal) | Exact sums over consume rows; `tokens` is their total. |
+| `quota_cny` | object | Conversion metadata (`currency`, `available`, optional `reason`, `quota_per_unit`, `usd_to_cny_rate`, `scale`, `rounding`) plus `amount`. |
+| `quota_cny.amount` | string or `null` | The raw quota is summed first and converted **once**; it is not the sum of per-row rounded amounts. `null` — never `"0.000000"` — when the conversion is unavailable. |
+| `start_timestamp`, `end_timestamp` | number | Effective window. |
+
+**Cost.** The statistics endpoint reads every matching record of the window in one pass on each call; there is no row cap or server-side timeout beyond the bounded window. Narrow the window or add a merchant filter for large data sets.
+
+**Records versus requests.** `total` and `record_count` count rows. `request_count` counts request outcomes: rows sharing a non-empty `request_id` (for example a failed attempt and its successful retry) fold into one outcome, while every row with an empty `request_id` is its own request. Filters are applied first and folding happens only among the selected rows: a row outside the window or excluded by a filter never changes the outcome of a selected request (with `type=error`, folding happens among error rows only).
+
+**Outcome and failure classification.** Among the rows of one request the outcome is the consume row over an error row, then the latest by time, then by ID (the existing request-outcome ranking of the user request list). Being chosen does not make a request successful. The chosen outcome is **failed** when it is an error record, when it carries a violation-fee marker, or when it is a stream whose recorded stream status is `error`; otherwise it succeeded.
+
+**Sums cover charged facts.** `quota` and the token sums add every consume row: a charged failure (for example a violation fee recorded as consume, or a stream that failed after being charged) and every charged retry attempt are included and are never zeroed or de-duplicated by `request_id`. Error rows add nothing. A request can therefore be counted as failed while its charge is part of `quota`.
+
+**CNY is a display equivalent.** `quota_cny` values convert raw quota at the **current** `quota_per_unit` and USD→CNY rate (one configuration snapshot per response), rounded once to six places, half away from zero. They are not historical cash debits, not a wallet balance and not a plan price; they change when the configuration changes. When either factor is invalid the amounts are `null` (`available: false`, `reason: "invalid_conversion_config"`) while the raw fields and HTTP 200 are unaffected. A small positive quota can round to `"0.000000"`; use the raw `quota` to tell it from zero.
+
+### Errors
+
+| HTTP | Code / message | Meaning |
+| ---- | -------------- | ------- |
+| 400 | `Invalid parameters` | Unknown or repeated parameter, malformed query encoding, non-canonical or out-of-range value, `start_timestamp` after `end_timestamp` (or after the server's current time when `end_timestamp` is omitted), or `p` / `page_size` on the statistics endpoint. No query is executed. |
+| 400 | `The time range cannot exceed {{days}} days` | The requested window is wider than the maximum log time range. The response body includes `days`. No query is executed. |
+| 401 | `AUTH_UNAUTHORIZED` (and the other dashboard authentication codes) | Missing, invalid or expired credential. |
+| 403 | `AUTH_INSUFFICIENT_PRIVILEGE` | The caller is not an administrator or root. |
+| 403 | `AUTH_DESKTOP_SCOPE_DENIED` | A desktop-client session called the route. |
+| 403 | `ACCESS_TOKEN_SCOPE_DENIED` | The personal access token lacks `log:read`. |
+| 503 | `Database error, please contact the administrator` | The records could not be read. No database detail is returned; retry later. |
+
+Authentication is evaluated before parameter validation. These two endpoints are documented from branch code. They have **not** been executed against PostgreSQL or through the real routes yet (see the usage-logs task verification record); ClickHouse, MySQL and SQLite behavior is derived from source only. No deployment claim is made.
 
 ## Additive migration and rollout boundary
 
