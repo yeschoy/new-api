@@ -263,6 +263,13 @@ export function useSidebarData(): SidebarData {
             },
           },
           {
+            title: t('Merchant usage logs'),
+            url: '/partner-usage-logs',
+            icon: FileText,
+            // Read-only page for ordinary administrators and root.
+            requiredRole: ROLE.ADMIN,
+          },
+          {
             title: t('System Info'),
             url: '/system-info',
             icon: ServerCog,

@@ -41,10 +41,12 @@
 
 ## D. 前端与金额集成
 
-- [ ] CNY 子任务 converter 契约/测试已交付后才接入，不先写第二套算法。
-- [ ] 实现 features/partner-usage-logs 与管理员 developer-shell 独立路由/菜单；复用通用表格/安全明细，拒绝不安全 Number 转换。
-- [ ] 筛选、summary、分页同 scope，包含会话/角色的 cache key；跨会话不可使用旧 placeholder。
-- [ ] 七语言通过现有 add-missing-keys.mjs + i18n:sync；补范围说明、空/错/不可用/无限额/微额展示。
+> D 阶段状态（2026-11-17）：**前端 source + DOM（mock 传输）已执行**：`web/` 下 typecheck / 定向 oxlint / oxfmt / build:check 均 rc=0，`src/features/partner-usage-logs` 2 文件 20 用例通过，四目录合计 47 文件 642 通过（trellis-check 复核后：修复 5 项缺陷，本目录 3 文件 35 用例、四目录 48 文件 657 通过，全站 lint 仍为既有基线 151/68；见 `quality-review.stage-d.md` 与 `verification.md` D.10）。**无浏览器运行、无真实数据（C 阶段 writer 未启用）、后端端点从未对数据库执行**。勾选项后标注证据类型；未写的 DOM 用例与未关闭门禁见 `verification.md`“D 阶段 — 管理员页面（前端）”。任务未完成。
+
+- [ ] CNY 子任务 converter 契约/测试已交付后才接入，不先写第二套算法。（D 阶段备注：前端未写任何换算算法，只渲染服务端 `quota_cny` 字符串及不可用/微额状态，有 DOM 证据；但“converter 契约/测试已交付”这一前置条件本派发未核实，故不勾选，由主会话依据 CNY 子任务记录判断。）
+- [x] 实现 features/partner-usage-logs 与管理员 developer-shell 独立路由/菜单；复用通用表格/安全明细，拒绝不安全 Number 转换。（已执行 DOM 证据：路由守卫、导航可见性、>2^53 字符串、详情 Dialog 键盘开关与 `other` 原样显示。无浏览器运行。）
+- [x] 筛选、summary、分页同 scope，包含会话/角色的 cache key；跨会话不可使用旧 placeholder。（已执行 DOM 证据：同窗口同过滤、跨查看者缓存隔离、过滤变更回第 1 页；分页控件点击与商户/类型点击级用例未写。）
+- [ ] 七语言通过现有 add-missing-keys.mjs + i18n:sync；补范围说明、空/错/不可用/无限额/微额展示。（D 阶段备注：26 键 × 7 语言已经脚本写入 + 同步，范围说明、空态、错误、不可用、微额展示均已实现并有执行过的 DOM/locale 用例；**“无限额”展示未实现**——日志/统计冻结契约没有 unlimited 字段，本页无处呈现。因条目未全部满足，不勾选，由主会话决定该子项是否适用。）
 
 ## E. 执行命令（均为批准后的计划）
 

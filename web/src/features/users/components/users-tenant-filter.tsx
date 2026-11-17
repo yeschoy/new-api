@@ -42,7 +42,12 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
 import { getUserTenantOptions } from '../api'
-import { userTenantOptionsSchema } from '../types'
+import {
+  userTenantOptionsSchema,
+  type ApiResponse,
+  type GetUserTenantOptionsParams,
+  type UserTenantOptions,
+} from '../types'
 
 /** Bounded option page; the server caps page_size at 100. */
 export const USER_TENANT_OPTIONS_PAGE_SIZE = 20
@@ -54,6 +59,16 @@ type UserTenantFilterProps = {
   onChange: (tenantId: string | undefined) => void
   /** Viewer identity + role; keeps cached options scoped to one session. */
   viewerKey: string
+  /**
+   * Options endpoint of the hosting page. Each administrator surface has its
+   * own scoped entry returning the same safe projection; defaults to the
+   * user-list entry.
+   */
+  fetchOptions?: (
+    params: GetUserTenantOptionsParams
+  ) => Promise<ApiResponse<UserTenantOptions>>
+  /** Query-key scope; must differ per `fetchOptions` endpoint. */
+  queryScope?: string
 }
 
 /**
@@ -70,10 +85,11 @@ export function UserTenantFilter(props: UserTenantFilterProps) {
     .slice(0, SEARCH_MAX_CODE_POINTS)
     .join('')
   const selectedId = props.value
+  const fetchOptions = props.fetchOptions ?? getUserTenantOptions
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: [
-      'users',
+      props.queryScope ?? 'users',
       'tenant-options',
       props.viewerKey,
       keyword,
@@ -82,7 +98,7 @@ export function UserTenantFilter(props: UserTenantFilterProps) {
     ],
     queryFn: async () => {
       const result = requireServerSuccess(
-        await getUserTenantOptions({
+        await fetchOptions({
           q: keyword || undefined,
           p: page,
           page_size: USER_TENANT_OPTIONS_PAGE_SIZE,

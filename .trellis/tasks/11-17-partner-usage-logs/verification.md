@@ -945,3 +945,151 @@ ClickHouse / MySQL / SQLite 的双表路径均未运行。
 4. **`/api/log/token` 真实路由的伪造参数用例**：未写。router 测试进程不执行 `initCol()`，补它需要新增可导出的列初始化夹具或改生产代码，不为一个测试扩大改动面。token 最近记录的归属限定目前只有 model 层用例。列为缺失用例。
 
 主会话在第 1 项改动后执行：`gofmt -l`（触碰文件）无输出；离线 `go build` 五包 + `./relay/...` rc=0；离线 `go vet` 五包 rc=0；`git diff --check` 写入本节后第一次 rc=2（又是本记录文件末尾多了一个空行），修正后重跑 rc=0。**Go 测试执行 0**。
+
+## D 阶段 — 管理员页面（前端）
+
+> 状态（2026-11-17 08:53–09:1x CST，trellis-implement 子代理）：**前端源码 + DOM（mock 传输）已执行通过；无真实数据、无浏览器运行、后端从未对数据库执行**。本节只覆盖 `web/`；未改任何 Go 文件、依赖文件、`.trellis/spec`，未触碰 C 阶段（writer 仍无生产调用方）。本阶段不代表任务完成。
+
+### D.1 文件
+
+新增：
+
+- `web/src/features/partner-usage-logs/index.tsx`（页面，受控 `search` / `onSearchChange`）
+- `web/src/features/partner-usage-logs/api.ts`（list / stat / LOG 侧 options + 错误分类）
+- `web/src/features/partner-usage-logs/types.ts`（zod schema：ID / quota / token / 聚合均为 `z.string()`，`quota_cny` nullable）
+- `web/src/features/partner-usage-logs/lib/filters.ts`（URL schema、窗口解析、参数构造、CNY 展示状态）
+- `web/src/features/partner-usage-logs/components/{columns,summary,detail-dialog,cny-amount}.tsx`
+- `web/src/features/partner-usage-logs/__tests__/partner-usage-logs.test.tsx`、`__tests__/navigation.test.tsx`
+- `web/src/routes/_authenticated/partner-usage-logs/index.tsx`
+
+修改：
+
+- `web/src/features/users/components/users-tenant-filter.tsx`：仅新增两个**可选** prop（`fetchOptions`、`queryScope`），默认值即原行为；用户页调用方未改。商户选择器因此被两页复用，没有写第三个变体。
+- `web/src/hooks/use-sidebar-data.ts`：Admin 组新增 `Merchant usage logs` → `/partner-usage-logs`，`requiredRole: ROLE.ADMIN`。
+- `web/src/lib/operator-route.ts`：`OPERATOR_PREFIXES` 增加 `/partner-usage-logs`（developer shell）。
+- `web/src/routeTree.gen.ts`：生成文件，+23 行，未手改（见 D.2）。
+- `web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json`：各 +26 / −0，仅经脚本写入。
+- `web/scripts/partner-usage-isolation/add-missing-keys.mjs`：追加 26 个键；原 13 个用户页键保持幂等。
+
+未修改：默认 usage-logs 页面及其统计/导出（`web/src/features/usage-logs/` 零改动，仅 import 其 `CompactDateTimeRangePicker`）；未调用 root-only `/api/partner-tenants`。
+
+### D.2 路由 / 导航 / route tree
+
+- 路由 `/partner-usage-logs`（`_authenticated` 下），`beforeLoad`：`!user || role < ROLE.ADMIN` → 重定向 `/403`；页面组件内再判一次 `canRead`（无会话/非管理员不发任何请求，显示 Access denied）。后端独立强制。
+- 未作为既有 usage-logs 页的 tab / 模式；easy 模式导航无此入口。
+- route tree：本项目由 `@tanstack/router-plugin`（`rsbuild.config.ts`）在 `rsbuild build/dev` 时生成，无独立 CLI。为在 typecheck 前得到路由，使用已安装的 `@tanstack/router-generator`（插件内部用的同一生成器）以 `node --input-type=module -e` 一次性调用 `new Generator({config: getConfig({target:'react'}, cwd), root: cwd}).run()`（rc=0）。之后 `bun run build:check` 再次经插件生成，文件 sha 前后**一致**（“routeTree unchanged by build”）。
+
+### D.3 URL 键、query key、默认窗口
+
+- URL 键：`page`、`pageSize`、`tenant`、`userId`、`username`、`model`、`requestId`、`type`（`consume`|`error`）、`start`、`end`（Unix 秒）。`tenant` / `userId` 是字符串且必须是规范正 int64 十进制；手写的未加引号数字会被路由解析成 Number → schema 丢弃（不取整、不发送）。非法/超长/含控制字符的文本、非法 type、越界页码同样丢弃。
+- query key：列表 `['admin','partner-usage-logs','list', viewerKey, filters, page, pageSize]`；统计 `['admin','partner-usage-logs','stat', viewerKey, filters]`；商户选项 `['partner-usage-logs','tenant-options', viewerKey, keyword, page, selectedId]`。`viewerKey = "<user.id>:<role>:<session.sid>"`，`filters` 含全部过滤与显式窗口。未使用 `placeholderData`；`refetchOnMount: 'always'` 且行/合计只在 `isFetchedAfterMount && !isError` 时展示。
+- 默认窗口：最近 **24 小时**（`DEFAULT_WINDOW_SECONDS`），以页面挂载（或每次 Search / Reset）时刻为终点固定下来；URL 给出 `start`/`end` 时用 URL 值。list 与 stat **始终**带同一对显式 `start_timestamp` / `end_timestamp`。页面显示服务端返回的生效窗口（`Effective window`），未返回前显示请求窗口。
+- 默认 `page_size` 20（上限 100）。
+
+### D.4 UI 要求对照
+
+| 要求 | 实现 |
+| --- | --- |
+| 过滤 | 商户（LOG 侧 options，服务端搜索/分页，`selected_id` 解析标签，`selected: null` 回退显示原始 ID）、时间范围、`user_id` 与 `username`、模型、类型、request ID。非法输入 `aria-invalid` + Search 禁用，不发送 |
+| 未设置参数省略 | `buildFilterParams` 只写非空值；统计不带 `p` / `page_size` |
+| 合计 | CNY（不可用 → Unavailable；原始额度 > 0 且金额为 0.000000 → Less than ¥0.000001）、Raw quota、Requests (retries folded) + Succeeded/Failed + “失败请求仍可能已计费”说明、Records (every attempt)、Tokens（输入/输出）。无 RPM/TPM 卡片 |
+| 表格 | 服务端分页（`total`）；时间、商户（快照名，无名回退 `Merchant #<id>`）、账号、模型、类型、tokens、额度 + CNY、时长/流式、request ID、详情 |
+| 详情 | 只读 Dialog；`other` 按服务端下发的文本原样显示（不 `JSON.parse`，避免大数取整，也不请求更多数据） |
+| 过滤改变回第 1 页 | 所有过滤变更在同一次 `onSearchChange` 中清除 `page` |
+| 状态 | 加载（sr-only status + 表格骨架）、空态（含切换前为空属正常的说明）、错误 + Retry、超窗口 400 显示天数、503；范围说明 Alert 在工具栏常驻 |
+| 字符串精度 | ID / quota / token / 聚合全程字符串渲染；feature 内无 `Number()` / `parseInt` / `parseFloat` 作用于这些值（唯一的 `Number(BIG_ID)` 在测试里用来构造“被取整的非法输入”） |
+| 只读 | 无导出/删除/变更 |
+
+### D.5 实际执行的命令与真实结果（均在 `web/`，`out=$(cmd 2>&1); rc=$?` 取退出码）
+
+| 命令 | rc | 结果 |
+| --- | --- | --- |
+| router-generator 一次性调用（见 D.2） | 0 | `routeTree.gen.ts` +23 行 |
+| `bun run typecheck`（首次 / 加测试后） | 0 / 0 | 无诊断 |
+| `bun run i18n:sync`（写入前） | 0 | — |
+| `node scripts/partner-usage-isolation/add-missing-keys.mjs` | 0 | 7 语言各 26，共 182；重复执行 2 次均 `Total: 0` |
+| `bun run i18n:sync`（写入后） | 0 | — |
+| `bun run test -- src/features/partner-usage-logs`（最终，最后一次源码改动之后） | 0 | **2 文件 / 20 通过 / 0 失败 / 0 跳过**（中途三次 rc=1：新增的详情用例失败，前两次是用例取到了表头按钮，第三次暴露真实缺陷，见 D.5a） |
+| `bun run test -- src/features/partner-usage-logs src/features/users src/features/usage-logs src/features/partner-oauth-clients`（缺陷修复后重跑） | 0 | **47 文件 / 642 通过 / 0 失败 / 0 跳过**（含本目录 2 文件 20 用例；既有三目录全绿；此前一次为 47 / 639） |
+| `bun run test -- src/features/users`（单独复核基线） | 0 | 8 文件 / 64 通过，与派发前基线一致 |
+| `./node_modules/.bin/oxlint -c .oxlintrc.json <本次触及文件>`（最终） | 0 | 无诊断（中途两次 rc=1：`api.ts` no-nested-ternary、测试文件 unicorn/prefer-at，均已改正后 rc=0） |
+| `./node_modules/.bin/oxfmt --check <本次触及文件>` | 0 | 全部符合（首次 rc=1：3 个本次文件，已用 oxfmt 仅格式化这些文件） |
+| `bun run build:check`（共 2 次；第 2 次在 `index.tsx` 缺陷修复之后） | 0 / 0 | tsgo + rsbuild 生产构建成功；两次 route tree 前后 sha 均一致。其后只改过测试文件一行（prefer-at），之后 `bun run typecheck` rc=0、本目录测试 rc=0，未再重跑构建 |
+| 只读七语言检查（node） | — | 26 键 × 7 语言，缺失 0；`git diff --numstat` 各 locale 26 / 0 |
+
+未运行：全站 `bun run lint`（既有基线 151 errors / 68 warnings，未重跑；本次文件的定向 oxlint 为 0 诊断）、任何 Go 命令、dev server、浏览器。
+
+### D.5a DOM 用例发现并修复的真实缺陷
+
+详情 Dialog 最初渲染在 `SectionPageLayout` 之下、`SectionPageLayout.Content` 之外；该布局只渲染自己的 slot，Dialog 被丢弃，点击“Details”无任何反应。typecheck / lint / build 均未发现，由新增的详情用例暴露。已把 Dialog 移入 `SectionPageLayout.Content` 内，用例通过。说明：仅靠编译类检查不足以证明交互可用；尚未写 DOM 用例的交互（见 D.7“未写”）同样可能存在此类问题，需 check 派发与浏览器实测覆盖。
+
+### D.6 新增 i18n 键（26）
+
+`Merchant usage logs`、范围说明长句、`No merchant usage records in this window`、空态说明长句、`Failed to load merchant usage logs`、`Amount (CNY, current rate)`、CNY 说明长句、`Raw quota`、`Internal metering units, not money or tokens.`、`Requests (retries folded)`、`Succeeded: {{value}}`、`Failed: {{value}}`、“失败仍可能计费”长句、`Records (every attempt)`、`Input: {{input}} · Output: {{output}}`、`Less than ¥0.000001`、`Less than the smallest displayed unit, not free.`、`All types`、`Effective window: {{start}} – {{end}}`、`Check the user ID, text filters and time range.`、`Merchant usage record details`、`Event ID`、`Upstream request ID`、`Identity source`、`Recorded metadata`、`Summary`。
+
+`The time range cannot exceed {{days}} days` 七语言**已存在**，未重复写入、未覆盖。其余文案复用既有键（`Owning merchant`、`Merchant #{{id}}`、`Unavailable`、`Consume`、`Error` 等）。
+
+### D.7 DOM 用例：已写并执行 vs 未写
+
+已写并通过（20，全部为 **mock HTTP 传输**——证明 UI 发送与渲染行为，不证明后端正确性）：
+
+1. list 与 stat 使用同一显式窗口与过滤；未设置参数省略、无空串；stat 不带 `p`/`page_size`；>2^53 的 tenant_id 原样重发。
+2. >2^53 的 ID / quota / token / 聚合按精确字符串渲染；无快照名回退 `Merchant #<id>`。
+3. CNY 三态：金额、不可用（非 ¥0）、原始额度 > 0 且 0.000000 → “小于”。
+4. 记录数与折叠后请求数分别标注；失败计数与计费合计并存（收费失败可见）。
+5. 空态下范围说明存在。
+6. 503 错误态 + 范围说明仍在 + 合计不臆造 + Retry 恢复。
+7. 超长窗口 400 显示天数上限。
+8. 过滤变更同一次更新回第 1 页；非规范 user ID 禁止提交、不发送。
+9. 不同查看者（不同 id/role/session、共享 QueryClient、同一过滤）看不到前一查看者缓存的行与合计。
+10. 商户选项走 LOG 侧端点、`selected_id`、选中标签；`selected: null` 回退原始 ID；未调用 `/api/user/*` 或 `/api/partner-tenants`。
+11. 非管理员组件内拒绝且零请求。
+12. 路由守卫：普通用户 → `/403`，管理员与 root 进入；`isOperatorRoute('/partner-usage-logs')`。
+13. URL schema 往返；被取整的 Number ID、非规范 ID、溢出 ID、空/含控制字符/超长文本、非法 type、越界分页被丢弃。
+14. 26 个新键 + 时间范围键在七语言存在、保留占位符、非英文不等于英文原文。
+15–17. 导航：普通用户（developer 与 easy 模式）无入口；管理员、root 有入口且指向 `/partner-usage-logs`。
+18. 详情 Dialog：键盘（焦点 + Enter）打开、`other` 文本原样显示（其中 >2^53 数字未被取整）、Escape 关闭。
+19. 其他非法输入的 400 显示 `Invalid parameters`，合计不臆造。
+20. Reset 清空全部过滤与页码，随后请求为第 1 页且不带已清除的参数。
+
+**未写**（留给后续 check 派发）：
+
+- 商户选择器的搜索/翻页交互与“选择商户/切换类型后回第 1 页”的点击级用例（当前只覆盖了文本过滤提交路径与 `selected_id` 解析）。
+- 时间范围选择器交互、分页控件点击（page / pageSize 写回 URL）。
+- 真实 TanStack Router 下的 URL 序列化往返（当前是 schema 级 + 受控 harness；未挂真实路由验证 `"…"` 字符串序列化）。
+- stat 成功而 list 失败（或相反）的混合态、加载态断言。
+- 移动端布局 / 键盘可达性的专门断言。
+
+### D.8 证据边界与未关闭门禁
+
+- **页面在 C 阶段启用前没有真实数据**：writer 无生产调用方，任何当前构建上此页为空属预期；未加假数据、feature flag 或回退到默认日志。
+- **未做浏览器运行**（本派发不允许 dev server / 浏览器）；视觉、移动端、键盘操作只有源码与 jsdom 层面的证据。
+- 后端三个端点从未对 PostgreSQL / 真实路由执行；DOM 用例对的是 `docs/partner-tenant-api.md` 冻结契约的 mock。
+- A-U5 未关闭项：浏览器实测（加载/错误/空态、键盘、移动端、切换商户）、上面“未写”的 DOM 用例、真实路由 URL 往返。
+- A-U3 未关闭项：total/过滤/分页/统计同范围需后端 pq 运行证据；“新页不暗示历史完整”仅有文案与 DOM 证据。
+- 契约中 UI 无法单独兑现/做了保守处理的点（如实报告，未自行发挥）：
+  1. 行级“收费失败”无法可靠标注：契约未给出 violation-fee 标记在 `other` 中的键名，且解析 `other` 会取整大数，故只在合计层用“失败数 + 计费合计 + 说明”呈现，行内不猜测。
+  2. 超窗口 400 的天数取自响应体 `days`（或 `message_params.days`）；若后端实际字段形态不同，会退化为通用 `Invalid parameters` 文案——需后端运行时确认。
+  3. `q` 搜索截断到 64 码点、`username`/`model`/`request_id` 在前端做了首尾空白裁剪（契约为精确匹配；带首尾空格的值无法从 UI 查询）。
+  4. 时间范围只选一端时：缺 `end` 用挂载时刻，缺 `start` 用 `end − 24h`，始终发送显式一对。
+
+### D.9 临时产物
+
+无新建脚本/日志/临时文件（输出均在 shell 变量）。工具刷新的被忽略输出已登记于 `TEMPORARY_ARTIFACTS.md`：`web/src/i18n/locales/_reports/*`、`web/dist/`、`web/node_modules/.tmp/*.tsbuildinfo`。未删除任何东西。
+
+### D.10 trellis-check 复核（2026-11-17 09:14–09:30 CST；详见 `quality-review.stage-d.md`）
+
+复核后代码有变化，以下覆盖 D.3 / D.5 / D.7 中与之不符的陈述：
+
+- **修复的缺陷（5 项 + 1 项 i18n 小修）**：
+  1. `types.ts`：统计 `quota_cny.quota_per_unit` / `usd_to_cny_rate` 原为非空字符串，而后端在换算配置无效时发 `null`，导致“不可用”场景整块统计被判为加载失败；已改 `nullable`。原用例夹具 `quota_per_unit: '0'` 是后端不会发的形状，已改为 `null`。
+  2. `index.tsx`：两个查询未设 `staleTime`，应用默认 10 秒；10 秒内回到刚看过的页/过滤会显示**伪空态**与 `—`。已显式 `staleTime: 0`。
+  3. `index.tsx`：Search / Reset 在默认窗口下先改锚点再改 URL，URL 异步提交时会多发一对“旧过滤 + 旧页 + 新窗口”的 list/stat。锚点改为随 URL 变更一起采用（`pending`）。
+  4. `api.ts`：超长窗口天数只从 `message_params.days` 读取（后端不发顶层 `days`）；原用例夹具改为真实响应体。
+  5. `index.tsx`：列表失败态不再显示“空结果是预期的”说明。
+  6. `columns.tsx` / `detail-dialog.tsx`：硬编码 `IP`、秒单位 ` s` 改用既有键 `t('IP')` / `t('s')`（未新增键，locale 文件未动）。
+- **D.3 更正**：默认窗口锚点现在是 `{anchor, pending, search}`；伴随 URL 变更的重新锚定在 `search` 属性变化的那次渲染里生效，URL 不变时立即生效。query key 组成不变。
+- **DOM 用例数**：本目录 **3 文件 / 35 用例**（原 2 / 20；新增 `__tests__/interactions.test.tsx` 15 用例）。D.7 “未写”清单中的商户选择器点击级、类型切换、时间范围、分页控件、每页条数、单端失败、加载态、Retry 重发、键盘操作现已写并执行；仍未写的见复核记录 §8。
+- **最终一轮命令（最后一次源码改动之后，`web/`，`out=$(cmd 2>&1); rc=$?`）**：四目录测试 rc=0，**48 文件 / 657 通过**；`src/features/users` 单独 rc=0，8 / 64（与基线一致）；`bun run typecheck` rc=0；定向 oxlint rc=0；`oxfmt --check` rc=0；全站 `bun run lint` rc=1，**151 errors / 68 warnings = 既有基线**，本次触及路径 0 命中；写入脚本重跑 `Total: 0`、`bun run i18n:sync` rc=0，七个 locale sha 不变；`bun run build:check` rc=0，route tree diff 仍为 +23 行；`git diff --quiet -- web/src/features/usage-logs` rc=0。
+- **证据边界不变**：以上全部是 mock 传输下的 DOM 证据 / 类型检查 / 构建；无浏览器、无真实后端、无真实数据（C 阶段 writer 未启用）。A-U3 / A-U5 的真实浏览器与真实后端门禁仍未关闭。
+- **需主会话知悉**：“无限额”展示在日志/统计契约中无对应字段，复核同意判为本页不适用；行级“已扣费失败”标记若要做需后端在 DTO 增加显式字段（契约变更，需用户决定）；文本过滤 trim 比后端严（后端允许首尾空格）；移动端卡片视图在列表失败态会回退显示共享组件的 “No data available”。

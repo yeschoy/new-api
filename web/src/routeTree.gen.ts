@@ -56,6 +56,7 @@ import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authen
 import { Route as AuthenticatedPartnerAuthorizeIndexRouteImport } from './routes/_authenticated/partner-authorize/index'
 import { Route as AuthenticatedPartnerOauthClientsIndexRouteImport } from './routes/_authenticated/partner-oauth-clients/index'
 import { Route as AuthenticatedPartnerOauthClientsLogsRouteImport } from './routes/_authenticated/partner-oauth-clients/logs'
+import { Route as AuthenticatedPartnerUsageLogsIndexRouteImport } from './routes/_authenticated/partner-usage-logs/index'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedRedemptionCodesIndexRouteImport } from './routes/_authenticated/redemption-codes/index'
@@ -333,6 +334,12 @@ const AuthenticatedPartnerOauthClientsLogsRoute =
     path: '/partner-oauth-clients/logs',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPartnerUsageLogsIndexRoute =
+  AuthenticatedPartnerUsageLogsIndexRouteImport.update({
+    id: '/partner-usage-logs/',
+    path: '/partner-usage-logs/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPlaygroundIndexRoute =
   AuthenticatedPlaygroundIndexRouteImport.update({
     id: '/playground/',
@@ -560,6 +567,7 @@ export interface FileRoutesByFullPath {
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/partner-authorize/': typeof AuthenticatedPartnerAuthorizeIndexRoute
   '/partner-oauth-clients/': typeof AuthenticatedPartnerOauthClientsIndexRoute
+  '/partner-usage-logs/': typeof AuthenticatedPartnerUsageLogsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -636,6 +644,7 @@ export interface FileRoutesByTo {
   '/models': typeof AuthenticatedModelsIndexRoute
   '/partner-authorize': typeof AuthenticatedPartnerAuthorizeIndexRoute
   '/partner-oauth-clients': typeof AuthenticatedPartnerOauthClientsIndexRoute
+  '/partner-usage-logs': typeof AuthenticatedPartnerUsageLogsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -716,6 +725,7 @@ export interface FileRoutesById {
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/partner-authorize/': typeof AuthenticatedPartnerAuthorizeIndexRoute
   '/_authenticated/partner-oauth-clients/': typeof AuthenticatedPartnerOauthClientsIndexRoute
+  '/_authenticated/partner-usage-logs/': typeof AuthenticatedPartnerUsageLogsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -795,6 +805,7 @@ export interface FileRouteTypes {
     | '/models/'
     | '/partner-authorize/'
     | '/partner-oauth-clients/'
+    | '/partner-usage-logs/'
     | '/playground/'
     | '/profile/'
     | '/redemption-codes/'
@@ -871,6 +882,7 @@ export interface FileRouteTypes {
     | '/models'
     | '/partner-authorize'
     | '/partner-oauth-clients'
+    | '/partner-usage-logs'
     | '/playground'
     | '/profile'
     | '/redemption-codes'
@@ -950,6 +962,7 @@ export interface FileRouteTypes {
     | '/_authenticated/models/'
     | '/_authenticated/partner-authorize/'
     | '/_authenticated/partner-oauth-clients/'
+    | '/_authenticated/partner-usage-logs/'
     | '/_authenticated/playground/'
     | '/_authenticated/profile/'
     | '/_authenticated/redemption-codes/'
@@ -1335,6 +1348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPartnerOauthClientsLogsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/partner-usage-logs/': {
+      id: '/_authenticated/partner-usage-logs/'
+      path: '/partner-usage-logs'
+      fullPath: '/partner-usage-logs/'
+      preLoaderRoute: typeof AuthenticatedPartnerUsageLogsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/playground/': {
       id: '/_authenticated/playground/'
       path: '/playground'
@@ -1659,6 +1679,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedPartnerAuthorizeIndexRoute: typeof AuthenticatedPartnerAuthorizeIndexRoute
   AuthenticatedPartnerOauthClientsIndexRoute: typeof AuthenticatedPartnerOauthClientsIndexRoute
+  AuthenticatedPartnerUsageLogsIndexRoute: typeof AuthenticatedPartnerUsageLogsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedRedemptionCodesIndexRoute: typeof AuthenticatedRedemptionCodesIndexRoute
@@ -1698,6 +1719,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedPartnerAuthorizeIndexRoute,
   AuthenticatedPartnerOauthClientsIndexRoute:
     AuthenticatedPartnerOauthClientsIndexRoute,
+  AuthenticatedPartnerUsageLogsIndexRoute:
+    AuthenticatedPartnerUsageLogsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedRedemptionCodesIndexRoute:
