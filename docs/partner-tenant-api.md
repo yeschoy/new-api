@@ -247,6 +247,39 @@ Query parameters (all optional; each may appear at most once; unknown parameters
 
 Authentication is evaluated before parameter validation. These two endpoints are documented from branch code; their PostgreSQL and real-route runtime tests have not been executed yet (see the usage-logs task verification record), so no deployment claim is made. The merchant usage-log list and statistics endpoints are specified in the next section.
 
+### Administrator user list: merchant classification
+
+The two existing administrator user endpoints, `GET /api/user/` and `GET /api/user/search`, accept an additive merchant (Tenant) dimension with identical meaning on both. Their access rules are unchanged (administrator or root session; personal access token scope `user:read`), no route is added, and every pre-existing parameter and response field keeps its behavior.
+
+| Parameter | Value | Meaning |
+| --- | --- | --- |
+| `user_category` | `all`, `ordinary` or `merchant`; omitted = `all` | `merchant`: the user has a Tenant account mapping. `ordinary`: the user has none. `all`: no category condition. |
+| `tenant_id` | Canonical positive signed 64-bit decimal text, e.g. `42` | Only users mapped to that merchant. Use an `id` returned by `GET /api/user/tenant-options`. |
+
+- Classification is **only** the existence of the Tenant account relation for the user. It is never inferred from a `p_` username prefix, group, role, balance, subscription or expiry. A disabled or expired merchant or account is still `merchant`; a soft-deleted user that the list shows keeps its attribution while the mapping exists.
+- It is independent of the Partner OAuth/Server dimension: the `partner_client_id` filter and the `partner_client_id` / `partner_client_name` fields are unchanged, a `client_id` is never a `tenant_id`, and a user may carry both. The two filters can be combined.
+- `tenant_id` with `user_category=all` (or omitted) and with `user_category=merchant` select the same users. `user_category=ordinary` together with `tenant_id` is contradictory and is rejected.
+- The filter is applied before pagination to both the total and the page, and combines with keyword, group, role, status (including the deleted status) and sorting.
+
+Each listed user gains three fields that are always present:
+
+| Field | Type | Value |
+| --- | --- | --- |
+| `user_category` | string | `merchant` or `ordinary` |
+| `partner_tenant_id` | string | Decimal text of the merchant ID (a string so a 64-bit ID survives JavaScript); `""` for an ordinary user |
+| `partner_tenant_name` | string | The merchant's current name; `""` for an ordinary user, and also `""` for a `merchant` whose merchant record is missing |
+
+No account ID, identity source, external buyer ID, credential or configuration is returned.
+
+| HTTP | `message` | Cause |
+| --- | --- | --- |
+| 400 | `user_category must be exactly one of all, ordinary or merchant` | Unknown, empty or repeated `user_category`. |
+| 400 | `tenant_id must be exactly one positive integer in canonical decimal form` | Empty, repeated, signed, zero, zero-padded, fractional, non-numeric or overflowing `tenant_id`. Nothing is rounded or ignored. |
+| 400 | `user_category=ordinary cannot be combined with tenant_id` | Contradictory combination. |
+| 503 | `Database error, please contact the administrator` | The merchant attribution of the page could not be read. The request fails rather than presenting users as `ordinary`; no database detail is returned. |
+
+Authentication and authorization are evaluated before parameter validation, and validation happens before any query. This subsection is documented from branch code; its PostgreSQL and real-route runtime tests have not been executed yet (see the user-classification task verification record).
+
 ## Administrator merchant usage logs
 
 > **Scope of this surface.** These endpoints read ONLY the dedicated merchant usage table, which receives records written after merchant usage logging is cut over to it. Merchant records written before the cut-over stay in the default log table, remain visible on the default administrator log page (`GET /api/log/`) and are **not** migrated, copied or hidden. An empty or short result here therefore does not mean a merchant had no earlier usage, and the earliest record here is not a global cut-over time. The default administrator list, statistics and export never include records of the dedicated table. On this branch the writer that fills the dedicated table is not enabled yet.

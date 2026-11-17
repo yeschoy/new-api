@@ -3,7 +3,7 @@
   "name": "partner-user-classification",
   "title": "用户列表商户归属与分类筛选",
   "description": "用户列表增加真实Tenant归属、全部普通商户分类与商户筛选，不改变用户角色权限",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

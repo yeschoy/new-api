@@ -61,6 +61,11 @@ export const userSchema = z.object({
   remark: z.string().optional(),
   partner_client_id: z.string().optional(),
   partner_client_name: z.string().optional(),
+  // Merchant (Tenant) ownership; independent of the Partner OAuth fields
+  // above. Optional so a response from an older server still parses.
+  user_category: z.string().optional(),
+  partner_tenant_id: z.string().optional(),
+  partner_tenant_name: z.string().optional(),
   admin_permissions: z
     .record(z.string(), z.record(z.string(), z.boolean()))
     .optional(),
@@ -90,11 +95,42 @@ export type UserSortBy =
 
 export type UserSortOrder = 'asc' | 'desc'
 
-export interface GetUsersParams {
+/** Merchant (Tenant) filter shared by the list and search endpoints. */
+export interface UserTenantFilterParams {
+  /** Omitted means all users; never sent as an empty value. */
+  user_category?: 'ordinary' | 'merchant'
+  /** Canonical positive decimal string; never converted to a number. */
+  tenant_id?: string
+}
+
+export interface GetUsersParams extends UserTenantFilterParams {
   p?: number
   page_size?: number
   sort_by?: UserSortBy
   sort_order?: UserSortOrder
+}
+
+/** Safe merchant option: decimal string ID and current name only. */
+export const userTenantOptionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+export type UserTenantOption = z.infer<typeof userTenantOptionSchema>
+
+export const userTenantOptionsSchema = z.object({
+  page: z.number(),
+  page_size: z.number(),
+  total: z.number(),
+  items: z.array(userTenantOptionSchema),
+  selected: userTenantOptionSchema.nullable(),
+})
+export type UserTenantOptions = z.infer<typeof userTenantOptionsSchema>
+
+export interface GetUserTenantOptionsParams {
+  q?: string
+  p?: number
+  page_size?: number
+  selected_id?: string
 }
 
 export interface GetUsersResponse {
@@ -108,7 +144,7 @@ export interface GetUsersResponse {
   }
 }
 
-export interface SearchUsersParams {
+export interface SearchUsersParams extends UserTenantFilterParams {
   keyword?: string
   group?: string
   /** Partner OAuth client ID; limits results to that partner's sub-accounts. */

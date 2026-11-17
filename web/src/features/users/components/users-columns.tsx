@@ -241,6 +241,66 @@ export function useUsersColumns(): ColumnDef<User>[] {
         meta: { mobileOrder: 35 },
       },
       {
+        // Merchant (Tenant) dimension. Values come from the server only and
+        // are independent of the Partner OAuth column above.
+        id: 'user_category',
+        accessorKey: 'user_category',
+        header: t('User category'),
+        cell: ({ row }) => {
+          const category = row.original.user_category
+          if (category === 'merchant') {
+            return (
+              <BadgeCell>
+                <StatusBadge
+                  label={t('Merchant user')}
+                  variant='warning'
+                  copyable={false}
+                />
+              </BadgeCell>
+            )
+          }
+          if (category === 'ordinary') {
+            return <span className='text-sm'>{t('Ordinary user')}</span>
+          }
+          // Unknown (older server): show nothing rather than guess.
+          return null
+        },
+        enableSorting: false,
+        size: 130,
+        meta: { mobileOrder: 36 },
+      },
+      {
+        id: 'partner_tenant',
+        accessorKey: 'partner_tenant_id',
+        header: t('Owning merchant'),
+        cell: ({ row }) => {
+          const tenantId = row.original.partner_tenant_id
+          const isMerchant = row.original.user_category === 'merchant'
+          if (!isMerchant && !tenantId) return null
+          // A merchant whose name is unavailable is shown by its ID.
+          const label =
+            row.original.partner_tenant_name ||
+            (tenantId
+              ? t('Merchant #{{id}}', { id: tenantId })
+              : t('Unknown merchant'))
+          return (
+            <BadgeCell>
+              <StatusBadge
+                label={label}
+                variant='neutral'
+                copyable={false}
+                title={
+                  tenantId ? t('Merchant ID: {{id}}', { id: tenantId }) : label
+                }
+              />
+            </BadgeCell>
+          )
+        },
+        enableSorting: false,
+        size: 160,
+        meta: { mobileOrder: 37 },
+      },
+      {
         accessorKey: 'role',
         header: t('Role'),
         cell: ({ row }) => {

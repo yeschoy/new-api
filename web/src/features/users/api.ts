@@ -28,6 +28,8 @@ import type {
   GetUsersParams,
   GetUsersResponse,
   SearchUsersParams,
+  GetUserTenantOptionsParams,
+  UserTenantOptions,
   UserFormData,
   ManageUserAction,
   ManageUserQuotaPayload,
@@ -61,8 +63,27 @@ export async function getUsers(
       page_size,
       sort_by,
       sort_order,
+      // The server rejects empty values, so unset filters are omitted.
+      ...(params.user_category ? { user_category: params.user_category } : {}),
+      ...(params.tenant_id ? { tenant_id: params.tenant_id } : {}),
     },
   })
+  return res.data
+}
+
+/**
+ * Read-only merchant options for the user list filter (administrator read).
+ * Server-side search and bounded paging; unset parameters are omitted.
+ */
+export async function getUserTenantOptions(
+  params: GetUserTenantOptionsParams = {}
+): Promise<ApiResponse<UserTenantOptions>> {
+  const query: Record<string, string | number> = {}
+  if (params.q) query.q = params.q
+  if (params.p) query.p = params.p
+  if (params.page_size) query.page_size = params.page_size
+  if (params.selected_id) query.selected_id = params.selected_id
+  const res = await api.get('/api/user/tenant-options', { params: query })
   return res.data
 }
 
@@ -86,6 +107,10 @@ export async function searchUsers(
   queryParams.set('keyword', keyword)
   queryParams.set('group', group)
   if (params.partner) queryParams.set('partner_client_id', params.partner)
+  if (params.user_category) {
+    queryParams.set('user_category', params.user_category)
+  }
+  if (params.tenant_id) queryParams.set('tenant_id', params.tenant_id)
   if (role) queryParams.set('role', role)
   if (status) queryParams.set('status', status)
   queryParams.set('p', String(p))

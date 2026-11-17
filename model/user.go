@@ -423,6 +423,16 @@ func GetMaxUserId() int {
 }
 
 func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (users []*User, total int64, err error) {
+	return GetAllUsersWithTenantFilter(pageInfo, UserTenantFilter{}, sortOptions...)
+}
+
+// GetAllUsersWithTenantFilter is GetAllUsers narrowed by the Tenant
+// classification. The zero filter adds no predicate.
+func GetAllUsersWithTenantFilter(pageInfo *common.PageInfo, tenantFilter UserTenantFilter, sortOptions ...UserSortOptions) (users []*User, total int64, err error) {
+	if err = tenantFilter.Validate(); err != nil {
+		return nil, 0, err
+	}
+
 	// Start transaction
 	tx := DB.Begin()
 	if tx.Error != nil {
@@ -435,7 +445,7 @@ func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (use
 	}()
 
 	// Get total count within transaction
-	err = tx.Unscoped().Model(&User{}).Count(&total).Error
+	err = tenantFilter.apply(tx.Unscoped().Model(&User{})).Count(&total).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
@@ -443,7 +453,7 @@ func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (use
 
 	// Get paginated users within same transaction
 	order := resolveUserSortOptions(sortOptions)
-	err = order.Apply(tx.Unscoped()).Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password", "access_token").Find(&users).Error
+	err = order.Apply(tenantFilter.apply(tx.Unscoped())).Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password", "access_token").Find(&users).Error
 	if err != nil {
 		tx.Rollback()
 		return nil, 0, err
@@ -458,9 +468,20 @@ func GetAllUsers(pageInfo *common.PageInfo, sortOptions ...UserSortOptions) (use
 }
 
 func SearchUsers(keyword string, group string, role *int, status *int, partnerClientID string, startIdx int, num int, sortOptions ...UserSortOptions) ([]*User, int64, error) {
+	return SearchUsersWithTenantFilter(keyword, group, role, status, partnerClientID, UserTenantFilter{}, startIdx, num, sortOptions...)
+}
+
+// SearchUsersWithTenantFilter is SearchUsers narrowed by the Tenant
+// classification, which is independent of partnerClientID (Partner OAuth).
+// The zero filter adds no predicate.
+func SearchUsersWithTenantFilter(keyword string, group string, role *int, status *int, partnerClientID string, tenantFilter UserTenantFilter, startIdx int, num int, sortOptions ...UserSortOptions) ([]*User, int64, error) {
 	var users []*User
 	var total int64
 	var err error
+
+	if err = tenantFilter.Validate(); err != nil {
+		return nil, 0, err
+	}
 
 	// 开始事务
 	tx := DB.Begin()
@@ -495,6 +516,8 @@ func SearchUsers(keyword string, group string, role *int, status *int, partnerCl
 	if partnerClientID != "" {
 		query = query.Where("id IN (?)", tx.Model(&PartnerAccount{}).Select("user_id").Where("client_id = ?", partnerClientID))
 	}
+	// Same predicate for the count below and the page after it.
+	query = tenantFilter.apply(query)
 	if role != nil {
 		query = query.Where("role = ?", *role)
 	}

@@ -20,6 +20,10 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
 import { Users } from '@/features/users'
+import {
+  USER_CATEGORIES,
+  isCanonicalTenantId,
+} from '@/features/users/lib/tenant-filter'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -37,6 +41,14 @@ const usersSearchSchema = z.object({
     .catch([]),
   group: z.array(z.string()).optional().catch([]),
   partner: z.array(z.string()).optional().catch([]),
+  // Merchant (Tenant) dimension; independent of the OAuth `partner` key.
+  // IDs stay strings and anything non-canonical is dropped, never sent.
+  userCategory: z.array(z.enum(USER_CATEGORIES)).max(1).optional().catch([]),
+  tenant: z
+    .array(z.string().refine(isCanonicalTenantId))
+    .max(1)
+    .optional()
+    .catch([]),
 })
 
 export const Route = createFileRoute('/_authenticated/users/')({

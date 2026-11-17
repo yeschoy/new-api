@@ -370,9 +370,13 @@ func Register(c *gin.Context) {
 }
 
 func GetAllUsers(c *gin.Context) {
+	tenantFilter, ok := parseUserTenantFilter(c)
+	if !ok {
+		return
+	}
 	pageInfo := common.GetPageQuery(c)
 	sortOptions := model.NewUserSortOptions(c.Query("sort_by"), c.Query("sort_order"))
-	users, total, err := model.GetAllUsers(pageInfo, sortOptions)
+	users, total, err := model.GetAllUsersWithTenantFilter(pageInfo, tenantFilter, sortOptions)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -383,6 +387,10 @@ func GetAllUsers(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if err := withPartnerTenantOwners(items); err != nil {
+		respondUserTenantOwnerUnavailable(c)
+		return
+	}
 	pageInfo.SetTotal(int(total))
 	pageInfo.SetItems(items)
 
@@ -391,11 +399,20 @@ func GetAllUsers(c *gin.Context) {
 }
 
 // adminUserListItem is a listed user plus, for partner sub-accounts, the
-// partner that owns it.
+// partner that owns it, plus the independent Tenant (merchant) classification.
 type adminUserListItem struct {
 	*model.User
 	PartnerClientId   string `json:"partner_client_id,omitempty"`
 	PartnerClientName string `json:"partner_client_name,omitempty"`
+	// UserCategory is "merchant" when a PartnerTenantAccount maps the user and
+	// "ordinary" otherwise. It is unrelated to the Partner OAuth fields above.
+	UserCategory string `json:"user_category"`
+	// PartnerTenantId is decimal text (a 64-bit ID survives JavaScript
+	// clients); empty for an ordinary user.
+	PartnerTenantId string `json:"partner_tenant_id"`
+	// PartnerTenantName is the tenant's current name; empty for an ordinary
+	// user and for a mapping whose tenant row is missing.
+	PartnerTenantName string `json:"partner_tenant_name"`
 }
 
 func withPartnerAccountOwners(users []*model.User) ([]adminUserListItem, error) {
@@ -416,6 +433,10 @@ func withPartnerAccountOwners(users []*model.User) ([]adminUserListItem, error) 
 }
 
 func SearchUsers(c *gin.Context) {
+	tenantFilter, ok := parseUserTenantFilter(c)
+	if !ok {
+		return
+	}
 	keyword := c.Query("keyword")
 	group := c.Query("group")
 	var role *int
@@ -432,7 +453,7 @@ func SearchUsers(c *gin.Context) {
 	}
 	pageInfo := common.GetPageQuery(c)
 	sortOptions := model.NewUserSortOptions(c.Query("sort_by"), c.Query("sort_order"))
-	users, total, err := model.SearchUsers(keyword, group, role, status, c.Query("partner_client_id"), pageInfo.GetStartIdx(), pageInfo.GetPageSize(), sortOptions)
+	users, total, err := model.SearchUsersWithTenantFilter(keyword, group, role, status, c.Query("partner_client_id"), tenantFilter, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), sortOptions)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -440,6 +461,10 @@ func SearchUsers(c *gin.Context) {
 	items, err := withPartnerAccountOwners(users)
 	if err != nil {
 		common.ApiError(c, err)
+		return
+	}
+	if err := withPartnerTenantOwners(items); err != nil {
+		respondUserTenantOwnerUnavailable(c)
 		return
 	}
 	pageInfo.SetTotal(int(total))

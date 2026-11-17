@@ -18,7 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import type { OnChangeFn, SortingState } from '@tanstack/react-table'
+import type {
+  ColumnFiltersState,
+  OnChangeFn,
+  SortingState,
+} from '@tanstack/react-table'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -49,10 +53,19 @@ import {
   getUserRoleOptions,
   isUserDeleted,
 } from '../constants'
+import {
+  USER_CATEGORY_COLUMN_ID,
+  USER_TENANT_COLUMN_ID,
+  applyUserTenantFilterChange,
+  normalizeUserTenantColumnFilters,
+  readUserTenantFilter,
+  resolveUserTenantFilter,
+} from '../lib/tenant-filter'
 import type { User, UserSortBy } from '../types'
 import { DataTableBulkActions } from './data-table-bulk-actions'
 import { useUsersColumns } from './users-columns'
 import { useUsers } from './users-provider'
+import { UserTenantFilter } from './users-tenant-filter'
 
 const route = getRouteApi('/_authenticated/users/')
 
@@ -76,16 +89,17 @@ export function UsersTable() {
   const isMobile = useMediaQuery('(max-width: 640px)')
   const [sorting, setSorting] = useState<SortingState>([])
 
+  const search = route.useSearch()
   const {
     globalFilter,
     onGlobalFilterChange,
-    columnFilters,
-    onColumnFiltersChange,
+    columnFilters: urlColumnFilters,
+    onColumnFiltersChange: onUrlColumnFiltersChange,
     pagination,
     onPaginationChange,
     ensurePageInRange,
   } = useTableUrlState({
-    search: route.useSearch(),
+    search,
     navigate: route.useNavigate(),
     pagination: { defaultPage: 1, defaultPageSize: isMobile ? 10 : 20 },
     globalFilter: { enabled: true, key: 'filter' },
@@ -94,8 +108,40 @@ export function UsersTable() {
       { columnId: 'role', searchKey: 'role', type: 'array' },
       { columnId: 'group', searchKey: 'group', type: 'array' },
       { columnId: 'partner', searchKey: 'partner', type: 'array' },
+      // Merchant (Tenant) dimension: its own URL keys, never the OAuth one.
+      {
+        columnId: USER_CATEGORY_COLUMN_ID,
+        searchKey: 'userCategory',
+        type: 'array',
+      },
+      { columnId: USER_TENANT_COLUMN_ID, searchKey: 'tenant', type: 'array' },
     ],
   })
+  // Contradictory or hand-edited URL state is normalised before it reaches
+  // the table or a request.
+  const columnFilters = useMemo(
+    () => normalizeUserTenantColumnFilters(urlColumnFilters),
+    [urlColumnFilters]
+  )
+  const onColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (updater) => {
+    const next =
+      typeof updater === 'function' ? updater(columnFilters) : updater
+    // One navigation writes the filters and resets the page together.
+    onUrlColumnFiltersChange(applyUserTenantFilterChange(next, columnFilters))
+  }
+  // The request reads the merchant filter from the same URL snapshot as the
+  // page index, so a new filter is never requested with an old page.
+  const urlCategory = search.userCategory?.[0]
+  const urlTenantId = search.tenant?.[0]
+  const tenantFilter = useMemo(
+    () => resolveUserTenantFilter(urlCategory, urlTenantId),
+    [urlCategory, urlTenantId]
+  )
+  const userCategoryParam =
+    tenantFilter.category && tenantFilter.category !== 'all'
+      ? tenantFilter.category
+      : undefined
+  const tenantIdParam = tenantFilter.tenantId
   const statusFilter =
     (columnFilters.find((filter) => filter.id === 'status')?.value as
       | string[]
@@ -114,6 +160,9 @@ export function UsersTable() {
       | string[]
       | undefined) ?? []
   const authUser = useAuthStore((state) => state.auth.user)
+  const sessionId = useAuthStore((state) => state.auth.session?.sid)
+  // Cached rows and options belong to one viewer (account, role, session).
+  const viewerKey = `${authUser?.id ?? 0}:${authUser?.role ?? 0}:${sessionId ?? ''}`
   const canReadPartners = hasPermission(
     authUser,
     ADMIN_PERMISSION_RESOURCES.PARTNER_OAUTH_CLIENT,
@@ -154,10 +203,22 @@ export function UsersTable() {
     }
   }
 
+  // Placeholder scope: viewer plus the merchant (Tenant) dimension only.
+  // Rows cached for another viewer or another merchant filter are never
+  // shown as placeholder data. Every pre-existing input (keyword, status,
+  // role, group, OAuth partner, page, page size, sort, refresh) keeps the
+  // previous rows while loading, exactly as before this dimension existed.
+  const placeholderScope = JSON.stringify([
+    viewerKey,
+    userCategoryParam ?? '',
+    tenantIdParam ?? '',
+  ])
+
   // Fetch data with React Query
   const { data, isLoading, isFetching } = useQuery({
     queryKey: [
       'users',
+      placeholderScope,
       pagination.pageIndex + 1,
       pagination.pageSize,
       globalFilter,
@@ -179,6 +240,9 @@ export function UsersTable() {
         p: pagination.pageIndex + 1,
         page_size: pagination.pageSize,
         ...sortParams,
+        // Sent on both endpoints when set and omitted when unset.
+        ...(userCategoryParam ? { user_category: userCategoryParam } : {}),
+        ...(tenantIdParam ? { tenant_id: tenantIdParam } : {}),
       }
 
       const result =
@@ -205,7 +269,10 @@ export function UsersTable() {
         total: result.data?.total || 0,
       }
     },
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[1] === placeholderScope
+        ? previousData
+        : undefined,
   })
 
   const users = data?.items || []
@@ -257,7 +324,33 @@ export function UsersTable() {
       toolbarProps={{
         searchPlaceholder: t('Filter by username, name or email...'),
         searchDebounceMs: 500,
+        additionalSearch: (
+          <UserTenantFilter
+            value={readUserTenantFilter(columnFilters).tenantId}
+            onChange={(tenantId) =>
+              onColumnFiltersChange((current) => [
+                ...current.filter(
+                  (filter) => filter.id !== USER_TENANT_COLUMN_ID
+                ),
+                ...(tenantId
+                  ? [{ id: USER_TENANT_COLUMN_ID, value: [tenantId] }]
+                  : []),
+              ])
+            }
+            viewerKey={viewerKey}
+          />
+        ),
         filters: [
+          {
+            columnId: USER_CATEGORY_COLUMN_ID,
+            title: t('User category'),
+            options: [
+              { label: t('All users'), value: 'all' },
+              { label: t('Ordinary user'), value: 'ordinary' },
+              { label: t('Merchant user'), value: 'merchant' },
+            ],
+            singleSelect: true,
+          },
           {
             columnId: 'status',
             title: t('Status'),

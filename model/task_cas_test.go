@@ -33,6 +33,11 @@ func TestMain(m *testing.M) {
 	if os.Getenv("TEST_PARTNER_QUOTA_CNY_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "PartnerTenantQuotaCNY") {
 		os.Exit(m.Run())
 	}
+	// The administrator user classification suite owns isolated PostgreSQL
+	// schemas (pt_user_class_); it must never run on the SQLite bootstrap below.
+	if os.Getenv("TEST_PARTNER_USER_CLASSIFICATION_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "PartnerTenantUserClassification") {
+		os.Exit(m.Run())
+	}
 	if os.Getenv("TEST_PARTNER_ACCESS_AUDIT_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "AccessMode") || strings.Contains(flag.Lookup("test.run").Value.String(), "AuthorizationAudit") || os.Getenv("TEST_PARTNER_SUBSCRIPTION_KEY_POSTGRES_DSN") != "" || strings.Contains(flag.Lookup("test.run").Value.String(), "SubscriptionKey") {
 		os.Exit(m.Run())
 	}
