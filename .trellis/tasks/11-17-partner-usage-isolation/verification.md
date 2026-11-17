@@ -90,6 +90,33 @@ Docker 复测：05:55、06:08、06:43、07:17、07:57、08:51、09:3x CST 仍不
 - A 阶段实现代理执行过以仓库根为起点的递归 `grep -r`，grep 进程遍历了 `.local-tests/`、`reports/` 等目录。一次未过滤的结果打印了 `.local-tests/` 源码导出副本中的一行（与 `router/api-router.go:275` 相同，不含凭证）；另一次带 `*.json/*.ts/*.tsx` 过滤的扫描可能打开过 `reports/` 下的同类文件，但没有输出任何内容或文件名。私钥文件与两份受保护清单未被打开，没有文件被修改或暂存。主会话早先的一次 `grep -r --include='*.go' .` 同样打印过 `.local-tests/` 导出副本中的 Go 源码行（无凭证）。此后所有检索限定为 `git grep` 或显式源码目录。
 - 基线阶段主会话创建并在同一命令中删除了两个 `/tmp` 输出捕获文件（内容为空的编译输出），未预先登记；已在 `TEMPORARY_ARTIFACTS.md` 披露，之后改用 shell 变量捕获。
 
-## 4. 父级 AC1–AC8 证据映射
+## 4. 父级 AC1–AC8 证据映射（2026-11-17 最终集成检查，HEAD `d2135cbda`）
 
-尚无子任务完成；本节在最终集成验收时填写。当前全部为未验收。
+证据类型：**源码**=源码与独立审阅推理；**类型**=离线 go build/vet；**DOM**=Vitest + 模拟传输（已执行）；**浏览器**=本地真实浏览器 + 假数据（已执行）；**pq**=隔离 PostgreSQL 实跑（本组为 0）。
+
+| AC | 结论 | 已有证据 | 欠缺（阻塞验收） |
+| --- | --- | --- | --- |
+| AC1 单写独立表 | **未实现（被门禁阻塞）** | 写入目标表、迁移和插入函数已就绪（源码/类型）；writer 普查已补 `channel-test.go`、`iq_executor.go` | C 阶段三入口分流未实施：按规划与用户要求，迁移与兼容 reader 经 pq 验证前不得启用 writer |
+| AC2 列表/统计/归属一致、无泄漏 | 源码就绪，未验收 | list/count/stat 同一 builder、归属同一原语（源码/类型）；页面与用户页 UI（DOM/浏览器） | 新表无真实数据；pq 上 total/分页/统计一致性、真实路由鉴权未跑 |
+| AC3 CNY 精确投影 | 源码就绪，未验收 | 转换器与三入口 additive 字段（源码/类型）；60 个测试期望经精确有理数复算 0 不一致（已执行）；OpenAPI 解析/103 个引用（已执行）；UI 不可用/微额状态（DOM/浏览器） | 三入口 HTTP 实际响应、旧字段类型不变的运行证据（pq） |
+| AC4 用户分类过滤 | 后端源码就绪，前端已执行 | EXISTS/NOT EXISTS 同事务在分页前生效（源码/类型）；URL/分页重置/缓存隔离/大 ID 精确请求（DOM/浏览器） | pq 上 count/行一致、与关键词/状态/角色/组/排序组合 |
+| AC5 共享/独立 LOG_DB 迁移、旧日志可追溯 | 源码就绪，未验收 | 两条初始化路径接线、ClickHouse 显式 DDL/TTL、不读不动 `logs`（源码/类型）；新页范围说明常驻（DOM/浏览器） | fresh/upgrade/repeat、实际 DDL/索引/持久化（pq）；ClickHouse 无实跑 |
+| AC6 默认顶部不读新表、全站只计一次 | 源码保持，未验收 | 默认管理员 reader 与 `model/usedata.go` 零改动（源码，git diff 证明） | 依赖 C 阶段 writer；`LogQuotaData` 只计一次需写入启用后实测 |
+| AC7 自身读取连续、越权负例 | 源码就绪，未验收 | 六个 reader 探测→原路径/双表 union，归属只来自已鉴权身份，普通用户执行原 SQL（源码/类型，两轮独立审阅） | pq 实跑 list/count/stream/requests/summary、同本地 ID、重试折叠、伪造参数 |
+| AC8 权限 | 源码就绪，部分已执行 | AdminAuth + 显式 PAT scope、root-only 未改（源码）；普通用户被前端拦截且零管理员请求（浏览器） | 真实 `SetApiRouter` 匿名/用户/admin/root/PAT 矩阵（pq 路由测试未跑） |
+
+**结论：父任务不能验收，也不能归档。** 三个子任务均停在 source-ready / runtime-blocked；AC1 与 AC6 的写入部分按规划被安全门禁阻塞（不是遗漏）。
+
+## 5. 原有功能回归与前组遗留门禁（实际结果）
+
+- 前端回归（已执行）：`usage-logs`、`users`、`partner-oauth-clients` 既有测试全部通过（四目录 48 文件 / 657）；全站 lint 151 errors / 68 warnings 与改动前基线一致，本组 0 条。B2a 曾改动的 4 个既有 Go 测试夹具已还原为与 HEAD 字节一致。
+- Go 既有回归：**未执行**（`model/log_*_test.go`、`controller/log_*_test.go`、`controller/relay_error_log_test.go`、用户/OAuth 相关测试等）。只确认了类型检查通过、断言未被弱化。
+- 前组（11-13 接入方式 + 授权审计）：本会话唯一新证据是当前 HEAD 下其业务与 20 个测试源码通过离线 build/vet（类型检查）；pq 迁移/行锁/真实路由/LOG_DB 持久化仍为 0 执行。本组共享改动涉及：`MigratePartnerTenantUsageLogs` 加入同一迁移链（在其审计迁移之后）；`controller/partner_oauth_client.go` 的 `tenant_id` 解析改用共享解析器（行为等价，已逐类输入证明）。这两点需在 Docker 可用后随前组套件一起实跑。
+
+## 6. 日志 best-effort 与发布注意事项
+
+- 新表写入（启用后）是计费事务外的同步 best-effort：业务提交后、写日志前进程退出或 LOG_DB 故障会漏记，不回落默认表、不双写、不回滚已扣额度；无 outbox，不承诺无损。
+- 发布顺序：迁移 + 兼容 reader 必须先于 writer 部署到全部 API 与后台节点；滚动期间不存在全局原子切换时刻，新页的“切换后”只能按每个节点升级时间理解。
+- 回滚：保留新表与数据及兼容 reader；只回滚到旧二进制会使成员的新历史在自身视图中不可见。
+- 待定性能项（需 pq EXPLAIN）：统计端点整窗流式扫描、成员双表列表无分支 top-N 下推、成员汇总按 `request_id` 库内排序；MySQL 两表 collation 不同可能令成员 union 报错（PostgreSQL 不涉及）。
+- 已知限制：返现 recorded-spend 报告与 Partner Server 子账号用量只读 `logs`，切写后不含成员新消费；H5 `quota_cny.usable` 是额度层面判断；用户列表 400/503 落入既有“查询失败→空态”无专门提示；新页无行级“已扣费失败”标记（需契约新增字段）。

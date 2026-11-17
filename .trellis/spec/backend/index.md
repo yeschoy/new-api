@@ -24,6 +24,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [Partner Tenant Paid Checkout](./partner-tenant-checkout.md) | Paid-only Tenant order/cashier/fulfillment, identity isolation and subscription-only funding | Implemented; DB runtime gate pending |
 | [Subscription Access Keys](./partner-subscription-key.md) | User-ID-free orders, paid-only internal users, independent single-subscription keys and same-row renewal | Implemented; targeted isolated pq passed, deployment unverified |
 | [Optional Hosted H5](./partner-hosted-h5.md) | Limited purchase sessions, transactional authority, exact quota DTO and standalone selector/cashier recovery | Implemented; DB runtime gate pending |
+| [Partner Tenant Usage Isolation](./partner-tenant-usage-isolation.md) | Safe Tenant owner, dedicated LOG_DB usage table, own-user two-table readers, admin merchant usage API, fixed-CNY `quota_cny`, user-list merchant classification | Source-level implemented; Go/pq runtime 0; dedicated writer NOT enabled |
 | [Group IQ Tests](./group-iq-tests.md) | Single-attempt routing, calendar/lease persistence, private latest artwork and API permissions | Implemented |
 
 ---
