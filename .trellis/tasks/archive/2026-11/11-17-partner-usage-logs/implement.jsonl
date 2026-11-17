@@ -5,6 +5,6 @@
 {"file":".trellis/spec/backend/partner-authorization-audit.md","reason":"Separate LOG_DB migration/redaction and best-effort boundary; do not replace credential audit"}
 {"file":".trellis/spec/frontend/index.md","reason":"Use project feature/layout/table conventions"}
 {"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Personal summary, historical billing facts and viewer-scoped state"}
-{"file":".trellis/tasks/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Actual three writers, self/admin consumers, default/separate/ClickHouse paths"}
-{"file":".trellis/tasks/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Owner primitive, single-write fault policy, personal union, final CNY and history contracts"}
-{"file":".trellis/tasks/11-17-partner-usage-isolation/research/planning-review.md","reason":"Internal stage gates, legacy regressions, union types, API contracts and application logger safety"}
+{"file":".trellis/tasks/archive/2026-11/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Actual three writers, self/admin consumers, default/separate/ClickHouse paths"}
+{"file":".trellis/tasks/archive/2026-11/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Owner primitive, single-write fault policy, personal union, final CNY and history contracts"}
+{"file":".trellis/tasks/archive/2026-11/11-17-partner-usage-isolation/research/planning-review.md","reason":"Internal stage gates, legacy regressions, union types, API contracts and application logger safety"}

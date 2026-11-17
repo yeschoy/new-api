@@ -1,7 +1,0 @@
-{"file":".trellis/spec/backend/database-guidelines.md","reason":"Require real PostgreSQL migration/index/persistence evidence"}
-{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"No funding/payment changes or unsupported Tenant upstream admission"}
-{"file":".trellis/spec/backend/partner-authorization-audit.md","reason":"No secrets/raw SQL in logs; independent credential audit and role projections remain intact"}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Own reports, request folding, cache and historical price projection regressions"}
-{"file":".trellis/tasks/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Verify complete writer and reader census, both migration paths"}
-{"file":".trellis/tasks/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Verify role/read matrix, best-effort fault behavior, owner identity and retention scope"}
-{"file":".trellis/tasks/11-17-partner-usage-isolation/research/planning-review.md","reason":"Verify existing regressions, charged-failure classification, both logging layers and union compatibility"}

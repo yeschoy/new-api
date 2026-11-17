@@ -1,6 +1,6 @@
 # CNY 额度执行与验收
 
-状态：**实现与本地隔离验收完成，用户已确认本地提交及归档**。规划于 2026-11-17 获批；历史 source-only 检查记录保留在 `verification.md` / `quality-review.md`，其后 Docker 恢复后的运行记录覆盖早期阻塞状态。最终集成见父 `final-acceptance.md`。不代表生产上线。
+状态：**实现、本地隔离验收、本地提交及官方归档完成**。工作记录提交 `3b41b3e13`，官方归档完成于2026-11-18；规划于 2026-11-17 获批；历史 source-only 检查记录保留在 `verification.md` / `quality-review.md`，其后 Docker 恢复后的运行记录覆盖早期阻塞状态。最终集成见父 `final-acceptance.md`。不代表生产上线。
 
 ## 实现
 
@@ -20,7 +20,7 @@
 - [x] 日志consumer测试、前端48文件657用例/typecheck/build通过；本次触碰TS/TSX定向lint/format干净，全局既有151错误/68警告分开披露。
 - [x] 独立trellis-check已审阅完整原差异，F1已由父会话按批准契约解释，不擅改鉴权；精确契约更新到 `.trellis/spec/backend/partner-tenant-usage-isolation.md`。
 - [x] 本轮验收/Trellis记录纳入用户已批准的明确路径文档提交批次（已有业务提交 `8457836d9`；不重复提交旧业务）。
-- [ ] 文档提交后官方归档，完成态以归档task.json/journal为准。
+- [x] 文档已提交 `3b41b3e13`，官方归档至 `archive/2026-11/11-17-partner-quota-cny`，task.json=completed；journal在工作/归档提交后单独保存。
 
 ## A-C1–A-C5
 

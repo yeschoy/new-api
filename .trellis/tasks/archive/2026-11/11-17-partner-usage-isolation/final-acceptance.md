@@ -87,7 +87,7 @@ go test ./model ./controller ./router ./middleware ./service \
 - 与`b1929bdda`的`runtime-legacy-base.log`+`runtime-legacy-base-relay.log`对照：**基线通过的全部用例在当前没有新增失败；跳过集合逐名完全相同**。没有把新增PG无DSN失败当通过；它们分别在显式DSN套件已实际通过。
 - 最后cached Go1.26.10离线 `go build ./...` / `go vet`五包 / gofmt / `git diff --check` rc0。未宿主go test、无依赖或lockfile变化；sanctioned i18n writer幂等执行7语言各0改动，语法/定向lint通过。
 
-**父AC1–AC8本地隔离验收完成；三个子任务具备归档条件。用户在核对测试与未上线边界后回复“好”并要求“继续”，已确认前述本地提交+四任务归档+journal批次；本轮测试/业务工具提交为`b5c9dee36`，文档批次随后保存。不推送、不部署、不清理；最终归档状态与收尾提交见归档task.json及workspace journal。**
+**父AC1–AC8本地隔离验收完成。用户在核对测试与未上线边界后回复“好”并要求“继续”，已按批准范围完成工作提交`b5c9dee36`与文档提交`3b41b3e13`；2026-11-18经官方task.py archive将三个child及父归档至`archive/2026-11/`，四份task.json均completed，当前任务指针已清空。归档/journal以其后独立提交保存。没有推送、部署或清理，不声称整仓所有测试绿色。**
 
 ## 5. 交付边界
 

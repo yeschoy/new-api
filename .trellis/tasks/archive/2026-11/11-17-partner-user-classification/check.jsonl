@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Real pq filter/count/sort evidence, no production/SQLite substitution"}
+{"file":".trellis/spec/backend/partner-tenant-checkout.md","reason":"Check immutable identity and no privilege/subscription mutation"}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check URL/pagination/viewer cache, empty/error and locale regression behavior"}
+{"file":".trellis/tasks/archive/2026-11/11-17-partner-usage-isolation/research/current-boundaries.md","reason":"Check old OAuth fields/filters remain and true Tenant relation is used"}
+{"file":".trellis/tasks/archive/2026-11/11-17-partner-usage-isolation/research/contract-decisions.md","reason":"Check same shared owner/options as logs, safe IDs and read permissions"}
+{"file":".trellis/tasks/archive/2026-11/11-17-partner-usage-isolation/research/planning-review.md","reason":"Check staged dependency evidence and old user/OAuth filter regressions"}

@@ -1,6 +1,6 @@
 # 商户日志执行与验收
 
-状态：**A/B/C/D实现与本地隔离验收完成，用户已确认本地提交及归档**。规划已于2026-11-17获批，旧source-only/Docker-blocked历史见verification各阶段；C在B的PostgreSQL门禁通过后才启用。当前writer已启用，不再“新表始终为空”。最终集成见父`final-acceptance.md`。
+状态：**A/B/C/D实现、本地隔离验收、本地提交及官方归档完成**。工作提交 `b5c9dee36` / `3b41b3e13`，官方归档完成于2026-11-18；最终会话journal随后独立记录，不表示生产上线。规划已于2026-11-17获批，旧source-only/Docker-blocked历史见verification各阶段；C在B的PostgreSQL门禁通过后才启用。当前writer已启用，不再“新表始终为空”。最终集成见父`final-acceptance.md`。
 
 ## A. 共享安全归属
 
@@ -55,7 +55,7 @@ go test ./model ./controller ./router ./service -run '^TestPartnerTenantUsage' -
 - [x] 独立check结果/全范围证据回填，A-U1–A-U8本地运行门禁关闭；父final-acceptance记录最终矩阵与限制。
 - [x] spec更新writer/读写故障、request memo/诊断卫生/测试回调链/部署回滚与已披露限制；不改变冻结DTO和计费。
 - [x] 本轮6个Go测试及本组i18n业务脚本已精确路径提交 `b5c9dee36`；规范/验收记录纳入已批准文档提交批次（旧业务在69092e8d5/febe9bd3e/1748176a6/65902706c等提交）。
-- [ ] 文档提交后官方归档并记录journal；完成态以归档task.json为准。
+- [x] 文档已提交 `3b41b3e13`，官方归档至 `archive/2026-11/11-17-partner-usage-logs`，task.json=completed；会话journal在工作/归档提交后单独保存。
 - [x] 实际临时资源登记，浏览器和e2e server已停止，数据保留；清理需用户同意，Trellis永不清理。
 
 ## 发布/回滚

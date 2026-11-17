@@ -1,6 +1,6 @@
 # 用户分类执行与验收
 
-状态：**实现与本地隔离验收完成，用户已确认本地提交及归档**。规划于2026-11-17获批；历史source-only审阅保留，早期Docker阻塞已被后续真实运行解除。父 `final-acceptance.md` 为最终跨页证据，不代表生产部署。
+状态：**实现、本地隔离验收、本地提交及官方归档完成**。工作记录提交 `3b41b3e13`，官方归档完成于2026-11-18；规划于2026-11-17获批；历史source-only审阅保留，早期Docker阻塞已被后续真实运行解除。父 `final-acceptance.md` 为最终跨页证据，不代表生产部署。
 
 ## 实现
 
@@ -21,7 +21,7 @@
 - [x] 普通管理员/root可读、root-only管理仍403；普通用户新页403且0次商户admin请求；API匿名/用户/admin/root/PAT完整矩阵由真实路由测试证明。
 - [x] 原完整差异独立trellis-check已完成，spec更新；父AC2/AC4/AC8集成证据见 `final-acceptance.md`。
 - [x] 本轮验收/Trellis记录纳入用户已批准的明确路径文档提交批次（已有业务提交 `9dd775cc2`）。
-- [ ] 文档提交后官方归档，完成态以归档task.json/journal为准。
+- [x] 文档已提交 `3b41b3e13`，官方归档至 `archive/2026-11/11-17-partner-user-classification`，task.json=completed；journal在工作/归档提交后单独保存。
 
 ## 已披露限制
 
