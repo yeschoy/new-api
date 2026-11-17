@@ -80,6 +80,9 @@ func TestMain(m *testing.M) {
 		&model.UserSubscription{},
 		&model.SystemTask{},
 		&model.SystemTaskLock{},
+		// The usage-log writers resolve the Tenant owner on the main DB.
+		&model.PartnerTenant{},
+		&model.PartnerTenantAccount{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}

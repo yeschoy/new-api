@@ -294,9 +294,20 @@ func RecordTopupLog(userId int, content *common.Message, callerIp string, paymen
 
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other *LogOther) {
-	logger.LogInfo(c, common.LogText("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))
-	username := c.GetString("username")
+	// Destination by the safe owner of the user ID this writer received.
+	owner, member, ownerErr := PartnerTenantOwnerForRequest(c, userId)
 	requestId := c.GetString(common.RequestIdKey)
+	if ownerErr == nil && !member {
+		logger.LogInfo(c, common.LogText("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))
+	} else {
+		logPartnerTenantUsageRecord(c, "error", userId, owner, member, requestId, 0)
+	}
+	if ownerErr != nil {
+		// Unknown ownership: never guess, write nothing.
+		warnPartnerTenantUsageOwnerLookup(c, userId, requestId)
+		return
+	}
+	username := c.GetString("username")
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := other.JSONString()
 	// 判断是否需要记录 IP
@@ -332,6 +343,10 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
+	if member {
+		writePartnerTenantUsageLog(c, log, owner, other)
+		return
+	}
 	err := createLog(log)
 	if err != nil {
 		logger.LogError(c, common.LogText("failed to record log: %s", err.Error()))
@@ -357,9 +372,15 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	if !common.LogConsumeEnabled {
 		return
 	}
-	logger.LogInfo(c, common.LogText("record consume log: userId=%d, params=%s", userId, common.GetJsonString(params)))
-	username := c.GetString("username")
+	// Destination by the safe owner of the user ID this writer received.
+	owner, member, ownerErr := PartnerTenantOwnerForRequest(c, userId)
 	requestId := c.GetString(common.RequestIdKey)
+	if ownerErr == nil && !member {
+		logger.LogInfo(c, common.LogText("record consume log: userId=%d, params=%s", userId, common.GetJsonString(params)))
+	} else {
+		logPartnerTenantUsageRecord(c, "consume", userId, owner, member, requestId, params.Quota)
+	}
+	username := c.GetString("username")
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
 	other := params.Other
@@ -398,9 +419,18 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := createLog(log)
-	if err != nil {
-		logger.LogError(c, common.LogText("failed to record log: %s", err.Error()))
+	switch {
+	case ownerErr != nil:
+		// Unknown ownership: never guess, write nothing. The dashboard feed
+		// below still counts the settled consumption once.
+		warnPartnerTenantUsageOwnerLookup(c, userId, requestId)
+	case member:
+		writePartnerTenantUsageLog(c, log, owner, other)
+	default:
+		err := createLog(log)
+		if err != nil {
+			logger.LogError(c, common.LogText("failed to record log: %s", err.Error()))
+		}
 	}
 	if common.DataExportEnabled {
 		var cacheReadTokens, cacheCreationTokens int
@@ -467,9 +497,24 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		Group:     params.Group,
 		Other:     other.JSONString(),
 	}
-	err := createLog(log)
-	if err != nil {
-		common.SysLog(common.LogText("failed to record task billing log: %s", err.Error()))
+	routeUsage := params.LogType == LogTypeConsume || params.LogType == LogTypeError
+	var owner PartnerTenantOwner
+	var member bool
+	var ownerErr error
+	if routeUsage {
+		// Context-free: the persisted task user ID decides the destination.
+		owner, member, ownerErr = GetPartnerTenantOwner(params.UserId)
+	}
+	switch {
+	case routeUsage && ownerErr != nil:
+		warnPartnerTenantUsageOwnerLookup(nil, params.UserId, "")
+	case routeUsage && member:
+		writePartnerTenantUsageLog(nil, log, owner, other)
+	default:
+		err := createLog(log)
+		if err != nil {
+			common.SysLog(common.LogText("failed to record task billing log: %s", err.Error()))
+		}
 	}
 	if params.LogType == LogTypeConsume && common.DataExportEnabled {
 		nodeName := params.NodeName

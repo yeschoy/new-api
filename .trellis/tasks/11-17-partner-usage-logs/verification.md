@@ -1126,3 +1126,92 @@ ClickHouse / MySQL / SQLite 的双表路径均未运行。
 **第 1 次失败的根因（测试注入缺陷，实现未改）**：该用例只在 GORM **Query** 回调链上注入失败，而探测（`Table(...).Scan`）与 migrator 的 `HasTable`（`Raw(...).Scan`）都走 **Row** 回调链，注入从未触发；探测因表确实不存在而失败、目录检查正确判定“表不存在”并回落原路径——这是设计的“表缺失”路径，不是用例要测的“目录检查失败”路径。修正：同一注入函数同时注册到 Row 链（`model/partner_tenant_usage_request_test.go`）。修正后用例按原意命中：每个 reader 3 次（探测 + 两次目录查询）共 18 次注入，6 个 reader 全部返回通用读取错误、错误文本不含注入标记、且不缓存。随后复查同包其余回调注入：所有者查询用 `Find`/`Count`（Query 链），计数与失败注入有效，无假通过；union 用例本来就注册了 Query+Row 两条链。
 
 覆盖到的 B 阶段门禁（真实 pq）：共享 / 独立 LOG_DB 的首次与重复迁移、实际 DDL 与 6 个索引名、>2^53 值与长文本持久化、写入脱敏（插入函数仅测试调用）；管理员 list/stat 同一过滤、折叠与求和（含超 int64 求和的 HTTP 断言）、admin/root 投影；真实 `SetApiRouter` 鉴权与 PAT（options / 日志端点）；六个自身读取（普通用户与原路径一致、成员双表合并/分页/折叠、表缺失回落、探测/目录失败即读取失败、伪造归属参数被忽略）。ClickHouse 只有生成 SQL 契约（无真实 ClickHouse），MySQL/SQLite 双表路径未实跑——均为已披露范围。
+
+## C1. 写入分流（trellis-implement）
+
+> 状态：**C1 源码完成 + 隔离 PostgreSQL 15.19 实跑通过**（2026-11-17 08:51–08:54 UTC）。仅覆盖 model 层三个 writer 的分流本身；service/relay/controller 的真实调用点、旧 SQLite 回归、ClickHouse 均**未运行**（见 C1.7）。未勾选 implement.md。
+
+### C1.1 改动文件
+
+- `model/log.go`（修改）：仅 `RecordErrorLog`、`RecordConsumeLog`、`RecordTaskBillingLog` 三个函数体；公开签名、`createLog`、`LogQuotaData`、`compareRequestOutcomes`、`LogFilter.apply`、默认管理员 reader 均未改。
+- `model/partner_tenant_usage_writer.go`（新）：`partnerTenantUsageSubscriptionId`、`newPartnerTenantUsageLogRow`、`partnerTenantUsageLogFailureText`、`logPartnerTenantUsageRecord`、`warnPartnerTenantUsageOwnerLookup`、`writePartnerTenantUsageLog`。
+- `model/partner_tenant_usage_writer_test.go`（新）：8 个 `TestPartnerTenantUsageWriter*`。
+- 四个冻结 fixture（`controller/log_summary_test.go`、`log_export_test.go`、`relay_error_log_test.go`、`user_manage_test.go`）未改；`service/`、`relay/`、`controller/` 无改动。无新缓存、未碰 bool membership cache。
+
+### C1.2 最终路由表
+
+归属一律来自 writer 收到的 user ID 参数（从不读 `c.GetInt("id")`）。
+
+| writer / 类型 | 早退 | 归属查询 | 确认非成员 | 成员 | 归属查询失败 | `LogQuotaData` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `RecordConsumeLog`（consume） | `!LogConsumeEnabled` 先返回，不查归属 | `PartnerTenantOwnerForRequest(c, userId)` | 原 `createLog`，原日志行与原失败行 | 新表恰好 1 行，失败只告警、不回落 | 两表都不写，1 条告警 | `DataExportEnabled` 时四个分支都恰好 1 次，位置不变 |
+| `RecordErrorLog`（error） | 无（同原状） | 同上 | 原 `createLog` + 原行 | 新表 1 行（type 5，quota 0） | 不写，1 条告警 | 无（同原状） |
+| `RecordTaskBillingLog` consume / error | consume 在 `!LogConsumeEnabled` 时先返回 | `GetPartnerTenantOwner(params.UserId)`（无 context） | 原 `createLog` + 原 SysLog 失败行 | 新表 1 行 | 不写，1 条 SysError | 仅 consume，四个分支都 1 次 |
+| `RecordTaskBillingLog` 其他类型（refund 等） | 原样 | **不查询** | 原 `createLog`（所有用户，含成员） | — | — | 原样（不计） |
+
+新表行：从已构建的 `Log` 拷贝全部事实（int → int64），加 owner 快照 tenant_id / account_id / tenant_name / identity_source；`SubscriptionId` 只取 `other.public["subscription_id"]` 中为正的 `int`/`int64`，其余为 0；request_id 与 createLog 同规则（上下文值，空则 `NewRequestId`）。
+
+### C1.3 安全日志行
+
+- 非成员：与改动前逐字相同（`record consume log: userId=…, params=…`、`record error log: … content=…`、`failed to record log: %s`、`failed to record task billing log: %s`），仍在写入之前打印。
+- 成员（替代原行）：`record partner tenant usage {consume|error} log: user_id=%d, tenant_id=%d, request_id=%s, quota=%d`（INFO）。
+- 归属未知（替代原行）：`record usage {consume|error} log with unresolved owner: user_id=%d, request_id=%s, quota=%d`（INFO）+ `usage log skipped: partner tenant owner lookup failed (user_id=%d, request_id=%s)`（context 写者 WARN；任务写者 SysError，request_id 为空）。
+- 新表写入失败：`usage log not recorded: <固定文本> (user_id=%d, tenant_id=%d, request_id=%s)`；固定文本只能是三个 `ErrPartnerTenantUsageLog*` 之一，否则折叠为 `partner tenant usage log write failed`。
+- 成员 / 未知分支不打印 params、content、other、原始 DB 错误或 SQL；新表插入仍走 silent GORM 会话。
+
+### C1.4 测试（`model/partner_tenant_usage_writer_test.go`，schema 前缀 `pt_usage_writer_`，fixture = `setupPartnerTenantUsageUnionPQ` + `seedPartnerTenantUsageFixture`；无 DSN 失败不跳过；`LogConsumeEnabled`/`DataExportEnabled`/两个 gin writer/`CacheQuotaData` 均在 cleanup 还原）
+
+`LogQuotaData` 只写进程内 `CacheQuotaData`（仅 `UpdateQuotaData` 循环才落 `quota_data`，测试不启动它），故按 user_id 汇总缓存的 `Count`/`Quota` 精确断言次数。
+
+| 测试 | 断言 |
+| --- | --- |
+| `SubscriptionFact` | 纯函数：int / int64 正值取用，0、负、字符串、float、nil、缺失均为 0 |
+| `ConsumeRoutesByOwner` | 成员：新表恰 1 行，owner 快照、quota/tokens/时长/流式/渠道/token/组、上下文 request_id 与 upstream id、subscription_id=555、`ptu_` event_id；logs 0 行；feed 1 次。subscription_key 成员零额：1 行、subscription_id 0；四个非成员（普通、有普通订阅、`p_` 前缀同组、仅 OAuth）各 logs 1 行、新表 0 行、feed 1 次；`LogConsumeEnabled=false` 时零次归属查询、两表行数与 feed 都不变 |
+| `ErrorRoutesByOwner` | 成员 error → 新表 type 5、quota 0、content/渠道/token/时长/流式/request_id、subscription_id 0；feed 0；非成员 → logs type 5 |
+| `TaskBillingRoutesUsageOnly` | 成员 consume → 新表（subscription_id int64=808、持久化用户名、生成的 request_id），feed 1；成员 refund → logs、feed 不变；成员任务 error → 新表；非成员 consume → logs |
+| `OwnerLookupFailureWritesNothing` | 只对 `partner_tenant_accounts` 语句在 Query 链注入失败并计数（每次调用恰 +1，共 4 次）；成员 consume/error/任务 consume 与普通用户 consume 均两表无行；feed 成员 2 次 / 普通 1 次；应用日志无标记、无原两行、恰 4 条 skipped 告警；GORM DEBUG 无标记 |
+| `DedicatedInsertFailureHasNoFallback` | 只对新表在 Create 链注入失败（3 次）；无 logs 回落行；feed 2 次；之后普通用户写入照常落 logs 且不触发注入；恰 3 条 `usage log not recorded: …database error`；成员段日志无标记/无原行/无 `failed to record` |
+| `DiagnosticsStaySafe` | DB 与 LOG_DB 均为 Info 级 GORM logger：成员三入口新表 3 行（存储保留 content/other 标记），应用日志与 GORM DEBUG 均无标记、无原两行，有精确的成员关联行；非成员仍打印原 consume / error 行（含原 content） |
+| `EndToEndHistory` | 预置旧商户 logs 行 + 写入成员新行、普通用户行、同 request_id 的 error→consume 重试：`GetAllLogs` 只见 logs 2 行（旧商户 + 普通）；`ListPartnerTenantUsageLogs` 只见 3 条新成员行；`GetUserLogs` 成员 4 行（旧+新）；`GetUserRequestLogs` 3 个请求、重试折叠为 consume/300；`GetPartnerTenantUsageStat`（该 request_id）records 2 / requests 1 / succeeded 1 / failed 0 / quota "300"；feed 2 次、500 |
+
+### C1.5 实际命令与结果
+
+宿主机（`go1.26.10`，`GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS=-mod=readonly`）：`gofmt -l model/` 空；`go build ./...` rc=0；`go vet ./model/ ./controller/ ./router/` rc=0。每次运行前把三个文件复制到 `.local-tests/partner-usage-1117/source/` 同路径并 `cmp` 通过；其余全部已跟踪 Go 文件与工作区逐字节一致（0 mismatch）。
+
+Docker（命令即派发给出的 `docker run … go test ./model ./controller ./router -run "^TestPartnerTenantUsage" -count=1 -v -timeout 20m`，仅改 runner 名）：
+
+| runner | 日志 | 结果 |
+| --- | --- | --- |
+| `ptusage-1117-go-c1-1` | `runtime-c1-1.log` | rc=1：55 通过 / 2 失败 / 0 跳过 |
+| `ptusage-1117-go-c1-2` | `runtime-c1-2.log` | rc=1：56 通过 / 1 失败 / 0 跳过 |
+| `ptusage-1117-go-c1-3` | `runtime-c1-3.log` | **rc=0：57/57 顶层通过（原 49 + 新 8）、107 子测试通过、0 失败、0 跳过** |
+
+前两次失败均为**测试假设错误，实现未改**：
+1. `OwnerLookupFailure` 注入未触发：GORM 对 `Table("partner_tenant_accounts AS a")` 把 `Statement.Table` 设为别名 `a`，完整表达式在 `TableExpr`。改为同时匹配 `TableExpr.SQL`。
+2. `EndToEndHistory`：`GetAllLogs` 会 join `channels`，fixture 未建该表（`relation "channels" does not exist`）。在该用例补 `AutoMigrate(&Channel{})`。
+3. （第 2 次）`OwnerLookupFailure` 最后一条断言期望 DEBUG 输出含查找语句；注入发生在 `gorm:query` 构建 SQL 之前，GORM 不会 trace 该语句。改为断言 DEBUG 捕获到本用例的 `FROM "users"` 语句（证明捕获有效）；无标记断言不变。
+
+Schema：每次 45 个（既有 38 个家族换新后缀 + 7 个 `pt_usage_writer_*`），保留不删；第 3 次的写入 schema 与容器名已登记到 `TEMPORARY_ARTIFACTS.md`“Stage C1 writer routing runtime”。
+
+### C1.6 自行决定
+
+- `RecordErrorLog` 的原 INFO 行原本是函数第一行；现在先做归属查询再决定打印哪一行，仍在写入之前。`RecordConsumeLog` 同理（在开关早退之后）。
+- 归属未知分支同时打印一条 INFO 关联行和一条 WARN 告警（均为有界字段）。
+- 任务 writer 成员成功不新增日志行（原函数成功时本来无日志行）；任务 writer 的告警走 `common.SysError`（无 context）。
+- 新日志格式未加中文翻译（`LogText` 允许无译文行，打印英文）。
+
+### C1.7 未覆盖 / 需主会话决定
+
+- **重要（静态推断，未运行）**：按冻结设计，归属查询失败 = 两表都不写。旧 SQLite fixture 若未建 `partner_tenant_accounts`，三个 writer 的归属查询必然失败，**不再写任何 logs 行**。未迁移该表且断言 logs 行的既有测试（按 grep）：`controller/relay_error_log_test.go`（冻结 fixture，只建 User/Log，经 `processChannelError` → `RecordErrorLog`，很可能回归）、`service/task_billing_test.go`、`relay/relay_task_test.go`、`controller/channel_test_internal_test.go`、`controller/iq_tests_test.go`、`controller/relay_task_plugin_test.go`；model 包 SQLite `TestMain` 引导也未迁移它。生产启动总会迁移该表，但需主会话决定：批准给这些 fixture 补 `PartnerTenantAccount` 迁移，或另行确认设计。本派发未运行任何旧套件。
+- service/relay/controller 的真实调用点（text、audio/websocket、任务提交/差额、可记录 relay 错误、违规费、channel-test、iq executor）未端到端运行；只在 model 层直接调用 writer。
+- ClickHouse 写入路径、MySQL/SQLite 双表路径未运行；独立 LOG_DB（与主库分离）下的写入未单独运行（fixture 为共享库）。
+- 进程崩溃 / LOG_DB 宕机导致的漏记属已披露的 best-effort 范围，未引入 outbox。
+
+### C1 主会话独立复核与夹具决定（2026-11-17 08:56–09:01 UTC）
+
+- 代码复核：非成员路径的 logger 行、写入调用与位置与原版逐字一致；成员路径只调用一次 `insertPartnerTenantUsageLog`，logger 只含 user_id/tenant_id/request_id/quota；归属失败两表都不写；`LogQuotaData` 仍在分支之外，各分支恰一次；任务 writer 只路由 consume/error，refund 等仍走原路径。宿主 gofmt / build（含 relay/...）/ vet rc=0；导出与工作区 `cmp` 一致。
+- 独立重跑 `^TestPartnerTenantUsage`（runner `ptusage-1117-go-c1-4`，08:56:58–08:57:05 UTC）：**57/57、107 子测试、0 跳过**，源码 57 个名称与实际运行一一对应（`git grep --untracked`）。
+- 既有回归（基线 `b1929bdda` vs HEAD+C1，5 包 + 新增 `./relay/...`，均无 DSN）：首轮（`ptusage-1117-go-legacy-c1-head`）**22 个基线通过的测试失败**，分布于 `service/text_quota_test.go`、`controller/iq_tests_test.go`、`service/task_billing_test.go`、`controller/relay_error_log_test.go`、`controller/responses_websocket_test.go`。22 个均出现 `usage log skipped` 告警：归属查询为 `partner_tenant_accounts LEFT JOIN partner_tenants`，这些 SQLite 夹具缺其中一张或两张表（`text_quota`、`responses_websocket` 只缺 `partner_tenants`），查询失败 → 按冻结契约不写任何表。
+- **主会话决定（技术细节，不是产品/兼容变更）**：生产主库迁移总会创建这两张表，契约又禁止把查询失败当非成员，故只在上述 5 个夹具的 `AutoMigrate` 中补 `PartnerTenant` / `PartnerTenantAccount`，其余不改（共 +8/−5 行）。沿用规范既有规则“使用 BillingSession 的夹具须迁移 PartnerTenantAccount”。`relay_error_log_test.go` 原先冻结是为证明“独立表缺失时 reader 仍可用”，只补主库表不影响这一点（独立表仍缺失）。
+- 调整后复跑（`ptusage-1117-go-legacy-c1-head-r2`，09:00:31–09:01:36 UTC）：**基线通过的测试全部仍通过，无新增非本组失败，跳过集合相同**；`TestPrepareTieredBillingForSelectedGroupStartsBillingAfterFreeGroup`（基线失败，同一缺表原因）随之通过；`TestImmediateTaskSettlementDatabase` 仍为基线既有失败（其夹具不在本次改动内）。这同时证明**非成员路径**经真实调用点（text、websocket、task、IQ、relay error）行为不变。
+- 仍未覆盖：成员经 service/relay 真实调用点（text/audio/realtime/task/violation fee/relay error）写入独立表的端到端用例（C2）；ClickHouse / MySQL 写入；分库部署下的写入。

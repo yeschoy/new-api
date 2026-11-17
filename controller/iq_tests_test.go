@@ -40,7 +40,7 @@ func setupIQController(t *testing.T) (*model.User, *model.User) {
 	sqlDB.SetMaxOpenConns(1)
 	model.DB = db
 	model.LOG_DB = db
-	require.NoError(t, db.AutoMigrate(&model.IQConfig{}, &model.IQBatch{}, &model.IQAttempt{}, &model.IQResult{}, &model.SystemTask{}, &model.SystemTaskLock{}, &model.User{}, &model.Channel{}, &model.Ability{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.IQConfig{}, &model.IQBatch{}, &model.IQAttempt{}, &model.IQResult{}, &model.SystemTask{}, &model.SystemTaskLock{}, &model.User{}, &model.Channel{}, &model.Ability{}, &model.Log{}, &model.PartnerTenant{}, &model.PartnerTenantAccount{}))
 	common.RedisEnabled = false
 	common.MemoryCacheEnabled = false
 	common.LogConsumeEnabled = true

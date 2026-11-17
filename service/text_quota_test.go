@@ -71,7 +71,7 @@ func TestSubscriptionGroupFundingPreferences(t *testing.T) {
 				model.ResetPartnerTenantMembershipCache()
 				common.SetDatabaseTypes(oldMain, oldLogKind)
 			}()
-			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.PartnerTenantAccount{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.PartnerTenantAccount{}, &model.PartnerTenant{}, &model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
 			now := model.GetDBTimestamp()
 			for i, tc := range []struct {
 				name, pref, group, applicable string
@@ -232,7 +232,7 @@ func TestFixedPriceBillingDatabaseMatrix(t *testing.T) {
 				model.ResetPartnerTenantMembershipCache()
 				common.SetDatabaseTypes(oldMainType, oldLogType)
 			})
-			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.PartnerTenantAccount{}, &model.Channel{}))
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.PartnerTenantAccount{}, &model.PartnerTenant{}, &model.Channel{}))
 			require.NoError(t, logDB.AutoMigrate(&model.Log{}))
 			versionQuery := "select version()"
 			if dialect.name == common.DatabaseTypeSQLite {
