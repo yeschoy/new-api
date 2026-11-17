@@ -266,6 +266,50 @@ func TestPartnerTenantUsageWriterErrorRoutesByOwner(t *testing.T) {
 	require.Zero(t, count)
 }
 
+// Every member state of the shared owner fixture routes by the account mapping
+// alone (disabled tenant/account, expired entitlement, missing tenant row,
+// soft-deleted user), and the per-user IP setting is honoured on both tables.
+func TestPartnerTenantUsageWriterEveryMemberStateAndIp(t *testing.T) {
+	db, fixture := setupPartnerTenantUsageWriterPQ(t, "pt_usage_writer_states_")
+	for _, member := range fixture.members() {
+		RecordConsumeLog(partnerTenantUsageWriterContext(member, "req-states-"+strconv.Itoa(member)), member, partnerTenantUsageWriterConsume("states-model", 9, nil))
+		legacy, dedicated := partnerTenantUsageWriterRows(t, db, member)
+		require.Empty(t, legacy, "user %d", member)
+		require.Len(t, dedicated, 1, "user %d", member)
+		account := fixture.accounts[member]
+		require.Equal(t, account.TenantId, dedicated[0].TenantId, "user %d", member)
+		require.Equal(t, int64(account.Id), dedicated[0].AccountId, "user %d", member)
+		require.Equal(t, int64(9), dedicated[0].Quota, "user %d", member)
+	}
+	_, orphan := partnerTenantUsageWriterRows(t, db, fixture.orphanTenantMember)
+	require.Equal(t, fixture.orphanTenantID, orphan[0].TenantId)
+	require.Empty(t, orphan[0].TenantName, "a missing tenant row keeps the mapping with an empty name")
+	_, disabled := partnerTenantUsageWriterRows(t, db, fixture.disabledTenantMember)
+	require.Equal(t, fixture.disabledTenant.Id, disabled[0].TenantId)
+	require.Equal(t, "Usage Disabled", disabled[0].TenantName)
+
+	// record_ip_log on: the client IP is copied exactly like the default table.
+	member, ordinary := fixture.externalMember, fixture.ordinary
+	for _, user := range []int{member, ordinary} {
+		require.NoError(t, db.Model(&User{}).Where("id = ?", user).Update("setting", `{"record_ip_log":true}`).Error)
+	}
+	consumeCtx := partnerTenantUsageWriterContext(member, "req-states-ip")
+	wantIp := consumeCtx.ClientIP()
+	require.NotEmpty(t, wantIp)
+	RecordConsumeLog(consumeCtx, member, partnerTenantUsageWriterConsume("states-model", 1, nil))
+	RecordErrorLog(partnerTenantUsageWriterContext(member, "req-states-ip-e"), member, 9, "err-model", "writer-key", "failed", 41, 1, false, "g", NewLogOther())
+	RecordConsumeLog(partnerTenantUsageWriterContext(ordinary, "req-states-ip-o"), ordinary, partnerTenantUsageWriterConsume("states-model", 1, nil))
+	_, dedicated := partnerTenantUsageWriterRows(t, db, member)
+	require.Len(t, dedicated, 3)
+	require.Empty(t, dedicated[0].Ip, "written before the setting changed")
+	require.Equal(t, wantIp, dedicated[1].Ip)
+	require.Equal(t, LogTypeError, dedicated[2].Type)
+	require.Equal(t, wantIp, dedicated[2].Ip)
+	legacy, _ := partnerTenantUsageWriterRows(t, db, ordinary)
+	require.Len(t, legacy, 1)
+	require.Equal(t, wantIp, legacy[0].Ip)
+}
+
 func TestPartnerTenantUsageWriterTaskBillingRoutesUsageOnly(t *testing.T) {
 	db, fixture := setupPartnerTenantUsageWriterPQ(t, "pt_usage_writer_task_")
 	member := fixture.externalMember

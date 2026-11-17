@@ -317,7 +317,9 @@ func TestPartnerTenantUsagePathsRelayConsumption(t *testing.T) {
 				quota := f.requireRouted(t, userID, model.LogTypeConsume, requestID)
 				require.Positive(t, quota)
 				quotas[userID] = quota
-				if userID == f.member && tc.name == "text" {
+				// Text, audio and realtime all build other through GenerateTextOtherInfo,
+				// which records the settled subscription fact.
+				if userID == f.member {
 					_, dedicated := f.rows(t, userID)
 					require.Equal(t, int64(f.subscription), dedicated[0].SubscriptionId, "the settled subscription fact is kept")
 				}
