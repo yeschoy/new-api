@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-11-13
+- **Total Sessions**: 15
+- **Last Active**: 2026-11-17
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~457 | Active |
+| `journal-1.md` | ~503 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-11-17 | Merchant usage isolation: stages A/B/D, CNY projection, user classification (runtime-blocked) | `69092e8d5`, `8457836d9`, `febe9bd3e`, `9dd775cc2`, `1748176a6`, `d2135cbda`, `83de2de6c` | `feat/partner-accounts` |
 | 14 | 2026-11-13 | 商户互斥接入与授权日志源码检查点 | `7b4b5af1a` | `feat/partner-accounts` |
 | 13 | 2026-11-13 | 商户接入 Demo：并行审查、订单恢复修复与提交 | `16c4acaa3`, `1d3e4b324` | `feat/partner-accounts` |
 | 12 | 2026-11-13 | 商户订阅 Key：付款后开户与原 Key 续费 | `58616beef` | `feat/partner-accounts` |

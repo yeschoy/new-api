@@ -455,3 +455,49 @@ Fixed the gallery regression: saved plans show one latest group row by default, 
 
 - Docker 可用后在新登记的任务专属 runner/隔离 PostgreSQL 中完成编译、迁移、持久化、权限与跨子任务端到端验收；两子任务继续 in_progress。
 - 本轮记录后正常推送 origin/feat/partner-accounts 并核对远端 SHA；临时产物按项目登记保留，仅获单独同意后清理，Trellis 记录保留。
+
+
+## Session 15: Merchant usage isolation: stages A/B/D, CNY projection, user classification (runtime-blocked)
+<!-- trellis-session: v=2 fp=998dddf5e25661e7 -->
+
+**Date**: 2026-11-17
+**Task**: Merchant usage isolation: stages A/B/D, CNY projection, user classification (runtime-blocked)
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+Implemented the approved plan for 11-17-partner-usage-isolation at source level: safe Tenant owner/options, fixed-CNY quota_cny, dedicated LOG_DB table + migration + admin read API + compatible own-user two-table readers, users merchant classification, admin merchant usage page. Docker daemon unreachable all session: Go tests executed = 0; stage C writer deliberately NOT enabled. Frontend verified by DOM tests and a local fake-data browser check.
+
+### Main Changes
+
+- usage-logs A/B/D source-ready; C (write routing) blocked by the migration/reader-before-writer gate
+- quota-cny: additive quota_cny on independent query, hosted H5 items and catalog; exact decimal, six places, invalid config -> null
+- user-classification: user_category/tenant_id filters before pagination; batch owner enrichment; users table filter and column
+- New spec .trellis/spec/backend/partner-tenant-usage-isolation.md with explicit evidence boundary
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `69092e8d5` | feat(partner): add safe tenant owner and merchant filter options (usage-logs stage A) |
+| `8457836d9` | feat(partner): add additive fixed-CNY quota projection for merchant quota APIs |
+| `febe9bd3e` | feat(partner): add dedicated tenant usage table, admin read API and compatible self readers (usage-logs stage B) |
+| `9dd775cc2` | feat(users): add merchant classification filter and owning-merchant column to the admin user list |
+| `1748176a6` | feat(partner): add administrator merchant usage page (usage-logs stage D) |
+| `d2135cbda` | fix(partner): wrap merchant usage summary values instead of truncating them |
+| `83de2de6c` | docs(spec): record merchant usage isolation contracts and parent integration status |
+
+### Testing
+
+- [OK] Executed: vitest 48 files / 657 tests; tsgo typecheck; touched-file oxlint/oxfmt; build:check; whole-site lint unchanged at baseline 151/68
+- [OK] Executed: CNY test oracle recomputed with exact rationals (60/60); OpenAPI parse + 103 refs; local browser QA (fixed a mobile amount truncation)
+- [OK] Type-check only: offline go build / go vet go1.26.10 exit 0; 71 new Go test sources never executed
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Make Docker available, register task-owned pq runner, run TestPartnerTenantUsage/QuotaCNY/UserClassification + affected legacy log/user suites + previous-group AccessMode/AuthorizationAudit suites
+- Only after B passes on pq: implement stage C write routing, then parent AC1/AC6 and final acceptance; no task archived yet
