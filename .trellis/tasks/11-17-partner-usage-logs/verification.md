@@ -1093,3 +1093,23 @@ ClickHouse / MySQL / SQLite 的双表路径均未运行。
 - **最终一轮命令（最后一次源码改动之后，`web/`，`out=$(cmd 2>&1); rc=$?`）**：四目录测试 rc=0，**48 文件 / 657 通过**；`src/features/users` 单独 rc=0，8 / 64（与基线一致）；`bun run typecheck` rc=0；定向 oxlint rc=0；`oxfmt --check` rc=0；全站 `bun run lint` rc=1，**151 errors / 68 warnings = 既有基线**，本次触及路径 0 命中；写入脚本重跑 `Total: 0`、`bun run i18n:sync` rc=0，七个 locale sha 不变；`bun run build:check` rc=0，route tree diff 仍为 +23 行；`git diff --quiet -- web/src/features/usage-logs` rc=0。
 - **证据边界不变**：以上全部是 mock 传输下的 DOM 证据 / 类型检查 / 构建；无浏览器、无真实后端、无真实数据（C 阶段 writer 未启用）。A-U3 / A-U5 的真实浏览器与真实后端门禁仍未关闭。
 - **需主会话知悉**：“无限额”展示在日志/统计契约中无对应字段，复核同意判为本页不适用；行级“已扣费失败”标记若要做需后端在 DTO 增加显式字段（契约变更，需用户决定）；文本过滤 trim 比后端严（后端允许首尾空格）；移动端卡片视图在列表失败态会回退显示共享组件的 “No data available”。
+
+## D.11 本地真实浏览器检查（主会话，2026-11-17 UTC 01:37 与 07:48–07:56）
+
+环境：已构建的 `web/dist/` 由任务自有预览 `.local-tests/partner-usage-1117/preview.mjs` 在 `127.0.0.1:3391` 提供，`/api/*` 全部为内存假数据，无任何外连、真实 API、数据库、Key 或模型请求。托管浏览器会话 `ptusage-1117`。**这是前端在真实浏览器里的渲染/交互证据，不是后端证据**：假数据由预览脚本按冻结契约构造，后端端点仍从未对数据库执行，C 阶段 writer 仍未启用。
+
+| 检查 | 结果（证据） |
+| --- | --- |
+| 管理员桌面 1440×900 | 页面、范围说明、摘要、表格渲染；> 2^53 的 ID / quota / Token 原样显示；`quota=1` 显示“小于 ¥0.000001”（`usage-desktop-admin.png`，DOM 文本） |
+| 移动端 390×844 | `scrollWidth=390=innerWidth` 无横向溢出；范围说明、大 ID、微额提示都在 |
+| **发现并修复的缺陷** | 移动端金额卡把 `¥18014398509.514502` 截成 `¥18014398509.51…`（`summary.tsx` 的值使用 `truncate`）。截断会隐藏金额位数，DOM 测试与构建都发现不了。改为 `break-all` 换行：修复后 5 张摘要卡的值 `scrollWidth ≤ clientWidth`，均未裁剪（`v2-usage-mobile-admin-fixed-settled.png`）。修复后执行：触碰文件 oxlint/oxfmt rc=0、typecheck rc=0、本目录 vitest 3 文件 / 35 通过、build:check rc=0 |
+| 键盘 | 聚焦第一行“详情”按 Enter 打开详情，焦点进入对话框关闭按钮；对话框只显示服务端角色投影的 `other` 原文；Escape 关闭后焦点回到触发按钮（`v2-usage-detail-dialog-keyboard.png`、`v2-usage-after-escape.png`）。观察：关闭后 DOM 中仍残留处于共享 Dialog 退出动画的节点（`data-closed`），视觉上已关闭，属无头浏览器动画计时现象，非本功能缺陷 |
+| CNY 不可用 | 金额卡显示“无法展示”，不出现 ¥0；原始额度照常显示 |
+| 503 | 显示“数据库出错，请联系管理员”和重试按钮，摘要各值为“—”，范围说明仍在 |
+| 普通用户 | 访问 `/partner-usage-logs` 被重定向到 `/403`，导航无入口；预览日志证明浏览器**零次**请求任何管理员接口 |
+| root | 可进入、导航有入口、数据渲染 |
+| 请求形态（预览日志） | list 与 stat 携带同一对显式 `start_timestamp`/`end_timestamp`；stat 不带 `p`/`page_size`；未设置参数省略 |
+
+无效证据披露：同目录 `usage-mobile-admin.png`、`usage-detail-dialog-keyboard.png`、`usage-cny-unavailable.png` 是在托管浏览器被重新拉起、会话型测试 cookie 丢失之后拍的，实为登录页（预览日志 `viewer=none`），已在 `TEMPORARY_ARTIFACTS.md` 标为无效，不引用。部分 `v2-*` 截图是入场模糊动画帧，以上表格以 DOM 测量为准。
+
+仍未覆盖：真实后端联调、写入启用后的同范围统计、前进/后退历史、屏幕阅读器。

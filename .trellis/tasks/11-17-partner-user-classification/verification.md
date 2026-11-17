@@ -302,3 +302,12 @@ TEST_PARTNER_USER_CLASSIFICATION_POSTGRES_DSN=... go test -mod=readonly ./model 
 - `trellis-check`、spec 更新、提交均未做；任务未标记完成。
 
 新测试清单（16，F3 表中的 #n 即此处顺序）：未设置时省略参数；深链两路径同参 + 超 2^53 ID + `selected_id` 标签；`selected:null` 原始 ID；矛盾/非法 URL 归一化；改类别先回第 1 页；服务端搜索/分页选商户 → merchant → 选普通清商户；键盘操作 + 刷新恢复；选项空/错态；OAuth 键独立且无权限不请求；有权限时请求 OAuth 选项；跨查看者不显示缓存行/选项；仅角色变化不复用缓存行；Reset 清空两个新筛选；空结果/请求失败的无匹配态；列渲染（有名/空名/普通/伪 `p_`/OAuth+商户/旧服务端）；七语言 13 键。
+
+## 前端半部 — 本地真实浏览器检查（主会话，2026-11-17 UTC 07:55–07:56）
+
+同一任务自有本地预览（`127.0.0.1:3391`，已构建 `web/dist/` + 内存假数据，无外连、无真实后端）。这是 UI 在真实浏览器中的证据，不是后端证据。
+
+- 桌面 `/users`：8 个假用户中，`p_looks_like_merchant` 与仅有 OAuth 关系的用户显示“普通用户”；OAuth 与商户兼有的用户两列同时显示；商户名缺失显示“商户 #77”；停用商户仍为“商户用户”（`v2-users-all-desktop.png`）。
+- 深链 `?userCategory=["merchant"]&tenant=["9007199254740993"]`：只显示 104，所属商户标签经 `selected_id` 解析为名称；预览日志证明请求为精确 `tenant_id=9007199254740993`，日志中未出现取整值 `9007199254740992`（`v2-users-merchant-deeplink.png`）。
+- 移动端 390×844 + 商户类别：`scrollWidth=390` 无横向溢出，5 个商户用户、无普通用户（`v2-users-merchant-mobile.png`）。
+- 未覆盖：真实后端联调（A-V1–A-V4 的后端行为仍只有源码推理）、前进/后退历史、屏幕阅读器。

@@ -39,7 +39,9 @@ function SummaryCard(props: {
       data-testid={props.testId}
     >
       <div className='text-muted-foreground text-xs'>{props.label}</div>
-      <div className='mt-1 truncate text-base font-semibold tabular-nums'>
+      {/* Values are exact decimal strings (CNY, raw quota, tokens). Wrap them
+          instead of truncating: an ellipsis would hide digits of an amount. */}
+      <div className='mt-1 text-base font-semibold break-all tabular-nums'>
         {props.value}
       </div>
       {props.hint && (
