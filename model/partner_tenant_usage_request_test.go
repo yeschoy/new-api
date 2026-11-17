@@ -1,16 +1,21 @@
 package model
 
 import (
+	"bytes"
 	"context"
+	dbsql "database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // A task-owned PostgreSQL schema whose log database has logs but NOT the
@@ -540,4 +545,122 @@ func TestPartnerTenantUsageRequestOrdinaryUserKeepsLegacyPath(t *testing.T) {
 		require.Contains(t, statement, "SELECT 1 AS hit FROM")
 		require.NotContains(t, statement, "UNION")
 	}
+}
+
+// Returned errors alone cannot prove diagnostic safety. Both the application
+// writers and an enabled GORM DEBUG logger observe failures *after* SQL has
+// been built (and the real statement executed), with secret-like bind/error
+// markers. Probe and UNION Query/Row callback chains are asserted live.
+func TestPartnerTenantUsageOwnedReadFailureDiagnostics(t *testing.T) {
+	db := setupPartnerTenantUsageUnionPQ(t, "pt_usage_read_diagnostics_")
+	now := partnerTenantUsageQueryStart + 100
+	require.NoError(t, db.Create(&Log{UserId: 7, Username: "member", TokenId: 71, Type: LogTypeConsume, CreatedAt: now, Quota: 3, RequestId: "diag-old"}).Error)
+	seedPartnerTenantUsageQueryRow(t, db, PartnerTenantUsageLog{TenantId: 61, UserId: 7, Username: "member", TokenId: 71, CreatedAt: now, ModelName: partnerTenantUsageSecretMarker, RequestId: "diag-new", Quota: 11, Other: `{"note":"` + partnerTenantUsageSecretMarker + `"}`})
+	var app, debug bytes.Buffer
+	oldWriter, oldErrorWriter := gin.DefaultWriter, gin.DefaultErrorWriter
+	common.LogWriterMu.Lock()
+	gin.DefaultWriter, gin.DefaultErrorWriter = &app, &app
+	common.LogWriterMu.Unlock()
+	t.Cleanup(func() {
+		common.LogWriterMu.Lock()
+		gin.DefaultWriter, gin.DefaultErrorWriter = oldWriter, oldErrorWriter
+		common.LogWriterMu.Unlock()
+	})
+	LOG_DB = db.Session(&gorm.Session{Logger: gormlogger.New(log.New(&debug, "", 0), gormlogger.Config{LogLevel: gormlogger.Info})})
+	var control int
+	require.NoError(t, LOG_DB.Raw("SELECT 1 AS logger_positive_control").Scan(&control).Error)
+	require.Contains(t, debug.String(), "logger_positive_control", "DEBUG capture is enabled, not vacuous")
+	hasRows, err := dedicatedLogOwnerHasRows(context.Background(), ownedLogUserColumn, 7)
+	require.NoError(t, err)
+	require.True(t, hasRows)
+	stat, err := SumUserUsedQuota(7, "member", LogTypeConsume, partnerTenantUsageQueryStart, partnerTenantUsageQueryEnd, "", "", 0, "")
+	require.NoError(t, err)
+	require.Equal(t, 14, stat.Quota, "positive control includes nonzero legacy and dedicated sums")
+	phase, forced := "", 0
+	fail := func(tx *gorm.DB) {
+		if tx.DryRun {
+			return // GORM also builds UNION branches using the Query chain.
+		}
+		sql := tx.Statement.SQL.String()
+		dedicated := strings.Contains(sql, partnerTenantUsageLogTable) && !strings.Contains(sql, "UNION ALL")
+		if (phase == "probe" && dedicated && strings.Contains(sql, "1 AS hit")) ||
+			(phase == "union" && strings.Contains(sql, "UNION ALL")) ||
+			(phase == "stat_quota" && dedicated && strings.Contains(sql, "sum(quota)")) ||
+			(phase == "stat_rate" && dedicated && strings.Contains(sql, "count(*) rpm")) {
+			require.NoError(t, tx.Error, "a real successful statement precedes injected failure")
+			forced++
+			if rows, ok := tx.Statement.Dest.(*dbsql.Rows); ok {
+				_ = rows.Close()
+			}
+			_ = tx.AddError(errors.New("raw reader failure " + partnerTenantUsageSecretMarker))
+		}
+	}
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register("pt_usage_diag:query", fail))
+	require.NoError(t, db.Callback().Row().After("gorm:row").Register("pt_usage_diag:row", fail))
+	t.Cleanup(func() {
+		_ = db.Callback().Query().Remove("pt_usage_diag:query")
+		_ = db.Callback().Row().Remove("pt_usage_diag:row")
+	})
+	filter := LogFilter{ModelName: partnerTenantUsageSecretMarker}
+	readers := []struct {
+		name string
+		read func(*testing.T) error
+	}{
+		{"list", func(t *testing.T) error {
+			rows, total, err := GetUserLogs(7, filter, 0, 10)
+			require.Nil(t, rows)
+			require.Zero(t, total)
+			return err
+		}},
+		{"token", func(t *testing.T) error { rows, err := GetLogByTokenId(71); require.Nil(t, rows); return err }},
+		{"stream", func(t *testing.T) error {
+			return StreamUserLogs(context.Background(), 7, filter, func(*Log) error { t.Fatal("failed stream must yield nothing"); return nil })
+		}},
+		{"requests", func(t *testing.T) error {
+			rows, total, err := GetUserRequestLogs(context.Background(), 7, partnerTenantUsageQueryStart, partnerTenantUsageQueryEnd, 0, 10)
+			require.Nil(t, rows)
+			require.Zero(t, total)
+			return err
+		}},
+		{"summary", func(t *testing.T) error {
+			rows, err := GetUserLogSummary(context.Background(), 7, partnerTenantUsageQueryStart, partnerTenantUsageQueryEnd, 0)
+			require.Nil(t, rows)
+			return err
+		}},
+	}
+	requireFailure := func(t *testing.T, read func(*testing.T) error) {
+		t.Helper()
+		before := forced
+		err := read(t)
+		require.Error(t, err)
+		require.NotContains(t, err.Error(), partnerTenantUsageSecretMarker)
+		require.Equal(t, before+1, forced, "exactly one executed SQL chain must fail, not dry-run branches")
+	}
+	for _, target := range []string{"probe", "union"} {
+		phase = target
+		for _, reader := range readers {
+			t.Run(target+"/"+reader.name, func(t *testing.T) {
+				requireFailure(t, reader.read)
+			})
+		}
+	}
+	// Self statistics do not use UNION: they add a dedicated quota/rate pair
+	// after the legacy sum. Fail each stage independently, never returning the
+	// already-read legacy quota (3) or a partial combined total.
+	for _, target := range []string{"probe", "stat_quota", "stat_rate"} {
+		phase = target
+		t.Run(target+"/self_stat", func(t *testing.T) {
+			requireFailure(t, func(t *testing.T) error {
+				stat, err := SumUserUsedQuota(7, "member", LogTypeConsume, partnerTenantUsageQueryStart, partnerTenantUsageQueryEnd, "", "", 0, "")
+				require.Equal(t, Stat{}, stat)
+				return err
+			})
+		})
+	}
+	require.NotContains(t, app.String(), partnerTenantUsageSecretMarker)
+	require.NotContains(t, debug.String(), partnerTenantUsageSecretMarker, "no interpolated model bind or driver error in DEBUG")
+	require.Contains(t, app.String(), "failed to probe dedicated user logs", "application diagnostic capture is live")
+	require.Contains(t, app.String(), "failed to query user logs across log tables")
+	require.Contains(t, app.String(), "failed to probe dedicated user log statistics")
+	require.Equal(t, 2, strings.Count(app.String(), "failed to query dedicated user log statistics"))
 }

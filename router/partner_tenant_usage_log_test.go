@@ -97,6 +97,13 @@ func TestPartnerTenantUsageLogProductionRouteAuth(t *testing.T) {
 	ordinary, ordinarySession := login("usage-log-user", common.RoleCommonUser)
 	admin, adminSession := login("usage-log-admin", common.RoleAdminUser)
 	root, rootSession := login("usage-log-root", common.RoleRootUser)
+	// Merchant membership does not add an administrator role or bypass gates.
+	merchant, merchantSession := login("usage-log-merchant", common.RoleCommonUser)
+	tenant, _, err := model.CreatePartnerTenantWithIntegrationMode("Usage Auth Merchant", "usage-auth-merchant", model.PartnerTenantIntegrationHostedH5)
+	require.NoError(t, err)
+	token := &model.Token{UserId: merchant.Id, Key: "usagelogmerchantkey", Status: common.TokenStatusEnabled, ExpiredTime: -1, UnlimitedQuota: true}
+	require.NoError(t, db.Create(token).Error)
+	require.NoError(t, db.Create(&model.PartnerTenantAccount{TenantId: tenant.Id, UserId: merchant.Id, TokenId: token.Id, IdentitySource: model.PartnerTenantIdentityExternal, ExternalUserId: "usage-log-buyer", ExternalUserIdHash: model.HashPartnerOAuthSecret("usage-log-buyer"), Status: model.PartnerTenantStatusEnabled}).Error)
 	desktopBundle, err := service.CreateLoginSession(admin.Id, service.DesktopLoginMethod, "192.0.2.221", "usage-log-desktop-test")
 	require.NoError(t, err)
 
@@ -177,6 +184,7 @@ func TestPartnerTenantUsageLogProductionRouteAuth(t *testing.T) {
 		{name: "anonymous", status: http.StatusUnauthorized, code: "AUTH_UNAUTHORIZED"},
 		{name: "ordinary user session", credential: ordinarySession, status: http.StatusForbidden, code: "AUTH_INSUFFICIENT_PRIVILEGE"},
 		{name: "ordinary user PAT with log:read", credential: scoped(ordinary.Id, "log:read"), status: http.StatusForbidden, code: "AUTH_INSUFFICIENT_PRIVILEGE"},
+		{name: "merchant sub-account session", credential: merchantSession, status: http.StatusForbidden, code: "AUTH_INSUFFICIENT_PRIVILEGE"},
 		{name: "ordinary admin session", credential: adminSession},
 		{name: "root session", credential: rootSession},
 		{name: "admin desktop-client session", credential: desktopBundle.AccessToken, status: http.StatusForbidden, code: "AUTH_DESKTOP_SCOPE_DENIED"},

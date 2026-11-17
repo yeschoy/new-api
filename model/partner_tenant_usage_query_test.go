@@ -6,10 +6,12 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/clickhouse"
 	"gorm.io/gorm"
 )
 
@@ -451,4 +453,120 @@ func TestPartnerTenantUsageQueryRoleProjectionAndDefaultReadersUntouched(t *test
 	require.NoError(t, err)
 	require.Equal(t, beforeStat.Quota, afterStat.Quota)
 	require.EqualValues(t, 150, afterStat.Quota, "the old merchant row is still counted by the default statistics")
+}
+
+// Capture the statements the actual admin list and member reader execute,
+// then EXPLAIN those same SQL+binds on PostgreSQL. Small fixtures may quite
+// correctly choose sequential scans: assert schema/predicates, not plan shape.
+func TestPartnerTenantUsageQueryPostgresExplain(t *testing.T) {
+	db := setupPartnerTenantUsageUnionPQ(t, "pt_usage_query_explain_")
+	require.NoError(t, db.Create(&Log{UserId: 7, TokenId: 71, CreatedAt: partnerTenantUsageQueryStart + 10, Type: LogTypeConsume, ModelName: "explain-model", RequestId: "plan-old", Quota: 3}).Error)
+	for i := range 12 {
+		seedPartnerTenantUsageQueryRow(t, db, PartnerTenantUsageLog{TenantId: int64(61 + i%2), UserId: int64(7 + i%2), TokenId: 71 + int64(i%2), CreatedAt: partnerTenantUsageQueryStart + int64(i), ModelName: "explain-model", RequestId: fmt.Sprintf("plan-%d", i), Quota: 11})
+	}
+	type statement struct {
+		sql  string
+		vars []any
+	}
+	var captured []statement
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register("pt_usage_explain:capture", func(tx *gorm.DB) {
+		sql := tx.Statement.SQL.String()
+		if !tx.DryRun && strings.Contains(sql, "SELECT") && !strings.Contains(sql, "count(*)") && strings.Contains(sql, partnerTenantUsageLogTable) {
+			captured = append(captured, statement{sql, append([]any(nil), tx.Statement.Vars...)})
+		}
+	}))
+	t.Cleanup(func() { _ = db.Callback().Query().Remove("pt_usage_explain:capture") })
+	filter := partnerTenantUsageQueryWindow(PartnerTenantUsageFilter{})
+	_, total, err := ListPartnerTenantUsageLogs(context.Background(), filter, 0, 5, false)
+	require.NoError(t, err)
+	require.EqualValues(t, 12, total)
+	filter.TenantId = 61
+	_, total, err = ListPartnerTenantUsageLogs(context.Background(), filter, 0, 5, false)
+	require.NoError(t, err)
+	require.EqualValues(t, 6, total)
+	_, total, err = GetUserLogs(7, LogFilter{StartTimestamp: filter.StartTimestamp, EndTimestamp: filter.EndTimestamp, ModelName: "explain-model"}, 0, 5)
+	require.NoError(t, err)
+	require.EqualValues(t, 7, total)
+	require.Len(t, captured, 3, "actual unfiltered admin, tenant admin, member union queries")
+	require.Contains(t, captured[0].sql, "created_at >=")
+	require.Contains(t, captured[0].sql, "created_at <=")
+	require.Contains(t, captured[0].sql, "ORDER BY created_at DESC, id DESC")
+	require.Equal(t, []any{LogTypeConsume, LogTypeError, filter.StartTimestamp, filter.EndTimestamp, 5}, captured[0].vars)
+	require.Contains(t, captured[1].sql, "tenant_id =")
+	require.Equal(t, []any{LogTypeConsume, LogTypeError, filter.StartTimestamp, filter.EndTimestamp, int64(61), 5}, captured[1].vars)
+	require.Equal(t, 2, strings.Count(captured[2].sql, "logs.user_id ="))
+	require.Equal(t, 2, strings.Count(captured[2].sql, "logs.created_at >="))
+	require.Equal(t, 2, strings.Count(captured[2].sql, "logs.model_name ="))
+	require.Contains(t, captured[2].sql, " UNION ALL ")
+	// Values belong to the executed statement, in branch order (not inferred
+	// from the optimizer's version-dependent display of constants/casts).
+	require.Equal(t, []any{7, "explain-model", filter.StartTimestamp, filter.EndTimestamp, 7, "explain-model", filter.StartTimestamp, filter.EndTimestamp, 5}, captured[2].vars)
+	indexes := partnerTenantUsageLogIndexDump(t, db, partnerTenantUsageLogTable)
+	for name, columns := range map[string]string{"idx_ptul_time": "(created_at, id)", "idx_ptul_tenant_time": "(tenant_id, created_at, id)", "idx_ptul_user_time": "(user_id, created_at, id)", "idx_ptul_token_time": "(token_id, created_at, id)"} {
+		require.Contains(t, indexes[name], columns)
+	}
+	require.Contains(t, partnerTenantUsageLogIndexDump(t, db, "logs")["idx_user_id_id"], "(user_id, id)")
+	for i, query := range captured {
+		rows, err := db.Raw("EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT) "+query.sql, query.vars...).Rows()
+		require.NoError(t, err)
+		var plan []string
+		for rows.Next() {
+			var line string
+			require.NoError(t, rows.Scan(&line))
+			plan = append(plan, line)
+		}
+		require.NoError(t, rows.Err())
+		require.NoError(t, rows.Close())
+		text := strings.Join(plan, "\n")
+		require.Contains(t, text, partnerTenantUsageLogTable)
+		require.Contains(t, text, "Execution Time:")
+		t.Logf("Actual PostgreSQL plan %d SQL=%s binds=%v\n%s", i, query.sql, query.vars, text)
+		if i == 2 {
+			require.Contains(t, text, "user_id", "ownership remains in the optimized plan; SQL binds checked above")
+			require.Contains(t, text, "logs")
+		}
+	}
+}
+
+// Existing DDL/projection/order contracts cover types and TTL, but the admin
+// reader previously checked only order strings. Build complete count/list/stat
+// and own-union SQL with the real ClickHouse dialect, without connecting to CH.
+func TestPartnerTenantUsageQueryClickHouseGeneratedSQL(t *testing.T) {
+	pg := setupPartnerTenantUsageUnionPQ(t, "pt_usage_query_ch_sql_")
+	ch, err := gorm.Open(clickhouse.New(clickhouse.Config{Conn: pg.ConnPool, SkipInitializeWithVersion: true}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
+	require.NoError(t, err)
+	LOG_DB = ch
+	common.SetLogDatabaseType(common.DatabaseTypeClickHouse)
+	initCol()
+	filter := PartnerTenantUsageFilter{TenantId: 61, UserId: 7, Username: "member-a", ModelName: "model-a", RequestId: "req-a", StartTimestamp: 100, EndTimestamp: 200}
+	var total int64
+	count := filter.apply(partnerTenantUsageReadSession(context.Background())).Count(&total).Statement
+	list := filter.apply(partnerTenantUsageReadSession(context.Background())).Order(partnerTenantUsageListOrder(true)).Limit(5).Offset(10).Find(&[]PartnerTenantUsageLog{}).Statement
+	stat := filter.apply(partnerTenantUsageReadSession(context.Background())).Select("id", "event_id", "request_id", "created_at", "type", "quota", "prompt_tokens", "completion_tokens", "is_stream", "other").Order(partnerTenantUsageStatOrder(true)).Find(&[]PartnerTenantUsageLog{}).Statement
+	for _, query := range []*gorm.Statement{count, list, stat} {
+		sql := query.SQL.String()
+		require.Contains(t, sql, "FROM `partner_tenant_usage_logs`")
+		for _, predicate := range []string{"type IN (?,?)", "created_at >= ? AND created_at <= ?", "tenant_id = ?", "user_id = ?", "username = ?", "model_name = ?", "request_id = ?"} {
+			require.Contains(t, sql, predicate)
+		}
+		require.NotContains(t, sql, "JOIN")
+		require.NotContains(t, sql, "UNION")
+		expected := []any{LogTypeConsume, LogTypeError, int64(100), int64(200), int64(61), int64(7), "member-a", "model-a", "req-a"}
+		if query == list {
+			expected = append(expected, 5, 10)
+		}
+		require.Equal(t, expected, query.Vars)
+	}
+	require.Contains(t, count.SQL.String(), "count(*)")
+	require.Contains(t, list.SQL.String(), "ORDER BY created_at DESC, event_id DESC LIMIT ? OFFSET ?")
+	require.Contains(t, stat.SQL.String(), "ORDER BY request_id ASC, created_at ASC, event_id ASC")
+	union, err := ownedLogUnion(context.Background(), ownedLogTokenColumn, 71, LogFilter{StartTimestamp: 100, EndTimestamp: 200})
+	require.NoError(t, err)
+	query := union.Select(ownedLogUnionOuterColumns(logGroupCol)).Order(ownedLogUnionOrder(common.DatabaseTypeClickHouse)).Limit(5).Find(&[]ownedLogRow{}).Statement
+	require.Equal(t, 2, strings.Count(query.SQL.String(), "logs.token_id = ?"))
+	require.Contains(t, query.SQL.String(), " UNION ALL ")
+	require.Contains(t, query.SQL.String(), "toInt64(logs.quota) AS quota")
+	require.Contains(t, query.SQL.String(), "logs.`group` AS `group`")
+	require.Contains(t, query.SQL.String(), "logs.request_id desc")
+	require.Equal(t, []any{71, int64(100), int64(200), 71, int64(100), int64(200), 5}, query.Vars)
 }

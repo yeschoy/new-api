@@ -559,3 +559,96 @@ func TestPartnerTenantUsagePathsChannelError(t *testing.T) {
 		require.Equal(t, int64(0), dedicated[0].SubscriptionId, "a failure has no settled subscription")
 	})
 }
+
+// A log-only schema on the existing owned PostgreSQL instance. No user,
+// subscription or owner tables: the real settlement must stay on main DB.
+func setupPartnerTenantUsagePathsLogDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	cfg, err := pgx.ParseConfig(os.Getenv("TEST_PARTNER_USAGE_POSTGRES_DSN"))
+	require.NoError(t, err)
+	cfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	base := stdlib.OpenDB(*cfg)
+	schema := fmt.Sprintf("pt_usage_paths_split_log_%d", time.Now().UnixNano())
+	_, err = base.Exec("CREATE SCHEMA " + schema)
+	require.NoError(t, err)
+	require.NoError(t, base.Close())
+	cfg.RuntimeParams["search_path"] = schema
+	conn := stdlib.OpenDB(*cfg)
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: conn, PreferSimpleProtocol: true}), &gorm.Config{Logger: gormlogger.Default.LogMode(gormlogger.Silent)})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	t.Logf("Retained task-owned schema: %s (no drop)", schema)
+	model.LOG_DB = db // outer fixture restores this global
+	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	require.NoError(t, model.MigratePartnerTenantUsageLogs())
+	return db
+}
+
+// Real text preconsume -> settle -> writer, with main and LOG_DB separated.
+// PostgreSQL rejects the post-settlement usage insert on the second request;
+// the already-charged subscription, token, counters and dashboard feed must
+// be identical to the successful request (no fallback, compensation or retry).
+func TestPartnerTenantUsagePathsSettledSeparateLogFailure(t *testing.T) {
+	f := setupPartnerTenantUsagePathsPQ(t)
+	logs := setupPartnerTenantUsagePathsLogDB(t)
+	require.NotSame(t, model.DB, model.LOG_DB)
+	require.False(t, logs.Migrator().HasTable(&model.UserSubscription{}))
+	quotaByUser := map[int]int{}
+	rejected := 0
+	require.NoError(t, logs.Callback().Create().After("gorm:create").Register("pt_usage_paths:reject", func(tx *gorm.DB) {
+		if tx.Statement.Table == "partner_tenant_usage_logs" && tx.Error != nil {
+			rejected++
+			require.Contains(t, tx.Error.Error(), "23514")
+		}
+	}))
+	for phase := range 2 {
+		if phase == 1 {
+			require.NoError(t, logs.Exec("ALTER TABLE partner_tenant_usage_logs ADD CONSTRAINT pt_usage_paths_reject CHECK (quota < 0) NOT VALID").Error)
+		}
+		for _, user := range f.users() {
+			before := f.balances(t, user)
+			rid := fmt.Sprintf("split-settlement-%d-%d", phase, user)
+			c, info := f.context(user, rid), f.relayInfo(user, rid)
+			require.Nil(t, PreConsumeBilling(c, 10, info))
+			PostTextConsumeQuota(c, info, &dto.Usage{PromptTokens: 100, CompletionTokens: 50, TotalTokens: 150}, nil)
+			after := f.balances(t, user)
+			charged := after.used - before.used
+			require.Positive(t, charged)
+			if phase == 0 {
+				quotaByUser[user] = charged
+			} else {
+				require.Equal(t, quotaByUser[user], charged, "logging failure cannot change the charge")
+			}
+			require.Equal(t, before.requests+1, after.requests)
+			require.Equal(t, before.tokenRemain-charged, after.tokenRemain)
+			require.Equal(t, before.tokenUsed+charged, after.tokenUsed)
+			if user == f.member {
+				require.Equal(t, before.wallet, after.wallet)
+				require.Equal(t, before.subscriptionUsed+int64(charged), after.subscriptionUsed)
+			} else {
+				require.Equal(t, before.wallet-charged, after.wallet)
+			}
+			count, quota := partnerTenantUsagePathsFeed(user)
+			require.Equal(t, phase+1, count)
+			require.Equal(t, (phase+1)*charged, quota)
+		}
+	}
+	require.Equal(t, 1, rejected, "real PostgreSQL constraint failure reached after settlement")
+	require.Equal(t, quotaByUser[f.ordinary], quotaByUser[f.member])
+	var memberRows []model.PartnerTenantUsageLog
+	require.NoError(t, logs.Find(&memberRows).Error)
+	require.Len(t, memberRows, 1, "only the first successful member usage insert exists")
+	require.Equal(t, int64(f.member), memberRows[0].UserId)
+	require.Equal(t, int64(quotaByUser[f.member]), memberRows[0].Quota)
+	var ordinaryRows []model.Log
+	require.NoError(t, logs.Find(&ordinaryRows).Error)
+	require.Len(t, ordinaryRows, 2, "ordinary logging stays on LOG_DB.logs even during the dedicated-table failure")
+	for _, row := range ordinaryRows {
+		require.Equal(t, f.ordinary, row.UserId)
+	}
+	var legacy, dedicated int64
+	require.NoError(t, f.db.Model(&model.Log{}).Count(&legacy).Error)
+	require.NoError(t, f.db.Model(&model.PartnerTenantUsageLog{}).Count(&dedicated).Error)
+	require.Zero(t, legacy, "no fallback to main logs")
+	require.Zero(t, dedicated, "no write to main dedicated-table decoy")
+}

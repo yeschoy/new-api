@@ -569,3 +569,90 @@ func TestPartnerTenantUsageWriterEndToEndHistory(t *testing.T) {
 	require.Equal(t, 2, count, "two settled consumes, the error adds nothing")
 	require.Equal(t, 500, quota)
 }
+
+// Separate handles and search_path schemas simulate main DB / LOG_DB without
+// cross-database joins. Both destination tables also exist on main as decoys:
+// their complete snapshots must remain unchanged for every writer.
+func TestPartnerTenantUsageWriterSeparateLogDatabase(t *testing.T) {
+	main, fixture := setupPartnerTenantUsageWriterPQ(t, "pt_usage_writer_split_main_")
+	logs := setupPartnerTenantUsageLogOnlyPQ(t, "pt_usage_writer_split_logs_")
+	DB = main
+	usePartnerTenantUsageLogDB(t, logs)
+	require.NoError(t, logs.AutoMigrate(&Log{}))
+	require.NoError(t, MigratePartnerTenantUsageLogs())
+	require.NotSame(t, DB, LOG_DB)
+	require.False(t, logs.Migrator().HasTable(&PartnerTenantAccount{}), "ownership is read only from main")
+	beforeLegacy := partnerTenantUsageLogRowDump(t, main, "logs")
+	beforeDedicated := partnerTenantUsageLogRowDump(t, main, partnerTenantUsageLogTable)
+	writers := []struct {
+		name  string
+		kind  int
+		write func(int, string)
+	}{
+		{"consume", LogTypeConsume, func(id int, rid string) {
+			RecordConsumeLog(partnerTenantUsageWriterContext(id, rid), id, partnerTenantUsageWriterConsume("split-model", 11, nil))
+		}},
+		{"error", LogTypeError, func(id int, rid string) {
+			RecordErrorLog(partnerTenantUsageWriterContext(id, rid), id, 0, "split-model", "key", "failed", 41, 1, false, "g", NewLogOther())
+		}},
+		{"task", LogTypeConsume, func(id int, _ string) {
+			RecordTaskBillingLog(RecordTaskBillingLogParams{UserId: id, LogType: LogTypeConsume, ModelName: "split-model", Quota: 9})
+		}},
+	}
+	for _, writer := range writers {
+		writer.write(fixture.externalMember, "split-member-"+writer.name)
+		writer.write(fixture.ordinary, "split-ordinary-"+writer.name)
+	}
+	legacy, dedicated := partnerTenantUsageWriterRows(t, logs, fixture.externalMember)
+	require.Empty(t, legacy)
+	require.Len(t, dedicated, 3)
+	for i, writer := range writers {
+		require.Equal(t, writer.kind, dedicated[i].Type)
+		require.Equal(t, fixture.enabledTenant.Id, dedicated[i].TenantId)
+	}
+	legacy, dedicated = partnerTenantUsageWriterRows(t, logs, fixture.ordinary)
+	require.Len(t, legacy, 3)
+	require.Empty(t, dedicated)
+	for i, writer := range writers {
+		require.Equal(t, writer.kind, legacy[i].Type)
+	}
+	// A real PostgreSQL constraint rejects every new-table insert, after SQL is
+	// built/executed. Ordinary logs remain writable; no GORM-only injected error.
+	require.NoError(t, logs.Exec("ALTER TABLE "+partnerTenantUsageLogTable+" ADD CONSTRAINT pt_usage_fixture_reject CHECK (quota < 0) NOT VALID").Error)
+	failed := 0
+	require.NoError(t, logs.Callback().Create().After("gorm:create").Register("pt_usage_split:rejected", func(tx *gorm.DB) {
+		if tx.Statement.Table == partnerTenantUsageLogTable {
+			failed++
+			require.Error(t, tx.Error)
+			require.Contains(t, tx.Error.Error(), "23514")
+		}
+	}))
+	for _, writer := range writers {
+		writer.write(fixture.externalMember, "split-failed-"+writer.name)
+	}
+	require.Equal(t, 3, failed, "all three writers attempted the independent LOG_DB")
+	legacy, dedicated = partnerTenantUsageWriterRows(t, logs, fixture.externalMember)
+	require.Empty(t, legacy, "no fallback")
+	require.Len(t, dedicated, 3, "no duplicate or successful new-table insert")
+	RecordConsumeLog(partnerTenantUsageWriterContext(fixture.ordinary, "split-still-ordinary"), fixture.ordinary, partnerTenantUsageWriterConsume("split-model", 1, nil))
+	legacy, _ = partnerTenantUsageWriterRows(t, logs, fixture.ordinary)
+	require.Len(t, legacy, 4)
+	require.Equal(t, 3, failed)
+	// Unknown ownership must not silently become ordinary even though LOG_DB
+	// itself is available. Inject the lookup failure on the main handle only.
+	fired := failPartnerTenantUsageWriterStatements(t, func(name string, fn func(*gorm.DB)) error {
+		return main.Callback().Query().Before("gorm:query").Register(name, fn)
+	}, func(name string) { _ = main.Callback().Query().Remove(name) }, "partner_tenant_accounts", errors.New("split owner unavailable"))
+	for _, writer := range writers {
+		writer.write(fixture.externalMember, "split-owner-failed-"+writer.name)
+	}
+	require.Equal(t, 3, *fired)
+	legacy, dedicated = partnerTenantUsageWriterRows(t, logs, fixture.externalMember)
+	require.Empty(t, legacy)
+	require.Len(t, dedicated, 3)
+	count, quota := partnerTenantUsageWriterQuotaFeed(fixture.externalMember)
+	require.Equal(t, 6, count, "two consume writers across success, insert failure and owner failure")
+	require.Equal(t, 60, quota)
+	require.Equal(t, beforeLegacy, partnerTenantUsageLogRowDump(t, main, "logs"))
+	require.Equal(t, beforeDedicated, partnerTenantUsageLogRowDump(t, main, partnerTenantUsageLogTable))
+}

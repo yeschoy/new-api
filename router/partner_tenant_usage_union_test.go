@@ -175,3 +175,80 @@ func TestPartnerTenantUsageUnionSelfRoutesIgnoreForgedOwnership(t *testing.T) {
 	})
 	_ = admin
 }
+
+// Unlike the self-route cases, exercise the actual model-Key authentication
+// middleware and its database key lookup. InitLogDB is the production column
+// initializer (including commonKeyCol); no unsafe test-only exported setter.
+func TestPartnerTenantUsageTokenProductionRouteIgnoresForgedOwnership(t *testing.T) {
+	db := setupPartnerTenantUsageRouterPQ(t, "pt_usage_token_router_")
+	oldSecret, oldMaster, oldRate, oldCache := common.SessionSecret, common.IsMasterNode, common.GlobalApiRateLimitEnable, common.MemoryCacheEnabled
+	common.SessionSecret, common.IsMasterNode, common.GlobalApiRateLimitEnable, common.MemoryCacheEnabled = "usage-token-route-fixture", true, false, false
+	t.Cleanup(func() {
+		common.SessionSecret, common.IsMasterNode, common.GlobalApiRateLimitEnable, common.MemoryCacheEnabled = oldSecret, oldMaster, oldRate, oldCache
+	})
+	t.Setenv("LOG_SQL_DSN", "")
+	require.NoError(t, model.InitLogDB())
+	require.NoError(t, db.AutoMigrate(&model.Log{}))
+	user := &model.User{Username: "usage-token-member", AffCode: "usage-token-member", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1, Group: "default"}
+	require.NoError(t, db.Create(user).Error)
+	other := &model.User{Username: "usage-token-other", AffCode: "usage-token-other", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AuthVersion: 1, Group: "default"}
+	require.NoError(t, db.Create(other).Error)
+	key := &model.Token{UserId: user.Id, Key: "usagetokenfixturelegalkey", Status: common.TokenStatusEnabled, Name: "token-fixture", ExpiredTime: -1, UnlimitedQuota: true}
+	require.NoError(t, db.Create(key).Error)
+	sibling := &model.Token{UserId: user.Id, Key: "usagetokenfixturesibling", Status: common.TokenStatusEnabled, Name: "sibling", ExpiredTime: -1, UnlimitedQuota: true}
+	require.NoError(t, db.Create(sibling).Error)
+	foreign := &model.Token{UserId: other.Id, Key: "usagetokenfixtureforeign", Status: common.TokenStatusEnabled, Name: "foreign", ExpiredTime: -1, UnlimitedQuota: true}
+	require.NoError(t, db.Create(foreign).Error)
+	for i, token := range []*model.Token{key, sibling, foreign} {
+		for _, source := range []string{"old", "new"} {
+			rid := fmt.Sprintf("token-%s-%d", source, i)
+			// Same merchant/account metadata and a forged username cannot change the
+			// token-scoped identity. Sibling token belongs to the very same user.
+			otherInfo := `{"admin_info":{"note":"token-admin-secret"},"root_info":{"note":"token-root-secret"}}`
+			if source == "old" {
+				require.NoError(t, db.Create(&model.Log{UserId: token.UserId, TokenId: token.Id, CreatedAt: 100 + int64(i), Type: model.LogTypeConsume, RequestId: rid, Quota: 7, Other: otherInfo}).Error)
+			} else {
+				require.NoError(t, db.Create(&model.PartnerTenantUsageLog{EventId: "ptu_" + rid, UserId: int64(token.UserId), TokenId: int64(token.Id), TenantId: 61, AccountId: 62, TenantName: "token-private-merchant", CreatedAt: 200 + int64(i), Type: model.LogTypeConsume, RequestId: rid, Quota: 11, Other: otherInfo}).Error)
+			}
+		}
+	}
+	engine := gin.New()
+	engine.Use(middleware.RequestId())
+	SetApiRouter(engine)
+	do := func(target, credential string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		if credential != "" {
+			req.Header.Set("Authorization", "Bearer "+credential)
+		}
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, req)
+		return response
+	}
+	baseline := do("/api/log/token", "sk-"+key.Key)
+	require.Equal(t, http.StatusOK, baseline.Code, baseline.Body.String())
+	var envelope struct {
+		Success bool        `json:"success"`
+		Data    []model.Log `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(baseline.Body.Bytes(), &envelope))
+	require.True(t, envelope.Success)
+	require.Len(t, envelope.Data, 2)
+	require.Equal(t, []string{"token-new-0", "token-old-0"}, []string{envelope.Data[0].RequestId, envelope.Data[1].RequestId})
+	for _, row := range envelope.Data {
+		require.Equal(t, key.Id, row.TokenId)
+		require.Equal(t, user.Id, row.UserId)
+	}
+	for _, forbidden := range []string{"token-new-1", "token-old-1", "token-new-2", "token-old-2", "token-private-merchant", "token-admin-secret", "token-root-secret", "event_id", "tenant_id", "log_source", key.Key} {
+		require.NotContains(t, baseline.Body.String(), forbidden)
+	}
+	for _, target := range []string{
+		fmt.Sprintf("/api/log/token?user_id=%d&tenant_id=61&token_id=%d&account_id=62", other.Id, foreign.Id),
+		fmt.Sprintf("/api/log/token?user_id=%d&tenant_id=999&token_id=%d", user.Id, sibling.Id),
+	} {
+		response := do(target, "sk-"+key.Key)
+		require.Equal(t, http.StatusOK, response.Code)
+		require.Equal(t, baseline.Body.String(), response.Body.String(), "external selectors never replace authenticated token_id")
+	}
+	require.Equal(t, http.StatusUnauthorized, do("/api/log/token", "").Code)
+	require.Equal(t, http.StatusUnauthorized, do("/api/log/token", "sk-nonexistentfixturekey").Code)
+}
