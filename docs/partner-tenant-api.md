@@ -282,7 +282,7 @@ Authentication and authorization are evaluated before parameter validation, and 
 
 ## Administrator merchant usage logs
 
-> **Scope of this surface.** These endpoints read ONLY the dedicated merchant usage table, which receives records written after merchant usage logging is cut over to it. Merchant records written before the cut-over stay in the default log table, remain visible on the default administrator log page (`GET /api/log/`) and are **not** migrated, copied or hidden. An empty or short result here therefore does not mean a merchant had no earlier usage, and the earliest record here is not a global cut-over time. The default administrator list, statistics and export never include records of the dedicated table. On this branch the writer that fills the dedicated table is not enabled yet.
+> **Scope of this surface.** These endpoints read ONLY the dedicated merchant usage table, which receives records written after merchant usage logging is cut over to it. Merchant records written before the cut-over stay in the default log table, remain visible on the default administrator log page (`GET /api/log/`) and are **not** migrated, copied or hidden. An empty or short result here therefore does not mean a merchant had no earlier usage, and the earliest record here is not a global cut-over time. The default administrator list, statistics and export never include records of the dedicated table. The writer that fills the dedicated table is enabled on this branch (see "Writer routing" below); after an upgrade this page starts empty and fills only as merchant sub-accounts make new model calls.
 
 | Method and path | Purpose | Session role | Personal access token scope |
 | --- | --- | --- | --- |
@@ -290,6 +290,25 @@ Authentication and authorization are evaluated before parameter validation, and 
 | `GET /api/log/partner-tenants/stat` | Aggregates for the same filter | Administrator or root | `log:read` |
 
 Authentication, token scope, legacy-token and desktop-session rules are those of the options endpoint above. Anonymous callers and ordinary users (including merchant sub-accounts) are rejected. Both endpoints use the dashboard `{success,message,data}` envelope and always send `Cache-Control: no-store`. The root-only management API (`/api/partner-tenants`) is unchanged.
+
+### Writer routing
+
+Only the three model-call writers are routed: settled consumption (`RecordConsumeLog`: text, audio, realtime/websocket, task submission, charged violation fee), recordable relay errors (`RecordErrorLog`) and the consume/error branch of context-free task billing (`RecordTaskBillingLog`, e.g. a positive task settlement delta). The destination is decided once per event by the safe owner of the user ID the writer receives:
+
+| Owner of the user | Destination |
+| --- | --- |
+| Confirmed non-member (ordinary user, ordinary subscription, Partner OAuth, PartnerServer) | Default log table, exactly as before |
+| Merchant sub-account (an account mapping exists, whatever the merchant/account/subscription state) | Exactly one row in the dedicated table; never the default table, never both |
+| Owner lookup failed | Neither table; one bounded warning (user ID and request ID only) |
+
+- Refunds, top-ups, system, security and audit records are not routed and stay in the default table for every user, including merchant sub-accounts.
+- Existing switches still apply first: consumption logging disabled, error logging disabled and errors marked as not recordable write nothing to either table. No request body or extra failure is collected.
+- Billing is unchanged. Debits, settlement, refunds, subscription and token quota are applied before and independently of the log write; a logging failure never rolls back or repeats a charge.
+- The global dashboard feed (`quota_data`) is fed exactly once per consumption event, independent of the destination, so merchant use stays included in whole-site totals. Error events add no consumption.
+- Best effort, no outbox: a crash between the billing commit and the log write, an owner lookup failure or a log-database outage can lose that row. A failed dedicated write is reported with fixed text and is never retried into the default table.
+- For merchant sub-accounts and unresolved owners the application log prints only correlation fields (user ID, merchant ID, request ID, quota), never params, content, other, raw database errors or SQL.
+
+Rollout: the dedicated-table migration and the compatible personal readers must be on every API and background node before, or together with, the writers. A node still running an older binary keeps writing merchant calls to the default table, so during a mixed rollout records can be split across both tables; there is no single global cut-over time. Merchant records written before the upgrade stay in the default table and are not migrated. Rolling back the binary keeps the dedicated table and its rows; an old binary cannot show them in personal views.
 
 ### Filter parameters (both endpoints)
 
@@ -457,7 +476,7 @@ Every ID, quota and token field is a decimal string: do not convert it to a Java
 | 403 | `ACCESS_TOKEN_SCOPE_DENIED` | The personal access token lacks `log:read`. |
 | 503 | `Database error, please contact the administrator` | The records could not be read. No database detail is returned; retry later. |
 
-Authentication is evaluated before parameter validation. These two endpoints are documented from branch code. They have **not** been executed against PostgreSQL or through the real routes yet (see the usage-logs task verification record); ClickHouse, MySQL and SQLite behavior is derived from source only. No deployment claim is made.
+Authentication is evaluated before parameter validation. These two endpoints, the writer routing and its real service call sites have been executed against an isolated PostgreSQL 15 test database and through the real routes in task-owned test runs (see the usage-logs task verification record); ClickHouse, MySQL and SQLite behavior is derived from source only, and a separate log database was not exercised for writes. No deployment claim is made.
 
 ## Additive migration and rollout boundary
 

@@ -1215,3 +1215,70 @@ Schema：每次 45 个（既有 38 个家族换新后缀 + 7 个 `pt_usage_write
 - **主会话决定（技术细节，不是产品/兼容变更）**：生产主库迁移总会创建这两张表，契约又禁止把查询失败当非成员，故只在上述 5 个夹具的 `AutoMigrate` 中补 `PartnerTenant` / `PartnerTenantAccount`，其余不改（共 +8/−5 行）。沿用规范既有规则“使用 BillingSession 的夹具须迁移 PartnerTenantAccount”。`relay_error_log_test.go` 原先冻结是为证明“独立表缺失时 reader 仍可用”，只补主库表不影响这一点（独立表仍缺失）。
 - 调整后复跑（`ptusage-1117-go-legacy-c1-head-r2`，09:00:31–09:01:36 UTC）：**基线通过的测试全部仍通过，无新增非本组失败，跳过集合相同**；`TestPrepareTieredBillingForSelectedGroupStartsBillingAfterFreeGroup`（基线失败，同一缺表原因）随之通过；`TestImmediateTaskSettlementDatabase` 仍为基线既有失败（其夹具不在本次改动内）。这同时证明**非成员路径**经真实调用点（text、websocket、task、IQ、relay error）行为不变。
 - 仍未覆盖：成员经 service/relay 真实调用点（text/audio/realtime/task/violation fee/relay error）写入独立表的端到端用例（C2）；ClickHouse / MySQL 写入；分库部署下的写入。
+
+## C2. 真实调用点与文档（trellis-implement）
+
+> 状态：**service 层真实调用点经隔离 PostgreSQL 15.19 实跑通过**（runner `ptusage-1117-go-c2-3`，2026-11-17 09:13:29–09:13:38 UTC，rc=0）。生产代码**未改**（`model/log.go`、`model/partner_tenant_usage_writer.go` 与 HEAD `65902706c` 一致）；未勾选 implement.md。
+
+### C2.1 改动文件
+
+- `service/partner_tenant_usage_paths_test.go`（新）：5 个 `TestPartnerTenantUsagePaths*` 顶层（7 个子测试），schema 前缀 `pt_usage_paths_`，共享 LOG_DB=DB，无 DSN 时 `require.NotEmpty` 失败（不跳过）。复用同包 `makeTask` 与内部 `taskAdjustFunding` / `taskAdjustTokenQuota` / `calcViolationFeeQuota`；未改任何既有测试文件。
+- `docs/partner-tenant-api.md`：见 C2.5。
+- `TEMPORARY_ARTIFACTS.md`：追加“Stage C2 real service call sites runtime”。
+
+### C2.2 夹具
+
+每个顶层（及 RelayConsumption 每个子测试）新建保留 schema：`MigratePartnerTenantIntegrationModes` + AutoMigrate User/Token/Channel/Log/Task/PartnerTenantAccount/SubscriptionPlan/UserSubscription/SubscriptionPreConsumeRecord + `model.MigratePartnerTenantUsageLogs()`。一个商户（hosted_h5，`CreatePartnerTenantWithIntegrationMode`）+ 真实 `partner_tenant_accounts` 行的成员（钱包 1000、该商户套餐的有效订阅 1,000,000）与一个普通用户（钱包 1,000,000，wallet_only）。cleanup 还原 `model.DB`、`model.LOG_DB`、两种数据库类型、`RedisEnabled`、`BatchUpdateEnabled`、`LogConsumeEnabled`、`DataExportEnabled`、`constant.ErrorLogEnabled`、Grok 违规费设置、`CacheQuotaData`，并重置 membership cache。全站 feed 断言读进程内 `CacheQuotaData`（`LogQuotaData` 只写该缓存，测试不启动 `UpdateQuotaData` 落 `quota_data`）。
+
+公共断言 `requireRouted`：成员 → logs 0 行、新表恰 1 行（type、user_id、tenant_id、account_id、tenant_name 快照 “Paths Tenant”、identity_source external、`ptu_` event_id、request_id 等于上下文值）；普通 → 新表 0 行、logs 恰 1 行（type、user_id、request_id）。
+
+### C2.3 调用点与断言
+
+| 调用点 | 测试 | 精确断言 |
+| --- | --- | --- |
+| `PostTextConsumeQuota`（text_quota.go:531） | `RelayConsumption/text` | 先走真实 `PreConsumeBilling`：成员 BillingSource=subscription（membership 强制）、普通=wallet；结算后 `requireRouted`（consume）、quota>0、成员新表 `subscription_id` = 订阅 ID；feed 恰 1 次且金额=quota；used_quota +quota、request_count +1、token remain −quota / used +quota；成员钱包不变、订阅 amount_used +quota；普通钱包 −quota；成员与普通 quota 相同 |
+| `PostAudioConsumeQuota`（quota.go:389） | `RelayConsumption/audio` | 同上（不断言 subscription_id） |
+| `PostWssConsumeQuota`（quota.go:250） | `RelayConsumption/realtime` | 同上（不断言 subscription_id） |
+| `PostTextConsumeQuota` 零额（无 usage） | `ZeroQuotaText` | 两类用户：路由正确、quota 0；feed 1 次、金额 0；余额/用量/token/订阅全部不变 |
+| `LogTaskConsumption`（task_billing.go:81） | `TaskBilling/submit` | quota 700 路由正确；feed 1 次 700；used +700、request_count +1；钱包、token、订阅不变（该函数本身不动资金） |
+| `RecalculateTaskQuota` 正差额（:365） | `TaskBilling/positive_delta_and_refunds` | 先用真实资金 helper 预扣 500；500→800：成员新表 1 行（consume、300、tenant_id、生成的 request_id、subscription_id 0），普通 logs 1 行 consume 300；feed 1 次 300；used +300、request_count 不变、token −300；成员钱包不变/订阅 +300，普通钱包 −300 |
+| `RecalculateTaskQuota` 负差额 + `RefundTaskQuota`（:286） | 同上 | 800→600 退 200、全额退 600：两条 refund（200、600）**都在 logs**（成员新表仍只有 1 行）；feed 仍 1 次 300；净额相对预扣后：used −500、token +500，成员钱包不变/订阅 −500，普通钱包 +500 |
+| `ChargeViolationFeeIfNeeded`（violation_fee.go:150） | `ViolationFee` | Grok 违规费开启 0.05、组倍率 1 → fee=`calcViolationFeeQuota(0.05,1)`；返回 true；consume 行路由正确且 quota=fee；feed 1 次 fee；used +fee、token −fee；成员（BillingSource=subscription、SubscriptionId 已设，模拟会话后状态）钱包不变/订阅 +fee，普通钱包 −fee |
+| `ProcessChannelError` → `RecordErrorLog`（relay_error.go:97） | `ChannelError/suppressed` | 成员：`ErrorLogEnabled=false` 与 `ErrOptionWithNoRecordErrorLog()` 两种情况两表都 0 行 |
+| 同上 | `ChannelError/recorded` | `ErrorLogEnabled=true`：两类用户 type 5、quota 0 路由正确（user 取 `c.GetInt("id")`）；feed 0 次；余额不变；成员行 channel_id、model（original_model）、token_id、group、subscription_id 0 |
+
+### C2.4 未驱动 / 未覆盖
+
+- 违规费的成员资金来源由测试直接设置 `BillingSource=subscription`+`SubscriptionId`（等价于会话预扣后的 RelayInfo），没有经过完整 relay 失败→退款→收费流程；该流程需要真实上游错误响应，未驱动。
+- legacy MJ（`relay/mjproxy_handler.go`）、channel-test、IQ executor 写入点未驱动（MJ 对商户本就在上游前拒绝；后两者需要渠道测试/上游执行器）。
+- 未覆盖：真实 HTTP relay 端到端（含上游 fake）、`RecalculateTaskQuotaByTokens`、`relay` 包调用方、独立 LOG_DB（分库）写入、ClickHouse / MySQL / SQLite 写入、秘密标记与 GORM DEBUG（已由 C1 model 层覆盖，C2 未重复）。
+
+### C2.5 文档改动（`docs/partner-tenant-api.md`）
+
+- “Scope of this surface” 删去“writer 未启用”，改为已启用，升级后页面从空开始、仅随新的子账号调用增长。
+- 新增 “Writer routing” 小节：仅三类模型调用 writer 分流；非成员 → 默认表不变、成员 → 仅新表恰一行、归属查询失败 → 两表都不写；refund/topup/system/security/audit 不分流；原开关先生效；计费不变；`quota_data` 每次消费恰一次（全站仍含商户）、error 不计消费；best-effort 无 outbox、崩溃/查询失败/LOG_DB 故障可丢行且不回落；成员/未知仅打印关联字段；上线顺序（迁移+兼容 reader 先于或同步 writer，混合版本可能分表、无全局切换时刻，旧商户历史留在默认表不迁移，回滚保留新表）。
+- Errors 段末尾把“未对 PostgreSQL / 真实路由执行”更新为已在隔离 PostgreSQL 15 与真实路由的任务自有测试中执行，并保留 ClickHouse/MySQL/SQLite 仅源码推导、分库写入未运行、不作部署结论。
+- 其他 docs 中无用量日志相关的“未启用”表述（`git grep` 确认）。
+
+### C2.6 命令与结果
+
+宿主机（go1.26.10，`GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS=-mod=readonly`）：`gofmt -l service/` 空；`go build ./...` rc=0；`go vet ./service/` rc=0（最后一次改动后重跑）。导出：新文件 `cp` 后 `cmp` 一致；其余全部已跟踪 Go 文件与工作区 0 mismatch。
+
+Docker（派发给出的命令，仅改 runner 名，`go test ./model ./controller ./router ./service -run "^TestPartnerTenantUsage" -count=1 -v -timeout 20m`）：
+
+| runner | 日志 | 结果 |
+| --- | --- | --- |
+| `ptusage-1117-go-c2-1` | `runtime-c2-1.log` | rc=1：model/controller/router ok；service `TaskBilling/submit` panic（nil 指针） |
+| `ptusage-1117-go-c2-2` | `runtime-c2-2.log` | rc=1：61 通过 / 1 失败 / 0 跳过 |
+| `ptusage-1117-go-c2-3` | `runtime-c2-3.log` | **rc=0：62/62 顶层通过（原 57 + 新 5）、114 子测试通过、0 失败、0 跳过**；四个包均 ok |
+
+两次失败均为**测试假设错误，生产代码未改**：
+1. `RelayInfo.Action` 来自内嵌 `*TaskRelayInfo`（nil）；改为设置 `info.TaskRelayInfo = &relaycommon.TaskRelayInfo{Action: "generate"}`。
+2. 任务正差额行的 `subscription_id` 期望为订阅 ID，实际 0：`taskBillingOther` 不写 `subscription_id` 事实，writer 按契约不事后查询 → 改为断言 0（见 C2.7）。
+
+Schema：run 3 共 52 个（既有 45 个家族换新后缀 + 7 个 `pt_usage_paths_*`），run 1/2 另建 5 / 7 个 `pt_usage_paths_*` 及其他家族；全部保留不删，已登记 `TEMPORARY_ARTIFACTS.md`。
+
+### C2.7 需主会话确认
+
+- 任务 writer（`RecordTaskBillingLog`）的成员行 `subscription_id` 恒为 0：任务资金来源事实在 `task.PrivateData.SubscriptionId`，但 `taskBillingOther` 不把它写进 other.public，writer 也按契约不事后查询。符合“未知不伪造”的冻结契约，但新页对任务正差额无法显示所用订阅；是否让任务路径把已知 subscription_id 写入 other（会同时改变默认表 other 内容）需单独决定。本派发未改。
+- 本次测试 run 未包含旧 SQLite 回归（C1 主会话已跑；C2 只新增测试文件，未改生产代码）。
