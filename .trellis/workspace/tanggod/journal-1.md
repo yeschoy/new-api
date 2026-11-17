@@ -501,3 +501,45 @@ Implemented the approved plan for 11-17-partner-usage-isolation at source level:
 
 - Make Docker available, register task-owned pq runner, run TestPartnerTenantUsage/QuotaCNY/UserClassification + affected legacy log/user suites + previous-group AccessMode/AuthorizationAudit suites
 - Only after B passes on pq: implement stage C write routing, then parent AC1/AC6 and final acceptance; no task archived yet
+
+
+## Session 16: 11-17商户用量隔离：完成运行验收与归档
+<!-- trellis-session: v=2 fp=ab326f70472973ad -->
+
+**Date**: 2026-11-18
+**Task**: 11-17商户用量隔离：完成运行验收与归档
+**Branch**: `feat/partner-accounts`
+
+### Summary
+
+完成三个11-17子任务及父集成的本地验收与提交归档；补6项Usage顶层和self-stat安全矩阵，独立Docker PostgreSQL两轮69/128通过；CNY/分类/前组/SubscriptionKey联合46/45通过，前端657通过，真实后端浏览器联调完成。整仓基线失败和lint基线单独披露，未推送部署或清理。
+
+### Main Changes
+
+- 补独立LOG_DB单写、结算后真实PG插入失败不影响计费/feed、token生产路由伪参、商户session拒绝、两层logger安全、EXPLAIN与CH生成SQL契约；生产业务源码本轮0改动。
+- 两批明确路径工作提交完成；a3cc0bc18归档3 child+parent至archive/2026-11，40份记录保留、四task.json completed、归档后JSONL引用校验通过；其他任务未归档。
+- 更新spec和验收证据边界，保留H5 usable额度层面、未知subscription_id不伪造、best-effort可能漏记、非liveCH/非容量验证等限制。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b5c9dee36` | test(partner): close merchant usage isolation acceptance gaps |
+| `3b41b3e13` | docs(partner): finalize November 17 task acceptance |
+
+### Testing
+
+- [OK] 独立Usage Docker PostgreSQL15.19两轮每轮69顶层+128子测试通过，0失败/skip；最终源码SHA256和只读导出一致。
+- [OK] 最终非Usage联合5包46顶层+45子测试通过，0失败/skip：CNY15、分类7、AccessMode11、AuthorizationAudit9、SubscriptionKey4。
+- [OK] 前端48文件657测试、typecheck/build及本组定向lint/format通过。
+- [KNOWN BASELINE / NOT GREEN] 全站lint有151错误/68警告；完整旧回归2007通过/70失败/21skip，其中69为无DSN PG必败，唯一非PG为既有缺表夹具。基线通过集合无新增失败、skip集合相同，不把整个检查报告为通过。
+- [OK] 真实backend+假PG浏览器覆盖两页同归属/同scope、默认旧历史、大ID精确请求、admin/root/普通用户、键盘焦点/移动布局/URL历史；fixture server已停止。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 未授权推送/部署；生产发布需迁移与兼容reader先行，协调所有API/异步节点。
+- 所有临时文件、Docker/schema/卷、私钥及报告保留，清理须用户另行明确同意；Trellis记录永不清理。

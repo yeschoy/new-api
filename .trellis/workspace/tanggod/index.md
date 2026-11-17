@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
-- **Last Active**: 2026-11-17
+- **Total Sessions**: 16
+- **Last Active**: 2026-11-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~503 | Active |
+| `journal-1.md` | ~545 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-11-18 | 11-17商户用量隔离：完成运行验收与归档 | `b5c9dee36`, `3b41b3e13` | `feat/partner-accounts` |
 | 15 | 2026-11-17 | Merchant usage isolation: stages A/B/D, CNY projection, user classification (runtime-blocked) | `69092e8d5`, `8457836d9`, `febe9bd3e`, `9dd775cc2`, `1748176a6`, `d2135cbda`, `83de2de6c` | `feat/partner-accounts` |
 | 14 | 2026-11-13 | 商户互斥接入与授权日志源码检查点 | `7b4b5af1a` | `feat/partner-accounts` |
 | 13 | 2026-11-13 | 商户接入 Demo：并行审查、订单恢复修复与提交 | `16c4acaa3`, `1d3e4b324` | `feat/partner-accounts` |
