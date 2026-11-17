@@ -1,62 +1,61 @@
-# 总体执行与集成门禁
+# 总体执行与最终集成门禁
 
-状态：最新完整规划已获用户批准（2026-11-17 续接会话，对应规划提交 `e61eb6533` + `b1929bdda`）。实施进度与真实证据见本目录 `verification.md` 及各子任务 `verification.md`；未勾选项即未完成。
+状态：**三个子任务实现与本地隔离验收完成，用户已确认本地提交及归档**。原计划已在提交`e61eb6533`+`b1929bdda`获批，最终事实见`final-acceptance.md`；旧source-only记录保留但不作为当前状态。
 
-## 0. 进入执行前
+## 0. 范围与准备
 
-- [x] 完整规划摘要展示 Goal / Scope / Non-goals / AC / Decisions / Risks；取得用户随后明确批准并记录批准对应的版本。（2026-11-17 续接会话批准 `e61eb6533` + `b1929bdda`；记录于 prd“授权与阶段”。）
-- [ ] 读取 trellis-before-dev、目标层 specs；前端实现还需 shadcn-ui、vercel-react-best-practices，新增文案必须 i18n-translate。
-- [ ] 复核 git baseline、四任务父子关系和 implement/check 清单；保留既有私钥/报告/Demo/临时清单，不读取秘密、不 blanket stage。
-- [ ] 读取 `research/planning-review.md` 和前组 `../11-13-partner-access-mode-audit/verification.md`。前组模式/授权审计只有源码与前端证据，Go/pq 尚未验证；在新建运行资源前核对 Docker 当前可用性，不把历史不可用当作当前实测，也不自行启动/重启引擎。
-- [ ] 为受本组变更影响的前组模式/审计套件及既有日志/额度/用户测试建立回归清单，检查 TestMain/fixture 的 DSN、schema、全局状态及删除风险；不能只运行新增前缀套件。
-- [ ] 仅 start 当前实际交付子任务；父任务不作为默认实现目标。若派发子代理必须先满足工具授权，prompt 第一行是 task.py current 得到的 Active task 路径；同 cwd 不并发写入。
+- [x] 用户批准R1–R7及AC1–AC8、三个现有child；恢复已有任务，不重复创建。
+- [x] 读取父/子PRD/design/implement/research、backend/frontend spec与技能要求；复核owner/writer/readers/前端/迁移边界。
+- [x] 起始HEAD`68cb5dd29`、原9组未跟踪资源保留；不读秘密、不blanket stage，npm/pnpm记录已有ignore。
+- [x] Docker当前可用（由用户之前启动），仅复用本组内部fixture，不自行启动/重启引擎；前组曾经阻塞已用20个真实PG用例解除。
+- [x] 受影响旧日志/用户/OAuth/额度回归清单与基线已核查；no-DSN legacy结果与明确DSN的PG结果分开。
+- [x] 单cwd实现与检查顺序执行；主会话只写不冲突的父/CNY/分类/规范文件，浏览器只主会话使用。
 
-## 1. 顺序与依赖
+## 1. 交付
 
-1. [ ] `usage-logs`：交付安全 owner / batch owner / safe options 契约，固化无秘密、禁用/过期不改身份、查错不当普通的测试。
-2. [ ] `quota-cny`：在无需新表的条件下实现 converter、三个兼容接口与文档。独立通过精度/终态/配置门禁；之后日志页可调用它。
-3. [ ] `usage-logs`：完成新表、两种迁移、三入口分流、管理员读取和所有 self/token 兼容；随后接入 CNY、页面、导航与七语言。
-4. [ ] `user-classification`：只消费已交付 owner/options，补 list/search 共用过滤、count、列及 UI，不改 OAuth 合作方协议。
-5. [ ] 回到父级做全交付集成检查。不提前归档仍有跨交付或运行阻塞的子任务。
+- [x] usage-logs A：safe single/batch owner、request memo、id/name-only bounded options、log/user两个权限入口；不按有效期/用户名/组猜身份。
+- [x] quota-cny：统一decimal转换器、三个入口additive wrapper、金额/终态/配置契约与文档；原quota/鉴权/秘密读取/计费保持。
+- [x] usage-logs B：独立表/索引、shared/separate迁移、ClickHouse DDL/TTL、admin list/stat、六自身/token兼容reader；PG门禁先于writer通过。
+- [x] usage-logs C：三入口仅consume/error分流、非成员原路、故障不回落、feed一次、秘密卫生与服务调用点；退款等非目标事件不重定向。
+- [x] usage-logs D：独立admin页/导航、统一窗口、分页/过滤/CNY与原始精确字符串、scope提示、键盘/mobile/七语言。
+- [x] user-classification：同owner过滤/批量enrichment、类别/商户/旧OAuth独立、同事务count/分页、safe options及会话隔离。
+- [x] 主会话真实后端+假PG浏览器联调两页：同商户12/禁用成员、大ID、范围/统计/分页、旧历史、admin/root/普通用户、键盘/移动/URL与前进后退。
+- [x] 日志独立trellis-check两轮每轮**69顶层/128子测试、0fail/skip**，修正版EXPLAIN/self-stat诊断矩阵已实跑；review结论持久化。
 
-保留三个子任务，不另建基础设施/个人兼容任务。日志内部按 A（owner/options）、B（迁移/读者）、C（写者）、D（金额/UI）记录交付。用户分类只依赖 A，不以日志 UI 完成为前置。每次切换 start 的子任务前，保存实际共享签名、修改文件所有权、已执行验证及阻塞项；A 的 source-ready 不等于日志任务完成。
+## 2. 实际验证
 
-## 2. 验证命令与证据
+所有Go运行在本组Docker，禁止宿主go test；source导出按明确文件同步、只读挂载、模块只读且GOPROXY/GOSUMDB off，无依赖变更。
 
-规划记录检查（可在 planning 运行，不是业务验收）：
-
-```bash
-for name in usage-isolation usage-logs quota-cny user-classification; do
-  python3 ./.trellis/scripts/task.py validate .trellis/tasks/11-17-partner-$name
-done
-git diff --check
-```
-
-批准后的具体命令由各子 implement 承接。Go 选择器预期为 `^TestPartnerTenant(Usage|QuotaCNY|UserClassification)`，仅在已登记的任务自有 Docker runner 中执行 `go test -mod=readonly ... -count=1 -v`，显式 DSN 指向空的隔离 PostgreSQL。记录实际选择/执行/skip 数和升级/重复迁移证据，禁止宿主机 go test。
-
-前端目标检查采用现有 `bun run test -- <目标路径>`、typecheck、目标 oxlint、build:check、脚本式七语言添加/同步；目标列表见各子计划。不得为规划下载依赖或启动运行资源。
-
-## 3. 父级验收矩阵
-
-| 验收 | 集成证据 |
+| 选择器 | 实际证据 |
 | --- | --- |
-| AC1 | 商户成功/零额/失败单写，普通订阅不误分流，原抑制/收费 consume 不变 |
-| AC2/AC4 | 两页同一商户关系，筛选/count/分页/聚合一致，OAuth 旧标签保留 |
-| AC3 | 大整数与微额 CNY、无限/终态/无效配置，旧协议快照不变 |
-| AC5 | 默认旧历史仍可查，新页切换提示；共享/独立 pq 迁移、清理不扩范围 |
-| AC6 | 默认顶部无新商户，全站 quota_data 仍计一次 |
-| AC7 | self 列表/stat/requests/summary/export/token 全覆盖；越权负例、跨表 ID 与重试 |
-| AC8 | 真实路由匿名/user/admin/root/PAT，安全 options，root-only 管理保持 |
+| Usage原63顶层/114子测试 | C1/C2已pq通过；本轮加6顶层到69，分库/结算真实故障/token伪参/member权限/logger/EXPLAIN/CH SQL，最终独立check69/128全部通过 |
+| QuotaCNY15 | 最终integration再次全过 |
+| UserClassification7/22子测试 | 最终integration再次全过 |
+| AccessMode11 / AuthorizationAudit9 | 最终integration再次全过，前组运行证据不等于擅自归档前组 |
+| 既有SubscriptionKey4 | 最终integration全过，quota/续费/终态/轮换/并发锁/旧HTTP协议 |
+| 上述非Usage五类联合 | 5包46顶层/45子测试，0fail/skip；34保留schema，`runtime-final-integration.log` |
+| 前端四目录 | 48文件657用例、typecheck/build rc0；触碰TS/TSX定向lint/format rc0，i18n:sync rc0；全站151错误/68警告为既有基线 |
 
-## 4. 检查、提交与交付
+现有SQLite无DSN回归有已披露基线失败及新增PG测试按设计无DSN失败；基线通过的既有用例在HEAD仍通过，不假报整仓全绿。完整证据/计数/执行命令与失误过程见final-acceptance及child verification。
 
-- [ ] 每轮实现后按 trellis-check 做目标验证及全差异复核；缺 Docker/pq 不能声称迁移/完整验收通过，不生产兜底。
-- [ ] 分开报告前组模式/授权审计、本组三个子任务及既有回归的实际执行数、skip、失败和基线；前组受影响运行门禁未通过时，不宣称新旧链路完整验收。新发现的旧问题记回原任务，禁止静默扩大本组范围。
-- [ ] 将真正验证的契约写入对应 spec，区分源码/静态/DOM/真实 pq/浏览器证据；planning 提案不能冒充已实现 spec。
-- [ ] 按明确路径提交业务代码、测试、文档及 Trellis 记录；当前 .trellis 被忽略，新规划文件须精确路径 force-add，绝不加入 runtime/secret/reports 等无关内容。
-- [ ] 资源创建前登记 TEMPORARY_ARTIFACTS.md；结束只汇报实际产物/运行状态。清理等待用户同意，Trellis 记录永不清理。npm/pnpm 缓存/日志保持 ignore。
-- [ ] 本地提交不等于推送/部署；后者没有授权。完成且质量门禁真实满足后再按 finish-work 记录/归档。
+## 3. 父AC矩阵
 
-## 5. 停止与回滚点
+- AC1/AC6：三writer+服务调用+fee/zero/error+feed；最终分库/已结算故障独立check已通过。
+- AC2/AC4：两页真实owner/相同scope，PG过滤/count/分页/排序与批量，浏览器精确ID/URL/mobile、旧OAuth回归。
+- AC3：15CNY+旧Key，舍入/无效配置/无限额/terminal，旧字段兼容与鉴权/审计不变；日志先聚合再转换。
+- AC5：shared/separate真实迁移/索引/存储，旧历史保留/scope提示，EXPLAIN实际SQL+bind独立check通过（非容量证据）。
+- AC7：六reader全覆盖，同ID/重试/跨日/导出stream取消/伪参，token生产路由与故障logger独立通过。
+- AC8：真实SetApiRouter/PAT/desktop/角色投影/root-only保持；browser普通用户403且0次商户admin请求。
 
-Owner 出现假普通、日志误混写、跨表自身越权、旧 quota 类型改变、迁移不兼容或缺 pq 运行证据均阻塞交付。保留已创建日志表/记录，回滚应用时保留兼容读者；不删除历史、不重发计费、不恢复旧密钥、不启动生产变更。
+## 4. 收尾
+
+- [x] 规范更新当前writer事实、best-effort/普通路径主库依赖/部署与回滚、测试注入链/EXPLAIN不要钉格式等可执行契约。
+- [x] 全部质量结果回填，最终6包无DSN回归2007通过/70失败/21skip，其中69缺DSN PG失败、唯一非PG为既有夹具失败；基线通过的用例无新增失败、跳过集合完全相同。
+- [x] 本轮6个Go测试及本组i18n writer已精确提交 `b5c9dee36`；规范和验收记录纳入已批准文档提交批次，无私钥/报告/临时文件。
+- [ ] 工作提交后按官方archive三个child与父；再记录journal并提交Trellis，禁止把前组/其他任务一起归档。
+- [x] 浏览器关闭且本组fixture server停止（未移除），无3392监听；其他容器/schema/卷/截图保留，实际清单在TEMPORARY_ARTIFACTS。
+- [ ] 完成后询问用户是否清理本组临时产物；不删Trellis或共享缓存/旧资源，不推送部署。
+
+## 5. 不扩范围
+
+保持H5 usable额度层面、task/fee未知subscription_id不伪造、report两读取方仍旧表；统计整窗性能/union无topN/MySQL collation/liveCH为已披露限制。outbox、SQL自动清理、历史迁移、生产发布不是首版验收承诺。回滚保留新表与兼容reader，不重放扣费。

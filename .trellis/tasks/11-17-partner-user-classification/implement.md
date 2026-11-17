@@ -1,43 +1,32 @@
-# 用户分类执行计划
+# 用户分类执行与验收
 
-状态：父任务规划已于 2026-11-17 获用户批准实施；进度与真实证据见 `verification.md`，未勾选项即未完成。日志 child 的 owner/options 是明确前置，CNY 无前置关系。
+状态：**实现与本地隔离验收完成，用户已确认本地提交及归档**。规划于2026-11-17获批；历史source-only审阅保留，早期Docker阻塞已被后续真实运行解除。父 `final-acceptance.md` 为最终跨页证据，不代表生产部署。
 
-## 顺序
+## 实现
 
-- [ ] 读取父任务 PRD/design/共享 research、现有 User list/search/controller/API/schema/table/route 和旧 OAuth 测试；核对日志 child 实际交付的 safe owner/options。
-- [ ] 保存 owner/options A 阶段签名和验证证据，不将其 source-ready 当作日志整体完成；本任务无需等待日志 UI 或 CNY。建立既有 user/OAuth list/search、权限与前端 partner-column 受影响回归清单，审核 fixture 后记录实际命令/执行数，不只测新增分类前缀。
-- [x] 新分类/ID typed parser 和共用模型过滤；GetAllUsers/SearchUsers 在 count/rows 分页前应用同条件，保留排序/状态/组/角色/关键词/OAuth。（后端源码级完成，2026-11-17；`gofmt`/`build`/`vet` 通过，Go 测试执行数 0，**运行待验证**，见 `verification.md` §2–§4、§6）
-- [x] 按页批量附加 user_category、partner_tenant_id/name，不持久化新角色，不把 owner 查询失败当普通。（后端源码级完成，2026-11-17；**运行待验证**，PG 语句计数与失败路径测试仅有源码，见 `verification.md` §3、§7）
-- [x] users API/schema/URL/columns/toolbar 使用独立 Tenant 维度；选择普通清商户、选择商户切类别；先重置分页再新查询。（前端源码完成并有 mock DOM 执行证据，2026-11-17：`bun run test -- src/features/users` 8 files / 61 tests 通过；未与真实后端联调、无浏览器验证，偏差见 `verification.md` F8）
-- [x] 使用 user:read safe options，不依赖 Root-only 管理 API；受控选项搜索/分页，缓存按会话/角色及全部过滤隔离。（前端源码完成并有 mock DOM 执行证据：`/api/user/tenant-options` 服务端搜索/分页/`selected_id`，query key 含查看者；仅 id+role 同时切换有缓存隔离测试，见 `verification.md` F3/F7）
-- [ ] 七语言经 sanctioned script + i18n:sync，覆盖空/错/未归属、键盘与移动布局；旧 OAuth 字段/权限/test 保留。（部分完成，**未勾选**：13 键已经脚本 + `i18n:sync` 写入七语言并有测试；商户筛选键盘、空/错/未归属有 DOM 证据；移动布局与真实浏览器未验证，见 `verification.md` F7/F9）
+- [x] 消费日志child的single/batch safe owner与safe options，无第二套分类/缓存；来源仅主库Tenant account关系，禁用/过期不变普通。
+- [x] typed `user_category` / `tenant_id` parser，非法/重复/冲突400；count与rows在同一事务、分页前用同一EXISTS/NOT EXISTS过滤，保留关键词/组/状态/角色/排序/OAuth。
+- [x] 按结果页一次batch enrichment，空页0查询，查错503而不是ordinary；只添加三个安全归属字段，不新增角色或持久化身份列。
+- [x] users API/schema/独立Tenant URL键/列/toolbar：选ordinary清tenant，选商户切merchant，同一次导航重置页码；不改变旧OAuth维度。
+- [x] options走`/api/user/tenant-options`受控搜索/分页/selected_id，admin/root只读，不依赖root管理API；viewer/session/role+全部过滤隔离query和Tenant placeholder。
+- [x] 13键七语言经sanctioned writer + i18n:sync，空/错/未知归属/键盘/移动布局覆盖；旧OAuth列/权限/断言保留。
 
-## 验证命令（批准后）
+## 验证
 
-在任务自有 Docker runner、空隔离 PostgreSQL `TEST_PARTNER_USER_CLASSIFICATION_POSTGRES_DSN` 内：
+- [x] `^TestPartnerTenantUserClassification`：**7顶层/22子测试通过、0skip**，真实PostgreSQL+SetApiRouter权限/PAT；新测试覆盖普通订阅/伪p_/external/subscription_key/禁用/过期/软删除/OAuth双关联，过滤组合/跨页count/排序oracle、空页及每页查询计数。
+- [x] 受影响旧model用户分页/OAuth过滤回归在历史Docker无DSN基线对照运行，基线通过的用例在当前仍通过；没有用新增suite替代旧回归，也未隐藏其他基线失败。
+- [x] 最终5包联合重跑：CNY15+分类7+模式11+审计9+SubscriptionKey4，**46顶层/45子测试/0失败/0skip**，日志 `runtime-final-integration.log`。
+- [x] 前端 `users` 8文件64用例、四目录合计48文件657用例通过；typecheck/build通过，本组定向oxlint/oxfmt通过；全局lint151错误/68警告为既有基线。
+- [x] 真实后端浏览器：tenant12只列101/105且105禁用仍商户，与日志页归属一致；ordinary排除成员但保留伪p_；类别联动/后退/刷新；大ID真实请求无舍入；键盘服务端搜索商户+选择；390px无横向溢出、移动卡归属可见。
+- [x] 普通管理员/root可读、root-only管理仍403；普通用户新页403且0次商户admin请求；API匿名/用户/admin/root/PAT完整矩阵由真实路由测试证明。
+- [x] 原完整差异独立trellis-check已完成，spec更新；父AC2/AC4/AC8集成证据见 `final-acceptance.md`。
+- [x] 本轮验收/Trellis记录纳入用户已批准的明确路径文档提交批次（已有业务提交 `9dd775cc2`）。
+- [ ] 文档提交后官方归档，完成态以归档task.json/journal为准。
 
-```bash
-go test -mod=readonly ./model ./controller ./router ./middleware -run '^TestPartnerTenantUserClassification' -count=1 -v
-```
+## 已披露限制
 
-需新增对应 TestMain 自包含选择分支，避免 legacy SQLite bootstrap；真实执行而非缺 DSN skip。矩阵包括普通/普通订阅/假 p_、两个真实 Tenant 身份、禁用/过期/软删除映射、Tenant+OAuth 双关联、同关键词/状态/组/角色/排序/跨页、非法/矛盾参数、真实路由/PAT/秘密负例。
+HTTP组过滤只在model真实pq矩阵测试，controller/router无法直接调用包内列名初始化；并非未实现过滤。关键词`_/%`保持原LIKE通配语义。列表HTTP200 success:false与owner503错误形态、查询失败UI沿用旧空态策略，不在此任务重做通用错误系统。全笛卡尔积不可能穷尽，实际矩阵见verification，不把未执行驱动冒充验证。
 
-在 web 使用现有依赖：
+## 回滚与资源
 
-```bash
-bun run test -- src/features/users src/features/partner-usage-logs
-bun run typecheck
-bun run lint
-bun run build:check
-bun run i18n:sync
-```
-
-另执行本次目标文件 oxlint，区分既有全局基线；locale 写入先经过脚本而非直接改 JSON。DOM 测试必须覆盖 URL/刷新/页码、旧 OAuth、跨会话缓存和七语言，不把 mock 行字段当后端归属证据。
-
-## 完成门禁
-
-- [ ] A-V1–A-V5 逐项实际证据，用户页和商户日志页同一 Tenant ID/归属；空页无无界 enrichment、无 N+1。
-- [ ] trellis-check 检查全差异、权限、参数/查询同口径与旧伙伴协议；Docker/pq 缺失时报告阻塞，不降级为宿主机或生产运行。（**未勾选**：2026-11-17 已做一轮源码级 trellis-check，记录见 `quality-review.md`——撤回了既有筛选 placeholder 行为的越界改动并补测试；Go 测试执行数仍为 0，Docker/pq 阻塞未解除。）
-- [ ] 将已验证契约写 spec，精确路径提交业务/测试/UI/docs/Trellis，不 staged 私钥/报告/临时产物；不推送/部署。
-- [ ] 回父级 AC2/AC4/AC8 集成检查。回滚仅新读取/UI，保留真实关系和仍被日志使用的共享 helper。
-- [ ] 实际资源登记 TEMPORARY_ARTIFACTS.md；清理须用户同意，Trellis 不清理。
+仅撤新增读取/filter/UI，不删除/重绑关系，不改角色/权益；共享owner仍被日志使用时保留。实际产物登记 `TEMPORARY_ARTIFACTS.md`，清理须用户同意、Trellis保留，不推送/部署。

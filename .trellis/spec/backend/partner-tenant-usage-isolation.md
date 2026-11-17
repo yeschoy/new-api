@@ -4,11 +4,11 @@
 
 Read before changing: Tenant (merchant) ownership lookups, the dedicated `partner_tenant_usage_logs` table or its migration, any own-user / API-Key log reader, the administrator merchant usage API or page, the `quota_cny` projection, or the administrator user list classification.
 
-Evidence status (2026-11-17, task group `11-17-partner-usage-isolation`) — keep these distinctions when citing this spec:
+Evidence status (2026-11-17/18, task group `11-17-partner-usage-isolation`) — keep these distinctions when citing this spec:
 
-- **Implemented at source level; Go tests executed = 0.** The task-owned Docker/PostgreSQL runner was unavailable. Offline `go build` / `go vet` (go1.26.10) pass; they are type checks, not runtime evidence. No PostgreSQL migration, persistence, union, route-auth or EXPLAIN result exists yet.
-- **The dedicated-table WRITER IS NOT ENABLED.** `insertPartnerTenantUsageLog` has no production caller; `RecordConsumeLog` / `RecordErrorLog` / `RecordTaskBillingLog` / `createLog` are unchanged. Stage C (write routing) is blocked until migration and readers pass on isolated PostgreSQL. On every current build the dedicated table stays empty.
-- Frontend: executed Vitest DOM tests (mocked transport) and a local real-browser check with fake data. Neither proves backend behaviour.
+- **The dedicated-table writer is enabled.** `RecordConsumeLog`, `RecordErrorLog` and consume/error branches of `RecordTaskBillingLog` route confirmed Tenant members only to `partner_tenant_usage_logs`. Generic `createLog` and other event types keep their original destination. Migration and own-reader PostgreSQL gates passed before this routing was enabled.
+- **Executed on task-owned PostgreSQL 15.19 in Docker (Go 1.26.10).** Migration/persistence, all own readers, route/PAT authorization, CNY compatibility and classification tests passed. Historical source-only / Docker-blocked notes in the task records are superseded by their later runtime sections; do not repeat them as current status.
+- Frontend: Vitest DOM tests (mock transport), local browser rendering checks, and real loopback backend + isolated fake PostgreSQL fixture checks. The browser's fake usage rows prove UI/API integration, not real model consumption. Writer/settlement integration is proved separately by the Go suites. No production deployment, real payment/model call or live ClickHouse/MySQL verification is implied.
 
 ## 2. Signatures
 
@@ -44,6 +44,15 @@ Ownership:
 
 Dedicated table (LOG_DB): explicit columns, 64-bit ids / quota / tokens, TEXT `content` / `other`, frozen owner snapshot (`tenant_id`, `account_id`, `tenant_name`, `identity_source`), random non-secret `event_id` (unique), no uniqueness on `request_id`. Index names `idx_ptul_time (created_at,id)`, `idx_ptul_tenant_time`, `idx_ptul_user_time`, `idx_ptul_token_time` (`(x, created_at, id)`), `idx_ptul_request`, `ux_ptul_event` — never reuse `Log` index tags (PostgreSQL index names are schema-wide). ClickHouse: explicit MergeTree CREATE, `ORDER BY (created_at, event_id)`, existing `LOG_SQL_CLICKHOUSE_TTL_DAYS` with MODIFY/REMOVE TTL. The migration never reads, moves or deletes `logs`; no new automatic SQL deletion. Inserts use a silent GORM session and return fixed error text.
 
+Writer contract:
+- Resolve ownership from the writer's actual `userID` argument (task writer: persisted task user), not another context user. Request memo keys include that ID. Original consume/error suppression remains upstream; consume disabled returns before ownership lookup. Refund/topup/system/security/authorization audit events do not get blanket-routed.
+- Confirmed member → one dedicated insert; confirmed non-member → original `createLog` and diagnostic path. Lookup failure → neither table, bounded warning. Dedicated insert failure → warning only, no default-table fallback, retry, or compensation. Main DB and LOG_DB may be separate; never join across them.
+- Keep `LogQuotaData` outside the routing branch, once per original consume event (including zero and failed-but-charged consumes), never for plain error. A failed log insert after settlement cannot roll back subscription/token/user counters or alter whole-site feed.
+- For member/unknown ownership, suppress the old full params/content/raw error diagnostics; application warnings contain fixed reason and user/tenant/request correlation only. Silent GORM insert/read sessions prevent interpolated binds/driver errors from bypassing this boundary. Non-member diagnostics are intentionally unchanged.
+- `subscription_id` uses only a positive `int`/`int64` in `other.public`; absent facts remain 0 internally / empty string in the admin DTO. Text/audio/realtime supply it. Task/violation/error paths without that fact do not re-query or fabricate a subscription.
+- Best-effort, not an outbox: a crash, ownership lookup failure or LOG_DB outage may lose the usage row. No claim of lossless cross-database logging. Even ordinary-user logging can be skipped if the main ownership query is unavailable.
+- SQLite fixtures that invoke the writers must migrate both `PartnerTenantAccount` and `PartnerTenant` even for ordinary users. Production initializes both; a test missing them is an ownership-query failure, not proof of non-membership.
+
 Read matrix:
 - Default administrator list / stat / export read only `logs` (old merchant history stays there). The dedicated endpoints read only the dedicated table and never union or fall back.
 - Own-user / API-Key readers probe the dedicated table for the authenticated `user_id` / `token_id`. No rows, or table confirmed absent → the original single-table code runs unchanged. Rows present → ownership-scoped `UNION ALL` (predicate bound inside both branches, explicit per-column casts, global order `created_at desc, id desc, source, event`), count / sort / page on the union. Table present but probe failed, or the presence check failed → the reader's generic error, never "no rows". Presence is cached positive-only, bound to the current `LOG_DB` handle; a successful migration marks the handle.
@@ -56,6 +65,12 @@ CNY: `amount = quota × USDExchangeRate ÷ QuotaPerUnit`, exact multiply then on
 User classification: `user_category=all|ordinary|merchant`, `tenant_id`; same EXISTS / NOT EXISTS predicate on count and page in one transaction before pagination; `ordinary` + `tenant_id` → 400. Each user gains `user_category`, `partner_tenant_id` (string, `""` if none), `partner_tenant_name`; one batch owner query per page; owner failure → 503, never "ordinary". OAuth `partner_client_id` filter and fields unchanged.
 
 Frontend: dedicated `/partner-usage-logs` route (role ≥ admin; non-admins redirected with zero admin requests), not a tab of the default usage-logs page. Scope notice always visible. List and stat always share one explicit window and filters; unset parameters omitted, never empty strings. Query keys include viewer (user id, role, session sid) and every input. ids / quota stay strings end to end.
+
+Compatibility limits and rollout:
+- Deploy migration plus compatible readers before enabling the writer across API/async nodes. During rolling upgrades there is no global atomic cutover timestamp. Keep the new table/data and compatible readers on rollback; an old read-only-from-logs binary hides the new own-user history.
+- Cashback recorded-spend reports and Partner Server sub-account usage are separate readers and still read only `logs`; they are not implicitly unioned. Tenant/PartnerAccount identity systems must not be conflated.
+- Stats stream the full bounded time window; own-union does not push per-branch top-N. Tiny-fixture EXPLAIN is not production-scale performance certification. MySQL collation mismatches and live ClickHouse remain unverified operational risks.
+- Usage DTO has no unlimited-balance field: the merchant log page therefore has no invented unlimited-quota badge. Unlimited/terminal balances belong to the CNY subscription/catalog DTO, not per-event log rows.
 
 ## 4. Validation & Error Matrix
 
@@ -81,9 +96,15 @@ Frontend: dedicated `/partner-usage-logs` route (role ≥ admin; non-admins redi
 
 ## 6. Tests Required
 
-Go sources (49 `TestPartnerTenantUsage*`, 15 `TestPartnerTenantQuotaCNY*`, 7 `TestPartnerTenantUserClassification*`) use explicit DSNs `TEST_PARTNER_USAGE_POSTGRES_DSN`, `TEST_PARTNER_QUOTA_CNY_POSTGRES_DSN`, `TEST_PARTNER_USER_CLASSIFICATION_POSTGRES_DSN`, unique retained schemas (`pt_usage_*`, `pt_quota_cny_*`, `pt_user_class_*`), no DROP/TRUNCATE, and fail (not skip) without a DSN; `model` / `service` `TestMain` bypass SQLite for these selections. They have never been executed. Required before Stage C: fresh / upgrade / repeat migration on shared and separate LOG_DB, actual DDL and index names, persistence of >2^53 values and >64 KiB text, every own-user reader (ordinary user identical to legacy; member merged, paged, folded), probe state machine against real `HasTable`, real `SetApiRouter` auth and PAT matrix, EXPLAIN of the admin list and member union, and the previous group's `TestPartnerTenantAccessMode*` / `TestPartnerTenantAuthorizationAudit*` suites. Run only inside task-owned Docker with `-run` selectors; never host `go test`.
+Go suites use explicit DSNs `TEST_PARTNER_USAGE_POSTGRES_DSN`, `TEST_PARTNER_QUOTA_CNY_POSTGRES_DSN`, `TEST_PARTNER_USER_CLASSIFICATION_POSTGRES_DSN`, unique retained schemas (`pt_usage_*`, `pt_quota_cny_*`, `pt_user_class_*`), no DROP/TRUNCATE, and fail (not skip) without a DSN; `model` / `service` `TestMain` bypass SQLite for these selections. Run only inside task-owned Docker with selectors, never host `go test`.
 
-Frontend (executed): `bun run test -- src/features/partner-usage-logs src/features/users src/features/usage-logs src/features/partner-oauth-clients` (48 files / 657 at review), typecheck, touched-file oxlint / oxfmt, build:check; seven locales via `web/scripts/partner-usage-isolation/add-missing-keys.mjs` + `bun run i18n:sync`.
+Assert: fresh/upgrade/repeat migration on shared and separate LOG_DB; actual DDL/indexes; >2^53 and long text persistence; every own reader and probe state; all writer destinations, suppression and feed counts; settled balances survive a genuine PostgreSQL constraint failure on separate LOG_DB; real route/PAT and token-selector forgery denial; exact CNY and old JSON token compatibility; user category/count/page/batch enrichment; whole SQL generation with ClickHouse dialect (not live CH).
+
+Regression evidence must separate selected PostgreSQL suites from the old no-DSN SQLite suites. The latter contain known baseline fixture failures and intentionally failing new PostgreSQL tests; compare named failure/skip sets, never hide them or call the whole run green. Previous-group access-mode/authorization-audit suites and affected SubscriptionKey quota tests are separate gates.
+
+GORM failure injection must target the executed chain: `Find`/`Count` use Query, `Scan`/migrator presence checks use Row; assert the injection fired. `Table("x AS a")` may expose only `a` in `Statement.Table`, so inspect `TableExpr` too. Positive-control SQL proves DEBUG capture is active. EXPLAIN actual executed SQL+binds, assert ownership predicates on both union branches and index definitions; do not hardcode the optimizer's small-fixture scan choice or constant/cast formatting.
+
+Frontend (executed): `bun run test -- src/features/partner-usage-logs src/features/users src/features/usage-logs src/features/partner-oauth-clients` (48 files / 657), typecheck, touched-file oxlint/oxfmt, build:check; seven locales via `web/scripts/partner-usage-isolation/add-missing-keys.mjs` + `bun run i18n:sync`. Global lint has a separately reported pre-existing 151-error/68-warning baseline. Browser integration: admin/root, ordinary-user 403 with zero admin requests, consistent list/stat/owner scope, history, exact large-ID requests, keyboard and 390px layout. Final task evidence lives in `11-17-partner-usage-isolation/final-acceptance.md` (then its archive path), not in screenshots alone.
 
 ## 7. Wrong vs Correct
 

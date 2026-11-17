@@ -1,5 +1,7 @@
 # 商户用量日志子任务验证记录
 
+> **最终验收入口**：`implement.md`、`quality-review.final.md`及父任务`final-acceptance.md`。早期各阶段“Go=0/Writer未启用”均为历史检查点，已被R/C1/C2和最终独立复验覆盖：writer现已启用，最终**69顶层/128子测试、0失败/skip**两轮通过。本轮只新增测试，不改生产逻辑。已关闭A-U1–A-U8的本地隔离验收门禁，待提交/归档；不等于生产部署。
+
 本文件只记录真实执行过的命令与结果。未列出的验证即未运行。父任务集成证据见 `../11-17-partner-usage-isolation/verification.md`。
 
 ## A 阶段交接
@@ -1282,3 +1284,221 @@ Schema：run 3 共 52 个（既有 45 个家族换新后缀 + 7 个 `pt_usage_pa
 
 - 任务 writer（`RecordTaskBillingLog`）的成员行 `subscription_id` 恒为 0：任务资金来源事实在 `task.PrivateData.SubscriptionId`，但 `taskBillingOther` 不把它写进 other.public，writer 也按契约不事后查询。符合“未知不伪造”的冻结契约，但新页对任务正差额无法显示所用订阅；是否让任务路径把已知 subscription_id 写入 other（会同时改变默认表 other 内容）需单独决定。本派发未改。
 - 本次测试 run 未包含旧 SQLite 回归（C1 主会话已跑；C2 只新增测试文件，未改生产代码）。
+
+
+## Final acceptance 补测交接（trellis-implement，2026-11-17 17:30 UTC）
+
+> 基线 `68cb5dd29`；只增加本组测试，**业务 source / 权限 / DTO / 计费 / 默认 other 未改**。没有提交、暂存、生产/真实模型/付款/浏览器操作、依赖下载、清理或新网络/卷。按主会话最新 steering，修正 r3 最后一个 EXPLAIN 文本断言后**不再运行第四次**，留给独立 check。最终整套仍须 check 实跑，不能把 68/69 当全绿。旧 spec 的 Go=0 / writer 未启用已过期，本记录以 R/C1/C2 与 stage-c 为基线。
+
+### 1. 既有 census 与真实缺口
+
+已审阅既有 63 Usage（model 48/controller 4/router 6/service 5）、15 QuotaCNY（9 service/2 model/4 controller）、7 UserClassification（2 model/3 controller/2 router）测试的清单、相邻断言及 quality-review/最新 verification。15/7 的最近 pq 证据在各自原 verification，**本次未重跑或重复写它们**。
+
+- 已有：owner 三态/全部成员状态/请求 memo；pq 首次/重复/共享/分库迁移；新表精度/索引；管理员统计折叠、真实收费失败；六个自身 reader 的双表/旧路径/越权/故障；三 writer 共享库单写、应用 logger 和 DEBUG 标记；真实 service 文本/音频/realtime/task/error/违规费成功路径。CNY 精度/终态/非法配置/三个 HTTP 入口和用户分类组合矩阵无此次新增必要。
+- 真缺：分库证据原来只到迁移和 insert helper，未覆盖三 writer、日志故障下已结算费用；token 的 model helper 有覆盖但 `/api/log/token` 真实 Key middleware 无覆盖；普通 session 拒绝已有，但新 list/stat 的实际商户映射 session 未覆盖（options 已有，不重复）；own union/probe 只有返回错误负例，没有同时检查应用 logger + GORM DEBUG；实际 list/union EXPLAIN 缺失；CH 既有 DDL/投影/排序和 pq 方言 dry-run 不等于真实 CH 方言整句 admin SQL 契约。
+
+### 2. 新增/增强测试（6 个顶层 + 11 个子测试；总 Usage = 69 顶层 / 125 子测试）
+
+| 文件 / 用例 | 关键证据 |
+| --- | --- |
+| `model/partner_tenant_usage_writer_test.go` / `WriterSeparateLogDatabase` | 独立主/日志 handle 与 schema；LOG_DB 无 owner 表；主库两张同名 decoy 完整快照不变。三 writer 成员仅新表3行，普通仅 logs3行；PG CHECK NOT VALID 令三次新表写实际 SQLSTATE23514，0回落/重复，普通仍可写；主库 owner 注入失败三 writer 不落两表；六个 consume feed = count6/quota60。 |
+| `service/partner_tenant_usage_paths_test.go` / `PathsSettledSeparateLogFailure` | 真实 PreConsumeBilling→PostTextConsumeQuota，主库资金/LOG_DB分离；第二次日志插入被真实PG约束拒绝（恰1次23514），订阅/Token/used_quota/request_count 与成功请求同额变化，商户钱包不动；全站内存feed两次/等额，普通两条 logs 保留；主库 decoy 0行。 |
+| `router/partner_tenant_usage_union_test.go` / `TokenProductionRouteIgnoresForgedOwnership` | 生产 InitLogDB 初始化列名，真实 SetApiRouter + TokenAuthReadOnly，合法 fake Coding Key 读取旧新两行；同用户其他 token、其他用户 token 均排除；伪造 user_id/tenant_id/token_id/account_id 响应逐字不变，admin/root/商户快照不泄漏；缺key/非法key 401。 |
+| `router/partner_tenant_usage_log_test.go` / 既有 ProductionRouteAuth + 商户 session 子测试 | 真 User/Token/TenantAccount 映射 + 真登录 session；list/stat均403 AUTH_INSUFFICIENT_PRIVILEGE；不更改admin/root/PAT原矩阵。 |
+| `model/partner_tenant_usage_request_test.go` / `OwnedReadFailureDiagnostics` | 启用Info级GORM logger正向对照；SQL执行后在Query/Row两链注入带marker错误，逐读者断言确实命中；probe/union × list/token/stream/requests/summary =10子测试，失败无部分结果，应用writer和DEBUG均不含marker；模型bind/存储Other中也有marker。仅测试注入，不声称模拟网络中断。 |
+| `model/partner_tenant_usage_query_test.go` / `QueryPostgresExplain` | 捕获**实际执行**的admin默认窗、tenant窗、GetUserLogs union SQL+bind，排除gorm内部dry-run分支；查真实pg_indexes列序；EXPLAIN ANALYZE/BUFFERS，打印真实计划。两分支ownership与完整实际bind顺序单独断言，不硬断言计划类型/索引必选/PG常量格式。 |
+| 同文件 / `QueryClickHouseGeneratedSQL` | 真CH dialector，SkipInitializeWithVersion+DryRun+DisableAutomaticPing，不连接CH；count/list/stat完整谓词、参数顺序、event_id排序、分页；token union Int64 casts/group/source/request tie-break。r3已过；仍不是live CH验证。 |
+
+### 3. 实际命令、rc 与逐轮结果
+
+每次把六个修改Go测试文件按原相对路径复制到 `.local-tests/partner-usage-1117/source/` 并cmp；最终全部已跟踪Go文件与工作区 **0 mismatch**。Docker命令均严格采用派发模板（仅runner名/日志后缀变化）：
+
+```bash
+docker run --name ptusage-1117-go-final-implement[-r2|-r3] --network ptusage-1117-net --read-only --tmpfs /tmp:rw,exec \
+  -v "$PWD/.local-tests/partner-usage-1117/source:/src:ro" -v /Users/lyh_god/go/pkg/mod:/go/pkg/mod:ro -v ptusage-1117-gocache:/gocache -w /src \
+  -e GOCACHE=/gocache -e GOPROXY=off -e GOSUMDB=off -e GOTOOLCHAIN=local -e GOFLAGS=-mod=readonly \
+  -e TEST_PARTNER_USAGE_POSTGRES_DSN="host=ptusage-1117-pq port=5432 user=ptusage_fixture dbname=ptusage_fixture sslmode=disable" \
+  golang:1.26.10-bookworm sh -c 'go test ./model ./controller ./router ./service -run "^TestPartnerTenantUsage" -count=1 -v -timeout 20m' \
+  > .local-tests/partner-usage-1117/runtime-final-implement[-r2|-r3].log 2>&1
+```
+
+| Runner / 真实rc | 顶层 | 子测试 | 失败原因 / 修复 |
+| --- | --- | --- | --- |
+| `ptusage-1117-go-final-implement` / **1** | 17 passed，model build failed（未执行model；不是0测试失败即通过） | 52 passed，0 skip | 新测试 int→int64 显式转换漏写、局部 sql 名遮蔽 database/sql；均修测试。controller/router/service ok。16保留schema。 |
+| `...-r2` / **1** | 67 passed / 2 failed / 0 skip | 125 passed / 0 failed / 0 skip | EXPLAIN capture计入GORM内部dry-run子语句；CH LIMIT/OFFSET为绑定参数不是literal。修过滤tx.DryRun与参数预期，不改业务。61保留schema。 |
+| `...-r3` / **1** | 68 passed / 1 failed / 0 skip | 125 passed / 0 failed / 0 skip | 唯一 `QueryPostgresExplain` 对plan文本 `user_id = 7` 预期过严，真实PG为 `user_id = '7'::bigint`；三个实际EXPLAIN都已执行。最后已改为结构谓词+完整SQL bind断言，并提前记录计划；**修正版尚未runtime**，交独立check。61保留schema。 |
+
+最终源码（最后修改后，17:29 UTC）：宿主 cached Go1.26.10 `gofmt -l` 六文件无输出 rc0；`GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS=-mod=readonly go vet ./model ./controller ./router ./service` rc0（只类型/静态，不当验收）；`git diff --check` rc0；`git diff --cached --name-only` 空。**没有宿主go test**。主会话虽批准复用自己已退出r3（无需新资源），后续steering要求直接交独立check，本代理未执行docker start。
+
+### 4. PostgreSQL真实计划（r3小样本，不代表生产容量）
+
+- 默认admin窗：Backward Index Scan `idx_ptul_time`，created_at条件 + consume/error filter；Planning 0.021ms / Execution 0.006ms。
+- tenant窗：仍选 `idx_ptul_time` + tenant filter（去除5行）；Planning 0.023ms / Execution 0.006ms。**不强制**使用 `idx_ptul_tenant_time`。
+- member union：Append 两分支，旧logs `idx_logs_user_id`、新表 `idx_ptul_user_time`；两分支user=7，新表有time Index Cond，旧表time/model filter；外层Sort + Limit；Planning 0.057ms / Execution 0.022ms。原plan在r3失败诊断内全文保留。
+- 实际索引存在及列序已过：time/tenant_time/user_time/token_time，旧logs(user_id,id)。无新增索引，无会话enable_seqscan或统计优化器设置，无小样本性能承诺。
+
+### 5. 资源 / 未覆盖边界
+
+仅复用登记的 `ptusage-1117-pq` / `ptusage-1117-net` / `ptusage-1117-gocache` 和三个允许runner；schema全部唯一保留，无DROP/TRUNCATE/删除。分库测试是同一个隔离PG database下的**独立连接+search_path schema**，证明来源隔离与无跨schema join；不是两个PG服务器、物理网络故障或宕机验收。feed为既有CacheQuotaData直接调用证据，不启动无限flush循环；既有设计的crash/outage best-effort漏记窗口仍在。
+
+未做：live ClickHouse/MySQL/SQLite、上游HTTP relay完整链、每个service结算路径均注入分库故障、process crash、完整应用启动/生产迁移/性能容量；没有浏览器操作（主会话独立负责）。self-stat既有返回错误测试保留，但新DEBUG标记组合未单独重复self-stat路径。CNY H5 usable前置条件语义和task/违规费subscription_id=0的旧决策未变，需主会话按原review告知，不擅改契约。旧回归/前组运行未在本代理重跑，继续依据已有C1/父verification且最终integration另验。
+
+非业务产物：仅已有export六文件刷新、三条 `runtime-final-implement*.log`、已登记Go缓存。工具读取超长Trellis/spec时自动溢出（不是主动scratch；已contact_supervisor报备，待主会话登记，未清理）：
+- `/var/folders/h7/1s08hdn51x778k3dtg4ytt140000gn/T/pi-bash-f2216772cb5382e2.log`
+- `/var/folders/h7/1s08hdn51x778k3dtg4ytt140000gn/T/pi-bash-13f4b87b2b9deb75.log`
+- `/var/folders/h7/1s08hdn51x778k3dtg4ytt140000gn/T/pi-bash-260df9d0132f7e36.log`
+
+### 6. 本轮所有保留schema名字（来自各run日志，完整列表）
+
+**initial (16)**
+
+```text
+pt_usage_log_http_1794936321231022255
+pt_usage_log_router_1794936323656559506
+pt_usage_options_http_1794936321325738630
+pt_usage_options_router_1794936323846634714
+pt_usage_paths_1794936323763333423
+pt_usage_paths_1794936323921421381
+pt_usage_paths_1794936324081320589
+pt_usage_paths_1794936324224306756
+pt_usage_paths_1794936324348491090
+pt_usage_paths_1794936324488999673
+pt_usage_paths_1794936324581609423
+pt_usage_paths_1794936324668776881
+pt_usage_paths_split_log_1794936324745674715
+pt_usage_request_router_1794936323997651798
+pt_usage_token_router_1794936324304520715
+pt_usage_union_router_1794936324163782673
+```
+
+**r2 (61)**
+
+```text
+pt_usage_log_http_1794936364334334928
+pt_usage_log_main_1794936365051407761
+pt_usage_log_persist_1794936365917425678
+pt_usage_log_redact_1794936366057440304
+pt_usage_log_router_1794936364598712886
+pt_usage_log_separate_1794936365330687136
+pt_usage_log_shared_1794936364286109178
+pt_usage_options_http_1794936364404376261
+pt_usage_options_model_1794936366715500179
+pt_usage_options_router_1794936364828600761
+pt_usage_owner_batch_1794936366325798804
+pt_usage_owner_request_1794936366486740887
+pt_usage_owner_single_1794936366199826595
+pt_usage_paths_1794936366004056220
+pt_usage_paths_1794936366148445679
+pt_usage_paths_1794936366302107262
+pt_usage_paths_1794936366493067054
+pt_usage_paths_1794936366768635762
+pt_usage_paths_1794936367235125512
+pt_usage_paths_1794936367404642054
+pt_usage_paths_1794936367565053471
+pt_usage_paths_split_log_1794936367718691596
+pt_usage_probe_absent_1794936368107284388
+pt_usage_probe_broken_1794936368274966763
+pt_usage_probe_catalog_1794936368355513221
+pt_usage_probe_swapped_1794936368191616055
+pt_usage_query_ch_sql_1794936368014934471
+pt_usage_query_channel_1794936367698307721
+pt_usage_query_explain_1794936367913813721
+pt_usage_query_filter_1794936367005942429
+pt_usage_query_fold_1794936367350206221
+pt_usage_query_role_1794936367825858596
+pt_usage_query_sum_1794936367535389471
+pt_usage_read_diagnostics_1794936368971875513
+pt_usage_request_midnight_1794936368645184221
+pt_usage_request_mixed_1794936368727682513
+pt_usage_request_ordinary_1794936368884455013
+pt_usage_request_outcomes_1794936368430190388
+pt_usage_request_router_1794936365042177803
+pt_usage_request_sql_1794936368806855971
+pt_usage_request_summary_1794936368521230305
+pt_usage_token_router_1794936365703471137
+pt_usage_union_admin_1794936370026733889
+pt_usage_union_filter_1794936369666047597
+pt_usage_union_ordinary_1794936369143745430
+pt_usage_union_paging_1794936369356240847
+pt_usage_union_projection_1794936369776670847
+pt_usage_union_router_1794936365402618678
+pt_usage_union_sql_1794936369054192138
+pt_usage_union_stat_1794936369950401055
+pt_usage_union_token_1794936369849707305
+pt_usage_writer_consume_1794936370101619514
+pt_usage_writer_e2e_1794936370699474791
+pt_usage_writer_error_1794936370183696014
+pt_usage_writer_insert_1794936370530077000
+pt_usage_writer_lookup_1794936370449166750
+pt_usage_writer_secret_1794936370616222458
+pt_usage_writer_split_logs_1794936370866119791
+pt_usage_writer_split_main_1794936370789973583
+pt_usage_writer_states_1794936370267918666
+pt_usage_writer_task_1794936370369769416
+```
+
+**r3 (61)**
+
+```text
+pt_usage_log_http_1794936421450951635
+pt_usage_log_main_1794936422898305052
+pt_usage_log_persist_1794936423775806052
+pt_usage_log_redact_1794936423960722761
+pt_usage_log_router_1794936422238154302
+pt_usage_log_separate_1794936423169533010
+pt_usage_log_shared_1794936421418366385
+pt_usage_options_http_1794936421924301802
+pt_usage_options_model_1794936424507633803
+pt_usage_options_router_1794936422666620552
+pt_usage_owner_batch_1794936424263258928
+pt_usage_owner_request_1794936424384719844
+pt_usage_owner_single_1794936424143874261
+pt_usage_paths_1794936423937193677
+pt_usage_paths_1794936424117512053
+pt_usage_paths_1794936424293997136
+pt_usage_paths_1794936424402708803
+pt_usage_paths_1794936424560958886
+pt_usage_paths_1794936424885397928
+pt_usage_paths_1794936425114349261
+pt_usage_paths_1794936425247427636
+pt_usage_paths_split_log_1794936425388250553
+pt_usage_probe_absent_1794936425699615845
+pt_usage_probe_broken_1794936425842761137
+pt_usage_probe_catalog_1794936425919047470
+pt_usage_probe_swapped_1794936425773017470
+pt_usage_query_ch_sql_1794936425611317428
+pt_usage_query_channel_1794936425341687553
+pt_usage_query_explain_1794936425534192970
+pt_usage_query_filter_1794936424673718011
+pt_usage_query_fold_1794936425024215011
+pt_usage_query_role_1794936425459500262
+pt_usage_query_sum_1794936425200826095
+pt_usage_read_diagnostics_1794936426489461429
+pt_usage_request_midnight_1794936426163257887
+pt_usage_request_mixed_1794936426234117137
+pt_usage_request_ordinary_1794936426392324762
+pt_usage_request_outcomes_1794936425987226303
+pt_usage_request_router_1794936422986590302
+pt_usage_request_sql_1794936426318104554
+pt_usage_request_summary_1794936426088984554
+pt_usage_token_router_1794936423658511427
+pt_usage_union_admin_1794936427830101304
+pt_usage_union_filter_1794936426997785929
+pt_usage_union_ordinary_1794936426631347762
+pt_usage_union_paging_1794936426708900595
+pt_usage_union_projection_1794936427158987221
+pt_usage_union_router_1794936423389491844
+pt_usage_union_sql_1794936426563238012
+pt_usage_union_stat_1794936427697672304
+pt_usage_union_token_1794936427521880263
+pt_usage_writer_consume_1794936427937894221
+pt_usage_writer_e2e_1794936428582095555
+pt_usage_writer_error_1794936428048107513
+pt_usage_writer_insert_1794936428395744388
+pt_usage_writer_lookup_1794936428313082430
+pt_usage_writer_secret_1794936428482615346
+pt_usage_writer_split_logs_1794936428806277596
+pt_usage_writer_split_main_1794936428725046471
+pt_usage_writer_states_1794936428149035929
+pt_usage_writer_task_1794936428231269930
+```

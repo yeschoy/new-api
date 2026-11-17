@@ -1,80 +1,63 @@
-# 商户日志执行与验证计划
+# 商户日志执行与验收
 
-状态：父任务规划已于 2026-11-17 获用户批准实施；本子任务已 start。阶段进度与真实证据见 `verification.md`，未勾选项即未完成。
+状态：**A/B/C/D实现与本地隔离验收完成，用户已确认本地提交及归档**。规划已于2026-11-17获批，旧source-only/Docker-blocked历史见verification各阶段；C在B的PostgreSQL门禁通过后才启用。当前writer已启用，不再“新表始终为空”。最终集成见父`final-acceptance.md`。
 
-## A. 先交付共享 owner 契约
+## A. 共享安全归属
 
-> A 阶段状态（2026-11-17）：**source-ready / runtime-blocked**。下列勾选仅表示源码与测试源码已写完并通过离线 `gofmt` / `go build` / `go vet`（vet 只做类型检查）；**Go 测试执行数为 0，PostgreSQL / 真实路由运行验证待补**（Docker daemon 不可用）。实际签名、权限矩阵、偏差与阻塞项见 `verification.md`“A 阶段交接”。A 的 source-ready 不等于日志任务完成。
+- [x] single/batch safe owner三态：真实映射即商户、确认无映射、查询失败。禁用/过期/假p_/普通订阅/OAuth边界，缺商户行仍保留映射。
+- [x] request-local以实际userID为key，无额外全局负缓存；user list按页批量、空页不查，无secret/external ID/hash/配置投影。
+- [x] log/user两个scope明确options入口，受控q/p/page_size/selected_id，仅id/name；真实SetApiRouter/PAT矩阵与字段白名单。
+- [x] 共享签名冻结于verification A，用户分类已消费同一契约；A的源码交付与日志整体验收明确区分。
 
-- [x] 读取父 PRD/design/共享 research 和 model/log.go、三写入口、LOG_DB 初始化/现有脱敏/真实路由；复核 writer census，没有遗漏新增调用。（已读；census 复核发现的额外写入口/读取方记入 verification A.10，留给 B/C 阶段处理。）
-- [x] 增加单用户及批量 safe owner、request-local 快照、无秘密商户 options；禁止额外全局负缓存。owner 查询失败不得按普通用户写回默认表。（源码完成：原语三态返回、失败不会被报成非成员；“不写回默认表”的 writer 行为属于 C 阶段，尚未实现。运行验证待补。）
-- [x] 两个 scope 明确的 options 入口复用同一安全投影；增加真实路由/PAT/字段白名单回归。（源码与回归测试源码完成；回归**未执行**。）
-- [x] 冻结共享签名/字段/错误语义，登记供用户分类消费。测试只在 owned Docker，未有 runtime 不宣称 owner 全验收。（签名已冻结并登记于 verification A.1–A.3；未宣称验收。）
-- [x] A 阶段交接写入 verification.md：owner/options 实际签名、字段/权限、文件所有权、测试执行数与阻塞项；仅表示可被其他子任务消费，不勾选整个日志交付完成。（已写入；测试执行数 0。）
+## B. 迁移与读取（先于C通过）
 
-## B. 表与读取先行
+- [x] 显式新表字段/TEXT/64位/event_id/短前缀索引，不复用Log tags；shared/separate LOG_DB迁移幂等、不搬历史。
+- [x] ClickHouse明确DDL/TTL，无新SQL清理，默认日志清理范围不变；完整CH dialect生成SQL契约，不冒充live CH验证。
+- [x] 新表admin list/count/stat同filter、严格参数、安全固定错误、admin/root脱敏、字符串ID/quota/聚合、nullable CNY、冻结API文档。
+- [x] outcome选择/失败分类分离，重试折叠、收费失败与stream错误保留真实consume；request=succeeded+failed。
+- [x] self list/stat/requests/summary/export/token recent全部双表兼容，ownership在每分支内，UNION ALL后count/排序/分页，同local ID不丢行；默认admin list/stat/export不union。
+- [x] 普通只有旧表的路径保持原行为；历史新表读取不依赖当前owner。不存在表回旧路径，存在但探测/目录失败返回错误；positive-only存在缓存绑定LOG_DB handle。
+- [x] 实际pq首次/升级/重复、shared/separate、持久化大整数/长文本、六索引与各reader已通过后启用C；本轮实际admin/member SQL的EXPLAIN及CH完整SQL独立通过，optimizer变化不钉死。
 
-> B1a 步骤状态（2026-11-17）：**source-ready / runtime pending**。新表模型、幂等迁移 helper（已接入共享与独立 LOG_DB 两条初始化路径，含 ClickHouse 显式 DDL/TTL）、一个**无生产调用方**的插入函数及 7 个测试源码已写完并通过离线 gofmt / build / vet；**Go 测试执行数 0**，pq 实际迁移/持久化未验证。下列各项均**未**勾选：管理员 list/stat、self/API-Key reader、union、切写尚未开始。详见 `verification.md`“B 阶段 — B1a 表与迁移”。
+## C. 写入与全站计数
 
-> B1b 步骤状态（2026-11-17）：**source-ready / runtime pending**。新表的管理员读取侧已写完：单一类型化 filter（list / count / stat 共用一个 builder）、`GET /api/log/partner-tenants` 与 `/stat`（`AdminAuth` + PAT `log:read`）、冻结的响应 schema 已写入 `docs/partner-tenant-api.md`、10 个测试源码；离线 gofmt / build / vet 通过，**Go 测试执行数 0**。writer 仍无生产调用方，默认管理员 reader 未改。下列各项仍**不**勾选：第 3、4 项只有源码与文档、无运行证据且有未写出的用例；self/API-Key reader、union、切写、前端未开始。偏差与缺口见 `verification.md`“B 阶段 — B1b 管理员查询与统计”。
+- [x] 仅RecordConsumeLog/RecordErrorLog/RecordTaskBillingLog的consume/error分流；createLog及refund/topup/system/security/audit不重定向。
+- [x] text/audio/realtime/task-submit/差额/可记录error/违规费真实service调用；零额/抑制/legacy funding不扩权，非成员原路。
+- [x] 主库归属错误/新表错误两表不写，不fallback/重试、不阻塞已结算扣额，LogQuotaData/用户计数按原规则一次。
+- [x] Tenant/未知归属不输出完整params/content/raw error；应用logger与GORM DEBUG秘密标记负例含正控/真实注入计数。
+- [x] 旧商户行留logs，新成员单写独立表，普通订阅只旧表，自身历史连续；IP开关和所有成员状态writer覆盖。
+- [x] 本轮新增6顶层至69：独立main/log schema+handle三writer，真实PG约束错误不回落、真实结算后收费/Token/feed不变、token生产路由伪参、商户session拒绝、own probe/union logger、EXPLAIN/CH SQL。
+- [x] 最终独立check补强至**69顶层/128子测试**，两轮每轮全部通过、0失败/skip；前三轮新测试假设失败如实保留。见quality-review.final.md，不用gofmt/vet代替。
 
-> B2a 步骤状态（2026-11-17）：**source-ready / runtime pending**。自身/Key 读取的双表基础设施（按已鉴权 `user_id` / `token_id` 的 `UNION ALL` 投影，先探测、无新表行则原单表路径原样执行）与 `GetUserLogs`、`StreamUserLogs`、`GetLogByTokenId`、self 统计（`SumUserUsedQuota`）已写完；11 个测试源码；离线 gofmt / build / vet 通过，**Go 测试执行数 0**。writer 仍无生产调用方，默认管理员 reader 未改。下列第 5–7 项仍**不**勾选：`GetUserRequestLogs` / `GetUserLogSummary`（B2b）未开始，且无任何运行证据。未写出的用例与需确认事项见 `verification.md`“B 阶段 — B2a 自身/Key 双表读取”。
+## D. 前端与金额
 
-> B2b 步骤状态（2026-11-17）：**source-ready / runtime pending**。（1）探测加固：独立表不存在 = 成功判定（走原单表路径），表存在但探测失败 / 存在性检查失败才是读取失败；只缓存阳性并绑定当前 `LOG_DB` handle；B2a 改过的 4 个既有 controller 测试文件已还原为与 `HEAD` 字节相同。（2）`GetUserRequestLogs`、`GetUserLogSummary` 的双表路径已写完，汇总的折叠/累加循环新旧路径共用一份。7 个新测试源码（并删除 1 个被取代的 B2a 用例）；离线 gofmt / build / vet 通过，**Go 测试执行数 0**。writer 仍无生产调用方，默认管理员 reader 与 `compareRequestOutcomes` 未改。下列第 5–7 项仍**不**勾选：六个 self reader 源码齐备但无任何运行证据，且有未写出的用例。详见 `verification.md`“B 阶段 — B2b 请求结果/汇总与探测加固”。
+- [x] CNY统一converter已由15个测试/真实HTTP验证；日志raw聚合后调用同converter，前端无第二套算法。
+- [x] 自有feature+admin developer-shell路由/菜单，复用DataTable/安全详情，不Number转换大ID/quota。
+- [x] 同窗口/filter的list/stat，query key包含viewer/session/role，跨会话无placeholder泄漏，分页/filter URL正确。
+- [x] 26日志键+13分类键七语言通过sanctioned writer+i18n:sync；范围提示/空/错/不可用/微额均覆盖。**无限额不适用于逐事件日志页**（冻结DTO无余额字段）；无限/terminal展示契约由订阅CNY接口覆盖，不伪造页面字段。
+- [x] 前端48文件657用例/typecheck/build与触碰文件lint/format通过；全站151error/68warning为既有基线。
+- [x] 真实backend浏览器：admin/root可读，普通403零admin请求，真实筛选/总数/统计一致、历史默认页、跨页、键盘详情焦点、移动大值换行、Back/Forward；用户页同归属/大ID精确请求。
 
-- [ ] 新表显式字段/TEXT/64位/短前缀索引/event_id，不复用 Log index tags。覆盖默认 LOG_DB=DB 与独立日志库初始化，迁移幂等且不搬历史。
-- [ ] ClickHouse 显式 DDL/TTL 保持现有驱动支持；SQL 新表不新增清理，默认清理范围不变。
-- [ ] 新表分页/count/stat 使用同一过滤；新 ID/quota 字符串，admin/root 脱敏与安全错误。
-- [ ] 冻结 list/stat/options 的 response schema、分页/字符串聚合、nullable CNY、过滤与 bounded options 参数；同步新端点 API 文档和契约测试。outcome 选择与失败分类分离，覆盖收费失败/流失败，requests=succeeded+failed。
-- [ ] 逐个适配 self list/stat/requests/summary/export/token-recent。ownership 下推两个分支后再 union/count/排序/分页；默认 admin list/stat/export 不 union。
-- [ ] 回归同本地 ID、空 request_id、失败重试成功、consume 与异常费用、时区/窗口、流式导出取消和既有开关。
-- [ ] 列出双表逐列投影/类型/别名与各驱动策略；pq 实跑联合流，CH 检查类型与生成 SQL；现有 logs 前缀过滤和固定 Model 的流读取须显式适配。普通旧表用户保持原行为，历史新表读取不受当前 owner 查询过滤。
-- [ ] B 阶段迁移/兼容 reader 通过后才允许进入 C 切写；记录 fresh/upgrade/repeat、同库/分库与 reader 实际证据。
+## E. 运行命令与证据边界
 
-## C. 切写与全站统计
-
-- [ ] 仅消费/错误专用入口分流；通用 createLog 及非目标类型不重定向。
-- [ ] 真实调用覆盖 text/audio/websocket/task 正向消费和可记录 error；抑制/legacy funding 禁止路径不扩权。
-- [ ] 归属与 LOG_DB 故障安全告警、不回默认表、不阻塞既有已结算扣费；LogQuotaData/全站计数仍一次。
-- [ ] 核对三 writer 原整对象 params/content/raw error 输出，Tenant/未知归属不能绕过安全告警；秘密标记覆盖应用 logger 与 GORM DEBUG，不只验证角色读取投影。
-- [ ] 预置旧商户行、写入新商户/普通订阅行，证明默认旧历史保留、新行单表隔离、自身连续可查。
-
-## D. 前端与金额集成
-
-> D 阶段状态（2026-11-17）：**前端 source + DOM（mock 传输）已执行**：`web/` 下 typecheck / 定向 oxlint / oxfmt / build:check 均 rc=0，`src/features/partner-usage-logs` 2 文件 20 用例通过，四目录合计 47 文件 642 通过（trellis-check 复核后：修复 5 项缺陷，本目录 3 文件 35 用例、四目录 48 文件 657 通过，全站 lint 仍为既有基线 151/68；见 `quality-review.stage-d.md` 与 `verification.md` D.10）。**无浏览器运行、无真实数据（C 阶段 writer 未启用）、后端端点从未对数据库执行**。勾选项后标注证据类型；未写的 DOM 用例与未关闭门禁见 `verification.md`“D 阶段 — 管理员页面（前端）”。任务未完成。
-
-- [ ] CNY 子任务 converter 契约/测试已交付后才接入，不先写第二套算法。（D 阶段备注：前端未写任何换算算法，只渲染服务端 `quota_cny` 字符串及不可用/微额状态，有 DOM 证据；但“converter 契约/测试已交付”这一前置条件本派发未核实，故不勾选，由主会话依据 CNY 子任务记录判断。）
-- [x] 实现 features/partner-usage-logs 与管理员 developer-shell 独立路由/菜单；复用通用表格/安全明细，拒绝不安全 Number 转换。（已执行 DOM 证据：路由守卫、导航可见性、>2^53 字符串、详情 Dialog 键盘开关与 `other` 原样显示。无浏览器运行。）
-- [x] 筛选、summary、分页同 scope，包含会话/角色的 cache key；跨会话不可使用旧 placeholder。（已执行 DOM 证据：同窗口同过滤、跨查看者缓存隔离、过滤变更回第 1 页；分页控件点击与商户/类型点击级用例未写。）
-- [ ] 七语言通过现有 add-missing-keys.mjs + i18n:sync；补范围说明、空/错/不可用/无限额/微额展示。（D 阶段备注：26 键 × 7 语言已经脚本写入 + 同步，范围说明、空态、错误、不可用、微额展示均已实现并有执行过的 DOM/locale 用例；**“无限额”展示未实现**——日志/统计冻结契约没有 unlimited 字段，本页无处呈现。因条目未全部满足，不勾选，由主会话决定该子项是否适用。）
-
-## E. 执行命令（均为批准后的计划）
-
-在已登记的 owned Docker runner 内，使用显式空隔离 PostgreSQL DSN `TEST_PARTNER_USAGE_POSTGRES_DSN`，新增 TestMain 选择分支避免误跑 legacy SQLite bootstrap：
+Go仅本组Docker+显式fixture DSN，禁止宿主go test：
 
 ```bash
-go test -mod=readonly ./model ./controller ./router ./middleware ./service -run '^TestPartnerTenantUsage' -count=1 -v
+go test ./model ./controller ./router ./service -run '^TestPartnerTenantUsage' -count=1 -v -timeout 20m
 ```
 
-测试名/DSN 是计划接口，须先实现并确认实际选中用例、无缺 DSN skip；测试夹具应隔离 schema、留存证据、不 DROP 旧资源。覆盖 fresh/repeat/default/separate LOG_DB、实际 DDL/持久化/目标 EXPLAIN、真实 SetApiRouter 鉴权、writer 与各 reader。其他 driver 只保持现有兼容并披露未运行项，不扩泛化数据库矩阵。
+最终非Usage联合套件已通过46顶层/45子测试/0fail/skip（CNY15+分类7+模式11+审计9+旧SubscriptionKey4）；已核查旧日志/summary/export/用户/OAuth/service/relay回归基线，原通过集合保持。遗留SQLite缺表失败与无DSN新增PG必败分别披露，不报整仓全绿。
 
-另建立受影响既有回归清单：`model/log_format_test.go`、`model/log_other_test.go`、`model/log_outcome_test.go`、`model/clickhouse_log_test.go`、`controller/log_export_test.go`、`controller/log_summary_test.go`、`controller/relay_error_log_test.go` 及相关 service/任务计数测试。先检查 TestMain/fixture，必要时把目标断言接入安全自包含 pq suite；登记实际命令/选中数，不盲跑旧 SQLite/清表夹具。新前缀命令通过不等于旧回归通过；新迁移/共享响应还须按父计划运行受影响前组模式/授权审计断言。
+完整6包无selector/no-DSN旧回归：2007通过/70失败/21跳过，69失败为应配DSN的PG用例，唯一非PG为既有TestImmediateTaskSettlementDatabase夹具缺表；基线通过集合无新增失败、跳过集合相同。初次巨型selector触发TestMain旁路的失败轮已披露作废，不作业务结论。静态最终gofmt/build/vet、git diff --check均rc0；不等同运行。实际PG EXPLAIN小夹具不等同生产容量证明。两独立schema/handle证明逻辑分库，不等于两台服务器宕机/恢复；liveCH/MySQL/SQLite联合读取无运行验收。无真实上游HTTP模型请求。
 
-在 web 使用现有依赖：
+## F. 收尾
 
-```bash
-bun run test -- src/features/partner-usage-logs src/features/usage-logs src/features/users
-bun run typecheck
-bun run lint
-bun run build:check
-bun run i18n:sync
-```
+- [x] 独立check结果/全范围证据回填，A-U1–A-U8本地运行门禁关闭；父final-acceptance记录最终矩阵与限制。
+- [x] spec更新writer/读写故障、request memo/诊断卫生/测试回调链/部署回滚与已披露限制；不改变冻结DTO和计费。
+- [x] 本轮6个Go测试及本组i18n业务脚本已精确路径提交 `b5c9dee36`；规范/验收记录纳入已批准文档提交批次（旧业务在69092e8d5/febe9bd3e/1748176a6/65902706c等提交）。
+- [ ] 文档提交后官方归档并记录journal；完成态以归档task.json为准。
+- [x] 实际临时资源登记，浏览器和e2e server已停止，数据保留；清理需用户同意，Trellis永不清理。
 
-先登记现有全局 lint 基线，如有无关报错另报，不顺手修全仓；另跑本次 TS/TSX 目标 oxlint。所有新翻译写入必须先过 sanctioned script，不能用同步代替翻译。本地浏览器仅任务自有 fixture，无真实 API/Key/网关。
+## 发布/回滚
 
-## F. 检查与提交门禁
-
-- [ ] A-U1–A-U8 的证据逐项齐全，全部个人入口都有回归，不以一个 summary 测试代表全部。
-- [ ] trellis-check 验证日志故障、秘密标记和 DEBUG SQL redaction；静态/DOM/pq/浏览器边界明确。缺 Docker/pq 时保持阻塞，不部署/归档为已验收。
-- [ ] 后续已验证契约写 spec；按 exact paths 提交日志业务/测试/UI/文档/Trellis 变更。
-- [ ] 记录实际临时资源；清理须同意且不删 Trellis。新表/data 保留，writer 回滚时保留兼容 reader。
+best-effort无outbox，归属主库错误也可能丢普通日志，已披露。task/fee未知subscription_id为0/DTO空，不事后查秘密；其他report只读旧表、整窗scan/union无topN等限制见spec。发布须迁移+reader先行，滚动节点无全球切换时刻；回滚保留新表/data/兼容reader，不倒灌或重放扣费。本次无生产变更/推送/部署。
