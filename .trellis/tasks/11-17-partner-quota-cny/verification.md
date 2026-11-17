@@ -309,3 +309,7 @@ go test -mod=readonly ./service ./model ./controller -run '^TestPartnerTenantQuo
 1. **H5 入口的 `usable` 语义**（详见 `quality-review.md` F1）：公式与独立查询的 `quota_usable` 相同，但 H5 额度接口历来不校验账号的平台 User/模型 Key 状态；在这些状态下独立查询返回 403/409，而 H5 会返回 `usable:true`。本会话只做了如实的文档与注释说明，没有改变行为。是否接受、或改为不在 H5 输出 `usable`、或增加校验读取，属于契约/范围决定。
 2. `implement.md` 最后一步“把经验证金额协议写入相关 spec”未做：协议尚无运行证据。是否现在以 source-ready / runtime-blocked 状态写入 spec，由主会话决定。
 3. Docker 需由用户提供可用环境后才能关闭 §10 的门禁。
+
+## 隔离 PostgreSQL 实跑（2026-11-17 08:34:14–08:34:20 UTC，主会话）
+
+环境同 `../11-17-partner-usage-logs/verification.md` R 节（PostgreSQL 15.19、go1.26.10 linux/arm64、只读 HEAD `834627dfa` 导出）。`go test ./service ./model ./controller -run '^TestPartnerTenantQuotaCNY' -count=1 -v`，仅设置 `TEST_PARTNER_QUOTA_CNY_POSTGRES_DSN`，runner `ptusage-1117-go-quotacny`：**rc=0，15/15 顶层通过（service 9、model 2、controller 4），0 跳过**；3 个 HTTP 用例分别建真实 schema `pt_quota_cny_independent_*`、`pt_quota_cny_hosted_*`、`pt_quota_cny_catalog_*`。A-C1/A-C2/A-C3/A-C5 现有真实 pq HTTP 证据（独立查询、托管 H5、目录三入口的 additive `quota_cny` 与原 quota 字段/类型不变）。日志 `.local-tests/partner-usage-1117/runtime-quotacny.log`。

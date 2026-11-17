@@ -1113,3 +1113,16 @@ ClickHouse / MySQL / SQLite 的双表路径均未运行。
 无效证据披露：同目录 `usage-mobile-admin.png`、`usage-detail-dialog-keyboard.png`、`usage-cny-unavailable.png` 是在托管浏览器被重新拉起、会话型测试 cookie 丢失之后拍的，实为登录页（预览日志 `viewer=none`），已在 `TEMPORARY_ARTIFACTS.md` 标为无效，不引用。部分 `v2-*` 截图是入场模糊动画帧，以上表格以 DOM 测量为准。
 
 仍未覆盖：真实后端联调、写入启用后的同范围统计、前进/后退历史、屏幕阅读器。
+
+## R. 隔离 PostgreSQL 实跑（2026-11-17 16:24 起，Docker Desktop 由用户启动；主会话执行）
+
+环境（全部已登记于 `TEMPORARY_ARTIFACTS.md`“Runtime gate resources”）：内部网络 `ptusage-1117-net`（`internal=true`）；`ptusage-1117-pq`（postgres:15 → **PostgreSQL 15.19**，无主机端口、非特权，库/用户 `ptusage_fixture`，仅网络内 trust，无密码）；runner 镜像 golang:1.26.10-bookworm（**go1.26.10 linux/arm64**），只读根、只读 `/src`（`git archive` HEAD `834627dfa` 导出，1257 个 Go 文件与工作区逐字节一致，私钥/reports/examples/临时清单均不在其中）、只读主机模块缓存、`GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local GOFLAGS=-mod=readonly`。每个选择器单独运行、只设置自己的 DSN。日志：`.local-tests/partner-usage-1117/runtime-*.log`。
+
+| 选择器 | 结果 |
+| --- | --- |
+| `go test ./model ./controller ./router -run '^TestPartnerTenantUsage'`（第 1 次，runner `ptusage-1117-go-usage`） | 49 个顶层全部执行、0 跳过；48 通过、**1 失败**：`TestPartnerTenantUsagePresenceCheckFailureFailsEveryReader` |
+| 同上（修正测试后第 2 次，`ptusage-1117-go-usage-r2`，08:33:24–08:33:34 UTC） | **rc=0：49/49 通过、107 个子测试通过、0 跳过**；源码中 49 个名称与实际运行名称一一对应；本次建 38 个真实 schema（含 controller HTTP `pt_usage_log_http`/`pt_usage_options_http`、router 真实路由 `pt_usage_*_router`） |
+
+**第 1 次失败的根因（测试注入缺陷，实现未改）**：该用例只在 GORM **Query** 回调链上注入失败，而探测（`Table(...).Scan`）与 migrator 的 `HasTable`（`Raw(...).Scan`）都走 **Row** 回调链，注入从未触发；探测因表确实不存在而失败、目录检查正确判定“表不存在”并回落原路径——这是设计的“表缺失”路径，不是用例要测的“目录检查失败”路径。修正：同一注入函数同时注册到 Row 链（`model/partner_tenant_usage_request_test.go`）。修正后用例按原意命中：每个 reader 3 次（探测 + 两次目录查询）共 18 次注入，6 个 reader 全部返回通用读取错误、错误文本不含注入标记、且不缓存。随后复查同包其余回调注入：所有者查询用 `Find`/`Count`（Query 链），计数与失败注入有效，无假通过；union 用例本来就注册了 Query+Row 两条链。
+
+覆盖到的 B 阶段门禁（真实 pq）：共享 / 独立 LOG_DB 的首次与重复迁移、实际 DDL 与 6 个索引名、>2^53 值与长文本持久化、写入脱敏（插入函数仅测试调用）；管理员 list/stat 同一过滤、折叠与求和（含超 int64 求和的 HTTP 断言）、admin/root 投影；真实 `SetApiRouter` 鉴权与 PAT（options / 日志端点）；六个自身读取（普通用户与原路径一致、成员双表合并/分页/折叠、表缺失回落、探测/目录失败即读取失败、伪造归属参数被忽略）。ClickHouse 只有生成 SQL 契约（无真实 ClickHouse），MySQL/SQLite 双表路径未实跑——均为已披露范围。

@@ -120,3 +120,16 @@ Docker 复测：05:55、06:08、06:43、07:17、07:57、08:51、09:3x CST 仍不
 - 回滚：保留新表与数据及兼容 reader；只回滚到旧二进制会使成员的新历史在自身视图中不可见。
 - 待定性能项（需 pq EXPLAIN）：统计端点整窗流式扫描、成员双表列表无分支 top-N 下推、成员汇总按 `request_id` 库内排序；MySQL 两表 collation 不同可能令成员 union 报错（PostgreSQL 不涉及）。
 - 已知限制：返现 recorded-spend 报告与 Partner Server 子账号用量只读 `logs`，切写后不含成员新消费；H5 `quota_cny.usable` 是额度层面判断；用户列表 400/503 落入既有“查询失败→空态”无专门提示；新页无行级“已扣费失败”标记（需契约新增字段）。
+
+## 7. 隔离 PostgreSQL 实跑与既有回归（2026-11-17 16:24 后，Docker 由用户启动）
+
+| 运行 | 结果 |
+| --- | --- |
+| `^TestPartnerTenantUsage`（49） | 第 1 次 48/49；1 个测试注入缺陷修正后 **49/49、107 子测试、0 跳过** |
+| `^TestPartnerTenantQuotaCNY`（15） | **15/15、0 跳过** |
+| `^TestPartnerTenantUserClassification`（7） | **7/7、22 子测试、0 跳过** |
+| 前组 `^TestPartnerTenantAccessMode`（11，model/controller/router/middleware/service） | **11/11、0 跳过**（13 个真实 schema）——前组首次真实执行 |
+| 前组 `^TestPartnerTenantAuthorizationAudit`（9，model/controller/router） | **9/9、0 跳过**（13 个真实 schema）——前组首次真实执行 |
+| 既有回归：`go test ./model ./controller ./router ./middleware ./service`（无 DSN，默认 SQLite 夹具），基线 `b1929bdda` 与 HEAD 各跑一次比较 | 基线 1455 通过 / 10 失败 / 21 跳过；HEAD 1484 通过 / 52 失败 / 21 跳过。**基线通过的测试在 HEAD 全部仍通过，跳过集合相同，无被修复也无新增的非本组失败**；HEAD 新增的 42 个失败全部是本组 PostgreSQL 用例在无 DSN 时按设计失败（有 DSN 时已通过）。基线既有的 10 个失败在 HEAD 不变：8 个前组授权审计 PG 用例（无 DSN）、`TestImmediateTaskSettlementDatabase` 与 `TestPrepareTieredBillingForSelectedGroupStartsBillingAfterFreeGroup`（夹具未迁移 `partner_tenant_accounts`，早于本组，不在范围内，未改） |
+
+结论：B 阶段“迁移 + 兼容 reader 先于 writer”的安全门禁已由真实 PostgreSQL 满足，C 阶段可以开始。

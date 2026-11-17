@@ -179,7 +179,11 @@ func TestPartnerTenantUsagePresenceCheckFailureFailsEveryReader(t *testing.T) {
 	require.NoError(t, db.Create(&Log{UserId: 7, Username: "member", TokenId: 71, Type: LogTypeConsume, Quota: 70, CreatedAt: partnerTenantUsageQueryStart + 1, RequestId: "old-1"}).Error)
 	start, end := partnerTenantUsageQueryStart, partnerTenantUsageQueryEnd
 	failing, forced := false, 0
-	require.NoError(t, db.Callback().Query().Before("gorm:query").Register("pt_usage_request:fail_presence", func(tx *gorm.DB) {
+	// GORM runs Find/First through the Query chain but Scan (the probe) and
+	// Raw(...).Scan (the migrator's catalog lookups) through the Row chain, so
+	// the failure is injected on both; registering it on Query alone never fires
+	// and silently exercises the table-absent path instead.
+	failPresence := func(tx *gorm.DB) {
 		if !failing {
 			return
 		}
@@ -187,7 +191,9 @@ func TestPartnerTenantUsagePresenceCheckFailureFailsEveryReader(t *testing.T) {
 			forced++
 			_ = tx.AddError(errors.New("forced catalog failure old-1"))
 		}
-	}))
+	}
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register("pt_usage_request:fail_presence", failPresence))
+	require.NoError(t, db.Callback().Row().Before("gorm:row").Register("pt_usage_request:fail_presence_row", failPresence))
 	requireSafe := func(t *testing.T, err error) {
 		require.Error(t, err, "a failed presence check is never an empty result")
 		for _, leaked := range []string{"forced", "catalog", "old-1", partnerTenantUsageLogTable} {

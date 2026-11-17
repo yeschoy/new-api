@@ -311,3 +311,7 @@ TEST_PARTNER_USER_CLASSIFICATION_POSTGRES_DSN=... go test -mod=readonly ./model 
 - 深链 `?userCategory=["merchant"]&tenant=["9007199254740993"]`：只显示 104，所属商户标签经 `selected_id` 解析为名称；预览日志证明请求为精确 `tenant_id=9007199254740993`，日志中未出现取整值 `9007199254740992`（`v2-users-merchant-deeplink.png`）。
 - 移动端 390×844 + 商户类别：`scrollWidth=390` 无横向溢出，5 个商户用户、无普通用户（`v2-users-merchant-mobile.png`）。
 - 未覆盖：真实后端联调（A-V1–A-V4 的后端行为仍只有源码推理）、前进/后退历史、屏幕阅读器。
+
+## 隔离 PostgreSQL 实跑（2026-11-17 08:34:20–08:34:25 UTC，主会话）
+
+环境同 `../11-17-partner-usage-logs/verification.md` R 节。`go test ./model ./controller ./router -run '^TestPartnerTenantUserClassification' -count=1 -v`，仅设置 `TEST_PARTNER_USER_CLASSIFICATION_POSTGRES_DSN`，runner `ptusage-1117-go-userclass`：**rc=0，7/7 顶层、22 个子测试通过，0 跳过**；真实 schema `pt_user_class_model_*`、`pt_user_class_http_*`、`pt_user_class_router_*`。A-V1–A-V4 现有真实 pq 证据（EXISTS/NOT EXISTS 在分页前、count 与行一致、ordinary+tenant_id 400、批量所有者补充、真实路由鉴权）。日志 `.local-tests/partner-usage-1117/runtime-userclass.log`。
