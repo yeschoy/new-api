@@ -1,7 +1,7 @@
 (function() {
   "use strict";
   const CONNECT_CODES_ISSUE_PATH = "/api/desktop/v2/connect-codes";
-  const DEFAULT_DOWNLOAD_URL = "https://yeschoy.com/download";
+  const DEFAULT_DOWNLOAD_URL = "https://yeschoy.app/";
   const SESSION_REQUIRED_CODES = new Set([
     "session_required",
     "AUTH_UNAUTHORIZED",

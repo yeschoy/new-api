@@ -16,13 +16,29 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { isRedirect } from '@tanstack/react-router'
 import { describe, expect, it } from 'vitest'
 
-import { DesktopClientPage } from '@/features/desktop-client'
-import { Route } from '@/routes/client'
+import { Route as ClientRoute } from '@/routes/client'
+import { Route as DownloadRoute } from '@/routes/download'
 
-describe('client route', () => {
-  it('registers the desktop client page as its public component', () => {
-    expect(Route.options.component).toBe(DesktopClientPage)
+function redirectTarget(beforeLoad: unknown): string | undefined {
+  try {
+    ;(beforeLoad as () => void)()
+  } catch (error) {
+    if (isRedirect(error)) return error.options.href
+    throw error
+  }
+  return undefined
+}
+
+describe('client release page routes', () => {
+  it.each([
+    ['/client', ClientRoute],
+    ['/download', DownloadRoute],
+  ])('%s sends visitors to yeschoy.app', (_path, route) => {
+    expect(redirectTarget(route.options.beforeLoad)).toBe(
+      'https://yeschoy.app/'
+    )
   })
 })

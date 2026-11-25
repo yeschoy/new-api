@@ -25,7 +25,7 @@ const SESSION_REQUIRED_CODES = new Set([
 ])
 
 export const DESKTOP_CONNECT_PATH = '/desktop/connect'
-export const DEFAULT_DESKTOP_DOWNLOAD_URL = 'https://yeschoy.com/download'
+export const DEFAULT_DESKTOP_DOWNLOAD_URL = 'https://yeschoy.app/'
 
 export function pageHttpsOrigin(locationLike: {
   protocol: string

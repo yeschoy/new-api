@@ -16,10 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { DesktopClientPage } from '@/features/desktop-client'
+import { DEFAULT_DESKTOP_DOWNLOAD_URL } from '@/features/desktop-connect/lib/connect'
 
+// The client release page lives on yeschoy.app.
 export const Route = createFileRoute('/client')({
-  component: DesktopClientPage,
+  beforeLoad: () => {
+    throw redirect({ href: DEFAULT_DESKTOP_DOWNLOAD_URL })
+  },
 })
